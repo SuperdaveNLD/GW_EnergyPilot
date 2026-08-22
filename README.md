@@ -30,24 +30,24 @@ v0.04
 
 ## Important: EMHASS comes first
 
-For the supported automatic-control workflow, **EMHASS must already be installed, configured, tested and publishing its Home Assistant sensors before GW EnergyPilot is added/configured for automatic control**.
+For the supported automatic-control workflow, **EMHASS must already be installed, configured, tested and publishing its Home Assistant sensors before GW EnergyPilot is installed/configured for automatic control**.
 
-Do not start the EnergyPilot automatic-control setup with an empty or unconfigured EMHASS environment.
+Do not start with an empty or unconfigured EMHASS environment.
 
 The required order is:
 
 1. Install Home Assistant and HACS.
 2. Install EMHASS.
 3. Configure EMHASS for your installation.
-4. Make sure the Home Assistant source sensors referenced by EMHASS exist and contain valid values.
-5. Enable battery use in EMHASS and configure the battery/inverter limits correctly.
+4. Make sure every Home Assistant source sensor referenced by EMHASS exists, is enabled, and contains a valid numeric value.
+5. Configure the battery, inverter, PV/load and optimization parameters in EMHASS.
 6. Run a successful EMHASS day-ahead optimization.
 7. Publish the optimization result to Home Assistant.
-8. Verify that the required EMHASS output sensors exist and update correctly.
+8. Verify that the required EMHASS output sensors exist, are enabled, and update correctly.
 9. Only now install/add GW EnergyPilot.
 10. Connect EnergyPilot to the GoodWe ETA inverter.
-11. Select the working EMHASS output entities in EnergyPilot.
-12. Verify the GoodWe telemetry and EMS state.
+11. Select the already-working EMHASS output entities in EnergyPilot.
+12. Verify GoodWe telemetry and EMS state.
 13. Only then enable EnergyPilot automatic control.
 
 EMHASS documentation:
@@ -57,13 +57,13 @@ EMHASS documentation:
 
 ### Minimum EMHASS readiness check
 
-Before configuring EnergyPilot automatic control, confirm at minimum:
+Before installing/configuring EnergyPilot automatic control, confirm at minimum:
 
 ```text
 EMHASS optimization            successful
-sensor.p_batt_forecast         exists and is numeric
-sensor.optim_status            exists if you use status validation
-EMHASS source sensors          available and numeric
+sensor.p_batt_forecast         exists, enabled and numeric
+sensor.optim_status            exists if status validation is used
+EMHASS source sensors          exist, enabled and numeric
 publish-data                   working
 ```
 
@@ -90,19 +90,20 @@ PV power
 House/load power
 ```
 
-The actual entity IDs are installation-specific. Do not point EMHASS at entities that are `unknown`, `unavailable`, permanently zero, or use the wrong sign convention.
+The actual entity IDs are installation-specific. Do not point EMHASS at entities that are disabled, `unknown`, `unavailable`, permanently zero when they should not be, or use the wrong sign convention.
 
 ### Fresh Home Assistant bootstrap note
 
-If you intentionally want to use **EnergyPilot's native GoodWe telemetry as the EMHASS source data on a completely fresh Home Assistant installation**, there is a bootstrap exception to the order above:
+If you intentionally want to use **EnergyPilot's native GoodWe telemetry as the EMHASS source data on a completely fresh Home Assistant installation**, there is one bootstrap exception:
 
 1. Add EnergyPilot with automatic control kept **OFF**.
 2. Use its telemetry entities as EMHASS source sensors.
-3. Configure, optimize and publish from EMHASS.
-4. Return to EnergyPilot options and select the now-working EMHASS output entities.
-5. Enable automatic control only after validation.
+3. Configure EMHASS completely, run an optimization and publish the results.
+4. Confirm the EMHASS output sensors are enabled and valid.
+5. Return to EnergyPilot options and select those working EMHASS output entities.
+6. Enable automatic control only after validation.
 
-This bootstrap path is only needed when the required source sensors do not exist before EnergyPilot is added.
+This exception is only needed when the required source sensors do not exist before EnergyPilot is added.
 
 ## Publishing EMHASS sensors to Home Assistant
 
@@ -141,7 +142,7 @@ A Home Assistant restart is normally not required just to make successfully publ
 
 ## Installation with HACS
 
-Until the repository is included in the default HACS store:
+Once the EMHASS prerequisite above is complete:
 
 1. Open HACS.
 2. Open **Custom repositories**.
@@ -151,8 +152,6 @@ Until the repository is included in the default HACS store:
 6. Restart Home Assistant.
 7. Go to **Settings -> Devices & services -> Add integration**.
 8. Search for **GW EnergyPilot**.
-
-Remember: complete the EMHASS prerequisite steps above before configuring EnergyPilot automatic control.
 
 ## GoodWe ETA connection
 
@@ -191,7 +190,7 @@ Telemetry currently includes:
 
 ### Cleaner default entity set in v0.04
 
-EnergyPilot still exposes the detailed register data, but lower-value or duplicate entities are now disabled by default to keep the device page and recorder cleaner.
+EnergyPilot still exposes the detailed register data, but lower-value or duplicate entities are disabled by default to keep the device page and recorder cleaner.
 
 Examples of entities disabled by default include:
 
@@ -343,6 +342,7 @@ Do not enable automatic control until:
 - the GoodWe ETA Modbus connection is verified;
 - telemetry values have been checked for plausibility;
 - EMHASS is fully configured and working;
+- all required EMHASS source/output sensors are enabled and valid;
 - EMHASS has completed a successful optimization;
 - EMHASS publish-data is working;
 - the selected `P_batt` entity is numeric and updates correctly;
