@@ -30,7 +30,11 @@ function orchestratorTone(status) {
   if (status === "ready" || status === "scheduled") return "ok";
   if (status === "manual_only") return "info";
   if (RUNNING_STATES.has(status)) return "running";
-  if (status === "legacy_yaml_detected" || status?.startsWith("error") || status === "stale_output") {
+  if (
+    status === "legacy_yaml_detected" ||
+    status?.startsWith("error") ||
+    status === "stale_output"
+  ) {
     return "error";
   }
   return "info";
@@ -114,16 +118,155 @@ function ensureStyles(root) {
       background: #ff7c73;
       box-shadow: 0 0 10px rgba(255,124,115,.55);
     }
+
+    /* One-touch GoodWe battery control. These are native HA button entities,
+       not frontend-only shortcuts. Every action takes manual ownership and
+       therefore turns EnergyPilot Automatic Control off. */
+    .ep-battery-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+      margin: 12px 0 9px;
+    }
+    .ep-battery-action {
+      min-width: 0;
+      min-height: 43px;
+      padding: 7px 5px;
+      border-radius: 10px;
+      border: 1px solid rgba(82, 175, 233, .18);
+      background: rgba(6, 31, 55, .48);
+      color: #a9c4d8;
+      cursor: pointer;
+      font-size: 9px;
+      font-weight: 850;
+      line-height: 1.15;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      transition: transform .14s ease, border-color .14s ease, background .14s ease, color .14s ease;
+    }
+    .ep-battery-action:hover:not(:disabled) {
+      transform: translateY(-1px);
+      color: #f3fdff;
+      border-color: rgba(40, 225, 255, .44);
+      background: rgba(11, 54, 83, .70);
+    }
+    .ep-battery-action[data-action="max_charge"] {
+      border-color: rgba(40, 239, 167, .22);
+      color: #8df1c6;
+    }
+    .ep-battery-action[data-action="battery_pause"] {
+      color: #b5d4e6;
+    }
+    .ep-battery-action[data-action="max_export"] {
+      color: #79e6fb;
+    }
+    .ep-battery-action.active {
+      border-color: rgba(35, 242, 179, .65);
+      color: #e7fff6;
+      background: linear-gradient(145deg, rgba(15, 105, 107, .52), rgba(9, 64, 80, .62));
+      box-shadow: inset 0 0 16px rgba(30, 241, 176, .08), 0 0 12px rgba(30, 241, 176, .08);
+    }
+    .ep-battery-action:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .ep-battery-action-note {
+      margin: -2px 0 8px;
+      color: #657e94;
+      font-size: 8px;
+      line-height: 1.35;
+    }
+
+    /* v0.10 flow animation: use moving energy balls only. The old chevrons
+       could visually suggest the wrong direction because the glyph itself has
+       a direction. A round particle has no orientation; its movement is the
+       only direction cue. */
+    .ep-flow-arrows {
+      display: none !important;
+    }
+    .ep-flow-link:not(.idle)::after {
+      width: 9px !important;
+      height: 9px !important;
+      border-radius: 50% !important;
+      background: currentColor !important;
+      opacity: 0;
+      box-shadow: 0 0 7px currentColor, 0 0 15px currentColor !important;
+    }
+    .ep-link-pv:not(.idle)::after,
+    .ep-link-grid:not(.idle)::after {
+      top: calc(50% - 4.5px) !important;
+      left: 0;
+    }
+    .ep-link-pv.inbound::after,
+    .ep-link-grid.outbound::after {
+      animation: epV010ParticleH .92s linear infinite !important;
+    }
+    .ep-link-pv.outbound::after,
+    .ep-link-grid.inbound::after {
+      animation: epV010ParticleH .92s linear infinite reverse !important;
+    }
+    .ep-link-house:not(.idle)::after,
+    .ep-link-battery:not(.idle)::after {
+      left: calc(50% - 4.5px) !important;
+      top: 0;
+    }
+    .ep-link-house.inbound::after,
+    .ep-link-battery.outbound::after {
+      animation: epV010ParticleV .92s linear infinite !important;
+    }
+    .ep-link-house.outbound::after,
+    .ep-link-battery.inbound::after {
+      animation: epV010ParticleV .92s linear infinite reverse !important;
+    }
+    .ep-animations-off .ep-flow-link::after {
+      animation: none !important;
+      opacity: .28 !important;
+    }
+
     @keyframes epV010Pulse {
       0%,100% { opacity: .45; transform: scale(.85); }
       50% { opacity: 1; transform: scale(1.18); }
     }
+    @keyframes epV010ParticleH {
+      0% { left: 0; opacity: 0; transform: scale(.78); }
+      13% { opacity: 1; }
+      50% { transform: scale(1.08); }
+      87% { opacity: 1; }
+      100% { left: calc(100% - 9px); opacity: 0; transform: scale(.78); }
+    }
+    @keyframes epV010ParticleV {
+      0% { top: 0; opacity: 0; transform: scale(.78); }
+      13% { opacity: 1; }
+      50% { transform: scale(1.08); }
+      87% { opacity: 1; }
+      100% { top: calc(100% - 9px); opacity: 0; transform: scale(.78); }
+    }
+
     @media (max-width: 720px) {
       .ep-v010-emhass-actions { justify-content: flex-start; }
       .panel-card.emhass .section-title-row { align-items: flex-start; }
+      .ep-battery-actions { gap: 5px; }
+      .ep-battery-action { min-height: 40px; padding: 6px 4px; font-size: 8px; }
     }
   `;
   root.appendChild(style);
+}
+
+async function pressNativeButton(panel, buttonElement, entityId, busyText) {
+  if (!entityId || buttonElement.disabled) return;
+  const original = buttonElement.textContent;
+  buttonElement.disabled = true;
+  buttonElement.textContent = busyText;
+  try {
+    await panel._hass.callService("button", "press", { entity_id: entityId });
+  } catch (err) {
+    console.error("GW EnergyPilot button action failed", err);
+    window.alert(`EnergyPilot action failed: ${err?.message || err}`);
+  } finally {
+    buttonElement.disabled = false;
+    buttonElement.textContent = original;
+    panel._queueRender();
+  }
 }
 
 function installOptimizeNow(panel, root) {
@@ -151,19 +294,9 @@ function installOptimizeNow(panel, root) {
     actions.appendChild(button);
     titleRow.appendChild(actions);
 
-    button.addEventListener("click", async () => {
-      if (!entityId || button.disabled) return;
-      button.disabled = true;
-      button.textContent = "Optimizing…";
-      try {
-        await panel._hass.callService("button", "press", { entity_id: entityId });
-      } catch (err) {
-        console.error("GW EnergyPilot: Optimize now failed", err);
-        window.alert(`EnergyPilot optimization failed: ${err?.message || err}`);
-      } finally {
-        panel._queueRender();
-      }
-    });
+    button.addEventListener("click", () =>
+      pressNativeButton(panel, button, entityId, "Optimizing…")
+    );
   }
 
   const target = card.querySelector(".emhass-target");
@@ -185,6 +318,65 @@ function installOptimizeNow(panel, root) {
   }
 }
 
+function installBatteryQuickActions(panel, root) {
+  const card = root.querySelector(".energy-card.battery");
+  if (!card) return;
+
+  const definitions = [
+    {
+      key: "max_export",
+      label: "Max export",
+      busy: "Applying…",
+      command: "manual_max_export",
+      title: "GoodWe mode 10 · maximum configured grid export target",
+    },
+    {
+      key: "battery_pause",
+      label: "Pause",
+      busy: "Applying…",
+      command: "manual_battery_hold",
+      title: "GoodWe mode 8 · Battery Hold around 0 W",
+    },
+    {
+      key: "max_charge",
+      label: "Max charge",
+      busy: "Applying…",
+      command: "manual_max_charge",
+      title: "GoodWe mode 11 · maximum configured battery charge power",
+    },
+  ];
+
+  const currentCommand = panel._textByKey("control_command", "");
+  const actionWrap = document.createElement("div");
+  actionWrap.className = "ep-battery-actions";
+
+  for (const definition of definitions) {
+    const entityId = panel._entityId(definition.key);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `ep-battery-action${currentCommand === definition.command ? " active" : ""}`;
+    button.dataset.action = definition.key;
+    button.title = definition.title;
+    button.disabled = !entityId;
+    button.textContent = definition.label;
+    button.addEventListener("click", () =>
+      pressNativeButton(panel, button, entityId, definition.busy)
+    );
+    actionWrap.appendChild(button);
+  }
+
+  const socTrack = card.querySelector(".soc-track");
+  if (socTrack) {
+    socTrack.insertAdjacentElement("afterend", actionWrap);
+    actionWrap.insertAdjacentHTML(
+      "afterend",
+      `<div class="ep-battery-action-note">Manual battery actions disable Automatic Control. Max export uses grid target mode 10; Pause uses Battery Hold mode 8; Max charge uses battery charge mode 11.</div>`
+    );
+  } else {
+    card.appendChild(actionWrap);
+  }
+}
+
 await customElements.whenDefined(PANEL_NAME);
 
 const PanelClass = customElements.get(PANEL_NAME);
@@ -198,6 +390,7 @@ PanelClass.prototype._render = function energyPilotV010Render() {
 
   ensureStyles(root);
   installOptimizeNow(this, root);
+  installBatteryQuickActions(this, root);
 
   const versionBadge = root.querySelector(".version");
   if (versionBadge) versionBadge.textContent = `v${VERSION}`;
