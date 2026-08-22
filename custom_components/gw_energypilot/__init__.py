@@ -27,7 +27,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v007.js?v=0.07"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v008.js?v=0.08"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -95,12 +95,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     )
     await controller.async_setup()
 
-    # Safety baseline: automatic control is intentionally not restored after
-    # a Home Assistant restart. Every setup/reload hands the inverter back to
-    # GoodWe Auto / AI (mode 1, setpoint 0). The user must explicitly enable
-    # EnergyPilot automatic control again.
-    await controller.async_disable()
-
+    # The automatic-control switch restores its previous Home Assistant state.
+    # First-time installs default to OFF. If it was ON before a reload/restart,
+    # the switch re-enables the controller after its restored state is loaded.
+    # The controller still refuses to command the inverter while configured
+    # EMHASS inputs are invalid or the optimization status is not ready.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_register_panel(hass)
     return True
