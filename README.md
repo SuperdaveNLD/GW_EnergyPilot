@@ -8,7 +8,7 @@ It provides direct Modbus TCP communication, native GoodWe ETA telemetry, manual
 
 ## Current status
 
-**Alpha - v0.02**
+**Alpha - v0.03**
 
 The project is being built from practical testing on a GoodWe ETA installation. Use it only if you understand the impact of forced charge, discharge, export and off-grid modes.
 
@@ -192,24 +192,26 @@ The automatic control switch intentionally starts **off after a Home Assistant r
 
 ## EnergyPilot control configuration
 
-Optional controller settings include:
+Controller settings include:
 
 - EMHASS `P_batt` entity.
 - Optimization status entity and required state.
-- Maximum battery charge/discharge power.
+- Maximum inverter power.
 - Power deadband.
-- EV mode and power entities.
+- Optional EV mode and power entities.
 
-### Maximum battery charge/discharge power
+### Maximum inverter power
 
-This is the maximum battery-control power EnergyPilot may request from the inverter. The value is entered in watts.
+This is the maximum charge or discharge power EnergyPilot may request from the inverter.
+
+Starting with v0.03, the setup UI uses **kW**. EnergyPilot converts the value internally to watts before writing an EMS power setpoint.
 
 Examples:
 
 ```text
-5000 W  = 5 kW
-10000 W = 10 kW
-15000 W = 15 kW
+5.0 kW  = 5000 W
+10.0 kW = 10000 W
+15.0 kW = 15000 W
 ```
 
 Configure this according to the supported inverter and battery limits.
@@ -291,8 +293,8 @@ Do not enable automatic control until:
 - [x] Native battery/BMS telemetry.
 - [x] Native inverter, BMS and cell temperature sensors.
 - [x] Document EMHASS prerequisite and publish workflow.
+- [x] English setup flow and field-level help text.
 - [ ] Setup-time EMHASS readiness validation.
-- [ ] Fully English setup flow and help text.
 - [ ] Advanced EV house-load compensation.
 - [ ] Diagnostics download.
 - [ ] Automated tests.
