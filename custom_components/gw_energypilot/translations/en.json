@@ -142,7 +142,10 @@
       "manual_mode": {"name": "Manual EMS mode"}
     },
     "button": {
-      "optimize_now": {"name": "Optimize now"}
+      "optimize_now": {"name": "Optimize now"},
+      "max_export": {"name": "Maximum export"},
+      "battery_pause": {"name": "Pause battery"},
+      "max_charge": {"name": "Maximum charge"}
     }
   }
 }
