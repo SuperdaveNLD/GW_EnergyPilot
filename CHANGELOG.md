@@ -1,155 +1,99 @@
 # Changelog
 
-All notable changes to GW EnergyPilot will be documented in this file.
+All notable changes to GW EnergyPilot are documented here.
+
+## [0.09] - 2026-08-22
+
+### Added
+
+- Prefilled EMHASS controller defaults:
+  - `sensor.p_batt_forecast`
+  - `sensor.optim_status`
+  - required optimization state `Optimal`
+- Tested local EMHASS orchestrator reference at `docs/examples/energypilot_emhass_orchestrator.yaml`.
+- Orchestrator status helpers and validation flow.
+- Recorder-based load forecast for fresh Home Assistant installations with insufficient EMHASS naive-history data.
+- HTTP response validation for EMHASS optimization and publish calls.
+- Fresh `p_batt_forecast` validation after publishing.
+- Updated installation and EMHASS mapping documentation.
+- Dashboard module wrapper `gw-energy-pilot-v009.js` with v0.09 cache busting/version display.
+
+### Changed
+
+- EnergyPilot setup now suggests the normal EMHASS output entities automatically instead of requiring manual selection on every installation.
+- Documentation now uses the bootstrap order: install EMHASS, install EnergyPilot, map EMHASS source sensors to EnergyPilot telemetry, optimize/publish, then enable Automatic Control.
+- EMHASS optimization is documented as independent from the EnergyPilot Automatic Control switch.
+- The reference orchestration layer never writes GoodWe registers; EnergyPilot remains the only GoodWe EMS controller.
 
 ## [0.08] - 2026-08-22
 
 ### Added
 
-- Draggable dashboard layout with persistent card ordering stored per browser.
-- Compact dashboard menu for enabling/disabling individual cards.
-- Dashboard edit mode with drag handles and drop targets.
-- Toggle to enable or disable flow animations.
-- Reset button to restore the default dashboard layout.
-- Strong moving energy particles on PV, house, grid and battery flow lines.
+- Draggable dashboard layout with persistent card ordering.
+- Dashboard layout/visibility menu.
+- Flow-animation toggle and stronger moving particles.
 
 ### Changed
 
-- Automatic Control now restores its previous Home Assistant state after an integration reload or Home Assistant restart.
-- If Automatic Control was ON before the restart/reload it is re-enabled after state restoration; if it was OFF it remains OFF.
-- A first-time installation still defaults Automatic Control to OFF and hands control to GoodWe Auto / AI.
-- The controller still waits instead of commanding the inverter when configured EMHASS inputs are invalid or optimization is not ready.
-- Dashboard module moved to `gw-energy-pilot-v008.js` for frontend cache busting.
-- Dashboard version badge and footer now report v0.08.
-
-### Fixed
-
-- Energy-flow motion is now clearly visible using animated glowing particles instead of relying only on subtly moving arrow glyphs.
+- Automatic Control restores its previous Home Assistant state after reload/restart.
+- First installation still defaults Automatic Control to OFF.
 
 ## [0.07] - 2026-08-22
 
 ### Added
 
-- Compact live energy-flow widget inspired by a mobile energy app.
-- Animated directional power-flow arrows between PV, house, grid and battery.
-- Live flow direction based on GoodWe meter and battery sign conventions.
-- Compact central GW EnergyPilot hub mark in the energy-flow widget.
+- Compact live PV / Home / Grid / Battery flow widget.
+- Live flow-direction mapping.
 
 ### Fixed
 
-- Dashboard branding now replaces the image element with an inline SVG logo, avoiding static-image contrast/path issues.
-- Temperature values now follow Home Assistant's current configured temperature unit directly in the dashboard.
-- Celsius/Fahrenheit/Kelvin conversion is handled dynamically when the stored entity unit differs from the current Home Assistant unit setting.
-- Negative or implausible raw house-load values are avoided in the compact flow view by using the validated power-balance calculation when necessary.
-
-### Changed
-
-- Dashboard module moved to `gw-energy-pilot-v007.js` for frontend cache busting.
-- Dashboard version badge and footer now report v0.07.
+- Inline SVG dashboard branding.
+- Temperature values follow the Home Assistant temperature unit.
 
 ## [0.06] - 2026-08-22
 
 ### Fixed
 
-- Dashboard logo is now rendered as a high-contrast embedded vector mark instead of relying on the dark PNG asset.
-- Added a versioned dashboard module wrapper for reliable frontend cache busting.
-- Dashboard version badge and footer now report v0.06.
+- High-contrast dashboard logo handling and frontend cache busting.
 
 ## [0.05] - 2026-08-22
 
 ### Added
 
-- Built-in EnergyPilot JavaScript dashboard registered automatically in the Home Assistant sidebar.
-- Responsive Solar, Home, Grid and Battery overview.
-- Live battery SOC, power and charging/discharging state.
-- Grid import/export state with L1/L2/L3 values.
-- EnergyPilot controller status, EMS mode, setpoint, target and command.
-- EMHASS overview with P_batt target, optimization status and forecast entities.
-- Thermal and BMS limits overview.
-- Automatic-control toggle with an EMHASS safety confirmation.
-- Automatic discovery of EnergyPilot entities through the Home Assistant entity registry.
-- Local frontend assets served by the integration; no manual Lovelace resource is required.
-
-### Changed
-
-- Roadmap now treats the built-in dashboard as an implemented feature instead of a future dashboard example.
+- Built-in Home Assistant sidebar dashboard.
+- Solar, Home, Grid, Battery, Controller, EMHASS and System Health cards.
 
 ## [0.04] - 2026-08-22
 
 ### Added
 
-- New GW EnergyPilot square brand icon/logo.
-- README branding header.
-- Explicit EMHASS readiness checklist before automatic-control setup.
-- Fresh-Home-Assistant bootstrap note for installations that intentionally use EnergyPilot telemetry as EMHASS source data.
+- GW EnergyPilot branding and improved EMHASS setup documentation.
 
 ### Changed
 
-- Corrected the documented installation order: EMHASS should be installed, configured, tested and publishing its Home Assistant forecast sensors before EnergyPilot automatic control is configured.
-- Updated the installation guide to require a successful EMHASS optimization and working `publish-data` before selecting `sensor.p_batt_forecast` in EnergyPilot.
-- Reduced the default visible entity set while keeping detailed GoodWe registers available.
-- Lower-value, duplicate and troubleshooting entities are now disabled by default using the Home Assistant entity registry.
-- Inverter radiator temperature remains the primary visible inverter temperature.
-- Secondary inverter temperatures, PV voltage/current details, duplicate meter values, per-phase inverter details, per-phase load details and raw diagnostics are disabled by default.
-- Cell-voltage sensors use higher display precision.
-- EV status is disabled by default when EV coordination is not configured.
+- Cleaner default entity set with diagnostic/duplicate entities disabled by default.
 
 ## [0.03] - 2026-08-22
 
 ### Changed
 
-- Setup and options UI is now English, including when Home Assistant uses the Dutch locale.
-- First setup screen now explicitly identifies the GoodWe ETA inverter.
-- `Host` renamed to `Inverter IP address`.
-- Added a clear static IP / DHCP reservation recommendation.
-- Added field-level help text using Home Assistant `data_description` strings.
-- Controller setup now clearly states that a working EMHASS environment is required before automatic battery control is enabled.
-- `Maximum battery power` renamed to `Maximum inverter power`.
-- Maximum inverter power is now entered in kW while EnergyPilot continues to store and control power internally in watts.
-- Power deadband help now explains Battery Hold behavior and recommends 300 W, with a typical range of 200-500 W.
-- Connection error text now explicitly refers to the GoodWe ETA and EMS registers 47511/47512.
+- English setup/options UI.
+- Static-IP guidance.
+- Improved controller descriptions, maximum inverter power and deadband guidance.
 
 ## [0.02] - 2026-08-22
 
 ### Added
 
-- Native GoodWe ETA telemetry over direct Modbus TCP.
-- PV1/PV2/PV3/PV4 voltage, current and power.
-- Total PV power.
-- Inverter L1/L2/L3 voltage, current, frequency and power.
-- Total inverter power and AC active power.
-- Smart-meter L1/L2/L3 and total power measurements.
-- Smart-meter phase voltage/current and frequency.
-- Battery SOC, SOH, power, voltage and current.
-- Battery mode and battery string count.
-- BMS status, current limits, protocol and version registers.
-- Maximum/minimum cell voltage.
-- Inverter air, module and radiator temperature.
-- BMS package temperature.
-- Maximum/minimum battery cell temperature.
-- Load and backup-load telemetry registers.
-- Extended inverter/BMS warning and error diagnostics.
-- Documentation for the required EMHASS setup and publish workflow.
-- Documentation for maximum battery control power and power deadband.
-- Static IP / DHCP reservation recommendation for the inverter.
-
-### Changed
-
-- Version numbering simplified to `v0.01`, `v0.02`, `v0.03`, etc.
-- Documentation updated for clean Home Assistant installations.
+- Native GoodWe ETA telemetry over direct Modbus TCP including PV, inverter, meter, battery/BMS, temperatures, loads and diagnostics.
 
 ## [0.01] - 2026-08-22
 
 ### Added
 
-- Initial HACS-compatible custom integration structure.
-- Direct Modbus TCP connection to GoodWe ETA.
-- EMS mode register 47511 and power setpoint register 47512 support.
-- Tested EMS mode names for modes 1 through 12.
-- Manual EMS mode selection and configurable manual power.
-- Automatic-control master switch.
-- EMHASS `P_batt` mapping to mode 8, 11 and 12.
-- Mode 1 fallback when automatic control is disabled.
-- Optional EV detection based on charging mode and charging power.
-- Conservative EV Battery Hold behavior for the first alpha release.
-- HACS and hassfest validation workflows.
+- Initial HACS-compatible integration.
+- EMS registers 47511/47512.
+- Modes 1-12.
+- Manual EMS control.
+- Automatic EMHASS `P_batt` mapping to modes 8/11/12.
+- Optional EV coordination.
