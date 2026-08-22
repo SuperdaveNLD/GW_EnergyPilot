@@ -2,6 +2,26 @@
 
 All notable changes to GW EnergyPilot will be documented in this file.
 
+## [0.04] - 2026-08-22
+
+### Added
+
+- New GW EnergyPilot square brand icon/logo.
+- README branding header.
+- Explicit EMHASS readiness checklist before automatic-control setup.
+- Fresh-Home-Assistant bootstrap note for installations that intentionally use EnergyPilot telemetry as EMHASS source data.
+
+### Changed
+
+- Corrected the documented installation order: EMHASS should be installed, configured, tested and publishing its Home Assistant forecast sensors before EnergyPilot automatic control is configured.
+- Updated the installation guide to require a successful EMHASS optimization and working `publish-data` before selecting `sensor.p_batt_forecast` in EnergyPilot.
+- Reduced the default visible entity set while keeping detailed GoodWe registers available.
+- Lower-value, duplicate and troubleshooting entities are now disabled by default using the Home Assistant entity registry.
+- Inverter radiator temperature remains the primary visible inverter temperature.
+- Secondary inverter temperatures, PV voltage/current details, duplicate meter values, per-phase inverter details, per-phase load details and raw diagnostics are disabled by default.
+- Cell-voltage sensors use higher display precision.
+- EV status is disabled by default when EV coordination is not configured.
+
 ## [0.03] - 2026-08-22
 
 ### Changed
