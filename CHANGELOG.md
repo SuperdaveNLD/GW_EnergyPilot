@@ -2,6 +2,25 @@
 
 All notable changes to GW EnergyPilot will be documented in this file.
 
+## [0.05] - 2026-08-22
+
+### Added
+
+- Built-in `EnergyPilot` sidebar panel for Home Assistant.
+- Responsive JavaScript dashboard served directly by the integration.
+- Live PV, home load, battery, grid, inverter and thermal overview.
+- Automatic discovery of GW EnergyPilot entities through the Home Assistant entity registry.
+- EMHASS status, `P_batt` target and common published forecast values on the dashboard.
+- Controller overview with EMS mode, EMS setpoint, EnergyPilot target and current command.
+- Guarded Automatic Control toggle with a safety confirmation before enabling automatic control.
+- Dashboard uses the GW EnergyPilot branding and requires no separate Lovelace resource or frontend HACS package.
+
+### Changed
+
+- Version bumped to `v0.05`.
+- README now documents the built-in dashboard and its behavior.
+- Dashboard uses the validated GoodWe smart-meter sign convention: positive power is export and negative power is import.
+
 ## [0.04] - 2026-08-22
 
 ### Added
