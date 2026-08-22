@@ -6,13 +6,13 @@
 
 GW EnergyPilot is an unofficial Home Assistant integration for advanced EMS and battery control of GoodWe ETA hybrid inverters.
 
-It provides direct Modbus TCP communication, native GoodWe ETA telemetry, manual EMS mode control, EMHASS `P_batt` mapping, battery hold logic, and optional EV charging coordination.
+It provides direct Modbus TCP communication, native GoodWe ETA telemetry, manual EMS mode control, EMHASS `P_batt` mapping, battery hold logic, optional EV charging coordination, and a built-in EnergyPilot dashboard.
 
 > This is an independent community project and is not affiliated with or endorsed by GoodWe.
 
 ## Current status
 
-**Alpha - v0.04**
+**Alpha - v0.05**
 
 The project is being built from practical testing on a GoodWe ETA installation. Forced EMS modes can charge or discharge a battery at high power and can export energy to the grid. Verify your inverter, battery and grid limits before enabling automatic control.
 
@@ -25,6 +25,7 @@ v0.01
 v0.02
 v0.03
 v0.04
+v0.05
 ...
 ```
 
@@ -167,6 +168,28 @@ The GoodWe ETA inverter should have a **static IP address or DHCP reservation**.
 
 EnergyPilot connects directly to the inverter over Modbus TCP. If the inverter receives a different IP address after a router or network restart, EnergyPilot will no longer be able to communicate with it.
 
+## Built-in EnergyPilot dashboard
+
+Starting with v0.05, the integration registers its own Home Assistant sidebar panel named **EnergyPilot**. No Lovelace YAML, manual JavaScript resource, or separate HACS frontend package is required.
+
+The panel is served locally from the integration and uses Home Assistant's live `hass` object. It discovers EnergyPilot entities from the Home Assistant entity registry, so renamed entity IDs remain supported.
+
+The initial dashboard includes:
+
+- live PV total and PV1/PV2/PV3 string power;
+- whole-home load;
+- battery SOC, power, voltage, current and temperature;
+- grid import/export and phase measurements;
+- inverter power and temperatures;
+- EMS mode, setpoint, EnergyPilot target and current command;
+- EMHASS `P_batt`, optimization status and common published forecast sensors;
+- a guarded Automatic Control toggle;
+- responsive desktop, tablet and mobile layouts.
+
+The dashboard uses the tested GoodWe smart-meter sign convention used by EnergyPilot: positive meter power is shown as export and negative meter power as import.
+
+When enabling Automatic Control from the dashboard, EnergyPilot shows a confirmation warning because automatic operation may command high battery power.
+
 ## Native GoodWe ETA telemetry
 
 EnergyPilot reads GoodWe ETA telemetry directly over Modbus TCP. A separate Home Assistant Modbus YAML package is not required for these native entities.
@@ -188,9 +211,9 @@ Telemetry currently includes:
 - Work mode, operation mode, grid mode, warning and error registers.
 - EMS mode and EMS setpoint.
 
-### Cleaner default entity set in v0.04
+### Cleaner default entity set
 
-EnergyPilot still exposes the detailed register data, but lower-value or duplicate entities are disabled by default to keep the device page and recorder cleaner.
+EnergyPilot still exposes detailed register data, but lower-value or duplicate entities are disabled by default to keep the device page and recorder cleaner.
 
 Examples of entities disabled by default include:
 
@@ -333,7 +356,7 @@ GW EnergyPilot ships its own local Home Assistant brand assets in:
 custom_components/gw_energypilot/brand/
 ```
 
-The v0.04 branding uses the new square GW EnergyPilot energy monogram for both `icon.png` and `logo.png`.
+The current branding uses the square GW EnergyPilot energy monogram for both `icon.png` and `logo.png`. The built-in dashboard uses the same branding.
 
 ## Safety
 
@@ -361,11 +384,12 @@ Do not enable automatic control until:
 - [x] English setup flow and help text.
 - [x] Cleaner default entity set.
 - [x] Local integration branding.
+- [x] Built-in responsive JavaScript dashboard.
 - [ ] Setup-time EMHASS readiness validation.
 - [ ] Advanced EV house-load compensation.
+- [ ] Forecast timeline / price graph in dashboard.
 - [ ] Diagnostics download.
 - [ ] Automated tests.
-- [ ] Dashboard example.
 - [ ] Stable v1.00 release.
 
 ## License
