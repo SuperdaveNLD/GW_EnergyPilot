@@ -3,53 +3,83 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to the GoodWe ETA",
-        "description": "Enter the Modbus TCP connection details. EnergyPilot validates EMS registers 47511 and 47512 before setup.",
+        "title": "Connect to your GoodWe ETA inverter",
+        "description": "Connect GW EnergyPilot directly to the GoodWe ETA inverter over Modbus TCP. Before continuing, make sure the inverter uses a static IP address or DHCP reservation so its address cannot change.",
         "data": {
-          "host": "Host",
-          "port": "Port",
-          "slave": "Unit ID"
+          "host": "Inverter IP address",
+          "port": "Modbus TCP port",
+          "slave": "Modbus Unit ID"
+        },
+        "data_description": {
+          "host": "Fixed IP address of the GoodWe ETA inverter. Configure a static IP address or DHCP reservation in your router.",
+          "port": "Modbus TCP port. The normal GoodWe ETA value is 502.",
+          "slave": "Modbus Unit ID. The commonly used GoodWe ETA value is 247."
         }
       },
       "controller": {
-        "title": "Configure EnergyPilot control",
-        "description": "EMHASS and EV coordination are optional. You can also configure them later from integration options.",
+        "title": "Configure EMHASS control",
+        "description": "Automatic battery control requires a working EMHASS environment. First make sure EMHASS can complete an optimization and publish its results to Home Assistant. EV coordination is optional and can be configured later.",
         "data": {
-          "p_batt_entity": "EMHASS P_batt entity",
-          "optim_status_entity": "Optimization status entity",
+          "p_batt_entity": "EMHASS battery power target",
+          "optim_status_entity": "EMHASS optimization status",
           "optim_required_state": "Required optimization state",
-          "max_power": "Maximum battery power",
-          "deadband": "Battery power deadband",
+          "max_power": "Maximum inverter power",
+          "deadband": "Power deadband",
           "scan_interval": "Modbus scan interval",
           "enable_ev_coordination": "Enable EV coordination",
           "ev_mode_entity": "EV charging mode entity",
           "ev_power_entity": "EV charging power entity",
           "ev_deadband": "EV active power threshold"
+        },
+        "data_description": {
+          "p_batt_entity": "Select the published EMHASS battery power target, normally sensor.p_batt_forecast. The state must be numeric and expressed in watts.",
+          "optim_status_entity": "Optional EMHASS optimization status entity, normally sensor.optim_status.",
+          "optim_required_state": "EnergyPilot only follows EMHASS when the optimization status matches this value. Recommended: Optimal.",
+          "max_power": "Maximum charge or discharge power EnergyPilot may request from the inverter. Example: 15000 W equals 15 kW.",
+          "deadband": "Targets inside this range around 0 W are treated as Battery Hold to prevent unnecessary switching. Recommended: 300 W. A typical range is 200-500 W.",
+          "scan_interval": "How often EnergyPilot refreshes GoodWe ETA telemetry. Recommended: 10 seconds.",
+          "enable_ev_coordination": "Optional. When enabled, EnergyPilot can react to an EV charging state or charging power entity.",
+          "ev_mode_entity": "Optional EV charging-state entity.",
+          "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_deadband": "Charging power above this value is considered active EV charging."
         }
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to the inverter or read EMS registers."
+      "cannot_connect": "Unable to connect to the GoodWe ETA inverter or read EMS registers 47511/47512. Verify the inverter IP address, port, Unit ID and Modbus TCP availability."
     },
     "abort": {
-      "already_configured": "This inverter is already configured."
+      "already_configured": "This GoodWe ETA inverter is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "GW EnergyPilot options",
+        "description": "Configure automatic control only after EMHASS is working and its published entities contain valid values.",
         "data": {
-          "p_batt_entity": "EMHASS P_batt entity",
-          "optim_status_entity": "Optimization status entity",
+          "p_batt_entity": "EMHASS battery power target",
+          "optim_status_entity": "EMHASS optimization status",
           "optim_required_state": "Required optimization state",
-          "max_power": "Maximum battery power",
-          "deadband": "Battery power deadband",
+          "max_power": "Maximum inverter power",
+          "deadband": "Power deadband",
           "scan_interval": "Modbus scan interval",
           "enable_ev_coordination": "Enable EV coordination",
           "ev_mode_entity": "EV charging mode entity",
           "ev_power_entity": "EV charging power entity",
           "ev_deadband": "EV active power threshold"
+        },
+        "data_description": {
+          "p_batt_entity": "Published EMHASS battery power target, normally sensor.p_batt_forecast.",
+          "optim_status_entity": "Optional EMHASS optimization status entity, normally sensor.optim_status.",
+          "optim_required_state": "Recommended value: Optimal.",
+          "max_power": "Maximum charge or discharge power EnergyPilot may request. Example: 15000 W equals 15 kW.",
+          "deadband": "Ignore small target deviations around 0 W to prevent unnecessary switching. Recommended: 300 W; typical range 200-500 W.",
+          "scan_interval": "Recommended: 10 seconds.",
+          "enable_ev_coordination": "Enable optional EV charging coordination.",
+          "ev_mode_entity": "Optional EV charging-state entity.",
+          "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_deadband": "Power above this threshold is considered active EV charging."
         }
       }
     }
