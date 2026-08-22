@@ -1,0 +1,75 @@
+{
+  "title": "GW EnergyPilot",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Verbinden met de GoodWe ETA",
+        "description": "Vul de Modbus TCP-gegevens in. EnergyPilot controleert EMS-registers 47511 en 47512 voordat de integratie wordt toegevoegd.",
+        "data": {
+          "host": "Host",
+          "port": "Poort",
+          "slave": "Unit ID"
+        }
+      },
+      "controller": {
+        "title": "EnergyPilot-regeling instellen",
+        "description": "EMHASS- en EV-koppeling zijn optioneel en kunnen later via de opties worden ingesteld.",
+        "data": {
+          "p_batt_entity": "EMHASS P_batt-entiteit",
+          "optim_status_entity": "Optimalisatiestatus-entiteit",
+          "optim_required_state": "Vereiste optimalisatiestatus",
+          "max_power": "Maximaal batterijvermogen",
+          "deadband": "Dode band batterijvermogen",
+          "scan_interval": "Modbus scaninterval",
+          "enable_ev_coordination": "EV-coordinatie inschakelen",
+          "ev_mode_entity": "EV-laadmodus-entiteit",
+          "ev_power_entity": "EV-laadvermogen-entiteit",
+          "ev_deadband": "EV actief-vermogensdrempel"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken met de omvormer of de EMS-registers niet lezen."
+    },
+    "abort": {
+      "already_configured": "Deze omvormer is al geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "GW EnergyPilot-opties",
+        "data": {
+          "p_batt_entity": "EMHASS P_batt-entiteit",
+          "optim_status_entity": "Optimalisatiestatus-entiteit",
+          "optim_required_state": "Vereiste optimalisatiestatus",
+          "max_power": "Maximaal batterijvermogen",
+          "deadband": "Dode band batterijvermogen",
+          "scan_interval": "Modbus scaninterval",
+          "enable_ev_coordination": "EV-coordinatie inschakelen",
+          "ev_mode_entity": "EV-laadmodus-entiteit",
+          "ev_power_entity": "EV-laadvermogen-entiteit",
+          "ev_deadband": "EV actief-vermogensdrempel"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ems_mode": {"name": "EMS-modus"},
+      "ems_setpoint": {"name": "EMS-setpoint"},
+      "control_command": {"name": "Regelcommando"},
+      "target_power": {"name": "Doelvermogen"},
+      "ev_status": {"name": "EV-laadstatus"}
+    },
+    "switch": {
+      "automatic_control": {"name": "Automatische regeling"}
+    },
+    "number": {
+      "manual_power": {"name": "Handmatig vermogen"}
+    },
+    "select": {
+      "manual_mode": {"name": "Handmatige EMS-modus"}
+    }
+  }
+}
