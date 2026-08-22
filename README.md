@@ -12,7 +12,7 @@ It provides direct Modbus TCP communication, native GoodWe ETA telemetry, manual
 
 ## Current status
 
-**Alpha - v0.05**
+**Alpha - v0.08**
 
 The project is being built from practical testing on a GoodWe ETA installation. Forced EMS modes can charge or discharge a battery at high power and can export energy to the grid. Verify your inverter, battery and grid limits before enabling automatic control.
 
@@ -26,6 +26,9 @@ v0.02
 v0.03
 v0.04
 v0.05
+v0.06
+v0.07
+v0.08
 ...
 ```
 
@@ -174,7 +177,7 @@ Starting with v0.05, the integration registers its own Home Assistant sidebar pa
 
 The panel is served locally from the integration and uses Home Assistant's live `hass` object. It discovers EnergyPilot entities from the Home Assistant entity registry, so renamed entity IDs remain supported.
 
-The initial dashboard includes:
+The dashboard includes:
 
 - live PV total and PV1/PV2/PV3 string power;
 - whole-home load;
@@ -184,11 +187,25 @@ The initial dashboard includes:
 - EMS mode, setpoint, EnergyPilot target and current command;
 - EMHASS `P_batt`, optimization status and common published forecast sensors;
 - a guarded Automatic Control toggle;
-- responsive desktop, tablet and mobile layouts.
+- responsive desktop, tablet and mobile layouts;
+- a compact animated PV / house / grid / battery flow widget;
+- a dashboard layout menu;
+- per-card visibility toggles;
+- drag-and-drop card ordering;
+- persistent layout preferences stored in the browser;
+- a flow-animation toggle and layout reset button.
 
 The dashboard uses the tested GoodWe smart-meter sign convention used by EnergyPilot: positive meter power is shown as export and negative meter power as import.
 
 When enabling Automatic Control from the dashboard, EnergyPilot shows a confirmation warning because automatic operation may command high battery power.
+
+### Dashboard layout controls
+
+Use the layout button in the dashboard header to open the mini menu.
+
+Enable **Edit layout** to drag cards into a different order. The card order, visibility settings and animation preference are stored in browser local storage, so each browser/device can keep its own dashboard arrangement.
+
+Use **Reset dashboard layout** to return to the default card order and visibility.
 
 ## Native GoodWe ETA telemetry
 
@@ -295,7 +312,19 @@ Mode 1 - GoodWe Auto / AI
 Setpoint 0 W
 ```
 
-The automatic-control switch intentionally starts **OFF after a Home Assistant restart or integration reload**.
+### Automatic Control state after restart/reload
+
+Starting with v0.08, the Automatic Control switch restores its previous Home Assistant state:
+
+```text
+Was ON before restart/reload  -> restore ON
+Was OFF before restart/reload -> remain OFF
+First installation            -> OFF
+```
+
+Restoring the switch to ON does not bypass EnergyPilot's input validation. If the configured `P_batt` value is unavailable/non-numeric, or a configured optimization-status entity is not ready, the controller waits instead of issuing a new EMS command.
+
+Turning Automatic Control OFF always hands the inverter back to GoodWe Auto / AI mode 1 with a 0 W setpoint.
 
 ## EnergyPilot control configuration
 
@@ -356,7 +385,7 @@ GW EnergyPilot ships its own local Home Assistant brand assets in:
 custom_components/gw_energypilot/brand/
 ```
 
-The current branding uses the square GW EnergyPilot energy monogram for both `icon.png` and `logo.png`. The built-in dashboard uses the same branding.
+The built-in dashboard additionally uses an inline high-contrast SVG mark so the EnergyPilot logo remains visible on the dark dashboard background.
 
 ## Safety
 
@@ -380,11 +409,14 @@ Do not enable automatic control until:
 - [x] Manual EMS mode control.
 - [x] EMHASS `P_batt` mapping to modes 8/11/12.
 - [x] Automatic-control master switch with mode 1 fallback.
+- [x] Restore Automatic Control state after reload/restart.
 - [x] Basic EV charging coordination.
 - [x] English setup flow and help text.
 - [x] Cleaner default entity set.
 - [x] Local integration branding.
 - [x] Built-in responsive JavaScript dashboard.
+- [x] Compact animated energy-flow overview.
+- [x] Drag-and-drop dashboard layout and visibility menu.
 - [ ] Setup-time EMHASS readiness validation.
 - [ ] Advanced EV house-load compensation.
 - [ ] Forecast timeline / price graph in dashboard.
