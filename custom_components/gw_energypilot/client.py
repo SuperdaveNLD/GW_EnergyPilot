@@ -9,12 +9,7 @@ from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 from .const import MODES_ZERO_POWER, REGISTER_EMS_MODE, REGISTER_EMS_POWER
-from .registers import (
-    REGISTER_DEFINITIONS,
-    TELEMETRY_BLOCKS,
-    RegisterDataType,
-    RegisterDefinition,
-)
+from .registers import REGISTER_DEFINITIONS, RegisterDataType, RegisterDefinition
 
 
 class GWModbusError(Exception):
@@ -36,6 +31,18 @@ class GWETAData:
     def power(self) -> int | None:
         value = self.values.get("ems_setpoint")
         return int(value) if value is not None else None
+
+
+# Contiguous blocks keep Modbus traffic low. Counts include the second word of
+# every 32-bit value at the end of a block.
+TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
+    (35103, 88),  # through 35190; includes 32-bit error message at 35189
+    (35212, 10),  # through 35221; includes 32-bit diagnose result at 35220
+    (35301, 36),  # through 35336; includes 32-bit warning at 35335
+    (36003, 55),  # through 36057
+    (37002, 22),  # through 37023
+    (47509, 4),   # through 47512
+)
 
 
 class GWModbusClient:
