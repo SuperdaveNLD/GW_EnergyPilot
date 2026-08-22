@@ -10,6 +10,13 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GWConfigEntry
+from .const import (
+    CONF_MAX_POWER,
+    DEFAULT_MAX_POWER,
+    MODE_BATTERY_HOLD,
+    MODE_CHARGE_BATTERY,
+    MODE_GRID_EXPORT_TARGET,
+)
 from .entity import GWEnergyPilotEntity
 
 
@@ -19,7 +26,14 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up EnergyPilot button entities."""
-    async_add_entities([GWOptimizeNowButton(entry)])
+    async_add_entities(
+        [
+            GWOptimizeNowButton(entry),
+            GWMaxExportButton(entry),
+            GWBatteryPauseButton(entry),
+            GWMaxChargeButton(entry),
+        ]
+    )
 
 
 class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
@@ -59,3 +73,74 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Start a manual optimization."""
         await self.entry.runtime_data.orchestrator.async_optimize(reason="manual_button")
+
+
+class _GWManualBatteryButton(GWEnergyPilotEntity, ButtonEntity):
+    """Base class for one-touch GoodWe battery commands."""
+
+    mode: int
+    command: str
+    use_max_power = False
+
+    def __init__(self, entry: GWConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_{self.entity_description_key}"
+
+    @property
+    def entity_description_key(self) -> str:
+        """Return stable key used for the entity unique ID."""
+        raise NotImplementedError
+
+    async def async_press(self) -> None:
+        """Take manual ownership and apply the requested GoodWe EMS command."""
+        power = (
+            int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
+            if self.use_max_power
+            else 0
+        )
+        await self.entry.runtime_data.controller.async_manual_command(
+            self.mode,
+            power,
+            self.command,
+        )
+
+
+class GWMaxExportButton(_GWManualBatteryButton):
+    """Request the configured maximum export at the grid connection."""
+
+    _attr_translation_key = "max_export"
+    _attr_icon = "mdi:transmission-tower-export"
+    mode = MODE_GRID_EXPORT_TARGET
+    command = "manual_max_export"
+    use_max_power = True
+
+    @property
+    def entity_description_key(self) -> str:
+        return "max_export"
+
+
+class GWBatteryPauseButton(_GWManualBatteryButton):
+    """Hold battery power at approximately zero watts."""
+
+    _attr_translation_key = "battery_pause"
+    _attr_icon = "mdi:pause-circle-outline"
+    mode = MODE_BATTERY_HOLD
+    command = "manual_battery_hold"
+
+    @property
+    def entity_description_key(self) -> str:
+        return "battery_pause"
+
+
+class GWMaxChargeButton(_GWManualBatteryButton):
+    """Charge the battery at the configured maximum power."""
+
+    _attr_translation_key = "max_charge"
+    _attr_icon = "mdi:battery-charging-high"
+    mode = MODE_CHARGE_BATTERY
+    command = "manual_max_charge"
+    use_max_power = True
+
+    @property
+    def entity_description_key(self) -> str:
+        return "max_charge"
