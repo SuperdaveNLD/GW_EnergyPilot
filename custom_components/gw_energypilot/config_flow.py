@@ -36,6 +36,8 @@ from .const import (
     NAME,
 )
 
+CONF_MAX_POWER_KW = "max_power_kw"
+
 
 class CannotConnect(Exception):
     """Raised when the inverter cannot be reached."""
@@ -67,13 +69,16 @@ def _controller_schema() -> vol.Schema:
                 CONF_OPTIM_REQUIRED_STATE,
                 default=DEFAULT_OPTIM_REQUIRED_STATE,
             ): selector.TextSelector(),
-            vol.Required(CONF_MAX_POWER, default=DEFAULT_MAX_POWER): selector.NumberSelector(
+            vol.Required(
+                CONF_MAX_POWER_KW,
+                default=DEFAULT_MAX_POWER / 1000,
+            ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=500,
-                    max=15000,
-                    step=100,
+                    min=0.5,
+                    max=15,
+                    step=0.1,
                     mode=selector.NumberSelectorMode.BOX,
-                    unit_of_measurement="W",
+                    unit_of_measurement="kW",
                 )
             ),
             vol.Required(CONF_DEADBAND, default=DEFAULT_DEADBAND): selector.NumberSelector(
@@ -114,6 +119,22 @@ def _controller_schema() -> vol.Schema:
     )
 
 
+def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Convert user-facing values to runtime/storage values."""
+    options = dict(user_input)
+    max_power_kw = float(options.pop(CONF_MAX_POWER_KW))
+    options[CONF_MAX_POWER] = int(round(max_power_kw * 1000))
+    return options
+
+
+def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
+    """Convert stored runtime values to user-facing values."""
+    form_options = dict(options)
+    max_power_w = float(form_options.pop(CONF_MAX_POWER, DEFAULT_MAX_POWER))
+    form_options[CONF_MAX_POWER_KW] = max_power_w / 1000
+    return form_options
+
+
 class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for GW EnergyPilot."""
 
@@ -128,7 +149,7 @@ class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            host = str(user_input[CONF_HOST])
+            host = str(user_input[CONF_HOST]).strip()
             port = int(user_input[CONF_PORT])
             slave = int(user_input[CONF_SLAVE])
             try:
@@ -149,10 +170,18 @@ class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_HOST): selector.TextSelector(),
                 vol.Required(CONF_PORT, default=DEFAULT_PORT): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=65535, mode=selector.NumberSelectorMode.BOX)
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=65535,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
                 ),
                 vol.Required(CONF_SLAVE, default=DEFAULT_SLAVE): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=247, mode=selector.NumberSelectorMode.BOX)
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=247,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
                 ),
             }
         )
@@ -167,7 +196,7 @@ class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=f"{NAME} ({host})",
                 data=self._connection_data,
-                options=user_input,
+                options=_options_from_form(user_input),
             )
 
         return self.async_show_form(step_id="controller", data_schema=_controller_schema())
@@ -185,10 +214,10 @@ class GWOptionsFlow(OptionsFlowWithReload):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage options."""
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            return self.async_create_entry(data=_options_from_form(user_input))
 
         schema = self.add_suggested_values_to_schema(
             _controller_schema(),
-            self.config_entry.options,
+            _options_for_form(dict(self.config_entry.options)),
         )
         return self.async_show_form(step_id="init", data_schema=schema)
