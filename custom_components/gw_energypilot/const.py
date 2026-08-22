@@ -15,6 +15,18 @@ CONF_DEADBAND = "deadband"
 CONF_EV_DEADBAND = "ev_deadband"
 CONF_SCAN_INTERVAL = "scan_interval"
 
+# Built-in EMHASS orchestration.
+CONF_ENABLE_EMHASS_ORCHESTRATOR = "enable_emhass_orchestrator"
+CONF_EMHASS_URL = "emhass_url"
+CONF_EMHASS_OPTIMIZATION_INTERVAL = "emhass_optimization_interval"
+CONF_EMHASS_SOC_FINAL = "emhass_soc_final"
+CONF_EMHASS_FALLBACK_LOAD = "emhass_fallback_load"
+CONF_USE_NORDPOOL_PRICES = "use_nordpool_prices"
+CONF_NORDPOOL_AREA = "nordpool_area"
+CONF_NORDPOOL_CURRENCY = "nordpool_currency"
+CONF_BUY_PRICE_ADDER = "buy_price_adder"
+CONF_SELL_PRICE_DEDUCTION = "sell_price_deduction"
+
 DEFAULT_PORT = 502
 DEFAULT_SLAVE = 247
 DEFAULT_MAX_POWER = 15000
@@ -24,6 +36,20 @@ DEFAULT_SCAN_INTERVAL = 10
 DEFAULT_P_BATT_ENTITY = "sensor.p_batt_forecast"
 DEFAULT_OPTIM_STATUS_ENTITY = "sensor.optim_status"
 DEFAULT_OPTIM_REQUIRED_STATE = "Optimal"
+
+# Existing installations upgrade with the native schedule OFF to avoid running
+# alongside a legacy YAML scheduler. Fresh v0.10 installations suggest ON in
+# the config flow.
+DEFAULT_ENABLE_EMHASS_ORCHESTRATOR = False
+DEFAULT_EMHASS_URL = "http://5b918bf2-emhass:5000"
+DEFAULT_EMHASS_OPTIMIZATION_INTERVAL = 15
+DEFAULT_EMHASS_SOC_FINAL = 0.10
+DEFAULT_EMHASS_FALLBACK_LOAD = 700
+DEFAULT_USE_NORDPOOL_PRICES = True
+DEFAULT_NORDPOOL_AREA = ""
+DEFAULT_NORDPOOL_CURRENCY = "EUR"
+DEFAULT_BUY_PRICE_ADDER = 0.0
+DEFAULT_SELL_PRICE_DEDUCTION = 0.0248
 
 REGISTER_EMS_MODE = 47511
 REGISTER_EMS_POWER = 47512
