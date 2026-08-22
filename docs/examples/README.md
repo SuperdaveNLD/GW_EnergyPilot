@@ -1,34 +1,48 @@
 # GW EnergyPilot examples
 
-## EMHASS orchestrator
+## EMHASS orchestrator YAML - v0.09 reference
 
-The tested local EMHASS orchestration package is available here:
+The tested local EMHASS orchestration package is retained here as a migration/reference example:
 
 - [`energypilot_emhass_orchestrator.yaml`](energypilot_emhass_orchestrator.yaml)
 
-Copy the complete file to your Home Assistant configuration, for example:
+Starting with **GW EnergyPilot v0.10**, normal installations should use the native EnergyPilot EMHASS orchestrator and the **Optimize now** button instead of copying this package into `/config/packages/`.
 
-```text
-/config/packages/energypilot_emhass_orchestrator.yaml
-```
+The old YAML reference demonstrated the design that was moved into the integration:
 
-The orchestrator:
-
-- runs a new EMHASS day-ahead optimization every 15 minutes;
-- remains independent from the EnergyPilot Automatic Control switch;
-- uses the current EnergyPilot battery SOC as `soc_init`;
-- builds a load forecast from Home Assistant Recorder statistics;
-- validates the EMHASS HTTP response before publishing;
-- publishes only after a successful optimization;
-- validates that a fresh `sensor.p_batt_forecast` was created;
-- never writes GoodWe Modbus registers directly.
+- recurring EMHASS day-ahead optimization;
+- optimization independent from Automatic Control;
+- current EnergyPilot battery SOC as `soc_init`;
+- Recorder-based load forecast;
+- HTTP response validation before publishing;
+- publish only after a successful optimization;
+- validation of a fresh numeric `sensor.p_batt_forecast`;
+- no direct GoodWe Modbus writes.
 
 Keep GW EnergyPilot as the only component that writes GoodWe EMS mode/setpoint registers.
 
+### v0.10 migration
+
+If this package is currently installed:
+
+```text
+1. Update GW EnergyPilot to v0.10
+2. Keep Automatic Control OFF
+3. Test the native Optimize now button
+4. Verify P_batt + Optimal
+5. Remove/disable this YAML package
+6. Restart/reload Home Assistant
+7. Enable the native EnergyPilot recurring orchestrator schedule
+8. Test Optimize now again
+9. Enable Automatic Control
+```
+
+EnergyPilot v0.10 detects the legacy script/automation names and prevents its recurring scheduler from starting next to this package.
+
 ### Price source
 
-The validated reference YAML currently uses a price entity exposing `raw_today` and `raw_tomorrow` because that is the setup used during development. Change the `price_entity` variable when your installation uses another price source.
+This historical YAML uses a price entity exposing `raw_today` and `raw_tomorrow` because that was the development setup.
 
-For new installations, Home Assistant's official Nord Pool integration is preferred. Its `nordpool.get_prices_for_date` action returns timestamped price intervals and is compatible with the transition to 15-minute market time units. A future EnergyPilot orchestrator revision can use that action directly.
+The v0.10 native orchestrator can instead call Home Assistant's official `nordpool.get_prices_for_date` action directly and handles the returned timestamped intervals, including the market transition between hourly and 15-minute MTUs.
 
-See [`../EMHASS_SETUP.md`](../EMHASS_SETUP.md) for the required EnergyPilot-to-EMHASS entity mappings and installation order.
+See [`../EMHASS_SETUP.md`](../EMHASS_SETUP.md) for the current setup and migration instructions.
