@@ -1,16 +1,27 @@
-{"repository_full_name":"SuperdaveNLD/GW_EnergyPilot","branch":"feature/eta-telemetry-sensors","path":"custom_components/gw_energypilot/registers.py","message":"Add GoodWe ETA telemetry register map","content":"\"\"\"GoodWe ETA runtime Modbus register definitions.\"\"\"\n\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\nfrom enum import StrEnum\n\n\nclass RegisterDataType(StrEnum):\n    \"\"\"Supported register data types.\"\"\"\n\n    UINT16 = \"uint16\"\n    INT16 = \"int16\"\n    UINT32 = \"uint32\"\n    INT32 = \"int32\"\n\n\n@dataclass(frozen=True, slots=True)\nclass RegisterDefinition:\n    \"\"\"Describe one GoodWe ETA register value.\"\"\"\n\n    key: str\n    address: int\n    data_type: RegisterDataType\n    scale: float = 1.0\n    precision: int | None = None\n\n\n# Read contiguous ranges instead of issuing one Modbus request per entity.\n# All ranges are holding registers and stay below the Modbus 125-register limit.\nTELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (\n    (35103, 87),  # PV, inverter, load, temperatures, battery, status\n    (35212, 9),   # Battery string count + diagnose result\n    (35301, 35),  # PV total + extended warning/error registers\n    (36003, 55),  # Smart meter runtime values\n    (37002, 22),  # BMS, SOC/SOH, cell temperatures and voltages\n    (47509, 4),   # Feed-power state + EMS mode/setpoint\n)\n\n\nREGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (\n    # General inverter state\n    RegisterDefinition(\"grid_mode\", 35136, RegisterDataType.UINT16),\n    RegisterDefinition(\"warning_code\", 35185, RegisterDataType.UINT16),\n    RegisterDefinition(\"work_mode\", 35187, RegisterDataType.UINT16),\n    RegisterDefinition(\"operation_mode\", 35188, RegisterDataType.UINT16),\n    RegisterDefinition(\"error_message\", 35189, RegisterDataType.UINT32),\n    RegisterDefinition(\"diagnose_result\", 35220, RegisterDataType.UINT32),\n\n    # PV string 1\n    RegisterDefinition(\"pv1_voltage\", 35103, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv1_current\", 35104, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv1_power\", 35105, RegisterDataType.UINT32),\n\n    # PV string 2\n    RegisterDefinition(\"pv2_voltage\", 35107, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv2_current\", 35108, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv2_power\", 35109, RegisterDataType.UINT32),\n\n    # PV string 3\n    RegisterDefinition(\"pv3_voltage\", 35111, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv3_current\", 35112, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv3_power\", 35113, RegisterDataType.UINT32),\n\n    # PV string 4\n    RegisterDefinition(\"pv4_voltage\", 35115, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv4_current\", 35116, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"pv4_power\", 35117, RegisterDataType.UINT32),\n\n    # PV total\n    RegisterDefinition(\"pv_total_power\", 35301, RegisterDataType.UINT32),\n\n    # Inverter phase R / L1\n    RegisterDefinition(\n        \"inverter_l1_voltage\", 35121, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_l1_current\", 35122, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_l1_frequency\", 35123, RegisterDataType.UINT16, 0.01, 2\n    ),\n    RegisterDefinition(\"inverter_l1_power\", 35125, RegisterDataType.INT16),\n\n    # Inverter phase S / L2\n    RegisterDefinition(\n        \"inverter_l2_voltage\", 35126, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_l2_current\", 35127, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_l2_frequency\", 35128, RegisterDataType.UINT16, 0.01, 2\n    ),\n    RegisterDefinition(\"inverter_l2_power\", 35130, RegisterDataType.INT16),\n\n    # Inverter phase T / L3\n    RegisterDefinition(\n        \"inverter_l3_voltage\", 35131, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_l3_current\", 35132, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_l3_frequency\", 35133, RegisterDataType.UINT16, 0.01, 2\n    ),\n    RegisterDefinition(\"inverter_l3_power\", 35135, RegisterDataType.INT16),\n    RegisterDefinition(\"total_inverter_power\", 35138, RegisterDataType.INT16),\n    RegisterDefinition(\"ac_active_power\", 35140, RegisterDataType.INT16),\n\n    # Load / backup\n    RegisterDefinition(\"load_l1_power\", 35164, RegisterDataType.INT16),\n    RegisterDefinition(\"load_l2_power\", 35166, RegisterDataType.INT16),\n    RegisterDefinition(\"load_l3_power\", 35168, RegisterDataType.INT16),\n    RegisterDefinition(\"total_backup_load_power\", 35170, RegisterDataType.INT16),\n    RegisterDefinition(\"total_load_power\", 35172, RegisterDataType.INT16),\n\n    # Inverter temperatures\n    RegisterDefinition(\n        \"inverter_air_temperature\", 35174, RegisterDataType.INT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_module_temperature\", 35175, RegisterDataType.INT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"inverter_radiator_temperature\", 35176, RegisterDataType.INT16, 0.1, 1\n    ),\n\n    # Battery runtime\n    RegisterDefinition(\"battery_voltage\", 35180, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"battery_current\", 35181, RegisterDataType.INT16, 0.1, 1),\n    RegisterDefinition(\"battery_power\", 35182, RegisterDataType.INT32),\n    RegisterDefinition(\"battery_mode\", 35184, RegisterDataType.UINT16),\n    RegisterDefinition(\"battery_strings\", 35212, RegisterDataType.UINT16),\n\n    # Extended inverter warnings / errors\n    RegisterDefinition(\"warning_message_32bit\", 35328, RegisterDataType.UINT32),\n    RegisterDefinition(\n        \"error_message_extended_32bit\", 35333, RegisterDataType.UINT32\n    ),\n    RegisterDefinition(\n        \"warning_message_extended_32bit\", 35335, RegisterDataType.UINT32\n    ),\n\n    # Smart meter\n    RegisterDefinition(\"meter_test_status\", 36003, RegisterDataType.UINT16),\n    RegisterDefinition(\"meter_communication\", 36004, RegisterDataType.UINT16),\n    RegisterDefinition(\"meter_l1_power_fast\", 36005, RegisterDataType.INT16),\n    RegisterDefinition(\"meter_l2_power_fast\", 36006, RegisterDataType.INT16),\n    RegisterDefinition(\"meter_l3_power_fast\", 36007, RegisterDataType.INT16),\n    RegisterDefinition(\"meter_total_power_fast\", 36008, RegisterDataType.INT16),\n    RegisterDefinition(\"meter_frequency\", 36014, RegisterDataType.UINT16, 0.01, 2),\n    RegisterDefinition(\"meter_l1_active_power\", 36019, RegisterDataType.INT32),\n    RegisterDefinition(\"meter_l2_active_power\", 36021, RegisterDataType.INT32),\n    RegisterDefinition(\"meter_l3_active_power\", 36023, RegisterDataType.INT32),\n    RegisterDefinition(\"meter_total_active_power\", 36025, RegisterDataType.INT32),\n    RegisterDefinition(\"meter_l1_voltage\", 36052, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"meter_l2_voltage\", 36053, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"meter_l3_voltage\", 36054, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"meter_l1_current\", 36055, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"meter_l2_current\", 36056, RegisterDataType.UINT16, 0.1, 1),\n    RegisterDefinition(\"meter_l3_current\", 36057, RegisterDataType.UINT16, 0.1, 1),\n\n    # BMS runtime / health\n    RegisterDefinition(\"bms_status\", 37002, RegisterDataType.UINT16),\n    RegisterDefinition(\n        \"bms_package_temperature\", 37003, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"bms_max_charge_current\", 37004, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"bms_max_discharge_current\", 37005, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\"bms_error_low\", 37006, RegisterDataType.UINT16),\n    RegisterDefinition(\"battery_soc\", 37007, RegisterDataType.UINT16),\n    RegisterDefinition(\"battery_soh\", 37008, RegisterDataType.UINT16),\n    RegisterDefinition(\"bms_warning_low\", 37010, RegisterDataType.UINT16),\n    RegisterDefinition(\"bms_protocol\", 37011, RegisterDataType.UINT16),\n    RegisterDefinition(\"bms_error_high\", 37012, RegisterDataType.UINT16),\n    RegisterDefinition(\"bms_warning_high\", 37013, RegisterDataType.UINT16),\n    RegisterDefinition(\"bms_software_version\", 37014, RegisterDataType.UINT16),\n    RegisterDefinition(\"bms_hardware_version\", 37015, RegisterDataType.UINT16),\n    RegisterDefinition(\n        \"battery_max_cell_temperature\", 37020, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"battery_min_cell_temperature\", 37021, RegisterDataType.UINT16, 0.1, 1\n    ),\n    RegisterDefinition(\n        \"battery_max_cell_voltage\", 37022, RegisterDataType.UINT16, 0.001, 3\n    ),\n    RegisterDefinition(\n        \"battery_min_cell_voltage\", 37023, RegisterDataType.UINT16, 0.001, 3\n    ),\n\n    # EMS runtime\n    RegisterDefinition(\"feed_power_enable\", 47509, RegisterDataType.UINT16),\n    RegisterDefinition(\"feed_power_parameter\", 47510, RegisterDataType.UINT16),\n    RegisterDefinition(\"ems_mode\", 47511, RegisterDataType.UINT16),\n    RegisterDefinition(\"ems_setpoint\", 47512, RegisterDataType.UINT16),\n)\n"}# GW EnergyPilot
+# GW EnergyPilot
 
 GW EnergyPilot is an unofficial Home Assistant integration for advanced EMS and battery control of GoodWe ETA hybrid inverters.
 
-It provides direct Modbus TCP control of the GoodWe EMS registers, optional EMHASS `P_batt` mapping, battery hold logic, manual EMS mode control, and optional EV charging coordination.
+It provides direct Modbus TCP communication, native GoodWe ETA telemetry, manual EMS mode control, optional EMHASS `P_batt` mapping, battery hold logic, and optional EV charging coordination.
 
 > This is an independent community project and is not affiliated with or endorsed by GoodWe.
 
 ## Current status
 
-**Early alpha - v0.1.0**
+**Alpha - v0.02**
 
 The project is being built from practical testing on a GoodWe ETA installation. Use it only if you understand the impact of forced charge, discharge, export and off-grid modes.
+
+### Version numbering
+
+GW EnergyPilot uses simple incremental versions:
+
+```text
+v0.01
+v0.02
+v0.03
+...
+```
 
 ## Important: installation order
 
@@ -20,21 +31,68 @@ Recommended order for a new Home Assistant installation:
 
 1. Install Home Assistant and HACS.
 2. Install GW EnergyPilot from HACS.
-3. Connect GW EnergyPilot to the GoodWe ETA inverter and verify basic Modbus communication.
-4. Make sure the source sensors required by EMHASS exist in Home Assistant.
+3. Connect GW EnergyPilot to the GoodWe ETA inverter and verify Modbus communication.
+4. Verify that the native EnergyPilot telemetry entities are updating correctly.
 5. Install and configure EMHASS.
-6. Run a successful EMHASS day-ahead optimization.
-7. Publish the EMHASS result to Home Assistant.
-8. Verify that the EMHASS output entities exist and contain valid values.
-9. Configure EnergyPilot automatic control using the EMHASS output entities.
-10. Only then enable EnergyPilot automatic control.
+6. Configure EMHASS to use suitable Home Assistant source entities.
+7. Run a successful EMHASS day-ahead optimization.
+8. Publish the EMHASS result to Home Assistant.
+9. Verify that the selected EMHASS output entities exist and contain valid values.
+10. Configure EnergyPilot automatic control using those EMHASS entities.
+11. Only then enable EnergyPilot automatic control.
 
 EMHASS documentation:
 
 - https://emhass.readthedocs.io/
 - https://github.com/davidusb-geek/emhass
 
-### EMHASS must already be working
+## GoodWe ETA connection
+
+The setup flow asks for:
+
+- GoodWe ETA inverter IP address.
+- Modbus TCP port, normally `502`.
+- Modbus Unit ID, commonly `247` on ETA installations.
+
+### Use a fixed inverter IP address
+
+The inverter should have a **static IP address or DHCP reservation**.
+
+EnergyPilot connects directly to the inverter over Modbus TCP. If the inverter receives a different IP address after a network or router restart, EnergyPilot will no longer be able to communicate with it.
+
+## Native GoodWe ETA telemetry
+
+Starting with v0.02, EnergyPilot reads a broad set of GoodWe ETA telemetry directly from Modbus TCP. A separate Home Assistant Modbus YAML package is no longer required for these native entities.
+
+Current telemetry includes:
+
+- PV1, PV2, PV3 and PV4 voltage, current and power.
+- Total PV power.
+- Inverter L1/L2/L3 voltage, current, frequency and power.
+- Total inverter power and AC active power.
+- Smart-meter L1/L2/L3 power, voltage and current.
+- Smart-meter total active power and fast power values.
+- Grid/meter frequency.
+- Battery SOC and SOH.
+- Battery voltage, current and power.
+- Battery mode and number of strings.
+- BMS status, protocol, software and hardware version values.
+- BMS maximum charge and discharge current.
+- Maximum and minimum cell voltage.
+- Inverter air, module and radiator temperature.
+- BMS package temperature.
+- Maximum and minimum battery cell temperature.
+- Load and backup-load registers.
+- Work mode, operation mode, grid mode, warning and error registers.
+- EMS mode and EMS setpoint.
+
+Some GoodWe registers are model- and firmware-dependent. Raw diagnostic values are exposed where a reliable human-readable mapping has not yet been confirmed.
+
+### Load power warning
+
+The GoodWe `total_load_power` register is exposed as telemetry, but EnergyPilot does **not** currently assume that it is always suitable as the EMHASS house-load source. Validate this value on your own installation before using it for optimization.
+
+## EMHASS prerequisite
 
 EnergyPilot does not install or configure EMHASS for you.
 
@@ -46,32 +104,11 @@ Before enabling automatic control, EMHASS must be able to:
 - provide a numeric battery-power target such as `sensor.p_batt_forecast`;
 - optionally provide an optimization status entity such as `sensor.optim_status`.
 
-If these entities do not exist yet, do not enable EnergyPilot automatic control.
-
-## EMHASS input sensors
-
-EMHASS normally needs existing Home Assistant entities for the values configured in EMHASS, for example:
-
-```text
-sensor.battery_state_of_charge
-sensor.power_battery
-sensor.power_photovoltaics
-sensor.power_load_no_var_loads
-```
-
-The exact names depend on your own EMHASS configuration.
-
-### Important for a fresh Home Assistant installation
-
-At this stage, **GW EnergyPilot v0.1.0 only provides the EMS control layer and does not yet expose all GoodWe ETA telemetry required as EMHASS input**.
-
-On a completely fresh Home Assistant installation, you must therefore make sure the required EMHASS source sensors already exist before expecting a useful optimization.
-
-Full GoodWe ETA telemetry is planned for a future EnergyPilot release so a fresh installation will no longer require a separate Modbus sensor package for the EMHASS source data.
+If these conditions are not met, do not enable EnergyPilot automatic control.
 
 ## Publishing EMHASS sensors to Home Assistant
 
-Installing and starting EMHASS does **not** automatically mean that entities such as `sensor.p_batt_forecast` are already available in Home Assistant.
+Installing and starting EMHASS does not automatically guarantee that forecast entities are already present in Home Assistant.
 
 The normal sequence is:
 
@@ -101,28 +138,24 @@ The exact entities depend on the EMHASS version and configuration.
 
 ### No Home Assistant restart is normally required
 
-When EMHASS publishes data successfully, the entities are created or updated in Home Assistant directly. A Home Assistant restart is normally not required just to make the published forecast sensors appear.
+When EMHASS publishes data successfully, the entities are created or updated directly in Home Assistant. A Home Assistant restart is normally not required just to make forecast sensors appear.
 
-If you use:
+If EMHASS is configured with:
 
 ```json
 "continual_publish": false
 ```
 
-EMHASS does not continuously publish the results by itself. You must explicitly run the publish action, or create an automation that publishes after optimization.
+results are not continuously published automatically. Run the publish action explicitly or create an automation that publishes after optimization.
 
-The commonly used EMHASS endpoints are:
+Common EMHASS endpoints are:
 
 ```text
 /action/dayahead-optim
 /action/publish-data
 ```
 
-After publishing, verify the entities under:
-
-**Settings -> Developer tools -> States**
-
-Before configuring EnergyPilot automatic control, confirm at minimum that your selected battery forecast entity contains a numeric value.
+After publishing, verify the entities under **Settings -> Developer tools -> States**.
 
 ## Tested EMS model
 
@@ -157,42 +190,6 @@ When automatic control is enabled and a valid `P_batt` entity is configured:
 
 The automatic control switch intentionally starts **off after a Home Assistant restart**.
 
-## EV coordination
-
-EV coordination is optional. In v0.1.0 it uses a conservative safety strategy: while the configured EV is actively charging, EnergyPilot puts the battery in mode 8 (Battery Hold). More advanced house-load compensation is planned for a later release.
-
-An EV is considered active if either:
-
-- its mode entity equals `connected_charging`, or
-- its charging power is above the configured EV threshold.
-
-## Installation with HACS
-
-Until the repository is included in the default HACS store:
-
-1. Open HACS.
-2. Open **Custom repositories**.
-3. Add `https://github.com/SuperdaveNLD/GW_EnergyPilot`.
-4. Select category **Integration**.
-5. Install **GW EnergyPilot**.
-6. Restart Home Assistant.
-7. Go to **Settings -> Devices & services -> Add integration**.
-8. Search for **GW EnergyPilot**.
-
-## GoodWe ETA connection
-
-The setup flow asks for:
-
-- GoodWe ETA inverter IP address.
-- Modbus TCP port, normally `502`.
-- Modbus Unit ID, commonly `247` on ETA installations.
-
-### Use a fixed inverter IP address
-
-The GoodWe ETA inverter should have a **static IP address or DHCP reservation**.
-
-EnergyPilot connects directly to the inverter over Modbus TCP. If the inverter receives a different IP address after a router or network restart, EnergyPilot will no longer be able to communicate with it.
-
 ## EnergyPilot control configuration
 
 Optional controller settings include:
@@ -205,9 +202,7 @@ Optional controller settings include:
 
 ### Maximum battery charge/discharge power
 
-This is the maximum battery-control power EnergyPilot may request from the inverter.
-
-The value is entered in watts.
+This is the maximum battery-control power EnergyPilot may request from the inverter. The value is entered in watts.
 
 Examples:
 
@@ -217,11 +212,11 @@ Examples:
 15000 W = 15 kW
 ```
 
-Configure this value according to the supported inverter and battery limits. EnergyPilot should never be configured above the safe limits of the actual installation.
+Configure this according to the supported inverter and battery limits.
 
 ### Power deadband
 
-The deadband prevents unnecessary switching between battery charging, Battery Hold and battery discharging when the EMHASS target is close to zero.
+The deadband prevents unnecessary switching between charging, Battery Hold and discharging when the EMHASS target is close to zero.
 
 For example, with a deadband of `300 W`:
 
@@ -245,6 +240,30 @@ Recommended default:
 300 W
 ```
 
+## EV coordination
+
+EV coordination is optional. In the current alpha it uses a conservative strategy: while the configured EV is actively charging, EnergyPilot puts the battery in mode 8 (Battery Hold).
+
+An EV is considered active if either:
+
+- its mode entity equals `connected_charging`, or
+- its charging power is above the configured EV threshold.
+
+More advanced house-load compensation is planned for a later version.
+
+## Installation with HACS
+
+Until the repository is included in the default HACS store:
+
+1. Open HACS.
+2. Open **Custom repositories**.
+3. Add `https://github.com/SuperdaveNLD/GW_EnergyPilot`.
+4. Select category **Integration**.
+5. Install **GW EnergyPilot**.
+6. Restart Home Assistant.
+7. Go to **Settings -> Devices & services -> Add integration**.
+8. Search for **GW EnergyPilot**.
+
 ## Safety
 
 Forced EMS modes can charge or discharge a battery at high power and can export energy to the grid. Verify inverter limits, battery limits, grid connection limits and local regulations before enabling automatic control.
@@ -252,6 +271,7 @@ Forced EMS modes can charge or discharge a battery at high power and can export 
 Do not enable automatic control until:
 
 - the GoodWe ETA connection is verified;
+- the telemetry values have been checked for plausibility;
 - the configured EMHASS input sensors are valid;
 - EMHASS successfully completes an optimization;
 - the selected `P_batt` entity is numeric and updates correctly;
@@ -266,15 +286,18 @@ Do not enable automatic control until:
 - [x] EMHASS `P_batt` mapping to modes 8/11/12.
 - [x] Automatic-control master switch with mode 1 fallback.
 - [x] Basic EV charging coordination.
+- [x] Native GoodWe ETA PV telemetry.
+- [x] Native inverter and smart-meter telemetry.
+- [x] Native battery/BMS telemetry.
+- [x] Native inverter, BMS and cell temperature sensors.
 - [x] Document EMHASS prerequisite and publish workflow.
-- [ ] Full GoodWe ETA telemetry entities for fresh installations.
 - [ ] Setup-time EMHASS readiness validation.
 - [ ] Fully English setup flow and help text.
 - [ ] Advanced EV house-load compensation.
 - [ ] Diagnostics download.
 - [ ] Automated tests.
 - [ ] Dashboard example.
-- [ ] Stable v1.0 release.
+- [ ] Stable v1.00 release.
 
 ## License
 
