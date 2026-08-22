@@ -2,24 +2,32 @@
 
 All notable changes to GW EnergyPilot will be documented in this file.
 
+## [0.06] - 2026-08-22
+
+### Fixed
+
+- Dashboard logo is now rendered as a high-contrast embedded vector mark instead of relying on the dark PNG asset.
+- Added a versioned dashboard module wrapper for reliable frontend cache busting.
+- Dashboard version badge and footer now report v0.06.
+
 ## [0.05] - 2026-08-22
 
 ### Added
 
-- Built-in `EnergyPilot` sidebar panel for Home Assistant.
-- Responsive JavaScript dashboard served directly by the integration.
-- Live PV, home load, battery, grid, inverter and thermal overview.
-- Automatic discovery of GW EnergyPilot entities through the Home Assistant entity registry.
-- EMHASS status, `P_batt` target and common published forecast values on the dashboard.
-- Controller overview with EMS mode, EMS setpoint, EnergyPilot target and current command.
-- Guarded Automatic Control toggle with a safety confirmation before enabling automatic control.
-- Dashboard uses the GW EnergyPilot branding and requires no separate Lovelace resource or frontend HACS package.
+- Built-in EnergyPilot JavaScript dashboard registered automatically in the Home Assistant sidebar.
+- Responsive Solar, Home, Grid and Battery overview.
+- Live battery SOC, power and charging/discharging state.
+- Grid import/export state with L1/L2/L3 values.
+- EnergyPilot controller status, EMS mode, setpoint, target and command.
+- EMHASS overview with P_batt target, optimization status and forecast entities.
+- Thermal and BMS limits overview.
+- Automatic-control toggle with an EMHASS safety confirmation.
+- Automatic discovery of EnergyPilot entities through the Home Assistant entity registry.
+- Local frontend assets served by the integration; no manual Lovelace resource is required.
 
 ### Changed
 
-- Version bumped to `v0.05`.
-- README now documents the built-in dashboard and its behavior.
-- Dashboard uses the validated GoodWe smart-meter sign convention: positive power is export and negative power is import.
+- Roadmap now treats the built-in dashboard as an implemented feature instead of a future dashboard example.
 
 ## [0.04] - 2026-08-22
 
