@@ -2,6 +2,27 @@
 
 All notable changes to GW EnergyPilot will be documented in this file.
 
+## [0.07] - 2026-08-22
+
+### Added
+
+- Compact live energy-flow widget inspired by a mobile energy app.
+- Animated directional power-flow arrows between PV, house, grid and battery.
+- Live flow direction based on GoodWe meter and battery sign conventions.
+- Compact central GW EnergyPilot hub mark in the energy-flow widget.
+
+### Fixed
+
+- Dashboard branding now replaces the image element with an inline SVG logo, avoiding static-image contrast/path issues.
+- Temperature values now follow Home Assistant's current configured temperature unit directly in the dashboard.
+- Celsius/Fahrenheit/Kelvin conversion is handled dynamically when the stored entity unit differs from the current Home Assistant unit setting.
+- Negative or implausible raw house-load values are avoided in the compact flow view by using the validated power-balance calculation when necessary.
+
+### Changed
+
+- Dashboard module moved to `gw-energy-pilot-v007.js` for frontend cache busting.
+- Dashboard version badge and footer now report v0.07.
+
 ## [0.06] - 2026-08-22
 
 ### Fixed
