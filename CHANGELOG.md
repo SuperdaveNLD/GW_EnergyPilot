@@ -2,6 +2,30 @@
 
 All notable changes to GW EnergyPilot will be documented in this file.
 
+## [0.08] - 2026-08-22
+
+### Added
+
+- Draggable dashboard layout with persistent card ordering stored per browser.
+- Compact dashboard menu for enabling/disabling individual cards.
+- Dashboard edit mode with drag handles and drop targets.
+- Toggle to enable or disable flow animations.
+- Reset button to restore the default dashboard layout.
+- Strong moving energy particles on PV, house, grid and battery flow lines.
+
+### Changed
+
+- Automatic Control now restores its previous Home Assistant state after an integration reload or Home Assistant restart.
+- If Automatic Control was ON before the restart/reload it is re-enabled after state restoration; if it was OFF it remains OFF.
+- A first-time installation still defaults Automatic Control to OFF and hands control to GoodWe Auto / AI.
+- The controller still waits instead of commanding the inverter when configured EMHASS inputs are invalid or optimization is not ready.
+- Dashboard module moved to `gw-energy-pilot-v008.js` for frontend cache busting.
+- Dashboard version badge and footer now report v0.08.
+
+### Fixed
+
+- Energy-flow motion is now clearly visible using animated glowing particles instead of relying only on subtly moving arrow glyphs.
+
 ## [0.07] - 2026-08-22
 
 ### Added
