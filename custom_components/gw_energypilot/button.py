@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.button import ButtonEntity
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GWConfigEntry
@@ -28,6 +31,30 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
     def __init__(self, entry: GWConfigEntry) -> None:
         super().__init__(entry)
         self._attr_unique_id = f"{entry.entry_id}_optimize_now"
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to native orchestrator status updates."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                self.entry.runtime_data.orchestrator.signal,
+                self._async_orchestrator_updated,
+            )
+        )
+
+    @callback
+    def _async_orchestrator_updated(self) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose current optimizer status on the same native entity."""
+        orchestrator = self.entry.runtime_data.orchestrator
+        return {
+            "orchestrator_status": orchestrator.status,
+            **orchestrator.attributes,
+        }
 
     async def async_press(self) -> None:
         """Start a manual optimization."""
