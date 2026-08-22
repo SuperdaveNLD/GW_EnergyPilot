@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
+from homeassistant.components import panel_custom
+from homeassistant.components.frontend import async_panel_exists
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
@@ -20,6 +24,12 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
 ]
 
+PANEL_URL = "gw-energypilot"
+PANEL_COMPONENT = "gw-energypilot-panel"
+PANEL_STATIC_URL = "/gw_energypilot_static"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot.js?v=0.05"
+FRONTEND_DIR = Path(__file__).parent / "frontend"
+
 
 @dataclass(slots=True)
 class GWRuntimeData:
@@ -31,6 +41,33 @@ class GWRuntimeData:
 
 
 type GWConfigEntry = ConfigEntry[GWRuntimeData]
+
+
+async def _async_register_panel(hass: HomeAssistant) -> None:
+    """Register the EnergyPilot sidebar panel once."""
+    if async_panel_exists(hass, PANEL_URL):
+        return
+
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                PANEL_STATIC_URL,
+                str(FRONTEND_DIR),
+                cache_headers=False,
+            )
+        ]
+    )
+    await panel_custom.async_register_panel(
+        hass=hass,
+        frontend_url_path=PANEL_URL,
+        webcomponent_name=PANEL_COMPONENT,
+        sidebar_title="EnergyPilot",
+        sidebar_icon="mdi:transmission-tower",
+        module_url=PANEL_MODULE,
+        embed_iframe=False,
+        require_admin=False,
+        handle_safe_area=True,
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
@@ -65,6 +102,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     await controller.async_disable()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await _async_register_panel(hass)
     return True
 
 
