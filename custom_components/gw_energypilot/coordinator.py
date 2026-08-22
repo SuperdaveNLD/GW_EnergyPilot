@@ -6,14 +6,14 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .client import GWEMSStatus, GWModbusClient, GWModbusError
+from .client import GWETAData, GWModbusClient, GWModbusError
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class GWEnergyPilotCoordinator(DataUpdateCoordinator[GWEMSStatus]):
-    """Coordinate polling of GoodWe EMS registers."""
+class GWEnergyPilotCoordinator(DataUpdateCoordinator[GWETAData]):
+    """Coordinate polling of GoodWe ETA runtime telemetry."""
 
     def __init__(self, hass: HomeAssistant, client: GWModbusClient, scan_interval: int) -> None:
         self.client = client
@@ -24,8 +24,8 @@ class GWEnergyPilotCoordinator(DataUpdateCoordinator[GWEMSStatus]):
             update_interval=timedelta(seconds=scan_interval),
         )
 
-    async def _async_update_data(self) -> GWEMSStatus:
+    async def _async_update_data(self) -> GWETAData:
         try:
-            return await self.client.async_read_status()
+            return await self.client.async_read_data()
         except GWModbusError as err:
             raise UpdateFailed(str(err)) from err

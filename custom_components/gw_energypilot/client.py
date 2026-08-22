@@ -9,6 +9,7 @@ from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 from .const import MODES_ZERO_POWER, REGISTER_EMS_MODE, REGISTER_EMS_POWER
+from .registers import REGISTER_DEFINITIONS, RegisterDataType, RegisterDefinition
 
 
 class GWModbusError(Exception):
@@ -16,15 +17,36 @@ class GWModbusError(Exception):
 
 
 @dataclass(slots=True)
-class GWEMSStatus:
-    """Current EMS status."""
+class GWETAData:
+    """Current GoodWe ETA telemetry snapshot."""
 
-    mode: int
-    power: int
+    values: dict[str, int | float]
+
+    @property
+    def mode(self) -> int | None:
+        value = self.values.get("ems_mode")
+        return int(value) if value is not None else None
+
+    @property
+    def power(self) -> int | None:
+        value = self.values.get("ems_setpoint")
+        return int(value) if value is not None else None
+
+
+# Contiguous blocks keep Modbus traffic low. Counts include the second word of
+# every 32-bit value at the end of a block.
+TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
+    (35103, 88),  # through 35190; includes 32-bit error message at 35189
+    (35212, 10),  # through 35221; includes 32-bit diagnose result at 35220
+    (35301, 36),  # through 35336; includes 32-bit warning at 35335
+    (36003, 55),  # through 36057
+    (37002, 22),  # through 37023
+    (47509, 4),   # through 47512
+)
 
 
 class GWModbusClient:
-    """Async Modbus TCP client for the GoodWe ETA EMS registers."""
+    """Async Modbus TCP client for a GoodWe ETA inverter."""
 
     def __init__(self, host: str, port: int, slave: int) -> None:
         self.host = host
@@ -34,6 +56,7 @@ class GWModbusClient:
         self._lock = asyncio.Lock()
 
     async def async_connect(self) -> None:
+        """Connect to the inverter."""
         if self._client.connected:
             return
         try:
@@ -44,6 +67,7 @@ class GWModbusClient:
             raise GWModbusError(f"Unable to connect to {self.host}:{self.port}")
 
     async def async_close(self) -> None:
+        """Close the Modbus connection."""
         self._client.close()
 
     async def _async_ensure_connected(self) -> None:
@@ -58,25 +82,78 @@ class GWModbusClient:
         if callable(is_error) and is_error():
             raise GWModbusError(f"Modbus error while {context}: {response}")
 
-    async def async_read_status(self) -> GWEMSStatus:
+    @staticmethod
+    def _unsigned_to_signed(value: int, bits: int) -> int:
+        sign_bit = 1 << (bits - 1)
+        return value - (1 << bits) if value & sign_bit else value
+
+    @classmethod
+    def _decode_value(
+        cls,
+        register_map: dict[int, int],
+        definition: RegisterDefinition,
+    ) -> int | float:
+        """Decode one value using Home Assistant Modbus-style big-endian words."""
+        address = definition.address
+        if definition.data_type in (RegisterDataType.UINT16, RegisterDataType.INT16):
+            raw = register_map[address]
+            if definition.data_type == RegisterDataType.INT16:
+                raw = cls._unsigned_to_signed(raw, 16)
+        else:
+            raw = (register_map[address] << 16) | register_map[address + 1]
+            if definition.data_type == RegisterDataType.INT32:
+                raw = cls._unsigned_to_signed(raw, 32)
+
+        value = raw * definition.scale
+        if definition.precision is not None:
+            return round(value, definition.precision)
+        if definition.scale == 1:
+            return int(value)
+        return value
+
+    async def _async_read_block(self, start: int, count: int) -> list[int]:
+        """Read one contiguous holding-register block."""
+        try:
+            response = await self._client.read_holding_registers(
+                start,
+                count=count,
+                device_id=self.slave,
+            )
+        except (ModbusException, OSError) as err:
+            raise GWModbusError(str(err)) from err
+
+        self._validate_response(response, f"reading registers {start}-{start + count - 1}")
+        registers = getattr(response, "registers", None)
+        if registers is None or len(registers) != count:
+            raise GWModbusError(
+                f"Register block {start}-{start + count - 1} returned an unexpected length"
+            )
+        return [int(register) for register in registers]
+
+    async def async_read_data(self) -> GWETAData:
+        """Read the GoodWe ETA runtime telemetry used by EnergyPilot."""
         async with self._lock:
             await self._async_ensure_connected()
-            try:
-                response = await self._client.read_holding_registers(
-                    REGISTER_EMS_MODE,
-                    count=2,
-                    device_id=self.slave,
-                )
-            except (ModbusException, OSError) as err:
-                raise GWModbusError(str(err)) from err
 
-            self._validate_response(response, "reading EMS status")
-            registers = getattr(response, "registers", None)
-            if not registers or len(registers) < 2:
-                raise GWModbusError("EMS response did not contain two registers")
-            return GWEMSStatus(mode=int(registers[0]), power=int(registers[1]))
+            register_map: dict[int, int] = {}
+            for start, count in TELEMETRY_BLOCKS:
+                registers = await self._async_read_block(start, count)
+                register_map.update(
+                    {start + offset: value for offset, value in enumerate(registers)}
+                )
+
+            values = {
+                definition.key: self._decode_value(register_map, definition)
+                for definition in REGISTER_DEFINITIONS
+            }
+            return GWETAData(values=values)
+
+    async def async_read_status(self) -> GWETAData:
+        """Read data for setup validation and backward compatibility."""
+        return await self.async_read_data()
 
     async def async_set_mode(self, mode: int, power: int) -> None:
+        """Set GoodWe EMS power first, then EMS mode."""
         if mode < 1 or mode > 12:
             raise ValueError("EMS mode must be between 1 and 12")
 
