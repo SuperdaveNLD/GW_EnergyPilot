@@ -1,0 +1,75 @@
+{
+  "title": "GW EnergyPilot",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the GoodWe ETA",
+        "description": "Enter the Modbus TCP connection details. EnergyPilot validates EMS registers 47511 and 47512 before setup.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "slave": "Unit ID"
+        }
+      },
+      "controller": {
+        "title": "Configure EnergyPilot control",
+        "description": "EMHASS and EV coordination are optional. You can also configure them later from integration options.",
+        "data": {
+          "p_batt_entity": "EMHASS P_batt entity",
+          "optim_status_entity": "Optimization status entity",
+          "optim_required_state": "Required optimization state",
+          "max_power": "Maximum battery power",
+          "deadband": "Battery power deadband",
+          "scan_interval": "Modbus scan interval",
+          "enable_ev_coordination": "Enable EV coordination",
+          "ev_mode_entity": "EV charging mode entity",
+          "ev_power_entity": "EV charging power entity",
+          "ev_deadband": "EV active power threshold"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the inverter or read EMS registers."
+    },
+    "abort": {
+      "already_configured": "This inverter is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "GW EnergyPilot options",
+        "data": {
+          "p_batt_entity": "EMHASS P_batt entity",
+          "optim_status_entity": "Optimization status entity",
+          "optim_required_state": "Required optimization state",
+          "max_power": "Maximum battery power",
+          "deadband": "Battery power deadband",
+          "scan_interval": "Modbus scan interval",
+          "enable_ev_coordination": "Enable EV coordination",
+          "ev_mode_entity": "EV charging mode entity",
+          "ev_power_entity": "EV charging power entity",
+          "ev_deadband": "EV active power threshold"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ems_mode": {"name": "EMS mode"},
+      "ems_setpoint": {"name": "EMS setpoint"},
+      "control_command": {"name": "Control command"},
+      "target_power": {"name": "Target power"},
+      "ev_status": {"name": "EV charging status"}
+    },
+    "switch": {
+      "automatic_control": {"name": "Automatic control"}
+    },
+    "number": {
+      "manual_power": {"name": "Manual power"}
+    },
+    "select": {
+      "manual_mode": {"name": "Manual EMS mode"}
+    }
+  }
+}
