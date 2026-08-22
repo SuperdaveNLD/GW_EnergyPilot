@@ -13,11 +13,18 @@ from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.NUMBER, Platform.SELECT]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.NUMBER,
+    Platform.SELECT,
+]
 
 
 @dataclass(slots=True)
 class GWRuntimeData:
+    """Runtime data for one EnergyPilot config entry."""
+
     client: GWModbusClient
     coordinator: GWEnergyPilotCoordinator
     controller: GWEnergyPilotController
@@ -37,13 +44,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     coordinator = GWEnergyPilotCoordinator(
         hass,
         client,
-        scan_interval=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
+        scan_interval=int(
+            entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        ),
     )
     await coordinator.async_config_entry_first_refresh()
 
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
-    entry.runtime_data = GWRuntimeData(client=client, coordinator=coordinator, controller=controller)
+    entry.runtime_data = GWRuntimeData(
+        client=client,
+        coordinator=coordinator,
+        controller=controller,
+    )
     await controller.async_setup()
+
+    # Safety baseline: automatic control is intentionally not restored after
+    # a Home Assistant restart. Every setup/reload hands the inverter back to
+    # GoodWe Auto / AI (mode 1, setpoint 0). The user must explicitly enable
+    # EnergyPilot automatic control again.
+    await controller.async_disable()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
