@@ -18,7 +18,7 @@
       },
       "controller": {
         "title": "Configure EMHASS control",
-        "description": "Automatic battery control requires a working EMHASS environment. First make sure EMHASS can complete an optimization and publish its results to Home Assistant. EV coordination is optional and can be configured later.",
+        "description": "Automatic battery control requires a working EMHASS environment. EnergyPilot pre-fills the standard EMHASS output entities sensor.p_batt_forecast and sensor.optim_status. Change them only when your EMHASS setup uses custom entity IDs. EV coordination is optional.",
         "data": {
           "p_batt_entity": "EMHASS battery power target",
           "optim_status_entity": "EMHASS optimization status",
@@ -32,9 +32,9 @@
           "ev_deadband": "EV active power threshold"
         },
         "data_description": {
-          "p_batt_entity": "Select the published EMHASS battery power target, normally sensor.p_batt_forecast. The state must be numeric and expressed in watts.",
-          "optim_status_entity": "Optional EMHASS optimization status entity, normally sensor.optim_status.",
-          "optim_required_state": "EnergyPilot only follows EMHASS when the optimization status matches this value. Recommended: Optimal.",
+          "p_batt_entity": "Standard value: sensor.p_batt_forecast. The state must be numeric and expressed in watts.",
+          "optim_status_entity": "Standard value: sensor.optim_status.",
+          "optim_required_state": "EnergyPilot only follows EMHASS when the optimization status matches this value. Standard value: Optimal.",
           "max_power_kw": "Maximum charge or discharge power EnergyPilot may request from the inverter, expressed in kW. For a 15 kW inverter use 15.0 kW.",
           "deadband": "Targets inside this range around 0 W are treated as Battery Hold to prevent unnecessary switching. Recommended: 300 W. A typical range is 200-500 W.",
           "scan_interval": "How often EnergyPilot refreshes GoodWe ETA telemetry. Recommended: 10 seconds.",
@@ -56,7 +56,7 @@
     "step": {
       "init": {
         "title": "GW EnergyPilot options",
-        "description": "Configure automatic control only after EMHASS is working and its published entities contain valid values.",
+        "description": "The standard EMHASS mappings are pre-filled automatically. Change them only if your EMHASS publish entity IDs differ.",
         "data": {
           "p_batt_entity": "EMHASS battery power target",
           "optim_status_entity": "EMHASS optimization status",
@@ -70,9 +70,9 @@
           "ev_deadband": "EV active power threshold"
         },
         "data_description": {
-          "p_batt_entity": "Published EMHASS battery power target, normally sensor.p_batt_forecast.",
-          "optim_status_entity": "Optional EMHASS optimization status entity, normally sensor.optim_status.",
-          "optim_required_state": "Recommended value: Optimal.",
+          "p_batt_entity": "Standard value: sensor.p_batt_forecast.",
+          "optim_status_entity": "Standard value: sensor.optim_status.",
+          "optim_required_state": "Standard value: Optimal.",
           "max_power_kw": "Maximum charge or discharge power EnergyPilot may request, expressed in kW.",
           "deadband": "Ignore small target deviations around 0 W to prevent unnecessary switching. Recommended: 300 W; typical range 200-500 W.",
           "scan_interval": "Recommended: 10 seconds.",
