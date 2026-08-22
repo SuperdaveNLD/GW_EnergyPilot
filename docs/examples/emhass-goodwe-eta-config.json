@@ -1,0 +1,158 @@
+{
+  "adjusted_pv_model_max_age": 24,
+  "adjusted_pv_regression_model": "LassoRegression",
+  "adjusted_pv_solar_elevation_threshold": 10,
+  "battery_charge_efficiency": 0.95,
+  "battery_charge_power_max": 15000,
+  "battery_discharge_efficiency": 1,
+  "battery_discharge_power_max": 15000,
+  "battery_dynamic_max": 0.9,
+  "battery_dynamic_min": -0.9,
+  "battery_identification_model_max_age": 24,
+  "battery_identification_trust_tier": "observe",
+  "battery_maximum_state_of_charge": 1,
+  "battery_minimum_state_of_charge": 0.05,
+  "battery_nominal_energy_capacity": 33280,
+  "battery_soc_deficit_cost": 0.002,
+  "battery_soc_deficit_threshold": 0.1,
+  "battery_soc_surplus_cost": 0.002,
+  "battery_soc_surplus_threshold": 0.9,
+  "battery_stress_cost": 0,
+  "battery_stress_segments": 10,
+  "battery_target_state_of_charge": 0.1,
+  "capacity_cost_per_kw": 0,
+  "compute_curtailment": false,
+  "continual_publish": true,
+  "cost_forecast_per_deferrable_load": [],
+  "costfun": "profit",
+  "def_minimum_off_time": [],
+  "def_minimum_on_time": [],
+  "deferrable_load_groups": [],
+  "deferrable_load_max_cost": [],
+  "delta_forecast_daily": 1,
+  "end_timesteps_of_each_deferrable_load": [],
+  "historic_days_to_retrieve": 7,
+  "influxdb_database": "homeassistant",
+  "influxdb_host": "localhost",
+  "influxdb_measurement": "W",
+  "influxdb_port": 8086,
+  "influxdb_retention_policy": "autogen",
+  "influxdb_use_ssl": false,
+  "influxdb_verify_ssl": false,
+  "inverter_ac_input_max": 15000,
+  "inverter_ac_output_max": 15000,
+  "inverter_efficiency_ac_dc": 1,
+  "inverter_efficiency_dc_ac": 1,
+  "inverter_is_hybrid": true,
+  "inverter_stress_cost": 0,
+  "inverter_stress_segments": 10,
+  "is_electric_load": [],
+  "load_cost_forecast_method": "csv",
+  "load_forecast_method": "naive",
+  "load_negative": false,
+  "load_offpeak_hours_cost": 0.1419,
+  "load_peak_hour_periods": {
+    "period_hp_1": [
+      {
+        "start": "02:54"
+      },
+      {
+        "end": "15:24"
+      }
+    ],
+    "period_hp_2": [
+      {
+        "start": "17:24"
+      },
+      {
+        "end": "20:24"
+      }
+    ]
+  },
+  "load_peak_hours_cost": 0.1907,
+  "logging_level": "INFO",
+  "lp_solver_mip_rel_gap": 0,
+  "lp_solver_timeout": 120,
+  "maximum_power_from_grid": 15000,
+  "maximum_power_to_grid": 15000,
+  "method_ts_round": "first",
+  "minimum_power_of_deferrable_loads": [],
+  "mlforecaster_weather_features": [],
+  "model_type": "load_forecast",
+  "modules_per_string": [
+    6
+  ],
+  "nominal_power_of_deferrable_loads": [],
+  "num_lags": 48,
+  "num_threads": 0,
+  "number_of_batteries": 1,
+  "number_of_deferrable_loads": 0,
+  "open_meteo_cache_max_age": 30,
+  "operating_hours_of_each_deferrable_load": [],
+  "optimization_time_step": 15,
+  "perform_backtest": false,
+  "photovoltaic_production_sell_price": 0.08,
+  "production_price_forecast_method": "csv",
+  "publish_deferrable_load_states": false,
+  "pv_inverter_model": [
+    "15000"
+  ],
+  "pv_module_model": [
+    "515"
+  ],
+  "sensor_battery_state_of_charge": [
+    "sensor.gw_energypilot_battery_state_of_charge"
+  ],
+  "sensor_linear_interp": [
+    "sensor.gw_energypilot_pv_total_power",
+    "sensor.gw_energypilot_total_load_power"
+  ],
+  "sensor_power_battery": [
+    "sensor.gw_energypilot_battery_power"
+  ],
+  "sensor_power_load_no_var_loads": "sensor.gw_energypilot_total_load_power",
+  "sensor_power_photovoltaics": "sensor.gw_energypilot_pv_total_power",
+  "sensor_power_photovoltaics_forecast": "sensor.p_pv_forecast",
+  "sensor_replace_zero": [
+    "sensor.gw_energypilot_pv_total_power",
+    "sensor.p_pv_forecast"
+  ],
+  "set_battery_dynamic": false,
+  "set_battery_first_priority": false,
+  "set_deferrable_load_single_constant": [],
+  "set_deferrable_max_startups": [],
+  "set_deferrable_startup_penalty": [],
+  "set_nocharge_from_grid": false,
+  "set_nodischarge_to_grid": false,
+  "set_total_pv_sell": false,
+  "set_use_adjusted_pv": true,
+  "set_use_battery": true,
+  "set_use_battery_identification": false,
+  "set_use_pv": true,
+  "set_zero_min": true,
+  "sklearn_model": "KNeighborsRegressor",
+  "split_date_delta": "48h",
+  "ssl_no_verify": false,
+  "start_timesteps_of_each_deferrable_load": [],
+  "strings_per_inverter": [
+    3
+  ],
+  "surface_azimuth": [
+    180
+  ],
+  "surface_tilt": [
+    11
+  ],
+  "treat_deferrable_load_as_semi_cont": [],
+  "use_influxdb": false,
+  "use_websocket": false,
+  "var_model": "sensor.gw_energypilot_total_load_power",
+  "weather_forecast_method": "open-meteo",
+  "weather_forecast_pv_quantile_bias": 0,
+  "weight_battery_charge": [
+    0
+  ],
+  "weight_battery_discharge": [
+    0
+  ]
+}
