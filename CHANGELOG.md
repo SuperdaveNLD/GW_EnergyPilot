@@ -2,6 +2,21 @@
 
 All notable changes to GW EnergyPilot will be documented in this file.
 
+## [0.03] - 2026-08-22
+
+### Changed
+
+- Setup and options UI is now English, including when Home Assistant uses the Dutch locale.
+- First setup screen now explicitly identifies the GoodWe ETA inverter.
+- `Host` renamed to `Inverter IP address`.
+- Added a clear static IP / DHCP reservation recommendation.
+- Added field-level help text using Home Assistant `data_description` strings.
+- Controller setup now clearly states that a working EMHASS environment is required before automatic battery control is enabled.
+- `Maximum battery power` renamed to `Maximum inverter power`.
+- Maximum inverter power is now entered in kW while EnergyPilot continues to store and control power internally in watts.
+- Power deadband help now explains Battery Hold behavior and recommends 300 W, with a typical range of 200-500 W.
+- Connection error text now explicitly refers to the GoodWe ETA and EMS registers 47511/47512.
+
 ## [0.02] - 2026-08-22
 
 ### Added
