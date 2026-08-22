@@ -1,16 +1,20 @@
+<p align="center">
+  <img src="custom_components/gw_energypilot/brand/logo.png" alt="GW EnergyPilot" width="180">
+</p>
+
 # GW EnergyPilot
 
 GW EnergyPilot is an unofficial Home Assistant integration for advanced EMS and battery control of GoodWe ETA hybrid inverters.
 
-It provides direct Modbus TCP communication, native GoodWe ETA telemetry, manual EMS mode control, optional EMHASS `P_batt` mapping, battery hold logic, and optional EV charging coordination.
+It provides direct Modbus TCP communication, native GoodWe ETA telemetry, manual EMS mode control, EMHASS `P_batt` mapping, battery hold logic, and optional EV charging coordination.
 
 > This is an independent community project and is not affiliated with or endorsed by GoodWe.
 
 ## Current status
 
-**Alpha - v0.03**
+**Alpha - v0.04**
 
-The project is being built from practical testing on a GoodWe ETA installation. Use it only if you understand the impact of forced charge, discharge, export and off-grid modes.
+The project is being built from practical testing on a GoodWe ETA installation. Forced EMS modes can charge or discharge a battery at high power and can export energy to the grid. Verify your inverter, battery and grid limits before enabling automatic control.
 
 ### Version numbering
 
@@ -20,31 +24,135 @@ GW EnergyPilot uses simple incremental versions:
 v0.01
 v0.02
 v0.03
+v0.04
 ...
 ```
 
-## Important: installation order
+## Important: EMHASS comes first
 
-For automatic battery control, **EMHASS must be installed, configured and working before EnergyPilot automatic control is enabled**.
+For the supported automatic-control workflow, **EMHASS must already be installed, configured, tested and publishing its Home Assistant sensors before GW EnergyPilot is added/configured for automatic control**.
 
-Recommended order for a new Home Assistant installation:
+Do not start the EnergyPilot automatic-control setup with an empty or unconfigured EMHASS environment.
+
+The required order is:
 
 1. Install Home Assistant and HACS.
-2. Install GW EnergyPilot from HACS.
-3. Connect GW EnergyPilot to the GoodWe ETA inverter and verify Modbus communication.
-4. Verify that the native EnergyPilot telemetry entities are updating correctly.
-5. Install and configure EMHASS.
-6. Configure EMHASS to use suitable Home Assistant source entities.
-7. Run a successful EMHASS day-ahead optimization.
-8. Publish the EMHASS result to Home Assistant.
-9. Verify that the selected EMHASS output entities exist and contain valid values.
-10. Configure EnergyPilot automatic control using those EMHASS entities.
-11. Only then enable EnergyPilot automatic control.
+2. Install EMHASS.
+3. Configure EMHASS for your installation.
+4. Make sure the Home Assistant source sensors referenced by EMHASS exist and contain valid values.
+5. Enable battery use in EMHASS and configure the battery/inverter limits correctly.
+6. Run a successful EMHASS day-ahead optimization.
+7. Publish the optimization result to Home Assistant.
+8. Verify that the required EMHASS output sensors exist and update correctly.
+9. Only now install/add GW EnergyPilot.
+10. Connect EnergyPilot to the GoodWe ETA inverter.
+11. Select the working EMHASS output entities in EnergyPilot.
+12. Verify the GoodWe telemetry and EMS state.
+13. Only then enable EnergyPilot automatic control.
 
 EMHASS documentation:
 
 - https://emhass.readthedocs.io/
 - https://github.com/davidusb-geek/emhass
+
+### Minimum EMHASS readiness check
+
+Before configuring EnergyPilot automatic control, confirm at minimum:
+
+```text
+EMHASS optimization            successful
+sensor.p_batt_forecast         exists and is numeric
+sensor.optim_status            exists if you use status validation
+EMHASS source sensors          available and numeric
+publish-data                   working
+```
+
+A typical battery setup will publish:
+
+```text
+sensor.p_batt_forecast
+sensor.soc_batt_forecast
+sensor.p_load_forecast
+sensor.p_pv_forecast
+sensor.optim_status
+```
+
+The exact entity IDs can differ if you use custom EMHASS publish IDs.
+
+### EMHASS source sensors
+
+EMHASS must be configured with working Home Assistant source sensors appropriate for your installation, for example:
+
+```text
+Battery state of charge
+Battery power
+PV power
+House/load power
+```
+
+The actual entity IDs are installation-specific. Do not point EMHASS at entities that are `unknown`, `unavailable`, permanently zero, or use the wrong sign convention.
+
+### Fresh Home Assistant bootstrap note
+
+If you intentionally want to use **EnergyPilot's native GoodWe telemetry as the EMHASS source data on a completely fresh Home Assistant installation**, there is a bootstrap exception to the order above:
+
+1. Add EnergyPilot with automatic control kept **OFF**.
+2. Use its telemetry entities as EMHASS source sensors.
+3. Configure, optimize and publish from EMHASS.
+4. Return to EnergyPilot options and select the now-working EMHASS output entities.
+5. Enable automatic control only after validation.
+
+This bootstrap path is only needed when the required source sensors do not exist before EnergyPilot is added.
+
+## Publishing EMHASS sensors to Home Assistant
+
+Installing and starting EMHASS does not by itself guarantee that forecast sensors already exist in Home Assistant.
+
+The normal sequence is:
+
+```text
+Valid source sensors
+        ↓
+Day-ahead optimization
+        ↓
+Successful optimization result
+        ↓
+Publish data
+        ↓
+Home Assistant forecast sensors
+```
+
+When EMHASS is configured with:
+
+```json
+"continual_publish": false
+```
+
+results are not continuously published automatically. Run `publish-data` manually or automate it.
+
+Common EMHASS endpoints are:
+
+```text
+/action/dayahead-optim
+/action/publish-data
+```
+
+A Home Assistant restart is normally not required just to make successfully published EMHASS sensors appear.
+
+## Installation with HACS
+
+Until the repository is included in the default HACS store:
+
+1. Open HACS.
+2. Open **Custom repositories**.
+3. Add `https://github.com/SuperdaveNLD/GW_EnergyPilot`.
+4. Select category **Integration**.
+5. Install **GW EnergyPilot**.
+6. Restart Home Assistant.
+7. Go to **Settings -> Devices & services -> Add integration**.
+8. Search for **GW EnergyPilot**.
+
+Remember: complete the EMHASS prerequisite steps above before configuring EnergyPilot automatic control.
 
 ## GoodWe ETA connection
 
@@ -56,106 +164,75 @@ The setup flow asks for:
 
 ### Use a fixed inverter IP address
 
-The inverter should have a **static IP address or DHCP reservation**.
+The GoodWe ETA inverter should have a **static IP address or DHCP reservation**.
 
-EnergyPilot connects directly to the inverter over Modbus TCP. If the inverter receives a different IP address after a network or router restart, EnergyPilot will no longer be able to communicate with it.
+EnergyPilot connects directly to the inverter over Modbus TCP. If the inverter receives a different IP address after a router or network restart, EnergyPilot will no longer be able to communicate with it.
 
 ## Native GoodWe ETA telemetry
 
-Starting with v0.02, EnergyPilot reads a broad set of GoodWe ETA telemetry directly from Modbus TCP. A separate Home Assistant Modbus YAML package is no longer required for these native entities.
+EnergyPilot reads GoodWe ETA telemetry directly over Modbus TCP. A separate Home Assistant Modbus YAML package is not required for these native entities.
 
-Current telemetry includes:
+Telemetry currently includes:
 
-- PV1, PV2, PV3 and PV4 voltage, current and power.
+- PV1/PV2/PV3/PV4 power, voltage and current.
 - Total PV power.
-- Inverter L1/L2/L3 voltage, current, frequency and power.
+- Inverter L1/L2/L3 power, voltage, current and frequency.
 - Total inverter power and AC active power.
 - Smart-meter L1/L2/L3 power, voltage and current.
-- Smart-meter total active power and fast power values.
-- Grid/meter frequency.
-- Battery SOC and SOH.
-- Battery voltage, current and power.
-- Battery mode and number of strings.
-- BMS status, protocol, software and hardware version values.
-- BMS maximum charge and discharge current.
-- Maximum and minimum cell voltage.
-- Inverter air, module and radiator temperature.
+- Smart-meter total power and fast power values.
+- Battery SOC, SOH, voltage, current and power.
+- BMS charge/discharge current limits.
+- Maximum/minimum cell voltage and temperature.
+- Inverter air, module and radiator temperatures.
 - BMS package temperature.
-- Maximum and minimum battery cell temperature.
 - Load and backup-load registers.
 - Work mode, operation mode, grid mode, warning and error registers.
 - EMS mode and EMS setpoint.
 
-Some GoodWe registers are model- and firmware-dependent. Raw diagnostic values are exposed where a reliable human-readable mapping has not yet been confirmed.
+### Cleaner default entity set in v0.04
 
-### Load power warning
+EnergyPilot still exposes the detailed register data, but lower-value or duplicate entities are now disabled by default to keep the device page and recorder cleaner.
 
-The GoodWe `total_load_power` register is exposed as telemetry, but EnergyPilot does **not** currently assume that it is always suitable as the EMHASS house-load source. Validate this value on your own installation before using it for optimization.
+Examples of entities disabled by default include:
 
-## EMHASS prerequisite
+- PV voltage/current detail.
+- Unused PV4 detail.
+- Per-phase inverter voltage/current/frequency.
+- Duplicate smart-meter fast phase power values.
+- Per-phase load detail.
+- Secondary inverter temperatures.
+- Raw BMS/inverter diagnostic registers.
 
-EnergyPilot does not install or configure EMHASS for you.
+You can enable any of these entities manually from the EnergyPilot device/entity page when troubleshooting.
 
-Before enabling automatic control, EMHASS must be able to:
+### Primary telemetry kept enabled
 
-- read its configured Home Assistant input sensors;
-- complete an optimization successfully;
-- publish its optimization result back to Home Assistant;
-- provide a numeric battery-power target such as `sensor.p_batt_forecast`;
-- optionally provide an optimization status entity such as `sensor.optim_status`.
-
-If these conditions are not met, do not enable EnergyPilot automatic control.
-
-## Publishing EMHASS sensors to Home Assistant
-
-Installing and starting EMHASS does not automatically guarantee that forecast entities are already present in Home Assistant.
-
-The normal sequence is:
+The default visible set focuses on useful operational data such as:
 
 ```text
-EMHASS input sensors available
-        ↓
-Day-ahead optimization
-        ↓
-Successful optimization result
-        ↓
-Publish data
-        ↓
-Home Assistant forecast entities
+PV total power
+PV1 / PV2 / PV3 power
+Total inverter power
+AC active power
+Total load power
+Battery SOC / SOH
+Battery power / voltage / current
+BMS max charge / discharge current
+BMS package temperature
+Battery maximum cell temperature
+Inverter radiator temperature
+Meter total active power fast
+Meter L1 / L2 / L3 active power
+Meter L1 / L2 / L3 voltage and current
 ```
 
-Typical published entities include:
+### Meter power note
 
-```text
-sensor.p_batt_forecast
-sensor.p_load_forecast
-sensor.p_pv_forecast
-sensor.soc_batt_forecast
-sensor.optim_status
-```
+On the first clean-HA validation system, the fast total meter value matched the sum of the three phase values closely. The slower `meter_total_active_power` register did not always match at the same instant, so the fast total is currently the preferred real-time grid reference.
 
-The exact entities depend on the EMHASS version and configuration.
+### Load power note
 
-### No Home Assistant restart is normally required
-
-When EMHASS publishes data successfully, the entities are created or updated directly in Home Assistant. A Home Assistant restart is normally not required just to make forecast sensors appear.
-
-If EMHASS is configured with:
-
-```json
-"continual_publish": false
-```
-
-results are not continuously published automatically. Run the publish action explicitly or create an automation that publishes after optimization.
-
-Common EMHASS endpoints are:
-
-```text
-/action/dayahead-optim
-/action/publish-data
-```
-
-After publishing, verify the entities under **Settings -> Developer tools -> States**.
+The `total_load_power` register matched the sum of the three load phase registers closely during initial clean-HA testing. Still validate this value on your own inverter/firmware before using it as an EMHASS load source.
 
 ## Tested EMS model
 
@@ -183,52 +260,48 @@ EnergyPilot uses:
 
 When automatic control is enabled and a valid `P_batt` entity is configured:
 
-- Negative `P_batt` outside the deadband -> mode 11, charge battery.
-- `P_batt` inside the deadband -> mode 8, Battery Hold.
-- Positive `P_batt` outside the deadband -> mode 12, discharge battery.
-- Disabling automatic control -> mode 1, GoodWe Auto / AI.
+```text
+P_batt < -deadband  -> mode 11 -> battery charge
+inside deadband     -> mode 8  -> Battery Hold
+P_batt > +deadband  -> mode 12 -> battery discharge
+```
 
-The automatic control switch intentionally starts **off after a Home Assistant restart**.
+Disabling automatic control returns the inverter to:
+
+```text
+Mode 1 - GoodWe Auto / AI
+Setpoint 0 W
+```
+
+The automatic-control switch intentionally starts **OFF after a Home Assistant restart or integration reload**.
 
 ## EnergyPilot control configuration
 
-Controller settings include:
-
-- EMHASS `P_batt` entity.
-- Optimization status entity and required state.
-- Maximum inverter power.
-- Power deadband.
-- Optional EV mode and power entities.
-
 ### Maximum inverter power
 
-This is the maximum charge or discharge power EnergyPilot may request from the inverter.
+This is the maximum battery-control power EnergyPilot may request from the inverter.
 
-Starting with v0.03, the setup UI uses **kW**. EnergyPilot converts the value internally to watts before writing an EMS power setpoint.
+The setup value is entered in kW. EnergyPilot converts it internally to watts.
 
-Examples:
+Example:
 
 ```text
-5.0 kW  = 5000 W
-10.0 kW = 10000 W
 15.0 kW = 15000 W
 ```
 
-Configure this according to the supported inverter and battery limits.
+Never configure this above the safe inverter or battery limits.
 
 ### Power deadband
 
 The deadband prevents unnecessary switching between charging, Battery Hold and discharging when the EMHASS target is close to zero.
 
-For example, with a deadband of `300 W`:
+With a `300 W` deadband:
 
 ```text
 P_batt < -300 W  -> charge battery
--300 W to +300 W -> Battery Hold
-P_batt > +300 W  -> discharge battery
+-300 W .. 300 W  -> Battery Hold
+P_batt > 300 W   -> discharge battery
 ```
-
-A lower deadband reacts more quickly but can cause more mode changes. A higher deadband is calmer but ignores larger small-power corrections.
 
 Recommended starting range:
 
@@ -253,47 +326,41 @@ An EV is considered active if either:
 
 More advanced house-load compensation is planned for a later version.
 
-## Installation with HACS
+## Branding
 
-Until the repository is included in the default HACS store:
+GW EnergyPilot ships its own local Home Assistant brand assets in:
 
-1. Open HACS.
-2. Open **Custom repositories**.
-3. Add `https://github.com/SuperdaveNLD/GW_EnergyPilot`.
-4. Select category **Integration**.
-5. Install **GW EnergyPilot**.
-6. Restart Home Assistant.
-7. Go to **Settings -> Devices & services -> Add integration**.
-8. Search for **GW EnergyPilot**.
+```text
+custom_components/gw_energypilot/brand/
+```
+
+The v0.04 branding uses the new square GW EnergyPilot energy monogram for both the integration icon and logo.
 
 ## Safety
 
-Forced EMS modes can charge or discharge a battery at high power and can export energy to the grid. Verify inverter limits, battery limits, grid connection limits and local regulations before enabling automatic control.
-
 Do not enable automatic control until:
 
-- the GoodWe ETA connection is verified;
-- the telemetry values have been checked for plausibility;
-- the configured EMHASS input sensors are valid;
-- EMHASS successfully completes an optimization;
+- the GoodWe ETA Modbus connection is verified;
+- telemetry values have been checked for plausibility;
+- EMHASS is fully configured and working;
+- EMHASS has completed a successful optimization;
+- EMHASS publish-data is working;
 - the selected `P_batt` entity is numeric and updates correctly;
-- the configured maximum power matches the actual inverter and battery limits.
+- the configured maximum inverter power matches the real installation limits.
 
 ## Roadmap
 
 - [x] HACS-ready custom integration structure.
 - [x] Direct Modbus TCP connection.
+- [x] Native GoodWe ETA telemetry.
 - [x] EMS mode and setpoint sensors.
 - [x] Manual EMS mode control.
 - [x] EMHASS `P_batt` mapping to modes 8/11/12.
 - [x] Automatic-control master switch with mode 1 fallback.
 - [x] Basic EV charging coordination.
-- [x] Native GoodWe ETA PV telemetry.
-- [x] Native inverter and smart-meter telemetry.
-- [x] Native battery/BMS telemetry.
-- [x] Native inverter, BMS and cell temperature sensors.
-- [x] Document EMHASS prerequisite and publish workflow.
-- [x] English setup flow and field-level help text.
+- [x] English setup flow and help text.
+- [x] Cleaner default entity set.
+- [x] Local integration branding.
 - [ ] Setup-time EMHASS readiness validation.
 - [ ] Advanced EV house-load compensation.
 - [ ] Diagnostics download.
