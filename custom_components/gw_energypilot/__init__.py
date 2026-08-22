@@ -16,18 +16,20 @@ from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
+from .orchestrator import GWEnergyPilotOrchestrator
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.SWITCH,
     Platform.NUMBER,
     Platform.SELECT,
+    Platform.BUTTON,
 ]
 
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v009.js?v=0.09-brand2"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v010.js?v=0.10"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -38,6 +40,7 @@ class GWRuntimeData:
     client: GWModbusClient
     coordinator: GWEnergyPilotCoordinator
     controller: GWEnergyPilotController
+    orchestrator: GWEnergyPilotOrchestrator
 
 
 type GWConfigEntry = ConfigEntry[GWRuntimeData]
@@ -88,18 +91,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
+    orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
         controller=controller,
+        orchestrator=orchestrator,
     )
+
     await controller.async_setup()
+    await orchestrator.async_setup()
 
     # The automatic-control switch restores its previous Home Assistant state.
-    # First-time installs default to OFF. If it was ON before a reload/restart,
-    # the switch re-enables the controller after its restored state is loaded.
-    # The controller still refuses to command the inverter while configured
-    # EMHASS inputs are invalid or the optimization status is not ready.
+    # The optimizer is deliberately independent from that switch: optimization
+    # can continue while GoodWe remains under its own Auto / AI control.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_register_panel(hass)
     return True
@@ -109,6 +114,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     """Unload GW EnergyPilot."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        await entry.runtime_data.orchestrator.async_unload()
         await entry.runtime_data.controller.async_unload()
         await entry.runtime_data.client.async_close()
     return unload_ok
