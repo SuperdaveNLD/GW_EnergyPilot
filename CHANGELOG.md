@@ -2,6 +2,30 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.10] - 2026-08-22
+
+### Added
+
+- Native EMHASS orchestrator inside GW EnergyPilot; the package YAML is no longer required for normal operation.
+- Native **Optimize now** Home Assistant button entity.
+- **Optimize now** control directly on the built-in EnergyPilot dashboard.
+- Current GoodWe battery SOC is passed to every optimization as runtime `soc_init`.
+- Recorder-based 48-hour load forecast with current-load fallback for fresh Home Assistant installations.
+- Optional official Home Assistant Nord Pool price retrieval using `nordpool.get_prices_for_date`.
+- Runtime import-price addition and export-price deduction settings.
+- Configurable EMHASS URL, optimization interval, final SOC target and fallback house load.
+- HTTP result validation for both `/action/dayahead-optim` and `/action/publish-data`.
+- Fresh numeric `P_batt` validation after publishing.
+- Orchestrator status/diagnostics exposed on the native Optimize now button and displayed in the dashboard.
+- Safety detection for the legacy `energypilot_emhass_orchestrator.yaml` scheduler to avoid duplicate recurring optimizations.
+
+### Changed
+
+- EMHASS optimization is now a first-class EnergyPilot function and remains independent from the GoodWe Automatic Control switch.
+- Existing v0.09 installations upgrade with the built-in recurring schedule disabled until explicitly enabled, preventing conflicts with an existing YAML scheduler.
+- The dashboard frontend moved to `gw-energy-pilot-v010.js` and reports v0.10.
+- EnergyPilot remains the only component that writes GoodWe EMS registers; the optimizer only creates and publishes the power plan.
+
 ## [0.09] - 2026-08-22
 
 ### Added
