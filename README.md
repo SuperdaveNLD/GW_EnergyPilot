@@ -333,7 +333,7 @@ GW EnergyPilot ships its own local Home Assistant brand assets in:
 custom_components/gw_energypilot/brand/
 ```
 
-The v0.04 branding uses the new square GW EnergyPilot energy monogram for both the integration icon and logo.
+The v0.04 branding uses the new square GW EnergyPilot energy monogram for both `icon.png` and `logo.png`.
 
 ## Safety
 
