@@ -9,6 +9,9 @@ All notable changes to GW EnergyPilot are documented here.
 - Native EMHASS orchestrator inside GW EnergyPilot; the package YAML is no longer required for normal operation.
 - Native **Optimize now** Home Assistant button entity.
 - **Optimize now** control directly on the built-in EnergyPilot dashboard.
+- Three native one-touch GoodWe battery buttons: **Maximum export**, **Pause battery**, and **Maximum charge**.
+- Battery quick actions are shown directly on the dashboard Battery card.
+- Manual quick actions take manual ownership and disable Automatic Control before applying the requested GoodWe EMS mode.
 - Current GoodWe battery SOC is passed to every optimization as runtime `soc_init`.
 - Recorder-based 48-hour load forecast with current-load fallback for fresh Home Assistant installations.
 - Optional official Home Assistant Nord Pool price retrieval using `nordpool.get_prices_for_date`.
@@ -18,11 +21,14 @@ All notable changes to GW EnergyPilot are documented here.
 - Fresh numeric `P_batt` validation after publishing.
 - Orchestrator status/diagnostics exposed on the native Optimize now button and displayed in the dashboard.
 - Safety detection for the legacy `energypilot_emhass_orchestrator.yaml` scheduler to avoid duplicate recurring optimizations.
+- Reusable `gw-energy-pilot-logo.svg` frontend asset while Home Assistant local-brand surfaces continue to use the supported PNG brand files.
 
 ### Changed
 
 - EMHASS optimization is now a first-class EnergyPilot function and remains independent from the GoodWe Automatic Control switch.
 - Existing v0.09 installations upgrade with the built-in recurring schedule disabled until explicitly enabled, preventing conflicts with an existing YAML scheduler.
+- Flow-direction chevrons were replaced with round moving energy particles so direction is communicated only by movement, not by arrow orientation.
+- Manual EMS mode selection now takes manual ownership instead of competing with Automatic Control.
 - The dashboard frontend moved to `gw-energy-pilot-v010.js` and reports v0.10.
 - EnergyPilot remains the only component that writes GoodWe EMS registers; the optimizer only creates and publishes the power plan.
 
