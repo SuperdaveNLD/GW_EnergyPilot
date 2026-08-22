@@ -29,6 +29,8 @@ from .const import (
     DEFAULT_EV_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_REQUIRED_STATE,
+    DEFAULT_OPTIM_STATUS_ENTITY,
+    DEFAULT_P_BATT_ENTITY,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SLAVE,
@@ -59,10 +61,16 @@ def _controller_schema() -> vol.Schema:
     """Return controller options schema."""
     return vol.Schema(
         {
-            vol.Optional(CONF_P_BATT_ENTITY): selector.EntitySelector(
+            vol.Optional(
+                CONF_P_BATT_ENTITY,
+                default=DEFAULT_P_BATT_ENTITY,
+            ): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=False)
             ),
-            vol.Optional(CONF_OPTIM_STATUS_ENTITY): selector.EntitySelector(
+            vol.Optional(
+                CONF_OPTIM_STATUS_ENTITY,
+                default=DEFAULT_OPTIM_STATUS_ENTITY,
+            ): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=False)
             ),
             vol.Optional(
@@ -130,6 +138,9 @@ def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
 def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     """Convert stored runtime values to user-facing values."""
     form_options = dict(options)
+    form_options.setdefault(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
+    form_options.setdefault(CONF_OPTIM_STATUS_ENTITY, DEFAULT_OPTIM_STATUS_ENTITY)
+    form_options.setdefault(CONF_OPTIM_REQUIRED_STATE, DEFAULT_OPTIM_REQUIRED_STATE)
     max_power_w = float(form_options.pop(CONF_MAX_POWER, DEFAULT_MAX_POWER))
     form_options[CONF_MAX_POWER_KW] = max_power_w / 1000
     return form_options
