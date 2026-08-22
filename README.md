@@ -6,15 +6,15 @@
 
 GW EnergyPilot is an unofficial Home Assistant integration for advanced EMS and battery control of GoodWe ETA hybrid inverters.
 
-It provides direct Modbus TCP telemetry and control, EMHASS `P_batt` mapping, Battery Hold, manual EMS control, optional EV coordination, and a built-in EnergyPilot dashboard.
+It provides direct Modbus TCP telemetry and control, native EMHASS orchestration, `P_batt` mapping, Battery Hold, manual EMS control, optional EV coordination, and a built-in EnergyPilot dashboard.
 
 > This is an independent community project and is not affiliated with or endorsed by GoodWe.
 
 ## Current status
 
-**Alpha - v0.09**
+**Alpha - v0.10**
 
-v0.09 adds the tested EMHASS orchestration reference, prefilled EMHASS controller entities, and the existing v0.08 dashboard/controller improvements.
+v0.10 moves the tested EMHASS optimization/publish workflow into EnergyPilot itself and adds a native **Optimize now** button to Home Assistant and the built-in dashboard.
 
 Forced EMS modes can charge or discharge a battery at high power and can export energy to the grid. Verify inverter, battery and grid limits before enabling Automatic Control.
 
@@ -27,8 +27,8 @@ v0.01
 v0.02
 v0.03
 ...
-v0.08
 v0.09
+v0.10
 ```
 
 # Recommended installation order
@@ -43,9 +43,12 @@ For a fresh Home Assistant installation use this sequence:
 5. Keep EnergyPilot Automatic Control OFF
 6. Verify EnergyPilot telemetry
 7. Change EMHASS source mappings to EnergyPilot entities
-8. Run EMHASS optimization + publish
-9. Verify sensor.p_batt_forecast and sensor.optim_status
-10. Enable EnergyPilot Automatic Control
+8. Restart/reload EMHASS
+9. Configure the EnergyPilot built-in EMHASS orchestrator
+10. Press Optimize now in the EnergyPilot dashboard
+11. Verify sensor.p_batt_forecast and sensor.optim_status
+12. Enable the recurring EnergyPilot orchestrator schedule
+13. Enable EnergyPilot Automatic Control
 ```
 
 The final data path is:
@@ -56,8 +59,15 @@ GoodWe ETA
     ▼
 GW EnergyPilot telemetry
     │
+    ├── current SOC
+    ├── current load + Recorder history
+    └── optional official Nord Pool prices
+    │
     ▼
-EMHASS optimization
+GW EnergyPilot EMHASS orchestrator
+    │
+    ▼
+EMHASS optimization + publish
     │ sensor.p_batt_forecast
     ▼
 GW EnergyPilot controller
@@ -66,21 +76,100 @@ GW EnergyPilot controller
 GoodWe EMS modes 8 / 11 / 12
 ```
 
-## EMHASS controller defaults in v0.09
+# Native EMHASS orchestrator in v0.10
 
-The EnergyPilot setup screen now pre-fills the standard EMHASS outputs:
+EnergyPilot can now run the complete EMHASS optimization cycle itself. A normal v0.10 installation no longer needs the old `energypilot_emhass_orchestrator.yaml` package.
+
+The native orchestrator:
+
+- runs independently from the EnergyPilot Automatic Control switch;
+- reads current battery SOC directly from EnergyPilot before every optimization;
+- passes actual SOC as runtime `soc_init`;
+- builds a 48-hour load forecast from current load plus Home Assistant Recorder history;
+- can retrieve timestamped prices from Home Assistant's official Nord Pool integration;
+- validates the EMHASS optimization HTTP result;
+- calls `publish-data` only after a successful optimization;
+- validates that a fresh numeric `sensor.p_batt_forecast` is available;
+- exposes optimizer diagnostics on the native **Optimize now** button entity;
+- never writes GoodWe registers itself.
+
+Recommended starting values:
 
 ```text
-P_batt entity               sensor.p_batt_forecast
-Optimization status         sensor.optim_status
-Required optimization state Optimal
-Maximum inverter power      15.0 kW
-Power deadband              300 W
-Modbus scan interval        10 s
-EV coordination             OFF
+EMHASS P_batt entity            sensor.p_batt_forecast
+Optimization status             sensor.optim_status
+Required optimization state     Optimal
+Maximum inverter power          15.0 kW
+Power deadband                  300 W
+Modbus scan interval            10 s
+EMHASS URL                      http://5b918bf2-emhass:5000
+Optimization interval           15 min
+Target final SOC                10%
+Fallback house load             700 W
+Nord Pool currency              EUR
+EV coordination                 OFF
 ```
 
-If `sensor.p_batt_forecast` does not exist yet during first setup, EnergyPilot simply waits. It starts reacting automatically after EMHASS publishes a valid numeric value.
+Existing v0.09 installations upgrade with the built-in recurring scheduler OFF so it cannot silently run next to an existing YAML scheduler. The native **Optimize now** button is still available for testing.
+
+## Optimize now
+
+v0.10 adds a native Home Assistant button entity named **GW EnergyPilot Optimize now**.
+
+The same control is shown directly on the dashboard EMHASS card:
+
+```text
+EMHASS
+P_batt target     +x.xx kW
+Optimization      Optimal
+
+[ Optimize now ]
+```
+
+Pressing it performs one complete transaction:
+
+```text
+current SOC + load forecast + optional prices
+        ↓
+POST /action/dayahead-optim
+        ↓
+HTTP 2xx?
+   no -> stop
+   yes
+        ↓
+POST /action/publish-data
+        ↓
+validate fresh P_batt + optimization status
+        ↓
+ready
+```
+
+The button works even when the recurring orchestrator schedule is disabled.
+
+## Official Nord Pool support
+
+When **Use official Nord Pool prices** is enabled and Home Assistant's Nord Pool integration is configured, EnergyPilot calls:
+
+```text
+nordpool.get_prices_for_date
+```
+
+EnergyPilot requests today and, when available, tomorrow, converts the returned currency/MWh values to currency/kWh, and sends timestamped `load_cost_forecast` and `prod_price_forecast` dictionaries to EMHASS.
+
+The price model supports:
+
+```text
+Import price addition
+Export price deduction
+```
+
+The validated Tibber setup used an export deduction of:
+
+```text
+0.0248 EUR/kWh
+```
+
+Disable official Nord Pool pricing in EnergyPilot when EMHASS should instead use its own configured price forecast method such as `hp_hc_periods`, `constant`, `csv`, etc.
 
 # EMHASS source mappings after EnergyPilot installation
 
@@ -107,51 +196,32 @@ Before using `sensor.gw_energypilot_total_load_power` for optimization, validate
 
 If the home also has separate AC-coupled PV, use a combined PV sensor for EMHASS instead of only the ETA-connected PV total.
 
-# v0.09 EMHASS orchestrator reference
+## Recommended EMHASS publish setting with v0.10
 
-v0.09 includes the tested local orchestration package used during development:
+When the EnergyPilot native orchestrator owns the optimization/publish transaction, use:
 
-```text
-docs/examples/energypilot_emhass_orchestrator.yaml
+```json
+"continual_publish": false,
+"optimization_time_step": 15
 ```
 
-Documentation:
+This lets EnergyPilot decide whether `publish-data` is allowed after checking the optimization result instead of unconditionally republishing an older plan after a failed optimization.
 
-```text
-docs/examples/README.md
-docs/EMHASS_SETUP.md
-```
+# Keep optimization separate from inverter control
 
-The reference orchestrator:
-
-- runs a fresh day-ahead optimization every 15 minutes;
-- runs independently from the EnergyPilot Automatic Control switch;
-- uses current EnergyPilot battery SOC as `soc_init`;
-- builds a load forecast from Home Assistant Recorder statistics;
-- validates the EMHASS HTTP response;
-- only calls `publish-data` after a successful optimization;
-- checks that a fresh `sensor.p_batt_forecast` was published;
-- never writes GoodWe Modbus registers.
-
-The tested reference currently uses a price entity with `raw_today` / `raw_tomorrow` attributes. For a public/general setup, prefer Home Assistant's official Nord Pool integration and its `nordpool.get_prices_for_date` action. The official integration can change automatically between hourly and 15-minute market time units, so price handling should not assume exactly 24 hourly values.
-
-## Keep optimization separate from inverter control
-
-EMHASS optimization must continue even when EnergyPilot Automatic Control is OFF.
+EMHASS optimization can continue even when EnergyPilot Automatic Control is OFF.
 
 ```text
 Automatic OFF
-├── EMHASS keeps optimizing
-├── EMHASS keeps publishing
+├── EnergyPilot keeps optimizing
+├── EnergyPilot keeps publishing valid plans
 └── GoodWe stays in GoodWe Auto / AI
 
 Automatic ON
-├── EMHASS keeps optimizing
-├── EMHASS keeps publishing
+├── EnergyPilot keeps optimizing
+├── EnergyPilot keeps publishing valid plans
 └── EnergyPilot applies the current P_batt target
 ```
-
-Do not gate recurring EMHASS optimization behind an old GoodWe/EMHASS master `input_boolean` when migrating from a YAML-based system.
 
 # Installation with HACS
 
@@ -187,6 +257,8 @@ The dashboard includes:
 - battery SOC, power, voltage, current and temperature;
 - EMS mode, setpoint, target and command;
 - EMHASS target/status/forecast information;
+- native orchestrator state and last-success information;
+- **Optimize now** button;
 - inverter/BMS health values;
 - Automatic Control switch;
 - draggable card ordering;
@@ -247,27 +319,40 @@ Telemetry includes PV strings, inverter values, smart-meter phase measurements, 
 
 Lower-value or duplicate diagnostic entities are disabled by default and can be enabled manually when troubleshooting.
 
-# Migration from older YAML control
+# Migration from v0.09 YAML orchestration
 
-Do not leave two systems writing GoodWe EMS registers at the same time.
+Do not leave two recurring EMHASS schedulers active at the same time and do not leave two systems writing GoodWe EMS registers.
 
-Recommended migration:
+Recommended v0.09 -> v0.10 migration:
 
 ```text
-1. Install EnergyPilot and validate telemetry
-2. Change EMHASS source mappings to EnergyPilot
-3. Validate optimization + publish
-4. Let EnergyPilot consume p_batt_forecast
-5. Disable old GoodWe EMS write automations/scripts
-6. Remove old Modbus YAML only after nothing else depends on it
+1. Update EnergyPilot to v0.10
+2. Keep Automatic Control OFF
+3. Verify the native Optimize now button exists
+4. Press Optimize now and verify P_batt + Optimal
+5. Remove/disable packages/energypilot_emhass_orchestrator.yaml
+6. Restart/reload Home Assistant
+7. Enable the built-in EnergyPilot orchestrator schedule
+8. Press Optimize now once more
+9. Enable Automatic Control
 ```
+
+If the legacy script or automation is still loaded while the native schedule is enabled, EnergyPilot reports:
+
+```text
+legacy_yaml_detected
+```
+
+and does not start its recurring scheduler.
+
+Old GoodWe EMS write automations and direct Modbus write scripts must also remain disabled after migrating control to EnergyPilot.
 
 Energy counters, separate AC-PV helpers and unrelated EV logic may still be needed until those functions are migrated separately.
 
 # Documentation
 
 - `docs/EMHASS_SETUP.md`
-- `docs/examples/energypilot_emhass_orchestrator.yaml`
+- `docs/examples/energypilot_emhass_orchestrator.yaml` (v0.09 reference / migration aid)
 - `docs/examples/README.md`
 - EMHASS: https://emhass.readthedocs.io/
 - Home Assistant developer documentation: https://developers.home-assistant.io/
