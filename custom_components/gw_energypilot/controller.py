@@ -129,6 +129,22 @@ class GWEnergyPilotController:
         await self.client.async_set_mode(MODE_AUTO, 0)
         await self.coordinator.async_request_refresh()
 
+    async def async_manual_command(self, mode: int, power: int, command: str) -> None:
+        """Apply a manual command and give manual control ownership.
+
+        Manual quick actions deliberately disable Automatic Control before the
+        new mode is written. This prevents a later P_batt state change from
+        immediately overwriting a user-requested charge/export/hold command.
+        Unlike async_disable(), this method does not write mode 1 first, so a
+        quick action is applied with a single EMS transaction.
+        """
+        self.enabled = False
+        self.target_power = max(0, int(power))
+        self.expected_mode = mode
+        self.last_command = command
+        await self.client.async_set_mode(mode, self.target_power)
+        await self.coordinator.async_request_refresh()
+
     async def async_evaluate(self) -> None:
         """Apply EMHASS-to-EMS mapping."""
         if not self.enabled:
