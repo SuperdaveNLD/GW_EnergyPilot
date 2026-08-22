@@ -42,12 +42,15 @@ class GWEMSModeSelect(GWEnergyPilotEntity, SelectEntity):
         return f"{mode}: {name}" if name else None
 
     async def async_select_option(self, option: str) -> None:
-        """Apply the selected EMS mode immediately."""
+        """Apply the selected EMS mode and switch to manual ownership."""
         mode = int(option.split(":", 1)[0])
         power = (
             0
             if mode in MODES_ZERO_POWER
             else self.entry.runtime_data.controller.manual_power
         )
-        await self.entry.runtime_data.client.async_set_mode(mode, power)
-        await self.coordinator.async_request_refresh()
+        await self.entry.runtime_data.controller.async_manual_command(
+            mode,
+            power,
+            f"manual_mode_{mode}",
+        )
