@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -24,15 +23,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GWConfigEntry
-from .const import MODE_NAMES
+from .const import CONF_ENABLE_EV_COORDINATION, MODE_NAMES
 from .entity import GWEnergyPilotEntity
-
-
-@dataclass(frozen=True, kw_only=True)
-class GWSensorEntityDescription(SensorEntityDescription):
-    """Describe a GoodWe ETA telemetry sensor."""
-
-    diagnostic: bool = False
 
 
 POWER = {
@@ -59,221 +51,317 @@ TEMPERATURE = {
     "device_class": SensorDeviceClass.TEMPERATURE,
     "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
     "state_class": SensorStateClass.MEASUREMENT,
+    "suggested_display_precision": 1,
 }
 
+DIAGNOSTIC_DISABLED = {
+    "entity_category": EntityCategory.DIAGNOSTIC,
+    "entity_registry_enabled_default": False,
+}
+DISABLED = {"entity_registry_enabled_default": False}
 
-TELEMETRY_SENSORS: tuple[GWSensorEntityDescription, ...] = (
-    # PV
-    GWSensorEntityDescription(key="pv_total_power", name="PV total power", **POWER),
-    GWSensorEntityDescription(key="pv1_power", name="PV1 power", **POWER),
-    GWSensorEntityDescription(key="pv1_voltage", name="PV1 voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="pv1_current", name="PV1 current", **CURRENT),
-    GWSensorEntityDescription(key="pv2_power", name="PV2 power", **POWER),
-    GWSensorEntityDescription(key="pv2_voltage", name="PV2 voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="pv2_current", name="PV2 current", **CURRENT),
-    GWSensorEntityDescription(key="pv3_power", name="PV3 power", **POWER),
-    GWSensorEntityDescription(key="pv3_voltage", name="PV3 voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="pv3_current", name="PV3 current", **CURRENT),
-    GWSensorEntityDescription(key="pv4_power", name="PV4 power", **POWER),
-    GWSensorEntityDescription(key="pv4_voltage", name="PV4 voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="pv4_current", name="PV4 current", **CURRENT),
 
-    # Inverter AC
-    GWSensorEntityDescription(
+TELEMETRY_SENSORS: tuple[SensorEntityDescription, ...] = (
+    # PV: keep total and individual string power visible. Electrical detail is
+    # available for troubleshooting but disabled by default.
+    SensorEntityDescription(key="pv_total_power", name="PV total power", **POWER),
+    SensorEntityDescription(key="pv1_power", name="PV1 power", **POWER),
+    SensorEntityDescription(
+        key="pv1_voltage", name="PV1 voltage", **VOLTAGE, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="pv1_current", name="PV1 current", **CURRENT, **DISABLED
+    ),
+    SensorEntityDescription(key="pv2_power", name="PV2 power", **POWER),
+    SensorEntityDescription(
+        key="pv2_voltage", name="PV2 voltage", **VOLTAGE, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="pv2_current", name="PV2 current", **CURRENT, **DISABLED
+    ),
+    SensorEntityDescription(key="pv3_power", name="PV3 power", **POWER),
+    SensorEntityDescription(
+        key="pv3_voltage", name="PV3 voltage", **VOLTAGE, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="pv3_current", name="PV3 current", **CURRENT, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="pv4_power", name="PV4 power", **POWER, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="pv4_voltage", name="PV4 voltage", **VOLTAGE, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="pv4_current", name="PV4 current", **CURRENT, **DISABLED
+    ),
+
+    # Inverter AC: keep the useful totals visible. Per-phase inverter telemetry
+    # is still available but the smart-meter phase values are usually more
+    # useful for day-to-day monitoring.
+    SensorEntityDescription(
         key="total_inverter_power", name="Total inverter power", **POWER
     ),
-    GWSensorEntityDescription(key="ac_active_power", name="AC active power", **POWER),
-    GWSensorEntityDescription(key="inverter_l1_power", name="Inverter L1 power", **POWER),
-    GWSensorEntityDescription(
-        key="inverter_l1_voltage", name="Inverter L1 voltage", **VOLTAGE
+    SensorEntityDescription(key="ac_active_power", name="AC active power", **POWER),
+    SensorEntityDescription(
+        key="inverter_l1_power", name="Inverter L1 power", **POWER, **DISABLED
     ),
-    GWSensorEntityDescription(
-        key="inverter_l1_current", name="Inverter L1 current", **CURRENT
+    SensorEntityDescription(
+        key="inverter_l1_voltage", name="Inverter L1 voltage", **VOLTAGE, **DISABLED
     ),
-    GWSensorEntityDescription(
-        key="inverter_l1_frequency", name="Inverter L1 frequency", **FREQUENCY
+    SensorEntityDescription(
+        key="inverter_l1_current", name="Inverter L1 current", **CURRENT, **DISABLED
     ),
-    GWSensorEntityDescription(key="inverter_l2_power", name="Inverter L2 power", **POWER),
-    GWSensorEntityDescription(
-        key="inverter_l2_voltage", name="Inverter L2 voltage", **VOLTAGE
+    SensorEntityDescription(
+        key="inverter_l1_frequency",
+        name="Inverter L1 frequency",
+        **FREQUENCY,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
-        key="inverter_l2_current", name="Inverter L2 current", **CURRENT
+    SensorEntityDescription(
+        key="inverter_l2_power", name="Inverter L2 power", **POWER, **DISABLED
     ),
-    GWSensorEntityDescription(
-        key="inverter_l2_frequency", name="Inverter L2 frequency", **FREQUENCY
+    SensorEntityDescription(
+        key="inverter_l2_voltage", name="Inverter L2 voltage", **VOLTAGE, **DISABLED
     ),
-    GWSensorEntityDescription(key="inverter_l3_power", name="Inverter L3 power", **POWER),
-    GWSensorEntityDescription(
-        key="inverter_l3_voltage", name="Inverter L3 voltage", **VOLTAGE
+    SensorEntityDescription(
+        key="inverter_l2_current", name="Inverter L2 current", **CURRENT, **DISABLED
     ),
-    GWSensorEntityDescription(
-        key="inverter_l3_current", name="Inverter L3 current", **CURRENT
+    SensorEntityDescription(
+        key="inverter_l2_frequency",
+        name="Inverter L2 frequency",
+        **FREQUENCY,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
-        key="inverter_l3_frequency", name="Inverter L3 frequency", **FREQUENCY
+    SensorEntityDescription(
+        key="inverter_l3_power", name="Inverter L3 power", **POWER, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="inverter_l3_voltage", name="Inverter L3 voltage", **VOLTAGE, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="inverter_l3_current", name="Inverter L3 current", **CURRENT, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="inverter_l3_frequency",
+        name="Inverter L3 frequency",
+        **FREQUENCY,
+        **DISABLED,
     ),
 
-    # Inverter temperatures
-    GWSensorEntityDescription(
-        key="inverter_air_temperature", name="Inverter air temperature", **TEMPERATURE
+    # Temperatures: radiator temperature is the primary inverter thermal value.
+    SensorEntityDescription(
+        key="inverter_air_temperature",
+        name="Inverter air temperature",
+        **TEMPERATURE,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="inverter_module_temperature",
         name="Inverter module temperature",
         **TEMPERATURE,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="inverter_radiator_temperature",
         name="Inverter radiator temperature",
         **TEMPERATURE,
     ),
 
-    # Load / backup. These are exposed as raw GoodWe telemetry. Some ETA
-    # installations report Total load power as zero, so do not assume this is
-    # a reliable whole-home load source without validating it locally.
-    GWSensorEntityDescription(key="load_l1_power", name="Load L1 power", **POWER),
-    GWSensorEntityDescription(key="load_l2_power", name="Load L2 power", **POWER),
-    GWSensorEntityDescription(key="load_l3_power", name="Load L3 power", **POWER),
-    GWSensorEntityDescription(
-        key="total_backup_load_power", name="Total backup load power", **POWER
+    # Load / backup. The total load register validated closely against the phase
+    # sum on the first clean-HA test installation. Phase and backup detail stay
+    # available but are disabled by default.
+    SensorEntityDescription(
+        key="load_l1_power", name="Load L1 power", **POWER, **DISABLED
     ),
-    GWSensorEntityDescription(key="total_load_power", name="Total load power", **POWER),
+    SensorEntityDescription(
+        key="load_l2_power", name="Load L2 power", **POWER, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="load_l3_power", name="Load L3 power", **POWER, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="total_backup_load_power",
+        name="Total backup load power",
+        **POWER,
+        **DISABLED,
+    ),
+    SensorEntityDescription(key="total_load_power", name="Total load power", **POWER),
 
-    # Battery runtime
-    GWSensorEntityDescription(
+    # Battery runtime.
+    SensorEntityDescription(
         key="battery_soc",
         name="Battery state of charge",
         device_class=SensorDeviceClass.BATTERY,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="battery_soh",
         name="Battery state of health",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
     ),
-    GWSensorEntityDescription(key="battery_power", name="Battery power", **POWER),
-    GWSensorEntityDescription(key="battery_voltage", name="Battery voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="battery_current", name="Battery current", **CURRENT),
-    GWSensorEntityDescription(
-        key="battery_mode", name="Battery mode", diagnostic=True
+    SensorEntityDescription(key="battery_power", name="Battery power", **POWER),
+    SensorEntityDescription(key="battery_voltage", name="Battery voltage", **VOLTAGE),
+    SensorEntityDescription(key="battery_current", name="Battery current", **CURRENT),
+    SensorEntityDescription(
+        key="battery_mode", name="Battery mode", **DIAGNOSTIC_DISABLED
     ),
-    GWSensorEntityDescription(
-        key="battery_strings", name="Battery strings", diagnostic=True
+    SensorEntityDescription(
+        key="battery_strings", name="Battery strings", **DIAGNOSTIC_DISABLED
     ),
 
-    # BMS temperatures, limits and cell health
-    GWSensorEntityDescription(
+    # BMS temperatures, limits and cell health.
+    SensorEntityDescription(
         key="bms_package_temperature", name="BMS package temperature", **TEMPERATURE
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="battery_max_cell_temperature",
         name="Battery maximum cell temperature",
         **TEMPERATURE,
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="battery_min_cell_temperature",
         name="Battery minimum cell temperature",
         **TEMPERATURE,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
-        key="battery_max_cell_voltage", name="Battery maximum cell voltage", **VOLTAGE
+    SensorEntityDescription(
+        key="battery_max_cell_voltage",
+        name="Battery maximum cell voltage",
+        suggested_display_precision=3,
+        **VOLTAGE,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
-        key="battery_min_cell_voltage", name="Battery minimum cell voltage", **VOLTAGE
+    SensorEntityDescription(
+        key="battery_min_cell_voltage",
+        name="Battery minimum cell voltage",
+        suggested_display_precision=3,
+        **VOLTAGE,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="bms_max_charge_current", name="BMS maximum charge current", **CURRENT
     ),
-    GWSensorEntityDescription(
-        key="bms_max_discharge_current", name="BMS maximum discharge current", **CURRENT
+    SensorEntityDescription(
+        key="bms_max_discharge_current",
+        name="BMS maximum discharge current",
+        **CURRENT,
     ),
-    GWSensorEntityDescription(key="bms_status", name="BMS status", diagnostic=True),
-    GWSensorEntityDescription(key="bms_protocol", name="BMS protocol", diagnostic=True),
-    GWSensorEntityDescription(
-        key="bms_software_version", name="BMS software version", diagnostic=True
+    SensorEntityDescription(key="bms_status", name="BMS status", **DIAGNOSTIC_DISABLED),
+    SensorEntityDescription(
+        key="bms_protocol", name="BMS protocol", **DIAGNOSTIC_DISABLED
     ),
-    GWSensorEntityDescription(
-        key="bms_hardware_version", name="BMS hardware version", diagnostic=True
+    SensorEntityDescription(
+        key="bms_software_version",
+        name="BMS software version",
+        **DIAGNOSTIC_DISABLED,
     ),
-    GWSensorEntityDescription(key="bms_error_low", name="BMS error low", diagnostic=True),
-    GWSensorEntityDescription(
-        key="bms_warning_low", name="BMS warning low", diagnostic=True
+    SensorEntityDescription(
+        key="bms_hardware_version",
+        name="BMS hardware version",
+        **DIAGNOSTIC_DISABLED,
     ),
-    GWSensorEntityDescription(
-        key="bms_error_high", name="BMS error high", diagnostic=True
+    SensorEntityDescription(
+        key="bms_error_low", name="BMS error low", **DIAGNOSTIC_DISABLED
     ),
-    GWSensorEntityDescription(
-        key="bms_warning_high", name="BMS warning high", diagnostic=True
+    SensorEntityDescription(
+        key="bms_warning_low", name="BMS warning low", **DIAGNOSTIC_DISABLED
+    ),
+    SensorEntityDescription(
+        key="bms_error_high", name="BMS error high", **DIAGNOSTIC_DISABLED
+    ),
+    SensorEntityDescription(
+        key="bms_warning_high", name="BMS warning high", **DIAGNOSTIC_DISABLED
     ),
 
-    # Smart meter / grid
-    GWSensorEntityDescription(
-        key="meter_total_active_power", name="Meter total active power", **POWER
+    # Smart meter / grid. During initial validation the fast total matched the
+    # sum of the three phase values, so it is the primary total grid sensor.
+    SensorEntityDescription(
+        key="meter_total_active_power",
+        name="Meter total active power",
+        **POWER,
+        **DISABLED,
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="meter_total_power_fast", name="Meter total active power fast", **POWER
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="meter_l1_active_power", name="Meter L1 active power", **POWER
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="meter_l2_active_power", name="Meter L2 active power", **POWER
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="meter_l3_active_power", name="Meter L3 active power", **POWER
     ),
-    GWSensorEntityDescription(key="meter_l1_power_fast", name="Meter L1 power fast", **POWER),
-    GWSensorEntityDescription(key="meter_l2_power_fast", name="Meter L2 power fast", **POWER),
-    GWSensorEntityDescription(key="meter_l3_power_fast", name="Meter L3 power fast", **POWER),
-    GWSensorEntityDescription(key="meter_l1_voltage", name="Meter L1 voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="meter_l2_voltage", name="Meter L2 voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="meter_l3_voltage", name="Meter L3 voltage", **VOLTAGE),
-    GWSensorEntityDescription(key="meter_l1_current", name="Meter L1 current", **CURRENT),
-    GWSensorEntityDescription(key="meter_l2_current", name="Meter L2 current", **CURRENT),
-    GWSensorEntityDescription(key="meter_l3_current", name="Meter L3 current", **CURRENT),
-    GWSensorEntityDescription(key="meter_frequency", name="Meter frequency", **FREQUENCY),
-    GWSensorEntityDescription(
-        key="meter_communication", name="Meter communication", diagnostic=True
+    SensorEntityDescription(
+        key="meter_l1_power_fast", name="Meter L1 power fast", **POWER, **DISABLED
     ),
-    GWSensorEntityDescription(
-        key="meter_test_status", name="Meter test status", diagnostic=True
+    SensorEntityDescription(
+        key="meter_l2_power_fast", name="Meter L2 power fast", **POWER, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="meter_l3_power_fast", name="Meter L3 power fast", **POWER, **DISABLED
+    ),
+    SensorEntityDescription(key="meter_l1_voltage", name="Meter L1 voltage", **VOLTAGE),
+    SensorEntityDescription(key="meter_l2_voltage", name="Meter L2 voltage", **VOLTAGE),
+    SensorEntityDescription(key="meter_l3_voltage", name="Meter L3 voltage", **VOLTAGE),
+    SensorEntityDescription(key="meter_l1_current", name="Meter L1 current", **CURRENT),
+    SensorEntityDescription(key="meter_l2_current", name="Meter L2 current", **CURRENT),
+    SensorEntityDescription(key="meter_l3_current", name="Meter L3 current", **CURRENT),
+    SensorEntityDescription(
+        key="meter_frequency", name="Meter frequency", **FREQUENCY, **DISABLED
+    ),
+    SensorEntityDescription(
+        key="meter_communication",
+        name="Meter communication",
+        **DIAGNOSTIC_DISABLED,
+    ),
+    SensorEntityDescription(
+        key="meter_test_status", name="Meter test status", **DIAGNOSTIC_DISABLED
     ),
 
-    # Inverter diagnostics
-    GWSensorEntityDescription(key="work_mode", name="Work mode", diagnostic=True),
-    GWSensorEntityDescription(
-        key="operation_mode", name="Operation mode", diagnostic=True
+    # Inverter diagnostics. Keep available for troubleshooting, but do not
+    # create database noise on a normal installation.
+    SensorEntityDescription(key="work_mode", name="Work mode", **DIAGNOSTIC_DISABLED),
+    SensorEntityDescription(
+        key="operation_mode", name="Operation mode", **DIAGNOSTIC_DISABLED
     ),
-    GWSensorEntityDescription(key="grid_mode", name="Grid mode", diagnostic=True),
-    GWSensorEntityDescription(key="warning_code", name="Warning code", diagnostic=True),
-    GWSensorEntityDescription(key="error_message", name="Error message", diagnostic=True),
-    GWSensorEntityDescription(
-        key="diagnose_result", name="Diagnose result", diagnostic=True
+    SensorEntityDescription(key="grid_mode", name="Grid mode", **DIAGNOSTIC_DISABLED),
+    SensorEntityDescription(
+        key="warning_code", name="Warning code", **DIAGNOSTIC_DISABLED
     ),
-    GWSensorEntityDescription(
-        key="warning_message_32bit", name="Warning message 32-bit", diagnostic=True
+    SensorEntityDescription(
+        key="error_message", name="Error message", **DIAGNOSTIC_DISABLED
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
+        key="diagnose_result", name="Diagnose result", **DIAGNOSTIC_DISABLED
+    ),
+    SensorEntityDescription(
+        key="warning_message_32bit",
+        name="Warning message 32-bit",
+        **DIAGNOSTIC_DISABLED,
+    ),
+    SensorEntityDescription(
         key="error_message_extended_32bit",
         name="Extended error message 32-bit",
-        diagnostic=True,
+        **DIAGNOSTIC_DISABLED,
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="warning_message_extended_32bit",
         name="Extended warning message 32-bit",
-        diagnostic=True,
+        **DIAGNOSTIC_DISABLED,
     ),
-    GWSensorEntityDescription(
-        key="feed_power_enable", name="Feed power enable", diagnostic=True
+    SensorEntityDescription(
+        key="feed_power_enable", name="Feed power enable", **DIAGNOSTIC_DISABLED
     ),
-    GWSensorEntityDescription(
+    SensorEntityDescription(
         key="feed_power_parameter",
         name="Feed power parameter",
-        diagnostic=True,
         **POWER,
+        **DIAGNOSTIC_DISABLED,
     ),
 )
 
@@ -289,8 +377,11 @@ async def async_setup_entry(
         GWEMSSetpointSensor(entry),
         GWControlCommandSensor(entry),
         GWTargetPowerSensor(entry),
-        GWEVActiveSensor(entry),
     ]
+
+    if entry.options.get(CONF_ENABLE_EV_COORDINATION, False):
+        entities.append(GWEVActiveSensor(entry))
+
     entities.extend(GWTelemetrySensor(entry, description) for description in TELEMETRY_SENSORS)
     async_add_entities(entities)
 
@@ -298,18 +389,16 @@ async def async_setup_entry(
 class GWTelemetrySensor(GWEnergyPilotEntity, SensorEntity):
     """Generic coordinator-backed GoodWe ETA telemetry sensor."""
 
-    entity_description: GWSensorEntityDescription
+    entity_description: SensorEntityDescription
 
     def __init__(
         self,
         entry: GWConfigEntry,
-        description: GWSensorEntityDescription,
+        description: SensorEntityDescription,
     ) -> None:
         super().__init__(entry)
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        if description.diagnostic:
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> Any:
