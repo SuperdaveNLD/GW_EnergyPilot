@@ -1,0 +1,844 @@
+###############################################################################
+# GW ENERGYPILOT - EMHASS ORCHESTRATOR
+#
+# LOCAL / REFERENCE IMPLEMENTATION
+#
+# Purpose:
+# - Run a fresh EMHASS day-ahead optimization every 15 minutes.
+# - Keep optimization independent from EnergyPilot Automatic Control.
+# - Use the current EnergyPilot battery SOC as soc_init.
+# - Build a load forecast from Home Assistant Recorder statistics.
+# - Publish only after a successful EMHASS optimization.
+# - Never write GoodWe Modbus registers from this YAML.
+#
+# GoodWe control must be performed only by GW EnergyPilot.
+#
+# IMPORTANT PRICE SOURCE NOTE
+# ---------------------------
+# This reference currently uses a Nord Pool entity with raw_today/raw_tomorrow
+# attributes because that is the setup used during validation.
+# Change price_entity below to the price entity used by your installation.
+# For new public installations, prefer Home Assistant's official Nord Pool
+# integration and nordpool.get_prices_for_date. See docs/EMHASS_SETUP.md.
+###############################################################################
+
+
+###############################################################################
+# REST COMMANDS
+###############################################################################
+
+rest_command:
+  energypilot_emhass_optimize:
+    url: "http://5b918bf2-emhass:5000/action/dayahead-optim"
+    method: POST
+    content_type: "application/json"
+    timeout: 180
+    payload: "{{ payload }}"
+
+  energypilot_emhass_publish:
+    url: "http://5b918bf2-emhass:5000/action/publish-data"
+    method: POST
+    content_type: "application/json"
+    timeout: 60
+    payload: "{}"
+
+
+###############################################################################
+# SETTINGS / STATUS
+###############################################################################
+
+input_number:
+  energypilot_emhass_fallback_load:
+    name: EnergyPilot EMHASS fallback load
+    min: 100
+    max: 5000
+    step: 50
+    unit_of_measurement: W
+    mode: box
+    icon: mdi:home-lightning-bolt
+    initial: 700
+
+  energypilot_emhass_sell_fee:
+    name: EnergyPilot EMHASS sell fee
+    min: 0
+    max: 0.1000
+    step: 0.0001
+    unit_of_measurement: EUR/kWh
+    mode: box
+    icon: mdi:cash-minus
+    initial: 0.0248
+
+
+input_text:
+  energypilot_emhass_status:
+    name: EnergyPilot EMHASS status
+    max: 100
+    icon: mdi:state-machine
+    initial: idle
+
+  energypilot_emhass_last_error:
+    name: EnergyPilot EMHASS last error
+    max: 255
+    icon: mdi:alert-circle-outline
+    initial: none
+
+
+input_datetime:
+  energypilot_emhass_last_success:
+    name: EnergyPilot EMHASS last success
+    has_date: true
+    has_time: true
+    icon: mdi:clock-check-outline
+
+
+###############################################################################
+# STATUS SENSOR
+###############################################################################
+
+template:
+  - sensor:
+      - name: EnergyPilot EMHASS Orchestrator
+        unique_id: energypilot_emhass_orchestrator
+        icon: mdi:robot-industrial-outline
+        state: >
+          {{ states('input_text.energypilot_emhass_status') }}
+        attributes:
+          last_success: >
+            {{ states('input_datetime.energypilot_emhass_last_success') }}
+          last_error: >
+            {{ states('input_text.energypilot_emhass_last_error') }}
+          p_batt: >
+            {{ states('sensor.p_batt_forecast') }}
+          optim_status: >
+            {{ states('sensor.optim_status') }}
+          battery_soc: >
+            {{ states('sensor.gw_energypilot_battery_state_of_charge') }}
+          current_load: >
+            {{ states('sensor.gw_energypilot_total_load_power') }}
+          fallback_load: >
+            {{ states('input_number.energypilot_emhass_fallback_load') }}
+          sell_fee: >
+            {{ states('input_number.energypilot_emhass_sell_fee') }}
+
+
+###############################################################################
+# MAIN SCRIPT
+###############################################################################
+
+script:
+  energypilot_emhass_optimize_now:
+    alias: EnergyPilot EMHASS - Optimize now
+    description: >
+      Builds prices, load forecast and current SOC, starts EMHASS day-ahead
+      optimization and only publishes after a successful optimization.
+    mode: single
+
+    sequence:
+      #########################################################################
+      # STATUS RESET
+      #########################################################################
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energypilot_emhass_status
+        data:
+          value: preparing
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energypilot_emhass_last_error
+        data:
+          value: none
+
+
+      #########################################################################
+      # BASE VARIABLES
+      #########################################################################
+
+      - variables:
+          # Change this to your working price entity when required.
+          # The validated setup uses raw_today/raw_tomorrow attributes.
+          price_entity: sensor.nordpool_kwh_nl_eur_3_10_021
+
+          soc_entity: sensor.gw_energypilot_battery_state_of_charge
+
+          load_entity: sensor.gw_energypilot_total_load_power
+
+          sell_fee: >
+            {{
+              states('input_number.energypilot_emhass_sell_fee')
+              | float(0.0248)
+            }}
+
+          fallback_load: >
+            {{
+              states('input_number.energypilot_emhass_fallback_load')
+              | float(700)
+            }}
+
+          p_batt_before: >
+            {% if has_value('sensor.p_batt_forecast') %}
+              {{
+                as_timestamp(
+                  states.sensor.p_batt_forecast.last_updated,
+                  default=0
+                )
+              }}
+            {% else %}
+              0
+            {% endif %}
+
+
+      #########################################################################
+      # SOURCE VALUES
+      #########################################################################
+
+      - variables:
+          raw_soc: >
+            {{ states(soc_entity) | float(-1) }}
+
+          raw_load: >
+            {{ states(load_entity) | float(-1) }}
+
+          raw_today: >
+            {{ state_attr(price_entity, 'raw_today') or [] }}
+
+          raw_tomorrow: >
+            {{ state_attr(price_entity, 'raw_tomorrow') or [] }}
+
+          price_count: >
+            {{
+              (
+                (state_attr(price_entity, 'raw_today') or [])
+                +
+                (state_attr(price_entity, 'raw_tomorrow') or [])
+              ) | count
+            }}
+
+          validation_error: >
+            {% if not has_value(soc_entity) %}
+              EnergyPilot battery SOC unavailable
+            {% elif states(soc_entity) | float(-1) < 0 %}
+              EnergyPilot battery SOC invalid
+            {% elif not has_value(load_entity) %}
+              EnergyPilot load sensor unavailable
+            {% elif (
+              (
+                (state_attr(price_entity, 'raw_today') or [])
+                +
+                (state_attr(price_entity, 'raw_tomorrow') or [])
+              ) | count
+            ) == 0 %}
+              Nord Pool price data unavailable
+            {% else %}
+              none
+            {% endif %}
+
+
+      #########################################################################
+      # INPUT ERROR -> STOP
+      #########################################################################
+
+      - if:
+          - condition: template
+            value_template: >
+              {{ validation_error != 'none' }}
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_status
+            data:
+              value: error_input
+
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_last_error
+            data:
+              value: >
+                {{ validation_error[:250] }}
+
+          - stop: >
+              {{ validation_error }}
+            error: true
+
+
+      #########################################################################
+      # CURRENT BATTERY SOC
+      #########################################################################
+
+      - variables:
+          soc_init: >
+            {% set s = states(soc_entity) | float(50) / 100 %}
+
+            {% if s < 0.05 %}
+              0.05
+            {% elif s > 1.00 %}
+              1.00
+            {% else %}
+              {{ s | round(4) }}
+            {% endif %}
+
+
+      #########################################################################
+      # LOAD HISTORY
+      #########################################################################
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energypilot_emhass_status
+        data:
+          value: reading_history
+
+      - action: recorder.get_statistics
+        data:
+          statistic_ids:
+            - sensor.gw_energypilot_total_load_power
+
+          start_time: >
+            {{ (now() - timedelta(days=7)).isoformat() }}
+
+          end_time: >
+            {{ now().isoformat() }}
+
+          period: hour
+
+          types:
+            - mean
+
+        response_variable: energypilot_load_stats
+        continue_on_error: true
+
+
+      #########################################################################
+      # LOAD FORECAST
+      #########################################################################
+
+      - variables:
+          load_power_forecast_json: >-
+            {%- set stats_map =
+              energypilot_load_stats.get('statistics', {})
+              if energypilot_load_stats is defined
+              else {}
+            -%}
+
+            {%- set rows =
+              stats_map.get(load_entity, [])
+            -%}
+
+            {%- set current_raw =
+              states(load_entity) | float(-1)
+            -%}
+
+            {%- if current_raw >= 50
+              and current_raw <= 20000
+            -%}
+              {%- set current_load = current_raw -%}
+            {%- else -%}
+              {%- set current_load = fallback_load -%}
+            {%- endif -%}
+
+            {%- set start =
+              now().replace(
+                minute=0,
+                second=0,
+                microsecond=0
+              )
+            -%}
+
+            {%- set ns = namespace(parts=[]) -%}
+
+            {%- for i in range(25) -%}
+
+              {%- set target =
+                start + timedelta(hours=i)
+              -%}
+
+              {%- set target_hour = target.hour -%}
+
+              {%- set values = namespace(items=[]) -%}
+
+              {%- for row in rows -%}
+
+                {%- set row_datetime =
+                  as_datetime(row.start)
+                -%}
+
+                {%- if row_datetime is not none -%}
+
+                  {%- set row_local =
+                    row_datetime | as_local
+                  -%}
+
+                  {%- set mean =
+                    row.mean | float(-1)
+                  -%}
+
+                  {%- if
+                    row_local.hour == target_hour
+                    and mean >= 50
+                    and mean <= 20000
+                  -%}
+
+                    {%- set values.items =
+                      values.items + [mean]
+                    -%}
+
+                  {%- endif -%}
+
+                {%- endif -%}
+
+              {%- endfor -%}
+
+              {%- if values.items | count > 0 -%}
+
+                {%- set forecast =
+                  (
+                    values.items | sum
+                    /
+                    values.items | count
+                  )
+                -%}
+
+              {%- else -%}
+
+                {%- set forecast = current_load -%}
+
+              {%- endif -%}
+
+              {%- set ns.parts =
+                ns.parts + [
+                  '"' ~
+                  target.isoformat() ~
+                  '":' ~
+                  (forecast | round(0))
+                ]
+              -%}
+
+            {%- endfor -%}
+
+            {{ '{' ~ ns.parts | join(',') ~ '}' }}
+
+
+      #########################################################################
+      # PURCHASE PRICE FORECAST
+      #########################################################################
+
+      - variables:
+          load_cost_forecast_json: >-
+            {%- set raw =
+              (
+                (state_attr(price_entity, 'raw_today') or [])
+                +
+                (state_attr(price_entity, 'raw_tomorrow') or [])
+              )
+            -%}
+
+            {%- set ns = namespace(parts=[]) -%}
+
+            {%- for item in raw -%}
+
+              {%- set ts =
+                item.start | string
+              -%}
+
+              {%- set price =
+                item.value | float(0)
+              -%}
+
+              {%- set ns.parts =
+                ns.parts + [
+                  '"' ~
+                  ts ~
+                  '":' ~
+                  (price | round(5))
+                ]
+              -%}
+
+            {%- endfor -%}
+
+            {{ '{' ~ ns.parts | join(',') ~ '}' }}
+
+
+      #########################################################################
+      # PRODUCTION / SELL PRICE FORECAST
+      #########################################################################
+
+      - variables:
+          prod_price_forecast_json: >-
+            {%- set raw =
+              (
+                (state_attr(price_entity, 'raw_today') or [])
+                +
+                (state_attr(price_entity, 'raw_tomorrow') or [])
+              )
+            -%}
+
+            {%- set ns = namespace(parts=[]) -%}
+
+            {%- for item in raw -%}
+
+              {%- set ts =
+                item.start | string
+              -%}
+
+              {%- set purchase =
+                item.value | float(0)
+              -%}
+
+              {%- set sell =
+                purchase - sell_fee
+              -%}
+
+              {%- set ns.parts =
+                ns.parts + [
+                  '"' ~
+                  ts ~
+                  '":' ~
+                  (sell | round(5))
+                ]
+              -%}
+
+            {%- endfor -%}
+
+            {{ '{' ~ ns.parts | join(',') ~ '}' }}
+
+
+      #########################################################################
+      # COMPLETE EMHASS PAYLOAD
+      #########################################################################
+
+      - variables:
+          emhass_payload: >-
+            {
+              "load_cost_forecast":
+                {{ load_cost_forecast_json }},
+
+              "prod_price_forecast":
+                {{ prod_price_forecast_json }},
+
+              "load_power_forecast":
+                {{ load_power_forecast_json }},
+
+              "soc_init":
+                {{ soc_init | float(0.5) }},
+
+              "soc_final":
+                0.10
+            }
+
+
+      #########################################################################
+      # OPTIMIZE
+      #########################################################################
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energypilot_emhass_status
+        data:
+          value: optimizing
+
+      - action: rest_command.energypilot_emhass_optimize
+        data:
+          payload: >
+            {{ emhass_payload }}
+        response_variable: emhass_optim_response
+        continue_on_error: true
+
+
+      #########################################################################
+      # OPTIMIZATION HTTP RESPONSE
+      #########################################################################
+
+      - variables:
+          optimize_http_status: >
+            {% if emhass_optim_response is defined %}
+              {{ emhass_optim_response.status | int(0) }}
+            {% else %}
+              0
+            {% endif %}
+
+          optimize_content: >
+            {% if emhass_optim_response is defined %}
+              {{ emhass_optim_response.content | string }}
+            {% else %}
+              No response from EMHASS
+            {% endif %}
+
+
+      #########################################################################
+      # DO NOT PUBLISH AFTER A FAILED OPTIMIZATION
+      #########################################################################
+
+      - if:
+          - condition: template
+            value_template: >
+              {{ optimize_http_status | int != 200 }}
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_status
+            data:
+              value: error_optimization
+
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_last_error
+            data:
+              value: >
+                {{
+                  (
+                    'Optimization HTTP '
+                    ~ optimize_http_status
+                    ~ ': '
+                    ~ optimize_content
+                  )[:250]
+                }}
+
+          - action: persistent_notification.create
+            data:
+              notification_id: energypilot_emhass_error
+              title: EnergyPilot EMHASS optimization failed
+              message: >
+                EMHASS returned HTTP
+                {{ optimize_http_status }}.
+
+                {{ optimize_content[:500] }}
+
+          - stop: >
+              EMHASS optimization failed
+            error: true
+
+
+      #########################################################################
+      # PUBLISH
+      #########################################################################
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energypilot_emhass_status
+        data:
+          value: publishing
+
+      - action: rest_command.energypilot_emhass_publish
+        response_variable: emhass_publish_response
+        continue_on_error: true
+
+
+      #########################################################################
+      # PUBLISH HTTP RESPONSE
+      #########################################################################
+
+      - variables:
+          publish_http_status: >
+            {% if emhass_publish_response is defined %}
+              {{ emhass_publish_response.status | int(0) }}
+            {% else %}
+              0
+            {% endif %}
+
+          publish_content: >
+            {% if emhass_publish_response is defined %}
+              {{ emhass_publish_response.content | string }}
+            {% else %}
+              No publish response from EMHASS
+            {% endif %}
+
+
+      - if:
+          - condition: template
+            value_template: >
+              {{ publish_http_status | int != 200 }}
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_status
+            data:
+              value: error_publish
+
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_last_error
+            data:
+              value: >
+                {{
+                  (
+                    'Publish HTTP '
+                    ~ publish_http_status
+                    ~ ': '
+                    ~ publish_content
+                  )[:250]
+                }}
+
+          - action: persistent_notification.create
+            data:
+              notification_id: energypilot_emhass_error
+              title: EnergyPilot EMHASS publish failed
+              message: >
+                EMHASS publish returned HTTP
+                {{ publish_http_status }}.
+
+          - stop: >
+              EMHASS publish failed
+            error: true
+
+
+      #########################################################################
+      # WAIT FOR A FRESH P_BATT OUTPUT
+      #########################################################################
+
+      - wait_template: >
+          {% if
+            has_value('sensor.p_batt_forecast')
+            and is_state('sensor.optim_status', 'Optimal')
+          %}
+
+            {{
+              as_timestamp(
+                states.sensor.p_batt_forecast.last_updated,
+                default=0
+              )
+              >
+              p_batt_before | float(0)
+            }}
+
+          {% else %}
+            false
+          {% endif %}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+
+
+      #########################################################################
+      # VALIDATE OUTPUT
+      #########################################################################
+
+      - variables:
+          fresh_output: >
+            {% if
+              has_value('sensor.p_batt_forecast')
+              and is_state('sensor.optim_status', 'Optimal')
+            %}
+
+              {{
+                as_timestamp(
+                  states.sensor.p_batt_forecast.last_updated,
+                  default=0
+                )
+                >
+                p_batt_before | float(0)
+              }}
+
+            {% else %}
+              false
+            {% endif %}
+
+
+      - if:
+          - condition: template
+            value_template: >
+              {{ not fresh_output }}
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_status
+            data:
+              value: error_output
+
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.energypilot_emhass_last_error
+            data:
+              value: >
+                EMHASS optimization/publish succeeded but no fresh
+                p_batt_forecast was detected
+
+          - action: persistent_notification.create
+            data:
+              notification_id: energypilot_emhass_error
+              title: EnergyPilot EMHASS output stale
+              message: >
+                Optimization and publish returned HTTP 200,
+                but no fresh sensor.p_batt_forecast was detected.
+
+          - stop: >
+              No fresh EMHASS output detected
+            error: true
+
+
+      #########################################################################
+      # SUCCESS
+      #########################################################################
+
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.energypilot_emhass_last_success
+        data:
+          datetime: >
+            {{ now().strftime('%Y-%m-%d %H:%M:%S') }}
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energypilot_emhass_status
+        data:
+          value: ready
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energypilot_emhass_last_error
+        data:
+          value: none
+
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: energypilot_emhass_error
+
+      - action: logbook.log
+        data:
+          name: EnergyPilot EMHASS
+          message: >
+            Optimization successful.
+            SOC init={{ soc_init }}.
+            P_batt={{ states('sensor.p_batt_forecast') }} W.
+
+
+###############################################################################
+# AUTOMATION
+###############################################################################
+
+automation:
+  - id: energypilot_emhass_orchestrator
+    alias: EnergyPilot EMHASS - Orchestrator
+    description: >
+      Runs EMHASS optimization every 15 minutes independently from
+      EnergyPilot Automatic Control.
+    mode: single
+
+    trace:
+      stored_traces: 96
+
+    triggers:
+      - trigger: time_pattern
+        id: periodic
+        minutes: "/15"
+        seconds: "5"
+
+      - trigger: homeassistant
+        id: ha_start
+        event: start
+
+      - trigger: state
+        id: tomorrow_prices
+        entity_id: binary_sensor.nord_pool_nl_tomorrow_price_available
+        to: "on"
+
+    conditions: []
+
+    actions:
+      - if:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'ha_start' }}
+        then:
+          - delay: "00:01:00"
+
+      - action: script.energypilot_emhass_optimize_now
