@@ -56,11 +56,12 @@ class GWAutomaticControlSwitch(
         restore_on = previous is not None and previous.state == STATE_ON
 
         # Publish the switch immediately. The inverter command is restored in a
-        # background task so Home Assistant and the other EnergyPilot entities
+        # config-entry background task so Home Assistant and the other entities
         # do not wait for an occupied or temporarily unavailable Modbus socket.
         self.entry.runtime_data.controller.enabled = restore_on
         self.async_write_ha_state()
-        self.hass.async_create_task(
+        self.entry.async_create_background_task(
+            self.hass,
             self._async_apply_restored_state(restore_on),
             f"GW EnergyPilot restore automatic control ({self.entry.entry_id})",
         )
