@@ -114,7 +114,7 @@ Until this inheritance chain is deliberately consolidated, changes to orchestrat
 
 ## Frontend
 
-The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`. In v0.16 the active entry point imports v0.15, which imports v0.14, v0.13 and the earlier layers below it. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
+The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`. In v0.17 the active entry point imports v0.16, which imports v0.15, v0.14, v0.13 and the earlier layers below it. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
 
 The repository validator checks that relative frontend imports resolve and that the active frontend `VERSION` matches `manifest.json` when the entry module declares one.
 
@@ -147,6 +147,7 @@ When a bug is reported:
 
 - `README.md` — user-facing overview and installation.
 - `docs/ARCHITECTURE.md` — runtime architecture and ownership boundaries.
+- `docs/SETTINGS.md` — dedicated EP / EMHASS / GOODWE configuration architecture and ownership.
 - `docs/MODBUS.md` — Modbus semantics, Beta register status and change rules.
 - `docs/ENTITIES.md` — Home Assistant entity contract.
 - `docs/DEVELOPMENT.md` — contributor workflow and known technical debt.
