@@ -10,14 +10,20 @@ from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import CONF_EMHASS_URL, DEFAULT_EMHASS_URL
+from .const import CONF_EMHASS_URL, DEFAULT_EMHASS_URL, DOMAIN
 
 EMHASS_COST_FUNCTIONS: tuple[str, ...] = (
     "profit",
     "cost",
     "self-consumption",
 )
+
+
+def emhass_config_update_signal(entry_id: str) -> str:
+    """Return the dispatcher signal for EMHASS configuration updates."""
+    return f"{DOMAIN}_{entry_id}_emhass_config_update"
 
 
 def _base_url(entry) -> str:
@@ -91,6 +97,8 @@ async def async_write_emhass_config(
                     )
     except (TimeoutError, ClientError) as err:
         raise HomeAssistantError(f"Unable to save EMHASS configuration: {err}") from err
+
+    async_dispatcher_send(hass, emhass_config_update_signal(entry.entry_id))
 
 
 async def async_patch_emhass_config(
