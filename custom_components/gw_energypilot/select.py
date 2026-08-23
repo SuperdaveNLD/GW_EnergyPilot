@@ -7,8 +7,9 @@ import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
@@ -17,6 +18,7 @@ from .const import MODE_NAMES, MODES_ZERO_POWER
 from .emhass_config import (
     async_get_emhass_cost_function,
     async_set_emhass_cost_function,
+    emhass_config_update_signal,
 )
 from .entity import GWEnergyPilotEntity
 
@@ -111,12 +113,19 @@ class GWEMHASSCostFunctionSelect(GWEnergyPilotEntity, SelectEntity):
         }
 
     async def async_added_to_hass(self) -> None:
-        """Read the active strategy and keep it synchronized periodically."""
+        """Read the active strategy and keep it synchronized."""
         await super().async_added_to_hass()
         self.entry.async_create_background_task(
             self.hass,
             self._async_refresh_from_emhass(),
             "GW EnergyPilot read EMHASS cost function",
+        )
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                emhass_config_update_signal(self.entry.entry_id),
+                self._async_config_updated,
+            )
         )
         self.async_on_remove(
             async_track_time_interval(
@@ -126,6 +135,15 @@ class GWEMHASSCostFunctionSelect(GWEnergyPilotEntity, SelectEntity):
                 name=f"GW EnergyPilot EMHASS strategy refresh ({self.entry.entry_id})",
                 cancel_on_shutdown=True,
             )
+        )
+
+    @callback
+    def _async_config_updated(self) -> None:
+        """Refresh immediately after any EnergyPilot EMHASS config write."""
+        self.entry.async_create_background_task(
+            self.hass,
+            self._async_refresh_from_emhass(),
+            "GW EnergyPilot refresh EMHASS cost function",
         )
 
     async def _async_periodic_refresh(self, _now: datetime) -> None:
