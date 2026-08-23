@@ -41,8 +41,25 @@ from .const import (
     CONF_SELL_PRICE_DEDUCTION,
     CONF_SLAVE,
     CONF_USE_NORDPOOL_PRICES,
+    DEFAULT_BUY_PRICE_ADDER,
+    DEFAULT_DEADBAND,
+    DEFAULT_EMHASS_FALLBACK_LOAD,
+    DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
+    DEFAULT_EMHASS_SOC_FINAL,
+    DEFAULT_EMHASS_URL,
+    DEFAULT_EV_DEADBAND,
+    DEFAULT_MAX_POWER,
+    DEFAULT_NORDPOOL_AREA,
+    DEFAULT_NORDPOOL_CURRENCY,
+    DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES,
+    DEFAULT_OPTIM_REQUIRED_STATE,
+    DEFAULT_OPTIM_STATUS_ENTITY,
+    DEFAULT_P_BATT_ENTITY,
     DEFAULT_PORT,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SELL_PRICE_DEDUCTION,
     DEFAULT_SLAVE,
+    DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
     NAME,
 )
@@ -76,276 +93,261 @@ EMHASS_KEYS = {
     CONF_BUY_PRICE_ADDER,
     CONF_SELL_PRICE_DEDUCTION,
 }
+OPTIONAL_ENTITY_KEYS = {CONF_EV_MODE_ENTITY, CONF_EV_POWER_ENTITY}
 
 GOODWE_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_HOST): vol.All(str, vol.Strip, vol.Length(min=1)),
-        vol.Required(CONF_PORT): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-        vol.Required(CONF_SLAVE): vol.All(vol.Coerce(int), vol.Range(min=1, max=247)),
+        vol.Required(CONF_HOST): vol.All(str, str.strip, vol.Length(min=1)),
+        vol.Required(CONF_PORT): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=65535)
+        ),
+        vol.Required(CONF_SLAVE): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=247)
+        ),
     },
     extra=vol.PREVENT_EXTRA,
 )
 
+EP_FIELD_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "key": CONF_MAX_POWER_KW,
+        "label": "Maximum control power",
+        "type": "number",
+        "default": DEFAULT_MAX_POWER / 1000,
+        "unit": "kW",
+        "min": 0.5,
+        "max": 15,
+        "step": 0.1,
+        "description": "Maximum power EnergyPilot may request from the GoodWe EMS controller.",
+    },
+    {
+        "key": CONF_DEADBAND,
+        "label": "Battery deadband",
+        "type": "number",
+        "default": DEFAULT_DEADBAND,
+        "unit": "W",
+        "min": 0,
+        "max": 2000,
+        "step": 50,
+        "description": "P_batt values inside this band hold the battery around zero watts.",
+    },
+    {
+        "key": CONF_SCAN_INTERVAL,
+        "label": "GoodWe telemetry refresh",
+        "type": "number",
+        "default": DEFAULT_SCAN_INTERVAL,
+        "unit": "s",
+        "min": 5,
+        "max": 60,
+        "step": 1,
+        "description": "Polling cadence for local GoodWe Modbus telemetry.",
+    },
+    {
+        "key": CONF_ENABLE_EV_COORDINATION,
+        "label": "EV coordination",
+        "type": "boolean",
+        "default": False,
+        "description": "Re-optimize after a configured EV charging session ends.",
+    },
+    {
+        "key": CONF_EV_MODE_ENTITY,
+        "label": "EV mode entity",
+        "type": "text",
+        "default": "",
+        "description": "Optional Home Assistant entity used to determine EV charging state.",
+    },
+    {
+        "key": CONF_EV_POWER_ENTITY,
+        "label": "EV power entity",
+        "type": "text",
+        "default": "",
+        "description": "Optional Home Assistant power entity for EV coordination.",
+    },
+    {
+        "key": CONF_EV_DEADBAND,
+        "label": "EV active threshold",
+        "type": "number",
+        "default": DEFAULT_EV_DEADBAND,
+        "unit": "W",
+        "min": 0,
+        "max": 3000,
+        "step": 50,
+        "description": "Power threshold used when determining whether EV charging is active.",
+    },
+)
 
-def _field(
-    key: str,
-    label: str,
-    field_type: str,
-    value: Any,
-    *,
-    description: str = "",
-    unit: str | None = None,
-    minimum: float | None = None,
-    maximum: float | None = None,
-    step: float | None = None,
-    readonly: bool = False,
-) -> dict[str, Any]:
-    """Build one frontend-neutral field description."""
-    result: dict[str, Any] = {
-        "key": key,
-        "label": label,
-        "type": field_type,
-        "value": value,
-        "description": description,
-        "readonly": readonly,
-    }
-    if unit is not None:
-        result["unit"] = unit
-    if minimum is not None:
-        result["min"] = minimum
-    if maximum is not None:
-        result["max"] = maximum
-    if step is not None:
-        result["step"] = step
-    return result
+EMHASS_FIELD_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "key": CONF_ENABLE_EMHASS_ORCHESTRATOR,
+        "label": "Native EMHASS orchestrator",
+        "type": "boolean",
+        "default": True,
+        "description": "Let EnergyPilot schedule and publish EMHASS optimizations.",
+    },
+    {
+        "key": CONF_EMHASS_URL,
+        "label": "EMHASS URL",
+        "type": "text",
+        "default": DEFAULT_EMHASS_URL,
+        "description": "Address Home Assistant Core uses to reach the EMHASS web server.",
+    },
+    {
+        "key": CONF_EMHASS_OPTIMIZATION_INTERVAL,
+        "label": "Optimization interval",
+        "type": "number",
+        "default": DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
+        "unit": "min",
+        "min": 5,
+        "max": 60,
+        "step": 5,
+        "description": "Periodic cadence; event triggers can still optimize immediately.",
+    },
+    {
+        "key": CONF_EMHASS_SOC_FINAL_PCT,
+        "label": "Target final SOC",
+        "type": "number",
+        "default": DEFAULT_EMHASS_SOC_FINAL * 100,
+        "unit": "%",
+        "min": 0,
+        "max": 100,
+        "step": 1,
+        "description": "Final SOC target sent to EMHASS for the optimization horizon.",
+    },
+    {
+        "key": CONF_EMHASS_FALLBACK_LOAD,
+        "label": "Fallback load",
+        "type": "number",
+        "default": DEFAULT_EMHASS_FALLBACK_LOAD,
+        "unit": "W",
+        "min": 100,
+        "max": 20000,
+        "step": 50,
+        "description": "Used when a valid current/history load value is unavailable.",
+    },
+    {
+        "key": CONF_P_BATT_ENTITY,
+        "label": "P_batt output entity",
+        "type": "text",
+        "default": DEFAULT_P_BATT_ENTITY,
+        "description": "Published battery-power target used by Automatic Control.",
+    },
+    {
+        "key": CONF_OPTIM_STATUS_ENTITY,
+        "label": "Optimization status entity",
+        "type": "text",
+        "default": DEFAULT_OPTIM_STATUS_ENTITY,
+    },
+    {
+        "key": CONF_OPTIM_REQUIRED_STATE,
+        "label": "Required optimization state",
+        "type": "text",
+        "default": DEFAULT_OPTIM_REQUIRED_STATE,
+    },
+    {
+        "key": CONF_USE_NORDPOOL_PRICES,
+        "label": "Use Nord Pool runtime prices",
+        "type": "boolean",
+        "default": DEFAULT_USE_NORDPOOL_PRICES,
+        "description": "Use Home Assistant Nord Pool prices for EMHASS runtime forecasts.",
+    },
+    {
+        "key": CONF_OPTIMIZE_ON_TOMORROW_PRICES,
+        "label": "Optimize when tomorrow prices arrive",
+        "type": "boolean",
+        "default": DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES,
+    },
+    {
+        "key": CONF_NORDPOOL_AREA,
+        "label": "Nord Pool area",
+        "type": "text",
+        "default": DEFAULT_NORDPOOL_AREA,
+        "description": "Optional override; leave empty to use the configured source.",
+    },
+    {
+        "key": CONF_NORDPOOL_CURRENCY,
+        "label": "Nord Pool currency",
+        "type": "text",
+        "default": DEFAULT_NORDPOOL_CURRENCY,
+    },
+    {
+        "key": CONF_BUY_PRICE_ADDER,
+        "label": "Import price adder",
+        "type": "number",
+        "default": DEFAULT_BUY_PRICE_ADDER,
+        "unit": "EUR/kWh",
+        "min": -1,
+        "max": 2,
+        "step": 0.001,
+    },
+    {
+        "key": CONF_SELL_PRICE_DEDUCTION,
+        "label": "Export price deduction",
+        "type": "number",
+        "default": DEFAULT_SELL_PRICE_DEDUCTION,
+        "unit": "EUR/kWh",
+        "min": -1,
+        "max": 2,
+        "step": 0.001,
+    },
+)
 
 
-def _option_fields(entry: ConfigEntry) -> dict[str, list[dict[str, Any]]]:
-    """Return settings fields backed by the existing config entry options."""
-    options = _options_for_form(dict(entry.options))
-
-    energypilot = [
-        _field(
-            CONF_MAX_POWER_KW,
-            "Maximum control power",
-            "number",
-            options.get(CONF_MAX_POWER_KW),
-            unit="kW",
-            minimum=0.5,
-            maximum=15,
-            step=0.1,
-            description="Maximum power EnergyPilot may request from the GoodWe EMS controller.",
-        ),
-        _field(
-            CONF_DEADBAND,
-            "Battery deadband",
-            "number",
-            options.get(CONF_DEADBAND, 300),
-            unit="W",
-            minimum=0,
-            maximum=2000,
-            step=50,
-            description="P_batt values inside this band hold the battery around zero watts.",
-        ),
-        _field(
-            CONF_SCAN_INTERVAL,
-            "GoodWe telemetry refresh",
-            "number",
-            options.get(CONF_SCAN_INTERVAL, 10),
-            unit="s",
-            minimum=5,
-            maximum=60,
-            step=1,
-            description="Polling cadence for local GoodWe Modbus telemetry.",
-        ),
-        _field(
-            CONF_ENABLE_EV_COORDINATION,
-            "EV coordination",
-            "boolean",
-            bool(options.get(CONF_ENABLE_EV_COORDINATION, False)),
-            description="Re-optimize after a configured EV charging session ends.",
-        ),
-        _field(
-            CONF_EV_MODE_ENTITY,
-            "EV mode entity",
-            "text",
-            options.get(CONF_EV_MODE_ENTITY, ""),
-            description="Optional Home Assistant entity used to determine EV charging state.",
-        ),
-        _field(
-            CONF_EV_POWER_ENTITY,
-            "EV power entity",
-            "text",
-            options.get(CONF_EV_POWER_ENTITY, ""),
-            description="Optional Home Assistant power entity for EV coordination.",
-        ),
-        _field(
-            CONF_EV_DEADBAND,
-            "EV active threshold",
-            "number",
-            options.get(CONF_EV_DEADBAND, 500),
-            unit="W",
-            minimum=0,
-            maximum=3000,
-            step=50,
-            description="Power threshold used when determining whether EV charging is active.",
-        ),
-    ]
-
-    emhass = [
-        _field(
-            CONF_ENABLE_EMHASS_ORCHESTRATOR,
-            "Native EMHASS orchestrator",
-            "boolean",
-            bool(options.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, True)),
-            description="Let EnergyPilot schedule and publish EMHASS optimizations.",
-        ),
-        _field(
-            CONF_EMHASS_URL,
-            "EMHASS URL",
-            "text",
-            options.get(CONF_EMHASS_URL, ""),
-            description="Address Home Assistant Core uses to reach the EMHASS web server.",
-        ),
-        _field(
-            CONF_EMHASS_OPTIMIZATION_INTERVAL,
-            "Optimization interval",
-            "number",
-            options.get(CONF_EMHASS_OPTIMIZATION_INTERVAL, 60),
-            unit="min",
-            minimum=5,
-            maximum=60,
-            step=5,
-            description="Periodic optimization cadence; event triggers can still run immediately.",
-        ),
-        _field(
-            CONF_EMHASS_SOC_FINAL_PCT,
-            "Target final SOC",
-            "number",
-            options.get(CONF_EMHASS_SOC_FINAL_PCT),
-            unit="%",
-            minimum=0,
-            maximum=100,
-            step=1,
-            description="Final SOC target sent to EMHASS for the optimization horizon.",
-        ),
-        _field(
-            CONF_EMHASS_FALLBACK_LOAD,
-            "Fallback load",
-            "number",
-            options.get(CONF_EMHASS_FALLBACK_LOAD, 700),
-            unit="W",
-            minimum=100,
-            maximum=20000,
-            step=50,
-            description="Used when a valid current/history load value is unavailable.",
-        ),
-        _field(
-            CONF_P_BATT_ENTITY,
-            "P_batt output entity",
-            "text",
-            options.get(CONF_P_BATT_ENTITY, "sensor.p_batt_forecast"),
-            description="Published EMHASS battery-power target used by Automatic Control.",
-        ),
-        _field(
-            CONF_OPTIM_STATUS_ENTITY,
-            "Optimization status entity",
-            "text",
-            options.get(CONF_OPTIM_STATUS_ENTITY, "sensor.optim_status"),
-        ),
-        _field(
-            CONF_OPTIM_REQUIRED_STATE,
-            "Required optimization state",
-            "text",
-            options.get(CONF_OPTIM_REQUIRED_STATE, "Optimal"),
-        ),
-        _field(
-            CONF_USE_NORDPOOL_PRICES,
-            "Use Nord Pool runtime prices",
-            "boolean",
-            bool(options.get(CONF_USE_NORDPOOL_PRICES, True)),
-            description="Use Home Assistant Nord Pool prices instead of only EMHASS price configuration.",
-        ),
-        _field(
-            CONF_OPTIMIZE_ON_TOMORROW_PRICES,
-            "Optimize when tomorrow prices arrive",
-            "boolean",
-            bool(options.get(CONF_OPTIMIZE_ON_TOMORROW_PRICES, True)),
-        ),
-        _field(
-            CONF_NORDPOOL_AREA,
-            "Nord Pool area",
-            "text",
-            options.get(CONF_NORDPOOL_AREA, ""),
-            description="Optional area override; leave empty to use the available configured source.",
-        ),
-        _field(
-            CONF_NORDPOOL_CURRENCY,
-            "Nord Pool currency",
-            "text",
-            options.get(CONF_NORDPOOL_CURRENCY, "EUR"),
-        ),
-        _field(
-            CONF_BUY_PRICE_ADDER,
-            "Import price adder",
-            "number",
-            options.get(CONF_BUY_PRICE_ADDER, 0.0),
-            unit="EUR/kWh",
-            minimum=-1,
-            maximum=2,
-            step=0.001,
-        ),
-        _field(
-            CONF_SELL_PRICE_DEDUCTION,
-            "Export price deduction",
-            "number",
-            options.get(CONF_SELL_PRICE_DEDUCTION, 0.0248),
-            unit="EUR/kWh",
-            minimum=-1,
-            maximum=2,
-            step=0.001,
-        ),
-    ]
-    return {SECTION_ENERGYPILOT: energypilot, SECTION_EMHASS: emhass}
+def _fields_from_specs(
+    options: dict[str, Any], specs: tuple[dict[str, Any], ...]
+) -> list[dict[str, Any]]:
+    """Combine frontend field metadata with current config-entry values."""
+    fields: list[dict[str, Any]] = []
+    for spec in specs:
+        field = {key: value for key, value in spec.items() if key != "default"}
+        field["value"] = options.get(spec["key"], spec.get("default"))
+        field["readonly"] = False
+        fields.append(field)
+    return fields
 
 
 def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Return all settings required by the dedicated frontend pages."""
-    option_fields = _option_fields(entry)
-    goodwe = [
-        _field(
-            "hardware_target",
-            "Validated hardware target",
-            "text",
-            "GoodWe GW15K-ETA-G20 / ETA-G20 generation",
-            readonly=True,
-            description="EnergyPilot is developed and validated primarily against the GoodWe ETA-G20 generation.",
-        ),
-        _field(
-            CONF_HOST,
-            "Inverter host",
-            "text",
-            str(entry.data.get(CONF_HOST, "")),
-            description="Local IP address or resolvable hostname of the inverter.",
-        ),
-        _field(
-            CONF_PORT,
-            "Modbus TCP port",
-            "number",
-            int(entry.data.get(CONF_PORT, DEFAULT_PORT)),
-            minimum=1,
-            maximum=65535,
-            step=1,
-        ),
-        _field(
-            CONF_SLAVE,
-            "Modbus unit ID",
-            "number",
-            int(entry.data.get(CONF_SLAVE, DEFAULT_SLAVE)),
-            minimum=1,
-            maximum=247,
-            step=1,
-        ),
+    options = _options_for_form(dict(entry.options))
+    goodwe_fields = [
+        {
+            "key": "hardware_target",
+            "label": "Validated hardware target",
+            "type": "text",
+            "value": "GoodWe GW15K-ETA-G20 / ETA-G20 generation",
+            "description": (
+                "EnergyPilot is developed and validated primarily against the "
+                "GoodWe ETA-G20 generation."
+            ),
+            "readonly": True,
+        },
+        {
+            "key": CONF_HOST,
+            "label": "Inverter host",
+            "type": "text",
+            "value": str(entry.data.get(CONF_HOST, "")),
+            "description": "Local IP address or resolvable hostname of the inverter.",
+            "readonly": False,
+        },
+        {
+            "key": CONF_PORT,
+            "label": "Modbus TCP port",
+            "type": "number",
+            "value": int(entry.data.get(CONF_PORT, DEFAULT_PORT)),
+            "min": 1,
+            "max": 65535,
+            "step": 1,
+            "readonly": False,
+        },
+        {
+            "key": CONF_SLAVE,
+            "label": "Modbus unit ID",
+            "type": "number",
+            "value": int(entry.data.get(CONF_SLAVE, DEFAULT_SLAVE)),
+            "min": 1,
+            "max": 247,
+            "step": 1,
+            "readonly": False,
+        },
     ]
 
     return {
@@ -363,19 +365,25 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
                 "title": "EnergyPilot",
                 "short_title": "EP",
                 "description": "Controller, telemetry and optional EV coordination.",
-                "fields": option_fields[SECTION_ENERGYPILOT],
+                "fields": _fields_from_specs(options, EP_FIELD_SPECS),
             },
             SECTION_EMHASS: {
                 "title": "EMHASS",
                 "short_title": "EMHASS",
-                "description": "Connection, orchestration, output entities and runtime price integration.",
-                "fields": option_fields[SECTION_EMHASS],
+                "description": (
+                    "Connection, orchestration, output entities and runtime price "
+                    "integration."
+                ),
+                "fields": _fields_from_specs(options, EMHASS_FIELD_SPECS),
             },
             SECTION_GOODWE: {
                 "title": "GoodWe",
                 "short_title": "GOODWE",
-                "description": "Local Modbus TCP connection. Changes are validated against the inverter before saving.",
-                "fields": goodwe,
+                "description": (
+                    "Local Modbus TCP connection. Changes are validated against the "
+                    "inverter before saving."
+                ),
+                "fields": goodwe_fields,
             },
         },
     }
@@ -415,7 +423,9 @@ async def websocket_get_settings(
     """Return the current EnergyPilot settings model."""
     entry = _resolve_entry(hass, msg.get("entry_id"))
     if entry is None:
-        connection.send_error(msg["id"], "not_found", "GW EnergyPilot config entry not found")
+        connection.send_error(
+            msg["id"], "not_found", "GW EnergyPilot config entry not found"
+        )
         return
     connection.send_result(msg["id"], _settings_payload(hass, entry))
 
@@ -440,7 +450,9 @@ async def websocket_update_settings(
     """Validate, save and reload one dedicated settings section."""
     entry = _resolve_entry(hass, msg["entry_id"])
     if entry is None:
-        connection.send_error(msg["id"], "not_found", "GW EnergyPilot config entry not found")
+        connection.send_error(
+            msg["id"], "not_found", "GW EnergyPilot config entry not found"
+        )
         return
 
     section = msg["section"]
@@ -456,7 +468,9 @@ async def websocket_update_settings(
         except (vol.Invalid, CannotConnect) as err:
             connection.send_error(
                 msg["id"],
-                "cannot_connect" if isinstance(err, CannotConnect) else "invalid_settings",
+                "cannot_connect"
+                if isinstance(err, CannotConnect)
+                else "invalid_settings",
                 "Unable to validate the GoodWe Modbus connection"
                 if isinstance(err, CannotConnect)
                 else str(err),
@@ -468,23 +482,22 @@ async def websocket_update_settings(
             (
                 candidate
                 for candidate in hass.config_entries.async_entries(DOMAIN)
-                if candidate.entry_id != entry.entry_id and candidate.unique_id == unique_id
+                if candidate.entry_id != entry.entry_id
+                and candidate.unique_id == unique_id
             ),
             None,
         )
         if duplicate is not None:
             connection.send_error(
-                msg["id"], "already_configured", "That GoodWe host and unit ID are already configured"
+                msg["id"],
+                "already_configured",
+                "That GoodWe host and unit ID are already configured",
             )
             return
 
         new_data = dict(entry.data)
         new_data.update(
-            {
-                CONF_HOST: host,
-                CONF_PORT: port,
-                CONF_SLAVE: slave,
-            }
+            {CONF_HOST: host, CONF_PORT: port, CONF_SLAVE: slave}
         )
         hass.config_entries.async_update_entry(
             entry,
@@ -493,7 +506,9 @@ async def websocket_update_settings(
             title=f"{NAME} ({host})",
         )
     else:
-        allowed = ENERGYPILOT_KEYS if section == SECTION_ENERGYPILOT else EMHASS_KEYS
+        allowed = (
+            ENERGYPILOT_KEYS if section == SECTION_ENERGYPILOT else EMHASS_KEYS
+        )
         unknown = set(values) - allowed
         if unknown:
             connection.send_error(
@@ -505,6 +520,10 @@ async def websocket_update_settings(
 
         form_values = _options_for_form(dict(entry.options))
         form_values.update(values)
+        for key in OPTIONAL_ENTITY_KEYS:
+            if form_values.get(key) in (None, ""):
+                form_values.pop(key, None)
+
         try:
             validated = _controller_schema(
                 orchestrator_default=bool(
