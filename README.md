@@ -10,11 +10,11 @@ GW EnergyPilot is an unofficial Home Assistant integration for local telemetry, 
 
 ## Status
 
-**Alpha — v0.16 · Beta diagnostics**
+**Alpha — v0.17 · Beta**
 
 GW EnergyPilot is being developed specifically around the **new GoodWe ETA G20 generation**.
 
-In this project, **Beta** means a feature is intentionally available to the active tester group but has **not yet been extensively field-tested**. Beta GoodWe register values remain read-only and optional until enough real-installation evidence exists to treat their semantics as confirmed.
+In this project, **Beta** means a feature is intentionally available to the active tester group but has **not yet been extensively field-tested**. Beta GoodWe register values remain read-only and optional until enough real-installation evidence exists to treat their semantics as confirmed. New Beta UI/configuration paths also need broader real-installation exposure before promotion.
 
 See `docs/RELEASE_NOTES.md` for the status and release notes of every version. `CHANGELOG.md` contains the detailed technical history.
 
@@ -44,6 +44,7 @@ That feedback will be used to build a real tested-model compatibility list rathe
 - GoodWe EMS mode and power control;
 - native EMHASS optimization and publishing;
 - one-touch EMHASS `profit`, `cost` and `self-consumption` strategy controls;
+- administrator settings pages for EP, EMHASS and GOODWE;
 - optional Nord Pool runtime prices;
 - automatic `P_batt` execution;
 - one-touch battery controls;
@@ -52,6 +53,7 @@ That feedback will be used to build a real tested-model compatibility list rathe
 - native cumulative grid import/export energy counters;
 - optional battery charge/discharge accounting diagnostics;
 - read-only Beta diagnostics for candidate G20 SOC-protection and extended-meter registers;
+- enabled Home Assistant Diagnostic sensors for the three SOC Beta candidates;
 - interactive 24-hour Grid history and daily import/export totals;
 - copyable normal and Beta diagnostics snapshots.
 
@@ -89,6 +91,22 @@ Use only one integration for continuous local polling where possible. If GW Ener
 12. Confirm `sensor.p_batt_forecast` is numeric and optimization status is `Optimal`.
 13. Enable Automatic Control.
 
+## Dashboard settings
+
+v0.17 adds a settings gear in the upper-right dashboard header for Home Assistant administrators. It opens three pages:
+
+- **EP** — maximum control power, `P_batt` deadband, telemetry cadence and optional EV coordination;
+- **EMHASS** — EnergyPilot-owned EMHASS connection, schedule, output mapping and Nord Pool runtime-price settings;
+- **GOODWE** — local inverter host, Modbus TCP port and unit ID.
+
+The settings pages use the **same Home Assistant config entry** as the existing config/options flows; no second settings database is created.
+
+GoodWe host/port/unit-ID changes are validated against the inverter before they are stored. After a successful save EnergyPilot reloads the config entry. Existing installations are migrated from the legacy mutable `host:slave` Home Assistant device identifier to the stable config-entry ID before entities are set up, so a validated IP/unit-ID change does not intentionally create a second device.
+
+The live EMHASS minimum/maximum SOC sliders and cost-function buttons still use their existing EMHASS API path and remain on the normal dashboard.
+
+See `docs/SETTINGS.md` for the configuration ownership and migration details.
+
 ## EMHASS URL
 
 EMHASS documentation commonly shows:
@@ -105,7 +123,7 @@ For a Home Assistant custom integration, however, the HTTP request originates fr
 http://5b918bf2-emhass:5000
 ```
 
-If your installation exposes EMHASS through another address, change **EMHASS URL** in EnergyPilot options.
+If your installation exposes EMHASS through another address, change **EMHASS URL** in EnergyPilot options or the v0.17 EMHASS settings page.
 
 ## EMHASS source mappings
 
@@ -227,7 +245,7 @@ The optional block cannot make required inverter telemetry unavailable when unsu
 
 ## Beta G20 field diagnostics
 
-v0.16 ships the following candidate values to the active tester group as **read-only Beta diagnostics**:
+v0.16+ ships the following candidate values to the active tester group as **read-only Beta diagnostics**:
 
 ```text
 45356  candidate on-grid battery discharge-depth / SOC limit
@@ -247,7 +265,15 @@ Until validated:
 - `36015/36017` remain the canonical grid-energy entities;
 - unsupported candidate registers cannot make normal telemetry unavailable.
 
-The Diagnostics card contains a **Copy beta diagnostics** action so testers can report these values together with model and firmware.
+v0.17 additionally exposes the three SOC candidates as enabled Home Assistant **Diagnostic** entities:
+
+```text
+Beta on-grid discharge depth (45356)  %
+Beta off-grid discharge depth (45358) %
+Beta battery SOC protection (47500)   raw
+```
+
+The Diagnostics card also contains a **Copy beta diagnostics** action so testers can report the candidate values together with model and firmware.
 
 ## Future energy-cost accounting
 
@@ -360,6 +386,7 @@ The sidebar dashboard includes:
 - visible telemetry refresh frequency;
 - Solar, Home, Grid and Battery cards;
 - Controller and EMHASS cards;
+- administrator settings gear with EP / EMHASS / GOODWE pages;
 - one-touch EMHASS strategy controls;
 - one-touch battery controls;
 - EMHASS minimum/maximum SOC controls with guidance popup;
@@ -391,7 +418,7 @@ For the separate SEMS/SEMS+ plugin interoperability issue, see `docs/KNOWN_ISSUE
 
 ## Diagnostics
 
-Use **Copy snapshot** when reporting a normal issue. Include the inverter model and firmware with the snapshot. For v0.16 candidate register validation, use **Copy beta diagnostics** as well.
+Use **Copy snapshot** when reporting a normal issue. Include the inverter model and firmware with the snapshot. For candidate-register validation, use **Copy beta diagnostics** as well.
 
 Useful values include:
 
@@ -410,8 +437,10 @@ Useful values include:
 ## Documentation
 
 - `docs/RELEASE_NOTES.md` — version summaries and Beta/validation status;
+- `docs/SETTINGS.md` — EP / EMHASS / GOODWE settings ownership and device migration;
 - `docs/EMHASS_SETUP.md`;
 - `docs/MODBUS.md`;
+- `docs/ENTITIES.md`;
 - `docs/KNOWN_ISSUES.md`;
 - `CHANGELOG.md` — detailed technical history;
 - EMHASS documentation: https://emhass.readthedocs.io/;
