@@ -16,9 +16,11 @@ from homeassistant.helpers.event import async_track_time_interval
 from . import GWConfigEntry
 from .const import MODE_NAMES, MODES_ZERO_POWER
 from .emhass_config import (
-    async_get_emhass_cost_function,
+    async_get_emhass_config,
     async_set_emhass_cost_function,
     emhass_config_update_signal,
+    emhass_cost_function_from_config,
+    emhass_soc_diagnostics_from_config,
 )
 from .entity import GWEnergyPilotEntity
 
@@ -95,6 +97,7 @@ class GWEMHASSCostFunctionSelect(GWEnergyPilotEntity, SelectEntity):
         super().__init__(entry)
         self._attr_unique_id = f"{entry.entry_id}_emhass_cost_function"
         self._cost_function: str | None = None
+        self._soc_diagnostics = emhass_soc_diagnostics_from_config({})
 
     @property
     def current_option(self) -> str | None:
@@ -105,20 +108,33 @@ class GWEMHASSCostFunctionSelect(GWEnergyPilotEntity, SelectEntity):
         return None
 
     @property
-    def extra_state_attributes(self) -> dict[str, str | None]:
-        """Expose the raw EMHASS config value for diagnostics."""
+    def extra_state_attributes(self) -> dict[str, str | float | None]:
+        """Expose selected EMHASS config values for support diagnostics."""
         return {
             "emhass_costfun": self._cost_function,
+            **self._soc_diagnostics,
             "source": "EMHASS /get-config",
         }
 
+    def _apply_config(self, config: dict) -> bool:
+        """Cache strategy and SOC diagnostics from one /get-config response."""
+        cost_function = emhass_cost_function_from_config(config)
+        soc_diagnostics = emhass_soc_diagnostics_from_config(config)
+        changed = (
+            cost_function != self._cost_function
+            or soc_diagnostics != self._soc_diagnostics
+        )
+        self._cost_function = cost_function
+        self._soc_diagnostics = soc_diagnostics
+        return changed
+
     async def async_added_to_hass(self) -> None:
-        """Read the active strategy and keep it synchronized."""
+        """Read active EMHASS config and keep selected values synchronized."""
         await super().async_added_to_hass()
         self.entry.async_create_background_task(
             self.hass,
             self._async_refresh_from_emhass(),
-            "GW EnergyPilot read EMHASS cost function",
+            "GW EnergyPilot read EMHASS strategy and SOC diagnostics",
         )
         self.async_on_remove(
             async_dispatcher_connect(
@@ -132,7 +148,7 @@ class GWEMHASSCostFunctionSelect(GWEnergyPilotEntity, SelectEntity):
                 self.hass,
                 self._async_periodic_refresh,
                 EMHASS_STRATEGY_REFRESH,
-                name=f"GW EnergyPilot EMHASS strategy refresh ({self.entry.entry_id})",
+                name=f"GW EnergyPilot EMHASS config refresh ({self.entry.entry_id})",
                 cancel_on_shutdown=True,
             )
         )
@@ -143,24 +159,22 @@ class GWEMHASSCostFunctionSelect(GWEnergyPilotEntity, SelectEntity):
         self.entry.async_create_background_task(
             self.hass,
             self._async_refresh_from_emhass(),
-            "GW EnergyPilot refresh EMHASS cost function",
+            "GW EnergyPilot refresh EMHASS config diagnostics",
         )
 
     async def _async_periodic_refresh(self, _now: datetime) -> None:
-        """Refresh costfun so changes made in the EMHASS UI also appear here."""
+        """Refresh values changed directly in the EMHASS UI."""
         await self._async_refresh_from_emhass()
 
     async def _async_refresh_from_emhass(self) -> None:
         try:
-            cost_function = await async_get_emhass_cost_function(self.hass, self.entry)
+            config = await async_get_emhass_config(self.hass, self.entry)
         except HomeAssistantError as err:
-            _LOGGER.debug("Unable to refresh EMHASS cost function: %s", err)
+            _LOGGER.debug("Unable to refresh EMHASS configuration: %s", err)
             return
 
-        if cost_function == self._cost_function:
-            return
-        self._cost_function = cost_function
-        self.async_write_ha_state()
+        if self._apply_config(config):
+            self.async_write_ha_state()
 
     async def async_select_option(self, option: str) -> None:
         """Save one strategy, expose it immediately, then rebuild the plan."""
@@ -168,12 +182,12 @@ class GWEMHASSCostFunctionSelect(GWEnergyPilotEntity, SelectEntity):
         if cost_function is None:
             raise HomeAssistantError(f"Unsupported EMHASS strategy option: {option}")
 
-        await async_set_emhass_cost_function(
+        config = await async_set_emhass_cost_function(
             self.hass,
             self.entry,
             cost_function,
         )
-        self._cost_function = cost_function
+        self._apply_config(config)
         self.async_write_ha_state()
 
         try:
