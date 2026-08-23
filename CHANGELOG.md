@@ -2,6 +2,26 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.20] - 2026-08-23
+
+### Fixed
+
+- EMHASS SOC values read from `/get-config` are now treated as percentages only when their raw values are inside the documented `0..1` range. Invalid finite values remain visible as raw support diagnostics instead of appearing as misleading values such as `-90%` or `-690%`.
+- **Configured EnergyPilot final SOC target** is now separated from **Last sent runtime final SOC (`soc_final`)**. Manual-only or externally orchestrated EMHASS installations therefore no longer show an EnergyPilot setting as if EnergyPilot had actually sent it.
+- The SOC diagnostics copy action uses the same validated/raw distinction shown on screen.
+
+### Changed
+
+- The active frontend is `gw-energy-pilot-v020.js`, layered on top of the complete consolidated v0.19 frontend so grid-neutral charging feedback and all v0.19 controls remain unchanged.
+- The EMHASS setting label is clarified as **EnergyPilot runtime final SOC target** and explicitly notes that externally orchestrated/manual-only EMHASS may use a different runtime target.
+- Unit tests now cover the field-observed invalid raw values `battery_target_state_of_charge=-0.9` and `battery_soc_deficit_threshold=-6.9` without accepting them as valid SOC percentages.
+
+### Safety boundary
+
+- No EMHASS optimizer objective, constraint, configured value or runtime payload is changed by this release.
+- No GoodWe register definition or write path changes.
+- Automatic Control, grid-neutral charging, EMS modes/registers, `P_batt` mapping and the manual `45356/45358` field-test path are unchanged.
+
 ## [0.19] - 2026-08-23
 
 ### Added
