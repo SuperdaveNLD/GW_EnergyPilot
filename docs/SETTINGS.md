@@ -4,7 +4,7 @@ GW EnergyPilot exposes administrator-only configuration inside the built-in dash
 
 The settings gear opens three sections:
 
-- **EP** — EnergyPilot controller, telemetry and optional EV-coordination settings;
+- **EP** — EnergyPilot controller, telemetry and optional EV anti-discharge protection;
 - **EMHASS** — EnergyPilot-owned EMHASS connection, scheduling, output mapping and Nord Pool runtime-price settings;
 - **GOODWE** — local GoodWe connection, automatic actuator strategy and manual G20 field-test controls.
 
@@ -36,12 +36,42 @@ The EP section manages:
 - maximum controller/setpoint power;
 - control deadband;
 - GoodWe telemetry refresh interval;
-- EV coordination enable/disable;
+- EV anti-discharge protection enable/disable;
 - EV mode entity;
 - EV power entity;
 - EV activity threshold.
 
 The configured maximum power caps the requested **mode-specific setpoint**. With mode 9/10 PCC control, this is the requested grid import/export target. It is not necessarily the final battery power because local PV or house load can add/subtract energy behind the meter.
+
+### EV anti-discharge protection
+
+The user-facing name is **EV anti-discharge protection**. For backwards compatibility, existing installations keep the original stored option key:
+
+```text
+enable_ev_coordination
+```
+
+No migration or duplicate setting is introduced merely to rename the feature.
+
+The configured EV mode/power entities are observation inputs. EnergyPilot uses them only to decide whether EV charging is active; EnergyPilot does not start, stop or modulate the charger.
+
+When the protection is enabled and EV charging is active:
+
+```text
+EMHASS P_batt > +deadband  -> Battery Hold; block home-battery discharge
+EMHASS P_batt near 0 W     -> Battery Hold
+EMHASS P_batt < -deadband  -> allow home-battery charging via mode 11
+```
+
+This is intentionally directional. The purpose is to prevent the home battery from becoming the energy source for an actively charging EV, not to freeze the battery for the entire EV session.
+
+A real-world reason for this distinction is **Tibber Grid Rewards**. Tibber can use connected chargers to support grid conditions, including changing the timing of EV charging, and reward the customer for that flexibility. An EV can therefore charge for an external grid-service reason even when the normal home-battery economics point in another direction. EnergyPilot should block battery discharge into that EV, while still allowing an independent EMHASS home-battery charge plan.
+
+GW EnergyPilot has no Tibber Grid Rewards API dependency and does not control or reproduce Tibber's EV scheduling. Tibber Grid Rewards is documented as a concrete example of the ownership boundary.
+
+When native EMHASS orchestration is enabled, the existing EV-stop behavior remains: after charging stops, EnergyPilot waits for a fresh optimization before returning to normal automatic execution.
+
+See `docs/EV_ANTI_DISCHARGE.md` for the full control contract.
 
 ## EMHASS page
 
@@ -108,6 +138,8 @@ GoodWe performs the fast control loop against its own smart meter/PCC.
 The dashboard shows whether live `meter_total_power_fast` telemetry is currently available. Do not rely on PCC control when the GoodWe meter is absent or invalid.
 
 If the setting is changed while Automatic Control is ON, the dashboard requires confirmation because the current EMHASS plan is immediately re-evaluated with the newly selected actuator strategy.
+
+The EV anti-discharge override is separate from this normal strategy. While EV charging is active, it may use direct mode 11 for an explicit battery-charge request so a changing EV load cannot turn a site-level PCC target into battery discharge.
 
 ### OFF — direct battery fallback
 

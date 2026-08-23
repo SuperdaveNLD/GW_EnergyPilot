@@ -234,6 +234,12 @@ function relabelSettingsFields(panel, root) {
       "Control deadband",
       "Tolerance around 0 W. Applied to EMHASS P_grid when Smart Meter control is ON and to P_batt when it is OFF."
     );
+    updateSettingField(
+      root,
+      "EV coordination",
+      "EV anti-discharge protection",
+      "Prevents the home battery from discharging while EV charging is active. Explicit EMHASS battery-charge plans remain allowed, so independent EV charging such as supplier or grid-reward sessions does not unnecessarily block battery charging."
+    );
   }
   if (panel.__epV016SettingsTab === "emhass") {
     updateSettingField(
@@ -260,7 +266,7 @@ function relabelControllerTarget(panel, root) {
     if (label.textContent?.trim() !== "EnergyPilot target") continue;
     if (command.startsWith("grid_") || command === "goodwe_auto") {
       label.textContent = "PCC target";
-    } else if (command.startsWith("battery_") || command === "ev_hold") {
+    } else if (command.startsWith("battery_") || command.startsWith("ev_")) {
       label.textContent = "Battery target";
     } else {
       label.textContent = "Control target";
@@ -271,7 +277,7 @@ function relabelControllerTarget(panel, root) {
   if (manualPad && !card.querySelector(".ep-v022-strategy-note")) {
     const note = document.createElement("div");
     note.className = "ep-v022-strategy-note";
-    note.innerHTML = `<strong>Automatic strategy:</strong> GoodWe smart meter ON uses P_grid → 9/10 (mode 1 around zero). Smart meter OFF uses P_batt → 11/12 (mode 8 around zero). Manual buttons always remain direct operator commands.`;
+    note.innerHTML = `<strong>Automatic strategy:</strong> GoodWe smart meter ON uses P_grid → 9/10 (mode 1 around zero). Smart meter OFF uses P_batt → 11/12 (mode 8 around zero). EV anti-discharge protection overrides both strategies while the EV is actively charging: discharge is held, explicit battery charging remains allowed. Manual buttons always remain direct operator commands.`;
     manualPad.insertAdjacentElement("afterend", note);
   }
 }
