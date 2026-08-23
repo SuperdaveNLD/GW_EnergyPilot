@@ -36,7 +36,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v022.js?v=0.22-pcc1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v022-flow-direction.js?v=0.22-flow-direction1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
