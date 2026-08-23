@@ -17,10 +17,13 @@ from .const import (
     CONF_MAX_POWER,
     CONF_OPTIM_STATUS_ENTITY,
     CONF_P_BATT_ENTITY,
+    CONF_P_GRID_ENTITY,
     DEFAULT_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_STATUS_ENTITY,
     DEFAULT_P_BATT_ENTITY,
+    DEFAULT_P_GRID_ENTITY,
+    GRID_NEUTRAL_CONTROL_INTERVAL_SECONDS,
     MODE_BATTERY_HOLD,
     MODE_CHARGE_BATTERY,
     MODE_GRID_EXPORT_TARGET,
@@ -101,6 +104,10 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             self.entry.options.get(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
             or DEFAULT_P_BATT_ENTITY
         )
+        p_grid_entity = str(
+            self.entry.options.get(CONF_P_GRID_ENTITY, DEFAULT_P_GRID_ENTITY)
+            or DEFAULT_P_GRID_ENTITY
+        )
         optim_entity = str(
             self.entry.options.get(
                 CONF_OPTIM_STATUS_ENTITY,
@@ -109,6 +116,7 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             or DEFAULT_OPTIM_STATUS_ENTITY
         )
         p_batt_state = self.hass.states.get(p_batt_entity)
+        p_grid_state = self.hass.states.get(p_grid_entity)
         optim_state = self.hass.states.get(optim_entity)
 
         load_phases = [
@@ -147,6 +155,16 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             ),
             "p_batt_entity": p_batt_entity,
             "p_batt_value": p_batt_state.state if p_batt_state else None,
+            "p_grid_entity": p_grid_entity,
+            "p_grid_value": p_grid_state.state if p_grid_state else None,
+            "grid_neutral_active": controller.grid_neutral_active,
+            "grid_neutral_charge_cap": controller.grid_neutral_charge_cap,
+            "grid_neutral_meter_power": controller.grid_neutral_last_meter_power,
+            "grid_neutral_hold_remaining": controller.grid_neutral_hold_remaining,
+            "grid_neutral_export_samples": controller.grid_neutral_export_samples,
+            "grid_neutral_control_interval_seconds": (
+                GRID_NEUTRAL_CONTROL_INTERVAL_SECONDS
+            ),
             "optim_status_entity": optim_entity,
             "optim_status_value": optim_state.state if optim_state else None,
             "ems_mode": mode,
