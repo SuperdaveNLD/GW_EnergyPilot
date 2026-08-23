@@ -12,6 +12,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import ConfigType
 
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL
@@ -19,6 +20,7 @@ from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .event_triggers import async_setup_event_triggers
 from .orchestrator_v013 import GWEnergyPilotOrchestrator
+from .settings_api import async_register_settings_api
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -31,7 +33,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v015.js?v=0.15-costfun1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v016.js?v=0.16-settings1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -47,6 +49,12 @@ class GWRuntimeData:
 
 
 type GWConfigEntry = ConfigEntry[GWRuntimeData]
+
+
+async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
+    """Set up integration-wide dashboard APIs."""
+    async_register_settings_api(hass)
+    return True
 
 
 async def _async_register_panel(hass: HomeAssistant) -> None:
