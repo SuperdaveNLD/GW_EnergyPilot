@@ -10,15 +10,19 @@ GW EnergyPilot is an unofficial Home Assistant integration for local telemetry, 
 
 ## Status
 
-**Alpha — v0.15**
+**Alpha — v0.16 · Beta diagnostics**
 
 GW EnergyPilot is being developed specifically around the **new GoodWe ETA G20 generation**.
+
+In this project, **Beta** means a feature is intentionally available to the active tester group but has **not yet been extensively field-tested**. Beta GoodWe register values remain read-only and optional until enough real-installation evidence exists to treat their semantics as confirmed.
+
+See `docs/RELEASE_NOTES.md` for the status and release notes of every version. `CHANGELOG.md` contains the detailed technical history.
 
 ### Tested hardware
 
 | Model | Status | Notes |
 |---|---|---|
-| **GoodWe GW15K-ETA-G20** | ✅ Tested | Primary development and validation inverter |
+| **GoodWe GW15K-ETA-G20** | Tested | Primary development and validation inverter |
 
 The broader ETA-G20 family uses closely related telemetry and EMS concepts, but the other models have not yet been individually validated by this project.
 
@@ -47,8 +51,9 @@ That feedback will be used to build a real tested-model compatibility list rathe
 - built-in EnergyPilot dashboard;
 - native cumulative grid import/export energy counters;
 - optional battery charge/discharge accounting diagnostics;
+- read-only Beta diagnostics for candidate G20 SOC-protection and extended-meter registers;
 - interactive 24-hour Grid history and daily import/export totals;
-- copyable diagnostics snapshot.
+- copyable normal and Beta diagnostics snapshots.
 
 ## Requirements
 
@@ -128,7 +133,7 @@ EnergyPilot passes live battery SOC to EMHASS as `soc_init` for every optimizati
 
 ## EMHASS strategy controls
 
-v0.15 exposes three one-touch EMHASS objectives:
+v0.15+ exposes three one-touch EMHASS objectives:
 
 ```text
 profit
@@ -203,7 +208,7 @@ The Grid card is interactive. Click it to open:
 - energy exported yesterday;
 - lifetime GoodWe smart-meter import/export counters.
 
-EnergyPilot reads the GoodWe meter's native cumulative registers:
+EnergyPilot currently keeps the GoodWe meter's legacy cumulative registers as the canonical Recorder-facing source:
 
 ```text
 36015 = total exported grid energy
@@ -219,6 +224,30 @@ After first installation, yesterday's value becomes complete after Recorder has 
 v0.14+ reads the GoodWe battery charge/discharge accounting block `35206-35211` as optional diagnostics. These values are useful for support and later energy/cost accounting, but are deliberately not used for EMS control or synthetic cycle-count calculations.
 
 The optional block cannot make required inverter telemetry unavailable when unsupported by another firmware/model.
+
+## Beta G20 field diagnostics
+
+v0.16 ships the following candidate values to the active tester group as **read-only Beta diagnostics**:
+
+```text
+45356  candidate on-grid battery discharge-depth / SOC limit
+45358  candidate off-grid battery discharge-depth / reserve limit
+47500  candidate battery SOC-protection status/enable value
+36104  candidate extended lifetime grid export counter
+36120  candidate extended lifetime grid import counter
+```
+
+The extended meter counters are decoded as unsigned 64-bit values with `0.01 kWh` scaling. They are intended to be compared with SEMS lifetime totals on real GW15K-ETA-G20 installations.
+
+Until validated:
+
+- all five candidate values are optional and read-only;
+- none is used by Automatic Control;
+- none changes EMS mode or setpoint;
+- `36015/36017` remain the canonical grid-energy entities;
+- unsupported candidate registers cannot make normal telemetry unavailable.
+
+The Diagnostics card contains a **Copy beta diagnostics** action so testers can report these values together with model and firmware.
 
 ## Future energy-cost accounting
 
@@ -336,6 +365,7 @@ The sidebar dashboard includes:
 - EMHASS minimum/maximum SOC controls with guidance popup;
 - interactive Grid detail;
 - battery accounting diagnostics;
+- Beta G20 diagnostics and Copy beta diagnostics action;
 - thermal/BMS information;
 - draggable ordering and per-card visibility;
 - flow animation toggle;
@@ -361,7 +391,7 @@ For the separate SEMS/SEMS+ plugin interoperability issue, see `docs/KNOWN_ISSUE
 
 ## Diagnostics
 
-Use **Copy snapshot** when reporting an issue. Include the inverter model and firmware with the snapshot.
+Use **Copy snapshot** when reporting a normal issue. Include the inverter model and firmware with the snapshot. For v0.16 candidate register validation, use **Copy beta diagnostics** as well.
 
 Useful values include:
 
@@ -371,6 +401,7 @@ Useful values include:
 - signed grid meter value;
 - 35138/35140 inverter diagnostics;
 - battery power/SOC/SOH, BMS limits and optional charge/discharge accounting;
+- Beta candidates `45356`, `45358`, `47500`, `36104`, `36120`;
 - selected EMHASS entities;
 - EMHASS health/version and HTTP results;
 - price and load point counts;
@@ -378,11 +409,13 @@ Useful values include:
 
 ## Documentation
 
-- `docs/EMHASS_SETUP.md`
-- `docs/KNOWN_ISSUES.md`
-- `CHANGELOG.md`
-- EMHASS documentation: https://emhass.readthedocs.io/
-- Home Assistant developer documentation: https://developers.home-assistant.io/
+- `docs/RELEASE_NOTES.md` — version summaries and Beta/validation status;
+- `docs/EMHASS_SETUP.md`;
+- `docs/MODBUS.md`;
+- `docs/KNOWN_ISSUES.md`;
+- `CHANGELOG.md` — detailed technical history;
+- EMHASS documentation: https://emhass.readthedocs.io/;
+- Home Assistant developer documentation: https://developers.home-assistant.io/.
 
 ## License
 
