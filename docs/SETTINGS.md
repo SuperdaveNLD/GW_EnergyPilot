@@ -73,6 +73,10 @@ Before a connection change is stored, EnergyPilot creates a temporary `GWModbusC
 
 Only after successful validation does EnergyPilot update the config entry and reload the integration.
 
+The Home Assistant device identity is deliberately **not** based on the mutable inverter host or Modbus unit ID anymore. v0.16 migrates the legacy `host:slave` device identifier to the stable GW EnergyPilot config-entry ID before entities are set up. This prevents an IP-address or unit-ID change from creating a second device or separating existing entities from their original device record.
+
+Entity unique IDs remain based on the existing config-entry ID, so the settings pages do not intentionally rename existing entities or reset Recorder history/statistics.
+
 The page also states the current primary validation target:
 
 ```text
