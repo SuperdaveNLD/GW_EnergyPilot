@@ -1,6 +1,6 @@
 # EMHASS setup for GW EnergyPilot
 
-GW EnergyPilot does not replace the EMHASS optimization engine. EMHASS creates the battery power plan; EnergyPilot v0.10 now runs the optimization/publish cycle natively and translates the current `P_batt` target into GoodWe ETA EMS modes and setpoints.
+GW EnergyPilot does not replace the EMHASS optimization engine. EMHASS creates the battery power plan; EnergyPilot v0.11 runs the optimization/publish cycle natively and translates the current `P_batt` target into GoodWe ETA EMS modes and setpoints.
 
 ## Recommended installation order
 
@@ -9,15 +9,15 @@ GW EnergyPilot does not replace the EMHASS optimization engine. EMHASS creates t
 3. Install GW EnergyPilot through HACS.
 4. Add GW EnergyPilot under **Settings -> Devices & services** and connect it to the GoodWe ETA inverter.
 5. Keep **Automatic Control OFF** during initial setup.
-6. Verify EnergyPilot telemetry, especially battery SOC, battery power, PV power and total load power.
+6. Verify EnergyPilot telemetry, especially battery SOC, battery power, PV power and house/load power.
 7. Open the EMHASS configuration and map its GoodWe source sensors to the EnergyPilot entities listed below.
 8. Restart/reload EMHASS after changing its configuration.
 9. In GW EnergyPilot options configure the built-in EMHASS orchestrator.
 10. Press **Optimize now** in the EnergyPilot dashboard.
 11. Verify that `sensor.p_batt_forecast` is numeric and `sensor.optim_status` is `Optimal` when status validation is enabled.
-12. Remove/disable the legacy `energypilot_emhass_orchestrator.yaml` package if it was used before v0.10.
-13. Enable the built-in recurring orchestrator schedule.
-14. Only after the optimization path is validated, enable EnergyPilot **Automatic Control**.
+12. Remove/disable the legacy `energypilot_emhass_orchestrator.yaml` package if it was used before native orchestration.
+13. Enable the built-in recurring orchestrator schedule and use a 60-minute periodic interval.
+14. Only after the optimization path is validated, enable EnergyPilot **Automatic Control** or press **AUTO**.
 
 Optimization remains independent from Automatic Control:
 
@@ -25,7 +25,7 @@ Optimization remains independent from Automatic Control:
 Automatic Control OFF
     -> optimization continues
     -> publishing continues
-    -> GoodWe remains in GoodWe Auto / AI
+    -> GoodWe remains under GoodWe/manual ownership
 
 Automatic Control ON
     -> optimization continues
@@ -40,7 +40,7 @@ The default EnergyPilot entity IDs are:
 | EMHASS parameter | EnergyPilot source | Default entity ID |
 |---|---|---|
 | `sensor_power_photovoltaics` | Total GoodWe ETA PV power | `sensor.gw_energypilot_pv_total_power` |
-| `sensor_power_load_no_var_loads` | GoodWe ETA total load power | `sensor.gw_energypilot_total_load_power` |
+| `sensor_power_load_no_var_loads` | GoodWe ETA house/load power | `sensor.gw_energypilot_total_load_power` |
 | `sensor_power_battery` | Signed battery power | `sensor.gw_energypilot_battery_power` |
 | `sensor_battery_state_of_charge` | Battery SOC | `sensor.gw_energypilot_battery_state_of_charge` |
 | `var_model` | Household/load model source | `sensor.gw_energypilot_total_load_power` |
@@ -54,9 +54,19 @@ negative battery power = charging
 positive battery power = discharging
 ```
 
-### Load-power warning
+### GoodWe house/load register
 
-GoodWe `total_load_power` can differ by firmware and operating mode. Validate the EnergyPilot load value against the phase sum or your power balance before using it as the EMHASS load source.
+GoodWe register `35172` is the **Total Load Power** / house-load value. It is not inverter self-consumption.
+
+The EnergyPilot diagnostics card compares:
+
+```text
+register 35172
+load L1 + L2 + L3 phase sum
+power-balance estimate: PV - grid + battery
+```
+
+Firmware, topology and separate AC-coupled PV can still make these values differ. Validate the source on the actual installation before using it for optimization.
 
 ### Additional AC-coupled PV
 
@@ -64,7 +74,7 @@ EnergyPilot `PV total power` represents PV connected to the ETA. If the property
 
 ## Current SOC / soc_init
 
-The built-in v0.10 orchestrator reads the current GoodWe battery SOC directly from the EnergyPilot coordinator immediately before every optimization and passes it to EMHASS as `soc_init`.
+The built-in orchestrator reads the current GoodWe battery SOC directly from the EnergyPilot coordinator immediately before every optimization and passes it to EMHASS as `soc_init`.
 
 Example:
 
@@ -80,11 +90,41 @@ EMHASS day-ahead optimization
 
 This prevents a stale fixed `soc_init` from producing a plan for the wrong battery state.
 
+## Minimum and maximum battery SOC
+
+v0.11 exposes native Home Assistant sliders for:
+
+```text
+EMHASS minimum battery SOC
+EMHASS maximum battery SOC
+```
+
+These write the actual EMHASS configuration parameters:
+
+```json
+"battery_minimum_state_of_charge": 0.10,
+"battery_maximum_state_of_charge": 1.00
+```
+
+EnergyPilot reads the current full configuration from:
+
+```text
+GET /get-config
+```
+
+changes only the selected constraint and writes the complete configuration through:
+
+```text
+POST /set-config
+```
+
+This avoids replacing unrelated EMHASS settings with defaults. The sliders affect subsequent optimizations; they do not directly command the inverter.
+
 ## Load forecast
 
-EnergyPilot v0.10 builds a timestamped load forecast before calling EMHASS:
+EnergyPilot builds a timestamped load forecast before calling EMHASS:
 
-- current EnergyPilot total load is used as the live fallback;
+- current EnergyPilot house/load power is used as the live fallback;
 - up to seven days of Home Assistant Recorder hourly statistics are read;
 - the same local hour from available history is averaged;
 - invalid or implausible load samples are ignored;
@@ -95,13 +135,13 @@ This also prevents a fresh Home Assistant installation from failing because the 
 
 ## Nord Pool prices
 
-EnergyPilot v0.10 can use Home Assistant's official Nord Pool integration through:
+EnergyPilot can use Home Assistant's official Nord Pool integration through:
 
 ```text
 nordpool.get_prices_for_date
 ```
 
-When enabled, EnergyPilot requests today and, after roughly 13:00 local time, tomorrow. Nord Pool returns currency/MWh; EnergyPilot converts this to currency/kWh before sending timestamped dictionaries to EMHASS.
+When enabled, EnergyPilot requests today and, when available, tomorrow. Nord Pool returns currency/MWh; EnergyPilot converts this to currency/kWh before sending timestamped dictionaries to EMHASS.
 
 Two runtime adjustments are available:
 
@@ -116,7 +156,11 @@ The validated Tibber setup used an export deduction of:
 0.0248 EUR/kWh
 ```
 
-If **Use official Nord Pool prices** is disabled, EnergyPilot does not send runtime price dictionaries and EMHASS uses its own configured price forecast methods such as `hp_hc_periods`, `constant`, `csv`, etc.
+When **Use official Nord Pool runtime prices** is enabled, EnergyPilot supplies `load_cost_forecast` and `prod_price_forecast` at runtime. EMHASS's internal price forecast methods are therefore bypassed for those two forecasts during EnergyPilot-triggered runs.
+
+If the runtime-price option is disabled, EnergyPilot does not send these price dictionaries and EMHASS uses its own configured forecast methods such as `hp_hc_periods`, `constant` or `csv`.
+
+With **Optimize when tomorrow prices arrive** enabled, EnergyPilot auto-detects the official Nord Pool tomorrow-price availability binary sensor and runs a new optimization immediately when tomorrow becomes available.
 
 ## Continual publishing
 
@@ -126,6 +170,8 @@ When using the native EnergyPilot orchestrator, recommended:
 "continual_publish": false,
 "optimization_time_step": 15
 ```
+
+The 15-minute `optimization_time_step` is the plan resolution. It is independent from the recommended 60-minute EnergyPilot periodic optimization interval.
 
 EnergyPilot performs this transaction itself:
 
@@ -145,6 +191,20 @@ validate fresh numeric P_batt
 
 This prevents a failed optimization from being followed by an unconditional publish of an older plan.
 
+## Optimization triggers
+
+Recommended v0.11 behavior:
+
+```text
+Periodic fallback             every 60 min
+Optimize now                  immediate
+AUTO                          immediate, then resume automatic control on success
+Tomorrow prices available     immediate
+EV charging stopped           immediate when EV coordination is configured
+```
+
+This provides fresh planning when the inputs materially change without running an essentially identical day-ahead calculation every 15 minutes.
+
 ## EnergyPilot orchestrator options
 
 Recommended starting values:
@@ -152,31 +212,44 @@ Recommended starting values:
 ```text
 Enable built-in EMHASS orchestrator   OFF while testing, ON after validation
 EMHASS URL                            http://5b918bf2-emhass:5000
-Optimization interval                 15 min
+Optimization interval                 60 min
 Target SOC at end                     10%
 Fallback house load                   700 W
-Use official Nord Pool prices         ON when the HA Nord Pool integration is used
+Use official Nord Pool runtime prices ON when the HA Nord Pool integration is used
+Optimize when tomorrow prices arrive  ON
 Nord Pool area                        blank for first configured area, or e.g. NL
 Nord Pool currency                    EUR
 Import price addition                 contract dependent
 Export price deduction                0.0248 EUR/kWh for the validated Tibber case
 ```
 
-Existing v0.09 installations upgrade with the recurring schedule OFF. This is intentional so EnergyPilot cannot silently run next to an existing YAML scheduler.
+Existing installations retain their stored EnergyPilot options. If v0.10 already stored a 15-minute optimization interval, change it to 60 minutes once in **GW EnergyPilot -> Configure**.
 
-## Optimize now
+## Optimize now and AUTO
 
-v0.10 creates a native Home Assistant button:
+EnergyPilot creates native Home Assistant buttons for **Optimize now** and **AUTO - optimize and resume**.
+
+**Optimize now** performs one complete cycle even when the recurring schedule is disabled.
+
+**AUTO** deliberately performs the operations in this order:
 
 ```text
-GW EnergyPilot Optimize now
+keep current manual state
+       ↓
+run fresh EMHASS optimization
+       ↓
+success?
+  no -> stay manual
+  yes
+       ↓
+enable Automatic Control
+       ↓
+apply fresh P_batt target
 ```
 
-The same control is available directly in the built-in EnergyPilot dashboard on the EMHASS card.
+This prevents an old published target from briefly being applied while returning from a manual battery command.
 
-The button performs one complete cycle even when the recurring schedule is disabled. This makes it the preferred validation method after changing EMHASS settings.
-
-The button entity also exposes orchestrator diagnostics as attributes, including:
+The Optimize now entity also exposes orchestrator and troubleshooting attributes including:
 
 ```text
 orchestrator_status
@@ -191,20 +264,44 @@ load_forecast_points
 optimize_http_status
 publish_http_status
 automatic_schedule
+controller_enabled
+controller_command
+controller_target_power
+controller_expected_mode
+ems_mode
+ems_setpoint
+work_mode_35187
+operation_mode_35188
+grid_mode_35136
+house_load_register_35172
+house_load_phase_sum
+house_load_power_balance
 ```
+
+The dashboard Diagnostics snapshot card renders these values and can copy a plain-text snapshot for support.
+
+## EV charging stop
+
+When **EV coordination** is enabled and a charging-state and/or charging-power entity is configured, EnergyPilot tracks whether charging is active. When charging changes from active to stopped, it immediately runs:
+
+```text
+reason = ev_charging_stopped
+```
+
+with the current SOC and current forecast inputs.
 
 ## Legacy YAML migration
 
-Before v0.10 a reference package could provide:
+Do not leave the old recurring YAML scheduler active together with the native scheduler.
+
+EnergyPilot detects these legacy entities during setup:
 
 ```text
 script.energypilot_emhass_optimize_now
 automation.energypilot_emhass_orchestrator
 ```
 
-Do not leave that recurring scheduler active together with the native v0.10 scheduler.
-
-EnergyPilot detects these legacy entities during setup. If found while the built-in schedule is enabled, the native scheduler reports:
+If found while the built-in schedule is enabled, the native scheduler reports:
 
 ```text
 legacy_yaml_detected
@@ -215,7 +312,7 @@ and does not start its own recurring timer.
 Recommended migration:
 
 ```text
-1. Update EnergyPilot to v0.10
+1. Update EnergyPilot
 2. Verify the native Optimize now button exists
 3. Keep Automatic Control OFF
 4. Run Optimize now once
@@ -223,8 +320,8 @@ Recommended migration:
 6. Remove/disable the old orchestrator YAML package
 7. Restart/reload Home Assistant
 8. Enable the built-in orchestrator schedule
-9. Run Optimize now again
-10. Enable Automatic Control
+9. Set Optimization interval to 60 min
+10. Use AUTO to return to automatic control
 ```
 
 ## EnergyPilot output mapping
@@ -282,7 +379,7 @@ Before turning Automatic Control ON, verify:
 
 ```text
 EnergyPilot PV power             numeric and plausible
-EnergyPilot load power           numeric and plausible
+EnergyPilot house/load power     numeric and plausible
 EnergyPilot battery SOC          numeric
 EnergyPilot battery power        numeric
 Optimize now                     successful
@@ -290,6 +387,7 @@ orchestrator status              ready
 sensor.p_batt_forecast           numeric and fresh
 sensor.optim_status              Optimal when configured
 EnergyPilot expected EMS mode    matches P_batt sign
+Diagnostics snapshot             values plausible
 ```
 
 References:
