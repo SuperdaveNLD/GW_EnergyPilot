@@ -12,13 +12,16 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.typing import ConfigType
 
 from .client import GWModbusClient
-from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL
+from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .event_triggers import async_setup_event_triggers
 from .orchestrator_v013 import GWEnergyPilotOrchestrator
+from .settings_api import async_register_settings_api
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -31,7 +34,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v016.js?v=0.16-beta-g20-1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v017.js?v=0.17-settings-strategy2"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -47,6 +50,34 @@ class GWRuntimeData:
 
 
 type GWConfigEntry = ConfigEntry[GWRuntimeData]
+
+
+async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
+    """Set up integration-wide dashboard APIs."""
+    async_register_settings_api(hass)
+    return True
+
+
+def _migrate_device_identifier(hass: HomeAssistant, entry: GWConfigEntry) -> None:
+    """Move the legacy mutable host:slave device identifier to entry_id."""
+    registry = dr.async_get(hass)
+    stable_identifier = (DOMAIN, entry.entry_id)
+    if registry.async_get_device_by_identifier(stable_identifier, entry.entry_id):
+        return
+
+    legacy_identifier = (
+        DOMAIN,
+        f"{entry.data[CONF_HOST]}:{entry.data[CONF_SLAVE]}",
+    )
+    device = registry.async_get_device_by_identifier(
+        legacy_identifier,
+        entry.entry_id,
+    )
+    if device is not None:
+        registry.async_update_device(
+            device.id,
+            new_identifiers={stable_identifier},
+        )
 
 
 async def _async_register_panel(hass: HomeAssistant) -> None:
@@ -77,6 +108,8 @@ async def _async_initial_refresh(coordinator: GWEnergyPilotCoordinator) -> None:
 
 async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     """Set up GW EnergyPilot from a config entry."""
+    _migrate_device_identifier(hass, entry)
+
     client = GWModbusClient(
         host=entry.data[CONF_HOST],
         port=int(entry.data[CONF_PORT]),

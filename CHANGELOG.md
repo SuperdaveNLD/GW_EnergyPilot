@@ -2,6 +2,36 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.17] - 2026-08-23
+
+### Added
+
+- A settings gear in the EnergyPilot dashboard header for Home Assistant administrators.
+- Dedicated **EP**, **EMHASS** and **GOODWE** configuration pages backed by the existing Home Assistant config entry.
+- Admin-only WebSocket settings commands for reading and updating the existing configuration.
+- GoodWe connection validation before host, Modbus TCP port or unit-ID changes are saved.
+- Multi-entry selection for installations with more than one GW EnergyPilot config entry.
+- Enabled-by-default Home Assistant Diagnostic sensors for the Beta SOC candidates `45356`, `45358` and `47500`.
+- A device-registry migration from the legacy mutable `host:slave` identifier to the stable config-entry ID.
+- A stateful **EMHASS optimization strategy** select that reads the active `costfun` from EMHASS `/get-config`.
+
+### Changed
+
+- GoodWe host/port/unit-ID changes can now be made from the dashboard and reload the existing integration after successful validation.
+- EP controller/telemetry/EV options and EnergyPilot-owned EMHASS orchestration/price options can be maintained from the dashboard settings pages.
+- The dashboard now highlights the active Profit / Cost / Self-consumption strategy instead of presenting three ambiguous stateless actions.
+- The strategy select refreshes after EnergyPilot EMHASS config writes and periodically so direct EMHASS UI changes are reflected in Home Assistant.
+- Existing v0.15 cost-function button unique IDs remain available for backwards-compatible automations and are classified as explicit configuration actions.
+- A successful `costfun` save is distinguished from a later fresh-optimization failure; the saved strategy remains visible even when re-optimization fails.
+- The active frontend is `gw-energy-pilot-v017.js`, layering the settings UI on top of all v0.16 Beta diagnostics and strategy readback behavior.
+- Home Assistant device identity no longer depends on mutable inverter connection data after migration.
+
+### Beta status
+
+- v0.17 remains **Beta** because the new settings UI/device migration has only limited field exposure and the G20 candidate register semantics are still being correlated across the active tester installations.
+- The G20 Beta registers remain read-only and optional.
+- The settings pages and stateful strategy selector do not change GoodWe EMS modes, register write ordering, `P_batt` mapping, sign conventions or controller ownership.
+
 ## [0.16] - 2026-08-23
 
 ### Added

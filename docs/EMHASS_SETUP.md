@@ -107,7 +107,9 @@ Import price addition                 contract dependent
 Export price deduction                contract dependent
 ```
 
-## 6. EMHASS cost function
+From v0.17, these EnergyPilot-owned integration settings are also available under the dashboard gear → **EMHASS** page. The dedicated settings page writes the same Home Assistant config entry as the normal integration options flow; it does not replace EMHASS `config.json`.
+
+## 6. EMHASS optimization strategy
 
 EMHASS supports these `costfun` objectives:
 
@@ -117,7 +119,19 @@ cost
 self-consumption
 ```
 
-From v0.15, the EnergyPilot dashboard exposes one button for each objective. Pressing a strategy button performs this sequence:
+v0.16+ represents this correctly as **one persistent setting** rather than three independent modes. Home Assistant exposes a stateful **EMHASS optimization strategy** select with these user-facing choices:
+
+```text
+Profit
+Cost
+Self-consumption
+```
+
+The EnergyPilot dashboard shows the same three choices as quick-selection buttons, but the active strategy is visibly highlighted and labelled `ACTIVE`. The state comes from the select entity, which reads the actual `costfun` from EMHASS `/get-config`.
+
+The select refreshes at startup, after EnergyPilot writes EMHASS configuration and periodically so a `costfun` change made directly in the EMHASS UI also appears in Home Assistant.
+
+Changing the strategy performs this sequence:
 
 ```text
 GET /get-config
@@ -126,6 +140,8 @@ change only costfun
       ↓
 POST /set-config with the complete configuration
       ↓
+update the Home Assistant strategy state
+      ↓
 run a fresh day-ahead optimization
       ↓
 publish fresh EMHASS output
@@ -133,7 +149,11 @@ publish fresh EMHASS output
 
 EnergyPilot deliberately reads and writes the complete configuration so unrelated EMHASS settings are preserved.
 
-Changing `costfun` changes **what EMHASS optimizes**. It does not by itself change the GoodWe control primitive. In v0.15 Automatic Control still consumes `P_batt` and maps it as follows:
+If the config write succeeds but the fresh optimization fails, the selected `costfun` remains saved. EnergyPilot reports this explicitly instead of presenting the entire selection as if it failed.
+
+The v0.15 button unique IDs remain available for backwards compatibility with existing automations. They are now configuration actions and their names explicitly say **Set EMHASS...**. New dashboard/UI logic should use the stateful select.
+
+Changing `costfun` changes **what EMHASS optimizes**. It does not by itself change the GoodWe control primitive. Automatic Control still consumes `P_batt` and maps it as follows:
 
 ```text
 charge target     → mode 11
@@ -207,7 +227,7 @@ AUTO performs a fresh optimization first and enables Automatic Control only afte
 Periodic optimization             every 60 minutes
 Optimize now                      immediately
 AUTO                              immediately
-Cost-function change              immediately after saving costfun
+Strategy change                   immediately after saving costfun
 Tomorrow prices available         immediately
 EV charging stops                 immediately when configured
 SOC limit changes                 3 seconds after the final change
@@ -256,7 +276,7 @@ Default deadband:
 
 ## Grid energy foundation
 
-v0.13+ exposes the GoodWe smart-meter cumulative grid counters:
+v0.13+ exposes the current canonical GoodWe smart-meter cumulative grid counters:
 
 ```text
 36015 total export
@@ -265,13 +285,13 @@ v0.13+ exposes the GoodWe smart-meter cumulative grid counters:
 
 They are Home Assistant `total_increasing` kWh sensors. Recorder can therefore calculate today, yesterday, month and year changes without repeatedly integrating every historical power sample.
 
-The dashboard's Grid detail graph uses 5-minute Recorder power statistics only when the user opens the Grid card. Daily import/export values are cached for five minutes.
+The v0.16+ extended `36104/36120` counters remain read-only Beta diagnostics pending physical SEMS lifetime correlation; they are not promoted to Recorder-facing canonical entities.
 
-These counters are also the intended foundation for future Nord Pool cost/revenue sensors.
+The dashboard's Grid detail graph uses 5-minute Recorder power statistics only when the user opens the Grid card. Daily import/export values are cached for five minutes.
 
 ## Diagnostics
 
-Use **Copy snapshot** when reporting an issue and include the inverter model/firmware.
+Use **Copy snapshot** when reporting an issue and include the inverter model/firmware. For Beta register validation also use **Copy beta diagnostics**.
 
 Relevant values include:
 
@@ -281,6 +301,9 @@ Relevant values include:
 - signed grid power;
 - inverter registers 35138 and 35140;
 - battery SOH and optional battery charge/discharge energy accounting;
+- Beta SOC diagnostics `45356`, `45358`, `47500`;
+- Beta extended grid counters `36104`, `36120`;
+- active EMHASS optimization strategy and raw `costfun`;
 - controller command/target;
 - selected EMHASS output entities;
 - EMHASS health/version and HTTP results;

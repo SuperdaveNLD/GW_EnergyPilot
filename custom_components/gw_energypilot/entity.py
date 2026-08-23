@@ -16,9 +16,8 @@ class GWEnergyPilotEntity(CoordinatorEntity[GWEnergyPilotCoordinator]):
     def __init__(self, entry: GWConfigEntry) -> None:
         super().__init__(entry.runtime_data.coordinator)
         self.entry = entry
-        unique = f"{entry.data['host']}:{entry.data['slave']}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, unique)},
+            identifiers={(DOMAIN, entry.entry_id)},
             name=NAME,
             manufacturer="GoodWe",
             model="ETA EMS Controller",

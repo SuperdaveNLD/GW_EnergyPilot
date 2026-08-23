@@ -31,7 +31,7 @@ EMHASS is an external prerequisite. GW EnergyPilot may integrate with EMHASS, bu
 3. Identify the root cause before rewriting code.
 4. Prefer the smallest robust change.
 5. Preserve working behaviour outside the requested scope.
-6. Check backwards compatibility for entity unique IDs, config entries, options, and Home Assistant Recorder history.
+6. Check backwards compatibility for entity unique IDs, device identifiers, config entries, options, and Home Assistant Recorder history.
 7. Update documentation when an architectural rule, register semantic, public entity, or operator workflow changes.
 
 ## Home Assistant rules
@@ -41,8 +41,10 @@ EMHASS is an external prerequisite. GW EnergyPilot may integrate with EMHASS, bu
 - Do not hold Home Assistant startup on slow or unavailable Modbus/EMHASS I/O.
 - Use coordinator-backed telemetry for polled inverter data.
 - Keep unique IDs stable unless a migration is explicitly implemented.
+- Device identifiers are also a migration contract: v0.17 uses `(DOMAIN, config_entry_id)` and migrates the legacy `(DOMAIN, host:slave)` identifier before platform setup.
+- Do not revert device identity to mutable host/unit-ID data.
 - Prefer config/options over hard-coded Home Assistant entity IDs.
-- Consider entity registry behaviour, translations, reload behaviour, availability, restore state, diagnostics, and error handling.
+- Consider entity registry behaviour, device registry behaviour, translations, reload behaviour, availability, restore state, diagnostics, and error handling.
 - Do not create duplicate sensors or parallel implementations for the same concept without a documented migration plan.
 
 ## Modbus rules
@@ -68,7 +70,7 @@ For Beta hardware semantics:
 - keep candidate registers read-only unless a separate validated write design exists;
 - keep them in optional read blocks so unsupported firmware cannot fail required telemetry;
 - do not feed Beta values into EMS control, ownership, SOC enforcement, Recorder-facing canonical energy entities, or automatic migration logic;
-- label them clearly as Beta in user-facing diagnostics and documentation;
+- label them clearly as Beta in user-facing diagnostics, Home Assistant entities, and documentation;
 - collect inverter model, firmware and matching SolarGo/SEMS+ values when validating;
 - promotion from Beta to confirmed semantics requires real-installation evidence and an intentional code/docs change.
 
@@ -97,6 +99,26 @@ Do not introduce code paths that silently fight each other for EMS ownership.
 
 Existing setup/operator guidance lives in `docs/EMHASS_SETUP.md`.
 
+## Dedicated settings API
+
+v0.17 adds dashboard configuration through:
+
+```text
+custom_components/gw_energypilot/settings_api.py
+```
+
+Rules:
+
+- `gw_energypilot/settings/get` and `gw_energypilot/settings/update` remain admin-only;
+- the existing Home Assistant `ConfigEntry` is the single configuration source;
+- do not add a parallel settings database;
+- EP/EMHASS option writes must preserve the existing config-flow validation/conversion path;
+- GoodWe host/port/unit-ID changes must be validated against the inverter before storage;
+- connection changes update the existing entry and reload it;
+- preserve the stable config-entry-based device identifier and existing entity unique IDs.
+
+See `docs/SETTINGS.md`.
+
 ## Current orchestration implementation
 
 Do not assume `orchestrator.py` alone is the active implementation.
@@ -114,7 +136,18 @@ Until this inheritance chain is deliberately consolidated, changes to orchestrat
 
 ## Frontend
 
-The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`. In v0.16 the active entry point imports v0.15, which imports v0.14, v0.13 and the earlier layers below it. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
+The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`.
+
+Current top-level chain in v0.17:
+
+```text
+gw-energy-pilot-v017.js
+  -> gw-energy-pilot-v016.js          Beta G20 diagnostics
+       -> gw-energy-pilot-v015.js     EMHASS strategy controls
+  -> gw-energy-pilot-settings-v016.js dedicated settings implementation
+```
+
+The lower versioned files themselves import earlier layers. Do not delete or modify a versioned file merely because its name looks historical. Trace the complete import chain first.
 
 The repository validator checks that relative frontend imports resolve and that the active frontend `VERSION` matches `manifest.json` when the entry module declares one.
 
@@ -127,7 +160,8 @@ Before merging a substantial change, run or rely on the `Quality` GitHub Actions
 - register-block coverage validation;
 - JSON parsing checks;
 - frontend dependency/import checks;
-- active frontend/manifest version consistency.
+- active frontend/manifest version consistency;
+- changelog/release-notes version coverage.
 
 These checks complement HACS and hassfest; they do not replace runtime testing on Home Assistant or hardware validation.
 
@@ -140,7 +174,7 @@ When a bug is reported:
 3. Check configuration and ownership state.
 4. Check external prerequisites (GoodWe reachability, EMHASS health/output, Home Assistant entity state).
 5. Identify the smallest root-cause fix.
-6. Consider startup, reload, unavailable-device, and stale-data edge cases.
+6. Consider startup, reload, unavailable-device, stale-data, and migration edge cases.
 7. Avoid unrelated refactors in the same fix unless they are required for correctness.
 
 ## Documentation map
@@ -148,9 +182,10 @@ When a bug is reported:
 - `README.md` — user-facing overview and installation.
 - `docs/ARCHITECTURE.md` — runtime architecture and ownership boundaries.
 - `docs/MODBUS.md` — Modbus semantics, Beta register status and change rules.
-- `docs/ENTITIES.md` — Home Assistant entity contract.
+- `docs/ENTITIES.md` — Home Assistant entity/device contract.
 - `docs/DEVELOPMENT.md` — contributor workflow and known technical debt.
 - `docs/EMHASS_SETUP.md` — EMHASS setup/operator guidance.
+- `docs/SETTINGS.md` — dedicated settings ownership, authorization and device migration.
 - `docs/KNOWN_ISSUES.md` — field issues adjacent to or outside EnergyPilot runtime code.
 - `docs/RELEASE_NOTES.md` — user-facing release summaries and Beta/validation status for every version.
 - `CHANGELOG.md` — detailed technical release history.
@@ -171,7 +206,7 @@ For a substantial change, check at least:
 - runtime behaviour;
 - failure/unavailable behaviour;
 - config/options compatibility;
-- entity/unique-ID compatibility;
+- entity/unique-ID/device-identifier compatibility;
 - translations when user-visible entities/options change;
 - dashboard impact;
 - relevant unit tests;
