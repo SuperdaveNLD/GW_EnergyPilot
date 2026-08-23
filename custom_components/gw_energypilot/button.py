@@ -147,6 +147,13 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             "ems_mode_name": MODE_NAMES.get(mode, "Unknown"),
             "ems_setpoint": coordinator.data.power if coordinator.data else None,
             "app_work_mode_47000": values.get("app_work_mode"),
+            "battery_discharge_depth_on_grid_45356": values.get(
+                "battery_discharge_depth_on_grid"
+            ),
+            "battery_discharge_depth_off_grid_45358": values.get(
+                "battery_discharge_depth_off_grid"
+            ),
+            "battery_soc_protection_47500": values.get("battery_soc_protection"),
             "work_mode_35187": values.get("work_mode"),
             "operation_mode_35188": values.get("operation_mode"),
             "grid_mode_35136": values.get("grid_mode"),
