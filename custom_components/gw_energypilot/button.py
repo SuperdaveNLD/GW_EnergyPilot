@@ -24,6 +24,7 @@ from .const import (
     MODE_GRID_EXPORT_TARGET,
     MODE_NAMES,
 )
+from .emhass_config import async_patch_emhass_config
 from .entity import GWEnergyPilotEntity
 
 
@@ -36,6 +37,9 @@ async def async_setup_entry(
     async_add_entities(
         [
             GWOptimizeNowButton(entry),
+            GWEMHASSProfitButton(entry),
+            GWEMHASSCostButton(entry),
+            GWEMHASSSelfConsumptionButton(entry),
             GWMaxExportButton(entry),
             GWBatteryPauseButton(entry),
             GWMaxChargeButton(entry),
@@ -177,6 +181,68 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Start a manual optimization."""
         await self.entry.runtime_data.orchestrator.async_optimize(reason="manual_button")
+
+
+class _GWEMHASSCostFunctionButton(GWEnergyPilotEntity, ButtonEntity):
+    """Base class for one-touch EMHASS cost-function selection."""
+
+    cost_function: str
+
+    def __init__(self, entry: GWConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_{self.entity_description_key}"
+
+    @property
+    def entity_description_key(self) -> str:
+        """Return stable key used for the entity unique ID."""
+        raise NotImplementedError
+
+    async def async_press(self) -> None:
+        """Persist the selected EMHASS objective and create a fresh plan."""
+        await async_patch_emhass_config(
+            self.hass,
+            self.entry,
+            {"costfun": self.cost_function},
+        )
+        await self.entry.runtime_data.orchestrator.async_optimize(
+            reason=f"cost_function_{self.cost_function}"
+        )
+
+
+class GWEMHASSProfitButton(_GWEMHASSCostFunctionButton):
+    """Select EMHASS profit optimization."""
+
+    _attr_translation_key = "emhass_costfun_profit"
+    _attr_icon = "mdi:cash-plus"
+    cost_function = "profit"
+
+    @property
+    def entity_description_key(self) -> str:
+        return "emhass_costfun_profit"
+
+
+class GWEMHASSCostButton(_GWEMHASSCostFunctionButton):
+    """Select EMHASS cost minimization."""
+
+    _attr_translation_key = "emhass_costfun_cost"
+    _attr_icon = "mdi:cash-minus"
+    cost_function = "cost"
+
+    @property
+    def entity_description_key(self) -> str:
+        return "emhass_costfun_cost"
+
+
+class GWEMHASSSelfConsumptionButton(_GWEMHASSCostFunctionButton):
+    """Select EMHASS self-consumption optimization."""
+
+    _attr_translation_key = "emhass_costfun_self_consumption"
+    _attr_icon = "mdi:home-battery"
+    cost_function = "self-consumption"
+
+    @property
+    def entity_description_key(self) -> str:
+        return "emhass_costfun_self_consumption"
 
 
 class _GWManualBatteryButton(GWEnergyPilotEntity, ButtonEntity):
