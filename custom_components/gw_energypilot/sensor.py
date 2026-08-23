@@ -24,6 +24,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GWConfigEntry
+from .accounting_sensor import GWGridDailyEnergySensor
 from .const import CONF_ENABLE_EV_COORDINATION, MODE_NAMES
 from .entity import GWEnergyPilotEntity
 
@@ -228,6 +229,8 @@ async def async_setup_entry(
         GWEMSSetpointSensor(entry),
         GWControlCommandSensor(entry),
         GWTargetPowerSensor(entry),
+        GWGridDailyEnergySensor(entry, "import"),
+        GWGridDailyEnergySensor(entry, "export"),
     ]
 
     if entry.options.get(CONF_ENABLE_EV_COORDINATION, False):
