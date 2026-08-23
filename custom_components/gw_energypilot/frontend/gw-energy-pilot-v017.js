@@ -13,6 +13,11 @@ PanelClass.prototype._render = function energyPilotV017Render() {
   const root = this.shadowRoot;
   if (!root) return;
 
+  const strategyNote = root.querySelector(".ep-v016-costfun-note");
+  if (strategyNote) {
+    strategyNote.innerHTML = "This is one persistent EMHASS setting, not three independent modes. The highlighted option is the current <strong>costfun</strong> read from EMHASS. Changing it saves the setting and immediately requests a fresh optimization. GoodWe execution remains P_batt-driven; changing strategy does not change the actuator mapping.";
+  }
+
   const versionBadge = root.querySelector(".version");
   if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
   const footerItems = root.querySelectorAll("footer span");
