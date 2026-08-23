@@ -90,7 +90,7 @@ PanelClass.prototype._render = function energyPilotV016Render() {
   enrichBetaDiagnostics(this, root);
 
   const versionBadge = root.querySelector(".version");
-  if (versionBadge) versionBadge.textContent = `v${VERSION}`;
+  if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
   const footerItems = root.querySelectorAll("footer span");
-  if (footerItems.length > 0) footerItems[0].textContent = `GW EnergyPilot v${VERSION}`;
+  if (footerItems.length > 0) footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
 };
