@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of GW EnergyPilot **v0.22 Beta**.
+This document describes the current runtime architecture of GW EnergyPilot **v0.22 Beta** plus staged next-update behavior where explicitly noted.
 
 ## High-level data flow
 
@@ -154,7 +154,7 @@ mode 1 · GoodWe Auto / AI
 setpoint 0 W
 ```
 
-When ON, the selected GoodWe strategy determines which optimizer output is the actuator plan.
+When ON, the selected GoodWe strategy determines which optimizer output is the actuator plan unless a documented safety override such as EV anti-discharge protection is active.
 
 ### Strategy A — GoodWe smart meter active = ON
 
@@ -201,7 +201,7 @@ Automatic evaluation also respects:
 
 - optimizer required state;
 - configured maximum setpoint magnitude;
-- EV Battery Hold ownership;
+- EV anti-discharge protection when configured and EV charging is active;
 - finite numeric plan values;
 - explicit Automatic Control ownership.
 
@@ -288,11 +288,46 @@ Optimization can be triggered by:
 
 Home Assistant startup itself deliberately does not start an optimization.
 
-## EV coordination
+## EV anti-discharge protection
 
-When enabled, active EV charging can force mode 8 Battery Hold.
+The staged next-update EV behavior is a **directional battery protection**, not an EV charging controller.
 
-After EV charging stops, EnergyPilot can request a fresh optimization and deliberately avoids executing the stale pre-EV plan while waiting for it.
+Ownership is deliberately separated:
+
+```text
+EV charger / external charging service
+    -> owns EV charging start/stop/power
+
+EMHASS
+    -> owns the desired home-battery plan
+
+EnergyPilot
+    -> prevents home-battery discharge while the EV is charging
+    -> allows an explicit home-battery charge plan
+
+GoodWe / BMS / smart meter
+    -> remain authoritative for inverter and hardware limits
+```
+
+During active EV charging, `P_batt` is the direction guard regardless of the normal automatic actuator strategy:
+
+```text
+P_batt > +deadband  -> mode 8 Battery Hold
+P_batt near 0 W     -> mode 8 Battery Hold
+P_batt < -deadband  -> mode 11 Battery charge power
+```
+
+The direct mode-11 charge override is intentional even when normal automatic operation uses PCC modes 9/10/1. A PCC target can result in either battery direction when the EV load changes; the EV safety contract instead requires a hard guarantee that the home battery cannot become the EV's source.
+
+This architecture is useful when the EV charger is scheduled by an external service rather than simply following the lowest spot price. **Tibber Grid Rewards** is a concrete example: Tibber can start or pause connected EV charging to support grid conditions and reward the customer for that flexibility. EnergyPilot must not counteract such an external EV schedule by discharging the home battery into the car, and it must not unnecessarily block a separate EMHASS home-battery charge request.
+
+EnergyPilot does not integrate with Tibber Grid Rewards and does not control the charger. Tibber Grid Rewards is only an explicit real-world ownership example.
+
+The existing stored option name `enable_ev_coordination` is retained for backwards compatibility. User-facing terminology becomes **EV anti-discharge protection**.
+
+After EV charging stops, EnergyPilot keeps the existing fresh-plan protection: when native orchestration is enabled it holds the battery while waiting for a new EMHASS optimization instead of executing the stale pre-stop plan.
+
+See `docs/EV_ANTI_DISCHARGE.md` for the complete behavior contract and non-goals.
 
 ## Frontend
 
@@ -361,3 +396,4 @@ See `docs/MODBUS.md` and `docs/EMS_MODES.md` for the full evidence/status contra
 7. Preserve entity unique IDs and stable device identity.
 8. Keep one Home Assistant config entry as the integration configuration source.
 9. Keep a reversible fallback for new Beta automatic control strategies.
+10. External EV charging schedules remain external; EV anti-discharge protection may constrain battery direction but never takes ownership of the charger.
