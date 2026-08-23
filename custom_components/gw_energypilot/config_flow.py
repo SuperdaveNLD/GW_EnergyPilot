@@ -28,6 +28,7 @@ from .const import (
     CONF_MAX_POWER,
     CONF_NORDPOOL_AREA,
     CONF_NORDPOOL_CURRENCY,
+    CONF_OPTIMIZE_ON_TOMORROW_PRICES,
     CONF_OPTIM_REQUIRED_STATE,
     CONF_OPTIM_STATUS_ENTITY,
     CONF_P_BATT_ENTITY,
@@ -45,6 +46,7 @@ from .const import (
     DEFAULT_MAX_POWER,
     DEFAULT_NORDPOOL_AREA,
     DEFAULT_NORDPOOL_CURRENCY,
+    DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES,
     DEFAULT_OPTIM_REQUIRED_STATE,
     DEFAULT_OPTIM_STATUS_ENTITY,
     DEFAULT_P_BATT_ENTITY,
@@ -172,6 +174,10 @@ def _controller_schema(*, orchestrator_default: bool = False) -> vol.Schema:
                 CONF_USE_NORDPOOL_PRICES,
                 default=DEFAULT_USE_NORDPOOL_PRICES,
             ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_OPTIMIZE_ON_TOMORROW_PRICES,
+                default=DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES,
+            ): selector.BooleanSelector(),
             vol.Optional(
                 CONF_NORDPOOL_AREA,
                 default=DEFAULT_NORDPOOL_AREA,
@@ -248,6 +254,10 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     )
     form_options.setdefault(CONF_EMHASS_FALLBACK_LOAD, DEFAULT_EMHASS_FALLBACK_LOAD)
     form_options.setdefault(CONF_USE_NORDPOOL_PRICES, DEFAULT_USE_NORDPOOL_PRICES)
+    form_options.setdefault(
+        CONF_OPTIMIZE_ON_TOMORROW_PRICES,
+        DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES,
+    )
     form_options.setdefault(CONF_NORDPOOL_AREA, DEFAULT_NORDPOOL_AREA)
     form_options.setdefault(CONF_NORDPOOL_CURRENCY, DEFAULT_NORDPOOL_CURRENCY)
     form_options.setdefault(CONF_BUY_PRICE_ADDER, DEFAULT_BUY_PRICE_ADDER)
