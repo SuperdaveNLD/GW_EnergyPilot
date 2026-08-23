@@ -12,11 +12,13 @@ Do not treat this document as permission to invent or extrapolate unverified reg
 
 ## Tested hardware
 
-Primary development and validation inverter:
+GW EnergyPilot is specifically designed and developed around the **new GoodWe ETA-G20 generation**.
 
-- **GoodWe GW15K-ETA-G20**
+The current tested-model list contains one confirmed inverter:
 
-The integration is built around the ETA-G20 generation. Other models must be individually validated before their register behaviour is considered confirmed.
+- **GoodWe GW15K-ETA-G20** — primary development and validation inverter.
+
+Other ETA-G20 models may use closely related telemetry and EMS concepts, but they are **not considered tested until verified on real hardware**. If EnergyPilot works on another inverter, please report the exact inverter model, firmware version, battery model and which telemetry/EMS controls work so it can be added to the tested-model list.
 
 ## Connection defaults
 
@@ -53,8 +55,8 @@ These conventions affect dashboard direction and EMHASS/controller logic and mus
 | 35182 | `battery_power` | int32 | 1 | Battery power |
 | 37007 | `battery_soc` | uint16 | 1 | Battery state of charge |
 | 36008 | `meter_total_power_fast` | int16 | 1 | Primary instantaneous grid power |
-| 36015 | `meter_total_energy_export` | float32 | 0.001 | Cumulative exported grid energy in kWh |
-| 36017 | `meter_total_energy_import` | float32 | 0.001 | Cumulative imported grid energy in kWh |
+| 36015 | `meter_total_energy_export` | float32 | 0.001 | Legacy cumulative exported grid energy in kWh |
+| 36017 | `meter_total_energy_import` | float32 | 0.001 | Legacy cumulative imported grid energy in kWh |
 | 47511 | `ems_mode` | uint16 | 1 | EMS mode control/state |
 | 47512 | `ems_setpoint` | uint16 | 1 | EMS power setpoint |
 
@@ -76,6 +78,8 @@ PV - grid + battery
 
 is a whole-system power balance. It may include conversion losses, auxiliary consumption, and differences between measurement points. It must not silently replace register `35172` as the Home/load entity.
 
+Example: a difference between the smart-meter power and the load register can be consistent with inverter conversion/auxiliary consumption, but that does **not** prove that another inverter-side power register directly represents self-consumption.
+
 ## Inverter-side diagnostic power
 
 Registers `35138` and `35140` are exposed as inverter-side diagnostics:
@@ -89,14 +93,45 @@ Do not label `35138` as inverter self-consumption unless independent validation 
 
 ## Grid meter energy
 
-GoodWe cumulative grid energy is decoded as IEEE-754 big-endian float32 values and scaled by `0.001` to kWh:
+The currently confirmed EnergyPilot cumulative grid-energy source uses GoodWe meter registers:
 
 ```text
 36015 = exported energy total
 36017 = imported energy total
 ```
 
-Home Assistant exposes these as `total_increasing` energy sensors so Recorder can derive daily/monthly/yearly deltas efficiently.
+They are decoded as IEEE-754 big-endian float32 values scaled by `0.001` to kWh and exposed as `total_increasing` sensors so Home Assistant Recorder can derive daily/monthly/yearly deltas efficiently.
+
+### Extended 15 kW+ meter counter validation
+
+On the tested GW15K-ETA-G20, the legacy `36015/36017` counters have been observed returning `0.00 kWh` while instantaneous smart-meter power is valid. This means the dashboard must not assume those counters are the correct lifetime source for this G20 without further validation.
+
+The upstream GoodWe ET implementation enables an extended meter layout for inverters with rated power `>= 15000 W` and defines these total counters:
+
+```text
+36104 = extended total exported energy
+36120 = extended total imported energy
+```
+
+That implementation treats each value as an unsigned 64-bit counter scaled by `0.01 kWh`.
+
+EnergyPilot's next-update validation branch reads `36092..36123` as an **optional diagnostic range** and exposes `36104/36120` only as candidate diagnostic values. They do not replace `36015/36017` in the dashboard until the values have been checked against the real GW15K-ETA-G20 / SEMS meter totals. This keeps unverified register behaviour out of the canonical user-facing energy calculation.
+
+## Battery SOC protection layers
+
+EMHASS minimum/maximum SOC values are optimizer constraints. They do not override inverter or BMS protection.
+
+Related GoodWe ET settings documented by the upstream implementation include on-grid battery discharge-depth / SOC-protection concepts, but EnergyPilot does not write those settings without G20-specific validation. The practical rule remains:
+
+```text
+EMHASS optimizer limit
+GoodWe / SEMS+ inverter limit
+Battery BMS limit
+
+most restrictive active limit wins
+```
+
+Therefore an inverter configured in SEMS+ to stop discharging around `10%` can refuse a mode-12 discharge request below that point even if EMHASS has a lower minimum SOC target.
 
 ## EMS modes currently used
 
@@ -154,13 +189,14 @@ The required runtime ranges are:
 47509 + 4 words
 ```
 
-The optional diagnostic range is:
+The optional diagnostic ranges in the next-update validation branch are:
 
 ```text
 47000 + 1 word
+36092 + 32 words
 ```
 
-Register `47000` remains optional so an unavailable diagnostic block does not fail the normal telemetry refresh.
+Optional ranges must not fail the normal telemetry refresh. The client reconnects between optional reads when an unsupported range causes pymodbus to close the connection.
 
 The first three required blocks intentionally extend one word beyond the last visible 32-bit register address in the block:
 
@@ -170,7 +206,7 @@ The first three required blocks intentionally extend one word beyond the last vi
 35335 is uint32 -> needs 35335 and 35336
 ```
 
-That extra word is required for correct decoding and must not be trimmed as apparently unused space.
+The extended energy candidates are 64-bit values and therefore consume four 16-bit Modbus words each.
 
 Run:
 
@@ -178,7 +214,7 @@ Run:
 python scripts/validate_repo.py
 ```
 
-The validator checks that every register definition is fully covered, including both words of uint32/int32/float32 values, and that no read block exceeds the Modbus 125-register request limit.
+The validator checks that every register definition is fully covered, including every word of multi-register values, and that no read block exceeds the Modbus 125-register request limit.
 
 ## Register change policy
 
