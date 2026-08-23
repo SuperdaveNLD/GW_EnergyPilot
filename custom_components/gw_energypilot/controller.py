@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from math import isfinite
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -147,16 +148,17 @@ class GWEnergyPilotController:
         )
 
     def _state_float(self, entity_id: str | None) -> float | None:
-        """Return entity state as float."""
+        """Return a finite entity state as float."""
         if not entity_id:
             return None
         state = self.hass.states.get(entity_id)
         if state is None or state.state in {"unknown", "unavailable", "none", ""}:
             return None
         try:
-            return float(state.state)
+            value = float(state.state)
         except (TypeError, ValueError):
             return None
+        return value if isfinite(value) else None
 
     def ev_is_active(self) -> bool:
         """Return whether configured EV charging is active."""
