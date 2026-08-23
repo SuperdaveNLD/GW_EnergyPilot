@@ -107,7 +107,7 @@ Import price addition                 contract dependent
 Export price deduction                contract dependent
 ```
 
-## 6. EMHASS cost function
+## 6. EMHASS optimization strategy
 
 EMHASS supports these `costfun` objectives:
 
@@ -117,7 +117,19 @@ cost
 self-consumption
 ```
 
-From v0.15, the EnergyPilot dashboard exposes one button for each objective. Pressing a strategy button performs this sequence:
+v0.16 represents this correctly as **one persistent setting** rather than three independent modes. Home Assistant exposes a stateful **EMHASS optimization strategy** select with these user-facing choices:
+
+```text
+Profit
+Cost
+Self-consumption
+```
+
+The EnergyPilot dashboard shows the same three choices as quick-selection buttons, but the active strategy is visibly highlighted and labelled `ACTIVE`. The state comes from the select entity, which reads the actual `costfun` from EMHASS `/get-config`.
+
+The select refreshes at startup, after EnergyPilot writes EMHASS configuration and periodically so a `costfun` change made directly in the EMHASS UI also appears in Home Assistant.
+
+Changing the strategy performs this sequence:
 
 ```text
 GET /get-config
@@ -126,6 +138,8 @@ change only costfun
       ↓
 POST /set-config with the complete configuration
       ↓
+update the Home Assistant strategy state
+      ↓
 run a fresh day-ahead optimization
       ↓
 publish fresh EMHASS output
@@ -133,7 +147,11 @@ publish fresh EMHASS output
 
 EnergyPilot deliberately reads and writes the complete configuration so unrelated EMHASS settings are preserved.
 
-Changing `costfun` changes **what EMHASS optimizes**. It does not by itself change the GoodWe control primitive. In v0.15 Automatic Control still consumes `P_batt` and maps it as follows:
+If the config write succeeds but the fresh optimization fails, the selected `costfun` remains saved. EnergyPilot reports this explicitly instead of presenting the entire selection as if it failed.
+
+The v0.15 button unique IDs remain available for backwards compatibility with existing automations. They are now configuration actions and their names explicitly say **Set EMHASS...**. New dashboard/UI logic should use the stateful select.
+
+Changing `costfun` changes **what EMHASS optimizes**. It does not by itself change the GoodWe control primitive. In v0.16 Automatic Control still consumes `P_batt` and maps it as follows:
 
 ```text
 charge target     → mode 11
@@ -207,7 +225,7 @@ AUTO performs a fresh optimization first and enables Automatic Control only afte
 Periodic optimization             every 60 minutes
 Optimize now                      immediately
 AUTO                              immediately
-Cost-function change              immediately after saving costfun
+Strategy change                   immediately after saving costfun
 Tomorrow prices available         immediately
 EV charging stops                 immediately when configured
 SOC limit changes                 3 seconds after the final change
