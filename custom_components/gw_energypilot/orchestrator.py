@@ -12,12 +12,16 @@ from typing import Any
 from aiohttp import ClientError
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -29,6 +33,7 @@ from .const import (
     CONF_EMHASS_SOC_FINAL,
     CONF_NORDPOOL_AREA,
     CONF_NORDPOOL_CURRENCY,
+    CONF_OPTIMIZE_ON_TOMORROW_PRICES,
     CONF_OPTIM_REQUIRED_STATE,
     CONF_OPTIM_STATUS_ENTITY,
     CONF_P_BATT_ENTITY,
@@ -41,6 +46,7 @@ from .const import (
     DEFAULT_EMHASS_URL,
     DEFAULT_NORDPOOL_AREA,
     DEFAULT_NORDPOOL_CURRENCY,
+    DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES,
     DEFAULT_OPTIM_REQUIRED_STATE,
     DEFAULT_OPTIM_STATUS_ENTITY,
     DEFAULT_P_BATT_ENTITY,
@@ -55,6 +61,7 @@ _LOGGER = logging.getLogger(__name__)
 LOAD_HISTORY_DAYS = 7
 LOAD_FORECAST_HOURS = 48
 OUTPUT_TIMEOUT = 30
+PRICE_LISTENER_RETRY_SECONDS = 90
 
 
 class GWEnergyPilotOrchestrator:
@@ -79,11 +86,14 @@ class GWEnergyPilotOrchestrator:
         self.last_price_area: str | None = None
         self.last_price_points = 0
         self.last_load_points = 0
+        self.last_price_trigger: datetime | None = None
+        self.price_trigger_entities: list[str] = []
         self.optimize_http_status: int | None = None
         self.publish_http_status: int | None = None
 
         self._lock = asyncio.Lock()
         self._unsubs: list[Callable[[], None]] = []
+        self._price_listener_unsub: Callable[[], None] | None = None
 
     @property
     def signal(self) -> str:
@@ -96,10 +106,38 @@ class GWEnergyPilotOrchestrator:
         return bool(self.entry.options.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, False))
 
     @property
+    def price_automation_enabled(self) -> bool:
+        """Return whether Nord Pool price publication should trigger optimization."""
+        return bool(
+            self.enabled
+            and self.entry.options.get(
+                CONF_USE_NORDPOOL_PRICES,
+                DEFAULT_USE_NORDPOOL_PRICES,
+            )
+            and self.entry.options.get(
+                CONF_OPTIMIZE_ON_TOMORROW_PRICES,
+                DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES,
+            )
+        )
+
+    @property
     def attributes(self) -> dict[str, Any]:
         """Return diagnostics for Home Assistant and the dashboard."""
         return {
             "automatic_schedule": self.enabled,
+            "price_runtime_source": (
+                "nordpool"
+                if self.entry.options.get(
+                    CONF_USE_NORDPOOL_PRICES,
+                    DEFAULT_USE_NORDPOOL_PRICES,
+                )
+                else "emhass"
+            ),
+            "price_refresh_automation": self.price_automation_enabled,
+            "price_trigger_entities": self.price_trigger_entities,
+            "last_price_trigger": (
+                self.last_price_trigger.isoformat() if self.last_price_trigger else None
+            ),
             "last_success": self.last_success.isoformat() if self.last_success else None,
             "last_error": self.last_error,
             "last_reason": self.last_reason,
@@ -143,10 +181,27 @@ class GWEnergyPilotOrchestrator:
             )
         )
         self._unsubs.append(async_call_later(self.hass, 60, self._async_initial_optimize))
+
+        if self.price_automation_enabled:
+            self._register_price_trigger_listener()
+            # Config entries are loaded concurrently during Home Assistant start.
+            # Retry discovery once so Nord Pool can finish creating its diagnostic
+            # tomorrow-price binary sensor before we give up on event triggering.
+            self._unsubs.append(
+                async_call_later(
+                    self.hass,
+                    PRICE_LISTENER_RETRY_SECONDS,
+                    self._async_refresh_price_trigger_listener,
+                )
+            )
+
         self._set_status("scheduled")
 
     async def async_unload(self) -> None:
         """Stop scheduler callbacks."""
+        if self._price_listener_unsub is not None:
+            self._price_listener_unsub()
+            self._price_listener_unsub = None
         while self._unsubs:
             self._unsubs.pop()()
 
@@ -159,6 +214,70 @@ class GWEnergyPilotOrchestrator:
                 "automation.energypilot_emhass_orchestrator",
             )
         )
+
+    def _discover_tomorrow_price_entities(self) -> list[str]:
+        """Find official Nord Pool tomorrow-price availability binary sensors."""
+        registry = er.async_get(self.hass)
+        entity_ids: set[str] = set()
+
+        for nordpool_entry in self.hass.config_entries.async_entries("nordpool"):
+            for registry_entry in er.async_entries_for_config_entry(
+                registry,
+                nordpool_entry.entry_id,
+            ):
+                if registry_entry.domain != "binary_sensor" or registry_entry.disabled:
+                    continue
+                if (
+                    registry_entry.translation_key == "tomorrow_price_available"
+                    or registry_entry.unique_id.endswith("-tomorrow_price_available")
+                ):
+                    entity_ids.add(registry_entry.entity_id)
+
+        return sorted(entity_ids)
+
+    def _register_price_trigger_listener(self) -> None:
+        """Subscribe to Nord Pool tomorrow-price publication state changes."""
+        if self._price_listener_unsub is not None:
+            self._price_listener_unsub()
+            self._price_listener_unsub = None
+
+        self.price_trigger_entities = self._discover_tomorrow_price_entities()
+        if self.price_trigger_entities:
+            self._price_listener_unsub = async_track_state_change_event(
+                self.hass,
+                self.price_trigger_entities,
+                self._async_tomorrow_price_changed,
+            )
+        async_dispatcher_send(self.hass, self.signal)
+
+    async def _async_refresh_price_trigger_listener(self, _now: datetime) -> None:
+        """Retry Nord Pool entity discovery after startup integrations settle."""
+        if self.price_automation_enabled:
+            self._register_price_trigger_listener()
+
+    @callback
+    def _async_tomorrow_price_changed(self, event: Event) -> None:
+        """Run a fresh optimization when official tomorrow prices become ready."""
+        old_state = event.data.get("old_state")
+        new_state = event.data.get("new_state")
+        if new_state is None or new_state.state != "on":
+            return
+        if old_state is not None and old_state.state == "on":
+            return
+
+        self.last_price_trigger = dt_util.utcnow()
+        async_dispatcher_send(self.hass, self.signal)
+        self.hass.async_create_task(
+            self._async_price_trigger_optimize(),
+            "gw-energypilot-tomorrow-prices",
+        )
+
+    async def _async_price_trigger_optimize(self) -> None:
+        """Handle price-triggered optimization without leaking task errors."""
+        try:
+            await self.async_optimize(reason="tomorrow_prices")
+        except HomeAssistantError as err:
+            _LOGGER.warning("Price-triggered EMHASS optimization failed: %s", err)
 
     async def _async_initial_optimize(self, _now: datetime) -> None:
         await self._async_scheduled_optimize(_now)
@@ -254,12 +373,18 @@ class GWEnergyPilotOrchestrator:
             forecast[target.isoformat()] = round(value, 0)
         return forecast
 
-    async def _async_nordpool_day(self, config_entry_id: str, target_date: date) -> dict[str, Any]:
+    async def _async_nordpool_day(
+        self,
+        config_entry_id: str,
+        target_date: date,
+    ) -> dict[str, Any]:
         data: dict[str, Any] = {
             "config_entry": config_entry_id,
             "date": target_date.isoformat(),
         }
-        area = str(self.entry.options.get(CONF_NORDPOOL_AREA, DEFAULT_NORDPOOL_AREA)).strip()
+        area = str(
+            self.entry.options.get(CONF_NORDPOOL_AREA, DEFAULT_NORDPOOL_AREA)
+        ).strip()
         currency = str(
             self.entry.options.get(CONF_NORDPOOL_CURRENCY, DEFAULT_NORDPOOL_CURRENCY)
         ).strip()
@@ -277,7 +402,10 @@ class GWEnergyPilotOrchestrator:
         )
         return response if isinstance(response, dict) else {}
 
-    def _select_price_area(self, response: dict[str, Any]) -> tuple[str | None, list[dict[str, Any]]]:
+    def _select_price_area(
+        self,
+        response: dict[str, Any],
+    ) -> tuple[str | None, list[dict[str, Any]]]:
         configured = str(
             self.entry.options.get(CONF_NORDPOOL_AREA, DEFAULT_NORDPOOL_AREA)
         ).strip()
@@ -287,6 +415,14 @@ class GWEnergyPilotOrchestrator:
             if isinstance(values, list):
                 return str(area), values
         return None, []
+
+    def _tomorrow_prices_available(self) -> bool:
+        """Return whether any discovered official Nord Pool sensor is ready."""
+        for entity_id in self.price_trigger_entities:
+            state = self.hass.states.get(entity_id)
+            if state is not None and state.state == "on":
+                return True
+        return False
 
     async def _async_price_forecasts(
         self,
@@ -320,9 +456,11 @@ class GWEnergyPilotOrchestrator:
             _LOGGER.warning("Unable to retrieve today's Nord Pool prices: %s", err)
             return {}, {}
 
-        # Tomorrow is normally published around 13:00 CET/CEST. Failure to get
-        # tomorrow must never invalidate today's optimization.
-        if dt_util.now().hour >= 13:
+        # The official Nord Pool integration exposes a diagnostic binary sensor
+        # when tomorrow is available. After 13:00 we also try proactively, so a
+        # missing/renamed binary sensor does not prevent tomorrow prices being
+        # included in the next periodic optimization.
+        if self._tomorrow_prices_available() or dt_util.now().hour >= 13:
             try:
                 responses.append(
                     await self._async_nordpool_day(
@@ -352,7 +490,8 @@ class GWEnergyPilotOrchestrator:
             if selected_area is None and area is not None:
                 selected_area = area
             if selected_area is not None and area != selected_area:
-                rows = response.get(selected_area, []) if isinstance(response.get(selected_area), list) else []
+                fallback_rows = response.get(selected_area)
+                rows = fallback_rows if isinstance(fallback_rows, list) else []
 
             for row in rows:
                 try:
@@ -375,7 +514,9 @@ class GWEnergyPilotOrchestrator:
         payload: dict[str, Any],
         timeout_seconds: int,
     ) -> tuple[int, str]:
-        base_url = str(self.entry.options.get(CONF_EMHASS_URL, DEFAULT_EMHASS_URL)).strip().rstrip("/")
+        base_url = str(
+            self.entry.options.get(CONF_EMHASS_URL, DEFAULT_EMHASS_URL)
+        ).strip().rstrip("/")
         if not base_url:
             raise HomeAssistantError("EMHASS URL is empty")
 
@@ -387,7 +528,9 @@ class GWEnergyPilotOrchestrator:
                     content = await response.text()
                     return response.status, content
         except (TimeoutError, ClientError) as err:
-            raise HomeAssistantError(f"Unable to reach EMHASS at {base_url}: {err}") from err
+            raise HomeAssistantError(
+                f"Unable to reach EMHASS at {base_url}: {err}"
+            ) from err
 
     def _optimization_ready(self) -> bool:
         entity_id = str(
@@ -408,7 +551,10 @@ class GWEnergyPilotOrchestrator:
         )
         return state is not None and state.state == required
 
-    async def _async_wait_for_fresh_output(self, before: datetime | None) -> float | None:
+    async def _async_wait_for_fresh_output(
+        self,
+        before: datetime | None,
+    ) -> float | None:
         entity_id = str(
             self.entry.options.get(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
             or DEFAULT_P_BATT_ENTITY
@@ -430,7 +576,9 @@ class GWEnergyPilotOrchestrator:
     async def async_optimize(self, reason: str = "manual") -> None:
         """Run one complete optimization and publish cycle."""
         if self._lock.locked():
-            raise HomeAssistantError("An EnergyPilot EMHASS optimization is already running")
+            raise HomeAssistantError(
+                "An EnergyPilot EMHASS optimization is already running"
+            )
 
         async with self._lock:
             self.last_reason = reason
@@ -440,7 +588,10 @@ class GWEnergyPilotOrchestrator:
 
             soc = self._coordinator_number("battery_soc")
             if soc is None or soc < 0 or soc > 100:
-                self._set_status("error_input", "EnergyPilot battery SOC is unavailable or invalid")
+                self._set_status(
+                    "error_input",
+                    "EnergyPilot battery SOC is unavailable or invalid",
+                )
                 raise HomeAssistantError(self.last_error)
 
             soc_init = min(1.0, max(0.0, soc / 100.0))
@@ -453,7 +604,9 @@ class GWEnergyPilotOrchestrator:
             )
             p_batt_before_state = self.hass.states.get(p_batt_entity)
             p_batt_before = (
-                p_batt_before_state.last_updated if p_batt_before_state is not None else None
+                p_batt_before_state.last_updated
+                if p_batt_before_state is not None
+                else None
             )
 
             self._set_status("reading_history")
@@ -488,7 +641,10 @@ class GWEnergyPilotOrchestrator:
             self.optimize_http_status = optimize_status
             async_dispatcher_send(self.hass, self.signal)
             if not 200 <= optimize_status < 300:
-                error = f"EMHASS optimization HTTP {optimize_status}: {optimize_content[:300]}"
+                error = (
+                    f"EMHASS optimization HTTP {optimize_status}: "
+                    f"{optimize_content[:300]}"
+                )
                 self._set_status("error_optimization", error)
                 raise HomeAssistantError(error)
 
@@ -501,14 +657,20 @@ class GWEnergyPilotOrchestrator:
             self.publish_http_status = publish_status
             async_dispatcher_send(self.hass, self.signal)
             if not 200 <= publish_status < 300:
-                error = f"EMHASS publish HTTP {publish_status}: {publish_content[:300]}"
+                error = (
+                    f"EMHASS publish HTTP {publish_status}: "
+                    f"{publish_content[:300]}"
+                )
                 self._set_status("error_publish", error)
                 raise HomeAssistantError(error)
 
             self._set_status("waiting_for_output")
             p_batt = await self._async_wait_for_fresh_output(p_batt_before)
             if p_batt is None:
-                error = "EMHASS published successfully but no fresh numeric P_batt output became available"
+                error = (
+                    "EMHASS published successfully but no fresh numeric P_batt "
+                    "output became available"
+                )
                 self._set_status("stale_output", error)
                 raise HomeAssistantError(error)
 
@@ -516,7 +678,8 @@ class GWEnergyPilotOrchestrator:
             self.last_success = dt_util.utcnow()
             self._set_status("ready")
             _LOGGER.info(
-                "EnergyPilot EMHASS optimization successful: reason=%s soc_init=%.3f p_batt=%.1f W",
+                "EnergyPilot EMHASS optimization successful: reason=%s "
+                "soc_init=%.3f p_batt=%.1f W",
                 reason,
                 self.last_soc_init,
                 p_batt,
