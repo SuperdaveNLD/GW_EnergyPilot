@@ -216,16 +216,41 @@ class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
                 "emhass_minimum_soc_pct": 2.0,
                 "emhass_maximum_soc_pct": 93.0,
                 "emhass_config_target_soc_pct": 6.0,
+                "emhass_config_target_soc_raw": 0.06,
                 "emhass_soc_deficit_threshold_pct": 7.0,
+                "emhass_soc_deficit_threshold_raw": 0.07,
                 "emhass_soc_deficit_cost": 0.002,
             },
         )
 
-    def test_soc_diagnostics_tolerate_missing_or_invalid_values(self):
+    def test_soc_diagnostics_keep_invalid_raw_values_without_percent_conversion(self):
+        config = {
+            "battery_minimum_state_of_charge": 0.05,
+            "battery_maximum_state_of_charge": 0.98,
+            "battery_target_state_of_charge": -0.9,
+            "battery_soc_deficit_threshold": -6.9,
+            "battery_soc_deficit_cost": 0.0,
+        }
+
+        self.assertEqual(
+            emhass_config.emhass_soc_diagnostics_from_config(config),
+            {
+                "emhass_minimum_soc_pct": 5.0,
+                "emhass_maximum_soc_pct": 98.0,
+                "emhass_config_target_soc_pct": None,
+                "emhass_config_target_soc_raw": -0.9,
+                "emhass_soc_deficit_threshold_pct": None,
+                "emhass_soc_deficit_threshold_raw": -6.9,
+                "emhass_soc_deficit_cost": 0.0,
+            },
+        )
+
+    def test_soc_diagnostics_tolerate_missing_or_non_finite_values(self):
         config = {
             "battery_minimum_state_of_charge": None,
             "battery_maximum_state_of_charge": "invalid",
             "battery_target_state_of_charge": float("nan"),
+            "battery_soc_deficit_threshold": None,
             "battery_soc_deficit_cost": float("inf"),
         }
 
@@ -235,7 +260,9 @@ class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
                 "emhass_minimum_soc_pct": None,
                 "emhass_maximum_soc_pct": None,
                 "emhass_config_target_soc_pct": None,
+                "emhass_config_target_soc_raw": None,
                 "emhass_soc_deficit_threshold_pct": None,
+                "emhass_soc_deficit_threshold_raw": None,
                 "emhass_soc_deficit_cost": None,
             },
         )
