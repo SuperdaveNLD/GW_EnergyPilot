@@ -34,6 +34,7 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (35301, 35),  # PV total + extended warning/error registers
     (36003, 55),  # Smart meter runtime values
     (37002, 22),  # BMS, SOC/SOH, cell temperatures and voltages
+    (47000, 1),   # APP / Work mode diagnostic
     (47509, 4),   # Feed-power state + EMS mode/setpoint
 )
 
@@ -193,6 +194,9 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition(
         "battery_min_cell_voltage", 37023, RegisterDataType.UINT16, 0.001, 3
     ),
+
+    # APP / work-mode diagnostic used by GoodWe tooling / troubleshooting.
+    RegisterDefinition("app_work_mode", 47000, RegisterDataType.UINT16),
 
     # EMS runtime
     RegisterDefinition("feed_power_enable", 47509, RegisterDataType.UINT16),
