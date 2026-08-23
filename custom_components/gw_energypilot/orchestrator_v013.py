@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import math
 from typing import Any
 
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -26,6 +27,22 @@ LOAD_FORECAST_HOURS = 24
 class GWEnergyPilotOrchestrator(_V012Orchestrator):
     """Use the G20 load registers consistently and expose refresh metadata."""
 
+    def __init__(self, hass, entry, coordinator) -> None:
+        super().__init__(hass, entry, coordinator)
+        # This is intentionally not initialized from the configured target.
+        # It represents only a target that completed an EnergyPilot-owned
+        # optimization cycle, so manual-only installations start with None.
+        self.last_runtime_soc_final: float | None = None
+
+    def _configured_runtime_soc_final(self) -> float:
+        """Return EnergyPilot's configured runtime soc_final value."""
+        return float(
+            self.entry.options.get(
+                CONF_EMHASS_SOC_FINAL,
+                DEFAULT_EMHASS_SOC_FINAL,
+            )
+        )
+
     @property
     def attributes(self) -> dict[str, Any]:
         """Return diagnostics used by Home Assistant and the dashboard."""
@@ -39,16 +56,12 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
             {
                 "system_balance_power": balance,
                 "load_forecast_source": "GoodWe load register 35172 + Recorder history",
-                # The base orchestrator sends this same config-entry value as
-                # runtime `soc_final` in every day-ahead optimization payload.
-                # Expose it explicitly so operators can distinguish it from
-                # EMHASS config.json battery_target_state_of_charge.
-                "runtime_soc_final": float(
-                    self.entry.options.get(
-                        CONF_EMHASS_SOC_FINAL,
-                        DEFAULT_EMHASS_SOC_FINAL,
-                    )
-                ),
+                # Keep the configured EnergyPilot target separate from the last
+                # value actually used by a successful EnergyPilot optimization.
+                # External/manual EMHASS publishing must not make a configured
+                # but never-sent value look like runtime evidence.
+                "configured_runtime_soc_final": self._configured_runtime_soc_final(),
+                "runtime_soc_final": self.last_runtime_soc_final,
                 "telemetry_refresh_seconds": int(
                     self.entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
                 ),
@@ -61,6 +74,13 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
             }
         )
         return attrs
+
+    async def async_optimize(self, reason: str = "manual") -> None:
+        """Record the runtime final SOC only after an EnergyPilot-owned run succeeds."""
+        requested_soc_final = self._configured_runtime_soc_final()
+        await super().async_optimize(reason=reason)
+        self.last_runtime_soc_final = requested_soc_final
+        async_dispatcher_send(self.hass, self.signal)
 
     def _build_load_forecast(
         self,
