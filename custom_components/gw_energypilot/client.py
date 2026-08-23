@@ -41,6 +41,7 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (35301, 36),  # through 35336; includes 32-bit warning at 35335
     (36003, 55),  # through 36057
     (37002, 22),  # through 37023
+    (47000, 1),   # APP / Work mode diagnostic
     (47509, 4),   # through 47512
 )
 
