@@ -14,6 +14,7 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.17** | 2026-08-23 | **Beta** | Adds the dashboard settings gear and dedicated EP, EMHASS and GOODWE configuration pages. GoodWe connection changes are validated before saving and the HA device identity is migrated away from mutable host/unit-ID values. v0.16 G20 Beta diagnostics remain read-only and unpromoted. |
 | **0.16** | 2026-08-23 | **Beta** | Ships read-only G20 SOC-protection candidates `45356/45358/47500` and extended 15 kW+ meter candidates `36104/36120` to the active tester group. Adds UINT64 decoding, beta diagnostics UI and tests. No candidate value is used for control or canonical grid accounting. |
 | **0.15** | 2026-08-23 | **Validated** | Adds EMHASS `profit`, `cost` and `self-consumption` strategy controls. Preserves unrelated EMHASS config and immediately re-optimizes after a strategy change. GoodWe `P_batt` control remains unchanged. |
 | **0.14** | 2026-08-23 | **Validated + beta diagnostics** | Adds optional battery SOH/charge/discharge accounting diagnostics from `35206-35211`. Those accounting values remain field-validation diagnostics and are not used for synthetic cycle calculations. |
@@ -31,9 +32,42 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
 
+## v0.17 — Dedicated configuration pages
+
+v0.17 adds a first-class configuration area to the EnergyPilot dashboard while keeping the existing Home Assistant config entry as the only stored configuration source.
+
+The header contains two distinct controls:
+
+```text
+Dashboard layout / visibility   existing tune/sliders button
+EnergyPilot configuration       new gear button
+```
+
+The gear opens three pages:
+
+- **EP** — controller limits, telemetry cadence and optional EV coordination;
+- **EMHASS** — EnergyPilot-owned EMHASS connection, schedule, output mapping and runtime-price settings;
+- **GOODWE** — inverter host, Modbus TCP port and unit ID.
+
+GoodWe connection changes are tested before being saved. The Home Assistant device identifier is also migrated from the old mutable `host:slave` value to the stable EnergyPilot config-entry ID so an IP-address change does not intentionally create a second HA device.
+
+### Beta status in v0.17
+
+The settings feature itself does not introduce new candidate GoodWe registers. The release remains marked **Beta** because it includes the v0.16 G20 field-diagnostic values in the active frontend/runtime:
+
+```text
+45356  candidate on-grid battery discharge-depth / SOC limit
+45358  candidate off-grid battery discharge-depth / reserve limit
+47500  candidate battery SOC-protection status/enable value
+36104  candidate extended lifetime grid export counter
+36120  candidate extended lifetime grid import counter
+```
+
+Those values remain read-only, optional and excluded from controller logic and canonical Recorder-facing grid accounting.
+
 ## v0.16 — Beta G20 field diagnostics
 
-The current beta release is intended to turn the small active installation base into useful validation data without expanding the write/control surface.
+The beta release is intended to turn the small active installation base into useful validation data without expanding the write/control surface.
 
 ### Beta values
 
