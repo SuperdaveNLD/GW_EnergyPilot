@@ -18,7 +18,7 @@
       },
       "controller": {
         "title": "Configure EMHASS control",
-        "description": "EnergyPilot can now run EMHASS optimization and publish natively. New installations enable the built-in orchestrator by default. Keep Automatic Control OFF until the first successful optimization has published a valid P_batt target.",
+        "description": "EnergyPilot can run EMHASS optimization and publish natively. New installations enable the built-in orchestrator by default. Keep Automatic Control OFF until the first successful optimization has published a valid P_batt target.",
         "data": {
           "p_batt_entity": "EMHASS battery power target",
           "optim_status_entity": "EMHASS optimization status",
@@ -31,7 +31,8 @@
           "emhass_optimization_interval": "Optimization interval",
           "emhass_soc_final_pct": "Target SOC at end of optimization",
           "emhass_fallback_load": "Fallback house load",
-          "use_nordpool_prices": "Use official Nord Pool prices",
+          "use_nordpool_prices": "Use official Nord Pool runtime prices",
+          "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive",
           "nordpool_area": "Nord Pool area",
           "nordpool_currency": "Nord Pool currency",
           "buy_price_adder": "Import price addition",
@@ -53,7 +54,8 @@
           "emhass_optimization_interval": "How often EnergyPilot runs a fresh optimization. Recommended: 15 minutes.",
           "emhass_soc_final_pct": "SOC target passed as soc_final. This does not replace your EMHASS minimum/maximum battery SOC settings.",
           "emhass_fallback_load": "Used only when current load or Recorder history cannot provide a plausible load forecast.",
-          "use_nordpool_prices": "When the official Home Assistant Nord Pool integration is available, EnergyPilot sends timestamped market prices to EMHASS. Disable this to use the price method configured inside EMHASS.",
+          "use_nordpool_prices": "EnergyPilot requests timestamped prices from Home Assistant's official Nord Pool integration and passes load_cost_forecast and prod_price_forecast at runtime. During these EnergyPilot-managed runs the internal EMHASS price forecast method is therefore not used.",
+          "optimize_on_tomorrow_prices": "Automatically detects the official Nord Pool Tomorrow price available binary sensor. When it changes to ON, EnergyPilot immediately runs one fresh optimization so the new day is included without waiting for the next periodic cycle.",
           "nordpool_area": "Optional. Leave empty to use the first area returned by the configured Nord Pool integration. Enter e.g. NL when needed.",
           "nordpool_currency": "Currency requested from Nord Pool. Recommended: EUR.",
           "buy_price_adder": "Amount added to the Nord Pool spot import price in EUR/kWh for supplier fees, taxes or other variable costs.",
@@ -89,7 +91,8 @@
           "emhass_optimization_interval": "Optimization interval",
           "emhass_soc_final_pct": "Target SOC at end of optimization",
           "emhass_fallback_load": "Fallback house load",
-          "use_nordpool_prices": "Use official Nord Pool prices",
+          "use_nordpool_prices": "Use official Nord Pool runtime prices",
+          "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive",
           "nordpool_area": "Nord Pool area",
           "nordpool_currency": "Nord Pool currency",
           "buy_price_adder": "Import price addition",
@@ -111,7 +114,8 @@
           "emhass_optimization_interval": "Recommended: 15 minutes.",
           "emhass_soc_final_pct": "Default: 10%.",
           "emhass_fallback_load": "Fallback only; normal operation uses current EnergyPilot load plus Recorder history.",
-          "use_nordpool_prices": "Disable to let EMHASS use its own configured price forecast method.",
+          "use_nordpool_prices": "When enabled, EnergyPilot supplies runtime buy/sell forecasts to EMHASS, so EMHASS's internal price forecast method is bypassed for EnergyPilot-triggered runs.",
+          "optimize_on_tomorrow_prices": "Recommended: ON. Re-optimizes immediately when the official Nord Pool integration reports that tomorrow's prices are available.",
           "nordpool_area": "Optional market area such as NL. Empty uses the first returned area.",
           "nordpool_currency": "Recommended: EUR.",
           "buy_price_adder": "Extra import cost added to spot price in EUR/kWh.",
@@ -145,7 +149,8 @@
       "optimize_now": {"name": "Optimize now"},
       "max_export": {"name": "Maximum export"},
       "battery_pause": {"name": "Pause battery"},
-      "max_charge": {"name": "Maximum charge"}
+      "max_charge": {"name": "Maximum charge"},
+      "resume_auto": {"name": "AUTO - optimize and resume"}
     }
   }
 }
