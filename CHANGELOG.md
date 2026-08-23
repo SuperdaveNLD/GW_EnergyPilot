@@ -2,6 +2,23 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.11] - 2026-08-23
+
+### Added
+
+- Native EMHASS minimum and maximum battery SOC number entities backed by EMHASS `/get-config` and `/set-config`.
+- Minimum/maximum SOC sliders directly on the dashboard EMHASS card.
+- Event-driven EMHASS re-optimization when configured EV charging changes from active to stopped.
+- Dashboard **Diagnostics snapshot** card with GoodWe EMS, controller, EMHASS and power-balance values plus a copy-to-clipboard support snapshot.
+- Diagnostic comparison of GoodWe house-load register 35172, the three load-phase sum and a power-balance-derived house load.
+
+### Changed
+
+- Default periodic EMHASS optimization interval changed from 15 minutes to 60 minutes. Immediate optimizations still run on **Optimize now**, **AUTO**, tomorrow-price publication and configured EV charging stop.
+- The Home card now identifies register 35172 as the GoodWe house/load value rather than implying it is inverter self-consumption.
+- Flow animation now uses three continuously spaced round particles across the full link. The LIVE indicator no longer pulses in sync with the energy particles.
+- Dashboard frontend moved to the v0.11 module chain.
+
 ## [0.10] - 2026-08-22
 
 ### Added
