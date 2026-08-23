@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import logging
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 from .const import MODES_ZERO_POWER, REGISTER_EMS_MODE, REGISTER_EMS_POWER
 from .registers import REGISTER_DEFINITIONS, RegisterDataType, RegisterDefinition
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class GWModbusError(Exception):
@@ -41,8 +44,13 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (35301, 36),  # through 35336; includes 32-bit warning at 35335
     (36003, 55),  # through 36057
     (37002, 22),  # through 37023
-    (47000, 1),   # APP / Work mode diagnostic
     (47509, 4),   # through 47512
+)
+
+# Useful troubleshooting registers that are not required for control. A
+# firmware that does not expose one of these must not make EnergyPilot fail.
+OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
+    (47000, 1),   # APP / Work mode diagnostic
 )
 
 
@@ -143,10 +151,33 @@ class GWModbusClient:
                     {start + offset: value for offset, value in enumerate(registers)}
                 )
 
-            values = {
-                definition.key: self._decode_value(register_map, definition)
-                for definition in REGISTER_DEFINITIONS
-            }
+            for start, count in OPTIONAL_TELEMETRY_BLOCKS:
+                try:
+                    registers = await self._async_read_block(start, count)
+                except GWModbusError as err:
+                    _LOGGER.debug(
+                        "Optional GoodWe register block %s-%s unavailable: %s",
+                        start,
+                        start + count - 1,
+                        err,
+                    )
+                    continue
+                register_map.update(
+                    {start + offset: value for offset, value in enumerate(registers)}
+                )
+
+            values: dict[str, int | float] = {}
+            for definition in REGISTER_DEFINITIONS:
+                try:
+                    values[definition.key] = self._decode_value(
+                        register_map,
+                        definition,
+                    )
+                except KeyError:
+                    # Only optional definitions can be absent because mandatory
+                    # block failures raise before decoding starts.
+                    continue
+
             return GWETAData(values=values)
 
     async def async_read_status(self) -> GWETAData:
