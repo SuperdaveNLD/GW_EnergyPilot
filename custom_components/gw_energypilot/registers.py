@@ -27,16 +27,23 @@ class RegisterDefinition:
     precision: int | None = None
 
 
-# Read contiguous ranges instead of issuing one Modbus request per entity.
-# All ranges are holding registers and stay below the Modbus 125-register limit.
+# Canonical runtime read layout. Keep the final word of every 32-bit/float
+# definition inside its block. All ranges are holding registers and remain
+# below the Modbus 125-register request limit.
 TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
-    (35103, 87),
-    (35212, 9),
-    (35301, 35),
+    (35103, 88),
+    (35212, 10),
+    (35301, 36),
     (36003, 55),
     (37002, 22),
-    (47000, 1),
     (47509, 4),
+)
+
+# Register 47000 is useful diagnostic information but is not available on every
+# tested/related device, so a failure to read this block must not fail the main
+# telemetry refresh.
+OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
+    (47000, 1),
 )
 
 
@@ -143,3 +150,33 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("ems_mode", 47511, RegisterDataType.UINT16),
     RegisterDefinition("ems_setpoint", 47512, RegisterDataType.UINT16),
 )
+
+
+def register_word_count(definition: RegisterDefinition) -> int:
+    """Return the number of 16-bit Modbus words needed by one definition."""
+    if definition.data_type in {
+        RegisterDataType.UINT32,
+        RegisterDataType.INT32,
+        RegisterDataType.FLOAT32,
+    }:
+        return 2
+    return 1
+
+
+def find_uncovered_registers(
+    blocks: tuple[tuple[int, int], ...] | None = None,
+) -> tuple[str, ...]:
+    """Return definition keys not fully covered by the supplied read blocks."""
+    if blocks is None:
+        blocks = TELEMETRY_BLOCKS + OPTIONAL_TELEMETRY_BLOCKS
+
+    uncovered: list[str] = []
+    for definition in REGISTER_DEFINITIONS:
+        first = definition.address
+        last = first + register_word_count(definition) - 1
+        if not any(
+            start <= first and last <= start + count - 1
+            for start, count in blocks
+        ):
+            uncovered.append(definition.key)
+    return tuple(uncovered)

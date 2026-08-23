@@ -48,17 +48,15 @@ EMHASS is an external prerequisite. GW EnergyPilot may integrate with EMHASS, bu
 ## Modbus rules
 
 - Never invent or guess GoodWe register addresses, data types, scales, or sign conventions.
-- `custom_components/gw_energypilot/registers.py` is the canonical register-definition source.
+- `custom_components/gw_energypilot/registers.py` is the canonical source for register definitions and telemetry read blocks.
+- `client.py` must import `TELEMETRY_BLOCKS` and `OPTIONAL_TELEMETRY_BLOCKS`; do not recreate block lists there.
 - Changes to register definitions require evidence from tested hardware, vendor documentation, or repeatable diagnostics.
 - Preserve the tested sign conventions unless evidence proves they are wrong:
   - grid power: negative = import, positive = export;
   - battery power: negative = charging, positive = discharging.
 - EMS control currently uses register `47511` for mode and `47512` for power setpoint.
 - Be conservative with write operations: an incorrect EMS write can move significant battery/grid power.
-
-### Known technical debt
-
-`client.py` currently contains its own telemetry block ranges in addition to `registers.py`. These definitions are not perfectly identical. Do not casually alter either list. A future refactor should make the block layout canonical in one place and validate that every multi-register value remains fully covered.
+- Keep `python scripts/validate_repo.py` passing; it verifies that every register definition, including both words of 32-bit/float values, is covered by a configured read block.
 
 ## Control ownership
 
@@ -99,7 +97,21 @@ Until this inheritance chain is deliberately consolidated, changes to orchestrat
 
 ## Frontend
 
-The sidebar panel module is selected in `__init__.py`. Multiple historical/versioned JavaScript files exist in `frontend/`; do not modify an older file merely because its name looks relevant. First confirm which module `PANEL_MODULE` actually loads.
+The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/` and the active v0.13 entry point deliberately imports earlier layers. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
+
+The repository validator checks that relative frontend imports resolve and that the active frontend `VERSION` matches `manifest.json` when the entry module declares one.
+
+## Repository checks
+
+Before merging a substantial change, run or rely on the `Quality` GitHub Actions workflow. It performs:
+
+- Python syntax compilation without importing Home Assistant;
+- register-block coverage validation;
+- JSON parsing checks;
+- frontend dependency/import checks;
+- active frontend/manifest version consistency.
+
+These lightweight checks complement HACS and hassfest; they do not replace runtime testing on Home Assistant or hardware validation.
 
 ## Bug-fixing workflow
 
@@ -133,5 +145,6 @@ For a substantial change, check at least:
 - entity/unique-ID compatibility;
 - translations when user-visible entities/options change;
 - dashboard impact;
+- repository quality checks;
 - README/docs impact;
 - changelog/release impact where appropriate.

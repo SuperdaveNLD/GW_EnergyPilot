@@ -134,20 +134,51 @@ Changing this order is a control-behaviour change and requires validation on rea
 
 The client reads contiguous holding-register blocks to reduce individual Modbus requests.
 
-There is currently a known duplication:
+The canonical block definitions now live together in `registers.py`:
 
-- `registers.py` defines `TELEMETRY_BLOCKS`;
-- `client.py` also defines `TELEMETRY_BLOCKS` and `OPTIONAL_TELEMETRY_BLOCKS`.
+```text
+TELEMETRY_BLOCKS
+OPTIONAL_TELEMETRY_BLOCKS
+```
 
-The ranges are not perfectly identical. Until this is deliberately refactored and tested, treat the blocks in `client.py` as the ranges actually used for runtime reads, while `registers.py` remains canonical for value definitions.
+`client.py` imports those definitions and does not maintain a second copy.
 
-A future cleanup should:
+The required runtime ranges are:
 
-1. define blocks in one place;
-2. automatically verify that every register definition is covered;
-3. ensure 32-bit/float values include both words;
-4. preserve optional-register behaviour;
-5. validate on the tested G20 inverter before release.
+```text
+35103 + 88 words
+35212 + 10 words
+35301 + 36 words
+36003 + 55 words
+37002 + 22 words
+47509 + 4 words
+```
+
+The optional diagnostic range is:
+
+```text
+47000 + 1 word
+```
+
+Register `47000` remains optional so an unavailable diagnostic block does not fail the normal telemetry refresh.
+
+The first three required blocks intentionally extend one word beyond the last visible 32-bit register address in the block:
+
+```text
+35189 is uint32 -> needs 35189 and 35190
+35220 is uint32 -> needs 35220 and 35221
+35335 is uint32 -> needs 35335 and 35336
+```
+
+That extra word is required for correct decoding and must not be trimmed as apparently unused space.
+
+Run:
+
+```text
+python scripts/validate_repo.py
+```
+
+The validator checks that every register definition is fully covered, including both words of uint32/int32/float32 values, and that no read block exceeds the Modbus 125-register request limit.
 
 ## Register change policy
 
