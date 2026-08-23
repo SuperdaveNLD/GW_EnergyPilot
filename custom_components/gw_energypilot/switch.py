@@ -4,8 +4,9 @@ from typing import Any, override
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import STATE_ON
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import restore_state
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GWConfigEntry
@@ -36,8 +37,15 @@ class GWAutomaticControlSwitch(
 
     @override
     async def async_added_to_hass(self) -> None:
-        """Restore the previous automatic-control state."""
+        """Restore state and subscribe to controller ownership changes."""
         await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                self.entry.runtime_data.controller.signal,
+                self._async_controller_updated,
+            )
+        )
 
         previous = await self.async_get_last_state()
         if previous is not None and previous.state == STATE_ON:
@@ -47,6 +55,11 @@ class GWAutomaticControlSwitch(
             # in GoodWe Auto / AI.
             await self.entry.runtime_data.controller.async_disable()
 
+        self.async_write_ha_state()
+
+    @callback
+    def _async_controller_updated(self) -> None:
+        """Refresh the switch after quick actions or AUTO change ownership."""
         self.async_write_ha_state()
 
     @property
