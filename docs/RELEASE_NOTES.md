@@ -14,7 +14,7 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
-| **0.17** | 2026-08-23 | **Beta** | Adds the administrator settings gear with EP, EMHASS and GOODWE pages, validates GoodWe connection changes before saving, migrates device identity from mutable `host:slave` to stable config-entry ID, and exposes the three SOC Beta candidates as enabled Home Assistant Diagnostic sensors. v0.16 field diagnostics remain read-only. |
+| **0.17** | 2026-08-23 | **Beta** | Adds the administrator settings gear with EP, EMHASS and GOODWE pages, validates GoodWe connection changes before saving, migrates device identity from mutable `host:slave` to stable config-entry ID, exposes the three SOC Beta candidates as enabled Home Assistant Diagnostic sensors, and makes the active EMHASS optimization strategy stateful/readable from `/get-config`. |
 | **0.16** | 2026-08-23 | **Beta** | Ships read-only G20 SOC-protection candidates `45356/45358/47500` and extended 15 kW+ meter candidates `36104/36120` to the active tester group. Adds UINT64 decoding, beta diagnostics UI and tests. No candidate value is used for control or canonical grid accounting. |
 | **0.15** | 2026-08-23 | **Validated** | Adds EMHASS `profit`, `cost` and `self-consumption` strategy controls. Preserves unrelated EMHASS config and immediately re-optimizes after a strategy change. GoodWe `P_batt` control remains unchanged. |
 | **0.14** | 2026-08-23 | **Validated + beta diagnostics** | Adds optional battery SOH/charge/discharge accounting diagnostics from `35206-35211`. Those accounting values remain field-validation diagnostics and are not used for synthetic cycle calculations. |
@@ -32,9 +32,9 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
 
-## v0.17 — Beta settings UI and field diagnostics
+## v0.17 — Beta settings UI, stateful strategy and field diagnostics
 
-v0.17 combines the current Beta G20 validation tools with a dedicated configuration experience for the two active installations.
+v0.17 combines the current Beta G20 validation tools with a dedicated configuration experience and clearer EMHASS strategy state for the active installations.
 
 ### Settings gear
 
@@ -45,6 +45,16 @@ Home Assistant administrators can open a configuration view from the dashboard h
 - **GOODWE** — inverter host, Modbus TCP port and unit ID.
 
 The pages update the existing Home Assistant config entry rather than creating a second settings store. GoodWe connection changes are tested before they are stored, after which EnergyPilot reloads the existing config entry.
+
+### Stateful EMHASS optimization strategy
+
+`profit`, `cost` and `self-consumption` are one persistent EMHASS `costfun` setting, not three independent modes. v0.17 exposes a stateful **EMHASS optimization strategy** select and uses it to highlight the active option in the dashboard.
+
+The state is read from EMHASS `/get-config`, refreshed after EnergyPilot config writes and periodically so changes made directly in EMHASS are reflected in Home Assistant.
+
+Changing the select safely updates only `costfun` in the complete current EMHASS config, then requests a fresh optimization. If the save succeeds but that optimization fails, the selected strategy remains saved and EnergyPilot reports the distinction.
+
+The three v0.15 strategy button unique IDs remain available for existing automations; new UI/state logic uses the select.
 
 ### Device identity migration
 
@@ -69,6 +79,8 @@ They remain Beta and are not inputs to the controller or EMHASS.
 - the settings UI and device migration have limited real-installation exposure;
 - the G20 candidate registers are still being correlated with SolarGo/SEMS+ on the active installations;
 - the extended `36104/36120` counters remain diagnostics and do not replace `36015/36017` for Recorder-facing grid energy.
+
+The stateful EMHASS strategy feature itself has automated coverage and does not change the GoodWe actuator mapping.
 
 No GoodWe EMS write behavior changes in this release.
 
