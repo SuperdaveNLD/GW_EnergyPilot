@@ -56,7 +56,8 @@ EMHASS is an external prerequisite. GW EnergyPilot may integrate with EMHASS, bu
   - battery power: negative = charging, positive = discharging.
 - EMS control currently uses register `47511` for mode and `47512` for power setpoint.
 - Be conservative with write operations: an incorrect EMS write can move significant battery/grid power.
-- Keep `python scripts/validate_repo.py` passing; it verifies that every register definition, including both words of 32-bit/float values, is covered by a configured read block.
+- Keep `python scripts/validate_repo.py` passing; it verifies that every register definition, including all words of multi-word values, is covered by a configured read block.
+- A draft that introduces unconfirmed register semantics is not release-ready merely because static CI is green; keep it in validation until the required evidence exists.
 
 ## Control ownership
 
@@ -77,6 +78,7 @@ Do not introduce code paths that silently fight each other for EMS ownership.
 - `/set-config` must receive the complete intended configuration; read the current config first when patching selected values.
 - Do not execute a stale `P_batt` target after a condition that requires re-optimization.
 - Treat optimizer readiness and numeric output validation as safety gates.
+- Strategy/cost-function changes alter the optimizer objective only; do not silently change the GoodWe actuator/control primitive at the same time.
 
 Existing setup/operator guidance lives in `docs/EMHASS_SETUP.md`.
 
@@ -97,7 +99,7 @@ Until this inheritance chain is deliberately consolidated, changes to orchestrat
 
 ## Frontend
 
-The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/` and the active v0.13 entry point deliberately imports earlier layers. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
+The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`. In v0.15 the active entry point imports v0.14, which imports v0.13 and the earlier layers below it. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
 
 The repository validator checks that relative frontend imports resolve and that the active frontend `VERSION` matches `manifest.json` when the entry module declares one.
 
@@ -105,13 +107,14 @@ The repository validator checks that relative frontend imports resolve and that 
 
 Before merging a substantial change, run or rely on the `Quality` GitHub Actions workflow. It performs:
 
-- Python syntax compilation without importing Home Assistant;
+- Python syntax compilation without importing the full Home Assistant runtime;
+- hardware-independent unit tests from `tests/`;
 - register-block coverage validation;
 - JSON parsing checks;
 - frontend dependency/import checks;
 - active frontend/manifest version consistency.
 
-These lightweight checks complement HACS and hassfest; they do not replace runtime testing on Home Assistant or hardware validation.
+These checks complement HACS and hassfest; they do not replace runtime testing on Home Assistant or hardware validation.
 
 ## Bug-fixing workflow
 
@@ -133,6 +136,7 @@ When a bug is reported:
 - `docs/ENTITIES.md` — Home Assistant entity contract.
 - `docs/DEVELOPMENT.md` — contributor workflow and known technical debt.
 - `docs/EMHASS_SETUP.md` — EMHASS setup/operator guidance.
+- `docs/KNOWN_ISSUES.md` — field issues adjacent to or outside EnergyPilot runtime code.
 - `CHANGELOG.md` — release history.
 
 ## Definition of done
@@ -145,6 +149,7 @@ For a substantial change, check at least:
 - entity/unique-ID compatibility;
 - translations when user-visible entities/options change;
 - dashboard impact;
+- relevant unit tests;
 - repository quality checks;
 - README/docs impact;
 - changelog/release impact where appropriate.
