@@ -21,6 +21,16 @@ from .registers import (
 
 _LOGGER = logging.getLogger(__name__)
 
+BETA_SOC_FLOOR_KEYS: tuple[str, str] = (
+    "battery_discharge_depth_on_grid",
+    "battery_discharge_depth_off_grid",
+)
+_BETA_SOC_FLOOR_REGISTERS = {
+    definition.key: definition.address
+    for definition in REGISTER_DEFINITIONS
+    if definition.key in BETA_SOC_FLOOR_KEYS
+}
+
 
 class GWModbusError(Exception):
     """Raised when Modbus communication fails."""
@@ -194,6 +204,47 @@ class GWModbusClient:
     async def async_read_status(self) -> GWETAData:
         """Read data for setup validation and backward compatibility."""
         return await self.async_read_data()
+
+    async def async_set_beta_soc_floor(self, key: str, minimum_soc: int) -> int:
+        """Write one manually selected Beta SOC-floor register and verify read-back.
+
+        The canonical register addresses come from ``registers.py``.  Upstream
+        GoodWe implementations expose these values as battery settings, while
+        EnergyPilot keeps this path manual/Beta until G20 field validation is
+        complete.  The raw value is treated as the minimum SOC floor in percent
+        (equivalent on-grid DoD = 100 - raw value).
+        """
+        if key not in _BETA_SOC_FLOOR_REGISTERS:
+            raise ValueError(f"Unsupported Beta SOC floor key: {key}")
+
+        value = int(minimum_soc)
+        if value < 0 or value > 100:
+            raise ValueError("Beta SOC floor must be between 0 and 100 percent")
+
+        address = _BETA_SOC_FLOOR_REGISTERS[key]
+        async with self._lock:
+            await self._async_ensure_connected()
+            try:
+                response = await self._client.write_register(
+                    address,
+                    value,
+                    device_id=self.slave,
+                )
+                self._validate_response(
+                    response,
+                    f"writing Beta SOC floor register {address}",
+                )
+                await asyncio.sleep(0.2)
+                readback = (await self._async_read_block(address, 1))[0]
+            except (ModbusException, OSError) as err:
+                self._client.close()
+                raise GWModbusError(str(err)) from err
+
+        if readback != value:
+            raise GWModbusError(
+                f"Beta SOC floor register {address} read back {readback}, expected {value}"
+            )
+        return readback
 
     async def async_set_mode(self, mode: int, power: int) -> None:
         """Set GoodWe EMS power first, then EMS mode."""

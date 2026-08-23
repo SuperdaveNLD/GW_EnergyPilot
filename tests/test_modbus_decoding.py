@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 from pathlib import Path
 import sys
@@ -58,6 +59,43 @@ def _load_modules():
 registers, client = _load_modules()
 
 
+class FakeResponse:
+    def __init__(self, registers=None, error: bool = False) -> None:
+        self.registers = registers
+        self._error = error
+
+    def isError(self) -> bool:
+        return self._error
+
+
+class FakeModbusClient:
+    def __init__(self) -> None:
+        self.connected = True
+        self.values = {45356: 10, 45358: 10}
+        self.writes: list[tuple[int, int, int]] = []
+
+    async def write_register(self, address: int, value: int, device_id: int):
+        self.writes.append((address, value, device_id))
+        self.values[address] = value
+        return FakeResponse()
+
+    async def read_holding_registers(self, start: int, count: int, device_id: int):
+        return FakeResponse([self.values[start + offset] for offset in range(count)])
+
+    def close(self) -> None:
+        self.connected = False
+
+
+def _beta_test_client():
+    instance = object.__new__(client.GWModbusClient)
+    instance.host = "127.0.0.1"
+    instance.port = 502
+    instance.slave = 247
+    instance._client = FakeModbusClient()
+    instance._lock = asyncio.Lock()
+    return instance
+
+
 class ModbusDecodingTests(unittest.TestCase):
     def test_uint64_extended_meter_counter_big_endian_and_scaled(self):
         definition = registers.RegisterDefinition(
@@ -96,6 +134,52 @@ class ModbusDecodingTests(unittest.TestCase):
         self.assertIn((45356, 1), registers.OPTIONAL_TELEMETRY_BLOCKS)
         self.assertIn((45358, 1), registers.OPTIONAL_TELEMETRY_BLOCKS)
         self.assertIn((47500, 1), registers.OPTIONAL_TELEMETRY_BLOCKS)
+
+    def test_beta_soc_write_keys_resolve_to_canonical_registers(self):
+        definitions = {definition.key: definition.address for definition in registers.REGISTER_DEFINITIONS}
+        self.assertEqual(definitions["battery_discharge_depth_on_grid"], 45356)
+        self.assertEqual(definitions["battery_discharge_depth_off_grid"], 45358)
+        self.assertEqual(
+            set(client.BETA_SOC_FLOOR_KEYS),
+            {"battery_discharge_depth_on_grid", "battery_discharge_depth_off_grid"},
+        )
+
+
+class BetaSocWriteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_on_grid_soc_floor_write_is_verified(self):
+        instance = _beta_test_client()
+
+        readback = await instance.async_set_beta_soc_floor(
+            "battery_discharge_depth_on_grid", 5
+        )
+
+        self.assertEqual(readback, 5)
+        self.assertEqual(instance._client.writes, [(45356, 5, 247)])
+        self.assertEqual(instance._client.values[45356], 5)
+
+    async def test_off_grid_soc_floor_write_is_verified(self):
+        instance = _beta_test_client()
+
+        readback = await instance.async_set_beta_soc_floor(
+            "battery_discharge_depth_off_grid", 7
+        )
+
+        self.assertEqual(readback, 7)
+        self.assertEqual(instance._client.writes, [(45358, 7, 247)])
+
+    async def test_beta_soc_floor_rejects_unknown_register_key(self):
+        instance = _beta_test_client()
+        with self.assertRaises(ValueError):
+            await instance.async_set_beta_soc_floor("battery_soc_protection", 5)
+        self.assertEqual(instance._client.writes, [])
+
+    async def test_beta_soc_floor_rejects_out_of_range_value(self):
+        instance = _beta_test_client()
+        with self.assertRaises(ValueError):
+            await instance.async_set_beta_soc_floor(
+                "battery_discharge_depth_on_grid", 101
+            )
+        self.assertEqual(instance._client.writes, [])
 
 
 if __name__ == "__main__":

@@ -10,11 +10,11 @@ GW EnergyPilot is an unofficial Home Assistant integration for local telemetry, 
 
 ## Status
 
-**Alpha — v0.17 · Beta**
+**Alpha — v0.18 · Beta**
 
 GW EnergyPilot is being developed specifically around the **new GoodWe ETA G20 generation**.
 
-In this project, **Beta** means a feature is intentionally available to the active tester group but has **not yet been extensively field-tested**. Beta GoodWe register values remain read-only and optional until enough real-installation evidence exists to treat their semantics as confirmed. New Beta UI/configuration paths also need broader real-installation exposure before promotion.
+In this project, **Beta** means a feature is intentionally available to the active tester group but has **not yet been extensively field-tested**. Beta GoodWe register values normally remain optional and read-only until enough real-installation evidence exists to treat their semantics as confirmed. v0.18 contains one explicitly scoped exception: manual, read-back-verified field-test writes for the known `45356/45358` minimum-SOC registers. These writes are not used by Automatic Control or EMHASS.
 
 See `docs/RELEASE_NOTES.md` for the status and release notes of every version. `CHANGELOG.md` contains the detailed technical history.
 
@@ -52,7 +52,8 @@ That feedback will be used to build a real tested-model compatibility list rathe
 - built-in EnergyPilot dashboard;
 - native cumulative grid import/export energy counters;
 - optional battery charge/discharge accounting diagnostics;
-- read-only Beta diagnostics for candidate G20 SOC-protection and extended-meter registers;
+- Beta diagnostics for candidate G20 SOC-protection and extended-meter registers;
+- manual, confirmed-per-write G20 minimum-SOC field-test controls for `45356/45358`;
 - enabled Home Assistant Diagnostic sensors for the three SOC Beta candidates;
 - interactive 24-hour Grid history and daily import/export totals;
 - copyable normal and Beta diagnostics snapshots.
@@ -93,17 +94,19 @@ Use only one integration for continuous local polling where possible. If GW Ener
 
 ## Dashboard settings
 
-v0.17 adds a settings gear in the upper-right dashboard header for Home Assistant administrators. It opens three pages:
+v0.17 introduced a settings gear in the upper-right dashboard header for Home Assistant administrators. It opens three pages:
 
 - **EP** — maximum control power, `P_batt` deadband, telemetry cadence and optional EV coordination;
 - **EMHASS** — EnergyPilot-owned EMHASS connection, schedule, output mapping and Nord Pool runtime-price settings;
-- **GOODWE** — local inverter host, Modbus TCP port and unit ID.
+- **GOODWE** — local inverter host, Modbus TCP port and unit ID, plus the v0.18 manual G20 minimum-SOC field test.
 
-The settings pages use the **same Home Assistant config entry** as the existing config/options flows; no second settings database is created.
+The normal settings pages use the **same Home Assistant config entry** as the existing config/options flows; no second settings database is created.
 
 GoodWe host/port/unit-ID changes are validated against the inverter before they are stored. After a successful save EnergyPilot reloads the config entry. Existing installations are migrated from the legacy mutable `host:slave` Home Assistant device identifier to the stable config-entry ID before entities are set up, so a validated IP/unit-ID change does not intentionally create a second device.
 
-The live EMHASS minimum/maximum SOC sliders and cost-function buttons still use their existing EMHASS API path and remain on the normal dashboard.
+The v0.18 `45356/45358` controls are deliberately different: these values live in the inverter, not in the Home Assistant config entry. The dashboard writes only one selected register after explicit confirmation, limits values to `0..100%`, and reports success only after the same register reads back the requested value. No automatic controller, EMHASS process or scheduled event writes these fields.
+
+The live EMHASS minimum/maximum SOC sliders and cost-function controls still use their existing EMHASS API path and remain on the normal dashboard.
 
 See `docs/SETTINGS.md` for the configuration ownership and migration details.
 
@@ -123,7 +126,7 @@ For a Home Assistant custom integration, however, the HTTP request originates fr
 http://5b918bf2-emhass:5000
 ```
 
-If your installation exposes EMHASS through another address, change **EMHASS URL** in EnergyPilot options or the v0.17 EMHASS settings page.
+If your installation exposes EMHASS through another address, change **EMHASS URL** in EnergyPilot options or the EMHASS settings page.
 
 ## EMHASS source mappings
 
@@ -243,35 +246,35 @@ v0.14+ reads the GoodWe battery charge/discharge accounting block `35206-35211` 
 
 The optional block cannot make required inverter telemetry unavailable when unsupported by another firmware/model.
 
-## Beta G20 field diagnostics
+## Beta G20 field diagnostics and SOC test
 
-v0.16+ ships the following candidate values to the active tester group as **read-only Beta diagnostics**:
+v0.16+ ships the following candidate values to the active tester group as Beta diagnostics:
 
 ```text
-45356  candidate on-grid battery discharge-depth / SOC limit
-45358  candidate off-grid battery discharge-depth / reserve limit
+45356  raw on-grid minimum SOC floor candidate
+45358  raw off-grid minimum SOC floor candidate
 47500  candidate battery SOC-protection status/enable value
 36104  candidate extended lifetime grid export counter
 36120  candidate extended lifetime grid import counter
 ```
 
-The extended meter counters are decoded as unsigned 64-bit values with `0.01 kWh` scaling. They are intended to be compared with SEMS lifetime totals on real GW15K-ETA-G20 installations.
+The extended meter counters are decoded as unsigned 64-bit values with `0.01 kWh` scaling. They are intended to be compared with independent lifetime/delta totals on real GW15K-ETA-G20 installations.
 
-Until validated:
+For `45356`, current maintained GoodWe handling maps user-facing on-grid depth of discharge as `100 - raw register value`. A raw value of `10` therefore corresponds to a 10% minimum SOC floor / 90% DoD. The reference GW15K-ETA-G20 has shown `45356 = 10`, `45358 = 10` while battery discharge stopped around 10%.
 
-- all five candidate values are optional and read-only;
-- none is used by Automatic Control;
-- none changes EMS mode or setpoint;
+v0.18 adds a **manual Beta write test** for only `45356` and `45358` on the GOODWE settings page. The test is guarded by admin authorization, a fixed key whitelist, `0..100%` validation, per-write confirmation and immediate register read-back. It is not connected to Automatic Control or EMHASS.
+
+Until promoted from Beta:
+
+- all five candidate values remain optional telemetry;
+- `47500`, `36104` and `36120` remain read-only;
+- `45356/45358` may be written only through the dedicated manual v0.18 field-test path;
+- none is used by Automatic Control as a control target;
+- none changes EMS mode or setpoint automatically;
 - `36015/36017` remain the canonical grid-energy entities;
 - unsupported candidate registers cannot make normal telemetry unavailable.
 
-v0.17 additionally exposes the three SOC candidates as enabled Home Assistant **Diagnostic** entities:
-
-```text
-Beta on-grid discharge depth (45356)  %
-Beta off-grid discharge depth (45358) %
-Beta battery SOC protection (47500)   raw
-```
+v0.17 additionally exposes the three SOC candidates as enabled Home Assistant **Diagnostic** entities. Their unique IDs/keys are preserved for backwards compatibility even as the `45356/45358` field-test UI now labels the raw values as minimum-SOC floors.
 
 The Diagnostics card also contains a **Copy beta diagnostics** action so testers can report the candidate values together with model and firmware.
 
@@ -305,13 +308,13 @@ There are multiple limit layers:
 
 ```text
 EMHASS min/max SOC     optimizer planning limits
-GoodWe / SEMS+ limits  inverter protection / operating limits
+GoodWe inverter floor hardware operating limit
 Battery BMS limits     final battery protection
 ```
 
-The most restrictive layer wins. Example: when the GoodWe/SEMS+ on-grid minimum is set to `10%`, EnergyPilot can request mode 12 below 10%, but the inverter/BMS may refuse further discharge around that threshold.
+The most restrictive layer wins. Example: when raw GoodWe on-grid register `45356` is `10`, EnergyPilot can request mode 12 below 10%, but the inverter/BMS may refuse further discharge around that threshold even if the EMHASS minimum is lower.
 
-GoodWe's current G20 documentation also recommends a substantially higher reserve for off-grid operation; off-grid SOC protection should therefore be treated separately from the 5–95% normal grid-connected cycling recommendation.
+GoodWe's current G20 guidance also uses a separate reserve concept for off-grid operation; off-grid SOC protection should therefore be treated separately from the 5–95% normal grid-connected cycling recommendation.
 
 The dashboard `i` button beside the SOC controls explains this distinction.
 
@@ -387,6 +390,7 @@ The sidebar dashboard includes:
 - Solar, Home, Grid and Battery cards;
 - Controller and EMHASS cards;
 - administrator settings gear with EP / EMHASS / GOODWE pages;
+- manual G20 minimum-SOC field-test controls on the GOODWE page;
 - one-touch EMHASS strategy controls;
 - one-touch battery controls;
 - EMHASS minimum/maximum SOC controls with guidance popup;

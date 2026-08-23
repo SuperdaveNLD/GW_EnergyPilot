@@ -7,13 +7,14 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 ## Status definitions
 
 - **Validated** — the release does not intentionally introduce unconfirmed hardware semantics. It has passed the repository Quality, HACS and hassfest checks. This does not mean the project has been tested across every ETA-G20 model or firmware version.
-- **Beta** — the release intentionally includes functionality that has not yet been extensively field-tested. Beta hardware values stay read-only/optional until enough real-installation evidence exists to promote them. New Beta UI/configuration paths likewise need broader real-installation exposure before promotion.
+- **Beta** — the release intentionally includes functionality that has not yet been extensively field-tested. Beta hardware values normally remain read-only/optional. A narrowly scoped manual write test is allowed only when it is explicitly documented, limited to known canonical registers, guarded by validation/read-back, and kept outside automatic control.
 - **Historical** — older development milestone retained for version history; current support and testing focus is on the latest release.
 
 ## Version overview
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.18** | 2026-08-23 | **Beta** | Adds manual, read-back-verified G20 field-test controls for the on-grid minimum SOC floor at `45356` and off-grid minimum SOC floor at `45358` inside GOODWE settings. No automatic control path uses these registers; `47500` remains read-only. |
 | **0.17** | 2026-08-23 | **Beta** | Adds the administrator settings gear with EP, EMHASS and GOODWE pages, validates GoodWe connection changes before saving, migrates device identity from mutable `host:slave` to stable config-entry ID, exposes the three SOC Beta candidates as enabled Home Assistant Diagnostic sensors, and makes the active EMHASS optimization strategy stateful/readable from `/get-config`. |
 | **0.16** | 2026-08-23 | **Beta** | Ships read-only G20 SOC-protection candidates `45356/45358/47500` and extended 15 kW+ meter candidates `36104/36120` to the active tester group. Adds UINT64 decoding, beta diagnostics UI and tests. No candidate value is used for control or canonical grid accounting. |
 | **0.15** | 2026-08-23 | **Validated** | Adds EMHASS `profit`, `cost` and `self-consumption` strategy controls. Preserves unrelated EMHASS config and immediately re-optimizes after a strategy change. GoodWe `P_batt` control remains unchanged. |
@@ -31,6 +32,58 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
+
+## v0.18 — Beta G20 minimum-SOC write validation
+
+v0.18 adds a deliberately narrow manual test path for the two G20 SOC-limit registers that have now produced consistent read evidence on the reference **GW15K-ETA-G20**.
+
+### Why `45356` is shown as minimum SOC
+
+Current upstream GoodWe code stores register `45356` as the raw battery discharge-depth setting but exposes on-grid DoD as:
+
+```text
+DoD = 100 - register 45356
+```
+
+That means a raw register value of `10` corresponds to a 10% minimum SOC / 90% depth of discharge. This matches the reference G20 observation that the battery stopped discharging at approximately 10% while `45356` read `10`.
+
+OpenEMS independently maps the same register to a minimum-SOC-under-limit concept. v0.18 therefore presents the **raw register value** directly as **On-grid minimum SOC** while retaining the existing internal entity key for backwards compatibility.
+
+Register `45358` is treated as the corresponding **Off-grid minimum SOC** candidate.
+
+### GOODWE settings field test
+
+The GOODWE configuration page now contains a separate **G20 field test · direct inverter setting** block for:
+
+```text
+45356  On-grid minimum SOC
+45358  Off-grid minimum SOC
+```
+
+These values are stored by the inverter, not in the Home Assistant `ConfigEntry`.
+
+Each control:
+
+- is available only when that register is already readable through the normal optional telemetry path;
+- accepts a whole percentage from `0` to `100`;
+- writes exactly one selected register per action;
+- asks for an explicit dashboard confirmation;
+- reads the same register back after the write;
+- reports success only when the read-back equals the requested value;
+- immediately updates the coordinator snapshot after a verified write.
+
+### Safety boundary
+
+This is **not** a new automatic SOC controller.
+
+- Automatic Control does not read or write `45356/45358`.
+- EMHASS does not change these values.
+- No event trigger or scheduler changes these values.
+- The existing `P_batt` → EMS mode `8/11/12` mapping is unchanged.
+- Arbitrary Modbus register writes are not exposed; the client whitelist contains only the two canonical keys already defined in `registers.py`.
+- `47500` remains read-only because its meaning varies by firmware and the reference G20 has returned `65535`, which is not treated as a valid percentage.
+
+Field testing should change one setting at a time and record the previous value, requested value, verified read-back and observed battery stop behavior.
 
 ## v0.17 — Beta settings UI, stateful strategy and field diagnostics
 
