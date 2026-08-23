@@ -119,7 +119,7 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
         pv = self._safe_number(values.get("pv_total_power"))
         grid = self._safe_number(values.get("meter_total_power_fast"))
         battery = self._safe_number(values.get("battery_power"))
-        balance_house_load = (
+        system_balance = (
             pv - grid + battery
             if pv is not None and grid is not None and battery is not None
             else None
@@ -152,15 +152,19 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             "grid_mode_35136": values.get("grid_mode"),
             "house_load_register_35172": values.get("total_load_power"),
             "house_load_phase_sum": load_phase_sum,
+            # Kept for backwards-compatible frontend/diagnostic consumers.
             "house_load_power_balance": (
-                round(balance_house_load, 0)
-                if balance_house_load is not None
-                else None
+                round(system_balance, 0) if system_balance is not None else None
+            ),
+            "system_balance_power": (
+                round(system_balance, 0) if system_balance is not None else None
             ),
             "pv_total_power": values.get("pv_total_power"),
             "battery_power": values.get("battery_power"),
             "battery_soc": values.get("battery_soc"),
             "meter_total_power_fast": values.get("meter_total_power_fast"),
+            "meter_total_energy_import": values.get("meter_total_energy_import"),
+            "meter_total_energy_export": values.get("meter_total_energy_export"),
             "total_inverter_power": values.get("total_inverter_power"),
             "ac_active_power": values.get("ac_active_power"),
         }
@@ -252,14 +256,6 @@ class GWResumeAutoButton(GWEnergyPilotEntity, ButtonEntity):
         self._attr_unique_id = f"{entry.entry_id}_resume_auto"
 
     async def async_press(self) -> None:
-        """Optimize first, then enable Automatic Control only on success.
-
-        Keeping the controller in its current manual state until EMHASS has
-        produced a fresh P_batt target prevents an old plan from being applied
-        during the transition back to automatic control. If optimization fails,
-        automatic control remains off and the existing manual state is kept.
-        """
-        await self.entry.runtime_data.orchestrator.async_optimize(
-            reason="resume_auto"
-        )
+        """Optimize first, then enable Automatic Control only on success."""
+        await self.entry.runtime_data.orchestrator.async_optimize(reason="resume_auto")
         await self.entry.runtime_data.controller.async_enable()
