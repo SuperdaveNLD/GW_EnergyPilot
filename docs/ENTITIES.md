@@ -86,15 +86,45 @@ Behaviour contract:
 
 Manual quick actions may switch the controller out of automatic ownership.
 
-## Manual control entities
+## Select entities
 
-### Manual power number
-
-Defines the requested power used by manual EMS modes that need a non-zero setpoint.
-
-### Manual mode select
+### Manual EMS mode
 
 Allows explicit selection of a GoodWe EMS mode and transfers ownership to manual control.
+
+### EMHASS optimization strategy
+
+v0.16 exposes the active EMHASS `costfun` as one stateful select entity with stable unique-ID suffix:
+
+```text
+emhass_cost_function
+```
+
+User-facing options map to the native EMHASS values:
+
+```text
+Profit           -> profit
+Cost             -> cost
+Self-consumption -> self-consumption
+```
+
+The select reads the active value from EMHASS `/get-config` during startup, refreshes periodically so changes made in the EMHASS UI are picked up, and refreshes immediately after EnergyPilot writes EMHASS configuration.
+
+Selecting another strategy:
+
+1. reads the complete active EMHASS configuration;
+2. changes only `costfun`;
+3. writes the complete configuration back through `/set-config`;
+4. updates the Home Assistant select state;
+5. requests a fresh optimization and publish cycle.
+
+If step 5 fails after the configuration write succeeded, EnergyPilot reports that distinction: the selected strategy remains saved even though the fresh plan could not be created.
+
+The raw value is also exposed as the select attribute `emhass_costfun`.
+
+## Manual power number
+
+Defines the requested power used by manual EMS modes that need a non-zero setpoint.
 
 ## EMHASS SOC number entities
 
@@ -123,9 +153,7 @@ EnergyPilot's normal grid-connected operating recommendation is approximately 5â
 Current major actions include:
 
 - Optimize now;
-- EMHASS Profit;
-- EMHASS Cost;
-- EMHASS Self-consumption;
+- legacy EMHASS strategy shortcuts;
 - Max export;
 - Battery pause/hold;
 - Max charge;
@@ -135,24 +163,9 @@ Current major actions include:
 
 Runs one complete EMHASS optimization/publish cycle and exposes runtime diagnostics as attributes.
 
-### EMHASS cost-function buttons
+### EMHASS strategy shortcut buttons
 
-The three strategy buttons correspond directly to the supported EMHASS `costfun` values:
-
-```text
-profit
-cost
-self-consumption
-```
-
-Each button:
-
-1. reads the complete active EMHASS configuration through `/get-config`;
-2. changes only the top-level `costfun` value;
-3. writes the complete configuration through `/set-config`;
-4. immediately runs and publishes a fresh optimization.
-
-Stable unique-ID suffixes are:
+The three v0.15 button unique IDs remain available for backwards compatibility with automations and existing entity registries:
 
 ```text
 emhass_costfun_profit
@@ -160,7 +173,11 @@ emhass_costfun_cost
 emhass_costfun_self_consumption
 ```
 
-These controls change the EMHASS optimization objective. In v0.15 they do **not** change the GoodWe actuator strategy: Automatic Control still executes the resulting `P_batt` target using the existing mode 8/11/12 mapping. Any future `P_grid`/grid-target controller must be introduced as a separate, validated control-ownership change.
+They use the same canonical safe config-write path as the v0.16 select and are categorized as configuration actions. Their display names deliberately start with an action such as **Set EMHASS...** so they are not mistaken for three independent persistent modes.
+
+New UI should prefer the stateful `emhass_cost_function` select because a button cannot represent which strategy is currently active.
+
+These controls change the EMHASS optimization objective only. GoodWe Automatic Control remains `P_batt` driven and continues to use the validated mode 8/11/12 mapping. Any future `P_grid`/grid-target controller is a separate control-ownership change requiring hardware validation.
 
 ### Resume AUTO
 
