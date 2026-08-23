@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .client import GWModbusClient
@@ -22,6 +23,7 @@ from .const import (
     DEFAULT_EV_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_REQUIRED_STATE,
+    DOMAIN,
     MODE_AUTO,
     MODE_BATTERY_HOLD,
     MODE_CHARGE_BATTERY,
@@ -42,8 +44,20 @@ class GWEnergyPilotController:
         self.target_power = 0
         self.expected_mode = MODE_AUTO
         self.last_command = "goodwe_auto"
-        self.manual_power = min(DEFAULT_MAX_POWER, int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)))
+        self.manual_power = min(
+            DEFAULT_MAX_POWER,
+            int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)),
+        )
         self._unsubs: list[Callable[[], None]] = []
+
+    @property
+    def signal(self) -> str:
+        """Dispatcher signal for controller ownership/state changes."""
+        return f"{DOMAIN}_{self.entry.entry_id}_controller_update"
+
+    def _notify_state(self) -> None:
+        """Notify entities that expose controller-owned state."""
+        async_dispatcher_send(self.hass, self.signal)
 
     async def async_setup(self) -> None:
         """Subscribe to configured Home Assistant entities."""
@@ -73,7 +87,10 @@ class GWEnergyPilotController:
     def _async_source_changed(self, event: Event) -> None:
         """Schedule reevaluation after an input entity changed."""
         if self.enabled:
-            self.hass.async_create_task(self.async_evaluate(), "gw-energypilot-evaluate")
+            self.hass.async_create_task(
+                self.async_evaluate(),
+                "gw-energypilot-evaluate",
+            )
 
     def _state_float(self, entity_id: str | None) -> float | None:
         """Return entity state as float."""
@@ -94,12 +111,17 @@ class GWEnergyPilotController:
 
         mode_entity = self.entry.options.get(CONF_EV_MODE_ENTITY)
         power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
-        ev_deadband = float(self.entry.options.get(CONF_EV_DEADBAND, DEFAULT_EV_DEADBAND))
+        ev_deadband = float(
+            self.entry.options.get(CONF_EV_DEADBAND, DEFAULT_EV_DEADBAND)
+        )
 
         mode_active = False
         if mode_entity:
             state = self.hass.states.get(mode_entity)
-            mode_active = state is not None and state.state.lower() == "connected_charging"
+            mode_active = (
+                state is not None
+                and state.state.lower() == "connected_charging"
+            )
 
         ev_power = self._state_float(power_entity)
         power_active = ev_power is not None and ev_power > ev_deadband
@@ -112,12 +134,18 @@ class GWEnergyPilotController:
         state = self.hass.states.get(entity_id)
         if state is None:
             return False
-        required = str(self.entry.options.get(CONF_OPTIM_REQUIRED_STATE, DEFAULT_OPTIM_REQUIRED_STATE))
+        required = str(
+            self.entry.options.get(
+                CONF_OPTIM_REQUIRED_STATE,
+                DEFAULT_OPTIM_REQUIRED_STATE,
+            )
+        )
         return state.state == required
 
     async def async_enable(self) -> None:
         """Enable automatic control."""
         self.enabled = True
+        self._notify_state()
         await self.async_evaluate()
 
     async def async_disable(self) -> None:
@@ -126,6 +154,7 @@ class GWEnergyPilotController:
         self.target_power = 0
         self.expected_mode = MODE_AUTO
         self.last_command = "goodwe_auto"
+        self._notify_state()
         await self.client.async_set_mode(MODE_AUTO, 0)
         await self.coordinator.async_request_refresh()
 
@@ -142,6 +171,7 @@ class GWEnergyPilotController:
         self.target_power = max(0, int(power))
         self.expected_mode = mode
         self.last_command = command
+        self._notify_state()
         await self.client.async_set_mode(mode, self.target_power)
         await self.coordinator.async_request_refresh()
 
@@ -153,10 +183,12 @@ class GWEnergyPilotController:
         p_batt = self._state_float(self.entry.options.get(CONF_P_BATT_ENTITY))
         if p_batt is None:
             self.last_command = "waiting_for_p_batt"
+            self._notify_state()
             return
 
         if not self._optim_is_ready():
             self.last_command = "waiting_for_optimization"
+            self._notify_state()
             return
 
         if self.ev_is_active():
@@ -164,8 +196,12 @@ class GWEnergyPilotController:
             power = 0
             command = "ev_hold"
         else:
-            deadband = float(self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
-            max_power = int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
+            deadband = float(
+                self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
+            )
+            max_power = int(
+                self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)
+            )
             power = min(int(abs(p_batt)), max_power)
 
             if p_batt > deadband:
@@ -182,6 +218,7 @@ class GWEnergyPilotController:
         self.target_power = power
         self.expected_mode = mode
         self.last_command = command
+        self._notify_state()
 
         await self.client.async_set_mode(mode, power)
         await self.coordinator.async_request_refresh()
