@@ -2,6 +2,44 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.22] - 2026-08-23
+
+### Added
+
+- A **GoodWe smart meter active** switch in the GOODWE dashboard settings. The setting is stored with the GoodWe config-entry data rather than in EMHASS configuration.
+- A dedicated admin WebSocket settings API for reading/updating the smart-meter actuator strategy and showing whether live GoodWe meter telemetry is currently available.
+- Automated regression coverage for both supported automatic strategies.
+
+### Changed
+
+- With **GoodWe smart meter active = ON** (default), Automatic Control now executes the EMHASS `P_grid` plan through GoodWe's own PCC control loop:
+  - `P_grid > deadband` → mode `9` Grid import target, setpoint = planned import magnitude;
+  - `P_grid < -deadband` → mode `10` Grid export target, setpoint = planned export magnitude;
+  - `P_grid` inside the deadband → mode `1` GoodWe Auto / AI at `0 W`.
+- With **GoodWe smart meter active = OFF**, Automatic Control keeps the direct battery fallback:
+  - `P_batt < -deadband` → mode `11` Battery charge power;
+  - `P_batt > deadband` → mode `12` Battery discharge power;
+  - `P_batt` inside the deadband → mode `8` Battery Hold.
+- The v0.18-v0.21 30-second mode-11 grid-neutral feedback loop is retired. GoodWe modes 9/10 now perform the fast closed-loop regulation against the inverter's own smart meter/PCC when smart-meter control is enabled.
+- The Controller target label now distinguishes PCC/grid targets from direct battery targets.
+- Flow particles are reasserted at the active frontend layer using explicit **to hub / from hub** semantics so visual direction follows the validated sign conventions instead of depending on older layered CSS direction rules.
+- The active frontend is `gw-energy-pilot-v022.js`, layered on top of v0.21.
+
+### Hardware evidence used
+
+- Mode `10` with a `400 W` setpoint produced approximately `395 W` export at the GoodWe smart meter.
+- Mode `9` with a `400 W` setpoint produced approximately `331 W` import at the GoodWe smart meter.
+- Mode `9` with a `15 kW` setpoint held approximately `15 kW` grid import while directly connected DC PV was added on top and the battery charged at roughly `16.9 kW`.
+- Mode `11` with a `15 kW` setpoint held the battery near `15 kW` charging while PV reduced the grid import needed to supply that battery target.
+- Mode `1` was observed naturally absorbing available PV surplus while keeping grid flow near zero on the reference ETA-G20.
+
+### Safety boundary
+
+- The existing EMS registers remain `47511`/`47512`; the `47512 -> wait -> 47511` write order is unchanged.
+- Manual EMS buttons/modes remain available exactly as operator commands and are not remapped by the Smart Meter setting.
+- BMS, inverter, SOC and grid limits remain authoritative regardless of requested PCC or battery targets.
+- v0.22 remains **Beta** because automatic mode-9/10 execution and the new strategy switch still have limited multi-installation field exposure.
+
 ## [0.21] - 2026-08-23
 
 ### Added
@@ -92,7 +130,7 @@ All notable changes to GW EnergyPilot are documented here.
 - Only the two already-known canonical register definitions `45356` and `45358` are accepted; arbitrary register writes are not exposed.
 - Values are limited to whole percentages from `0` through `100` and the register must already be readable on the current inverter before a write is allowed.
 - Each user action changes exactly one register and requires a separate dashboard confirmation.
-- Register `47500` remains read-only because its G20 semantics are still unresolved and the tested inverter has returned the sentinel-like value `65535`.
+- Register `47500` remains read-only because its G20 semantics are still unresolved and the tested inverter has returned the sentinel-like value `65535`, which is not treated as a valid percentage.
 - EMS modes `8/11/12`, registers `47511/47512`, sign conventions, control ownership and canonical grid-energy accounting remain unchanged.
 
 ## [0.17] - 2026-08-23
