@@ -158,6 +158,11 @@ class GWModbusClient:
 
             for start, count in OPTIONAL_TELEMETRY_BLOCKS:
                 try:
+                    # An unsupported optional register can close the Modbus
+                    # connection in _async_read_block(). Reconnect before each
+                    # optional block so one candidate diagnostic cannot mask
+                    # later optional diagnostics during every refresh cycle.
+                    await self._async_ensure_connected()
                     registers = await self._async_read_block(start, count)
                 except GWModbusError as err:
                     _LOGGER.debug(
