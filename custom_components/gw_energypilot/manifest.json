@@ -3,6 +3,7 @@
   "name": "GW EnergyPilot",
   "codeowners": ["@SuperdaveNLD"],
   "config_flow": true,
+  "dependencies": ["http"],
   "documentation": "https://github.com/SuperdaveNLD/GW_EnergyPilot",
   "integration_type": "device",
   "iot_class": "local_polling",
