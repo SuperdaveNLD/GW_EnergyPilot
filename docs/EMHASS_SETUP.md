@@ -50,7 +50,7 @@ positive battery power = discharging
 
 EnergyPilot sends current battery SOC as runtime `soc_init` for every optimization.
 
-### Why v0.13 uses register 35172 for load
+### Why v0.13+ uses register 35172 for load
 
 On the tested GW15K-ETA-G20:
 
@@ -107,7 +107,43 @@ Import price addition                 contract dependent
 Export price deduction                contract dependent
 ```
 
-## 6. Price sources
+## 6. EMHASS cost function
+
+EMHASS supports these `costfun` objectives:
+
+```text
+profit
+cost
+self-consumption
+```
+
+From v0.15, the EnergyPilot dashboard exposes one button for each objective. Pressing a strategy button performs this sequence:
+
+```text
+GET /get-config
+      ↓
+change only costfun
+      ↓
+POST /set-config with the complete configuration
+      ↓
+run a fresh day-ahead optimization
+      ↓
+publish fresh EMHASS output
+```
+
+EnergyPilot deliberately reads and writes the complete configuration so unrelated EMHASS settings are preserved.
+
+Changing `costfun` changes **what EMHASS optimizes**. It does not by itself change the GoodWe control primitive. In v0.15 Automatic Control still consumes `P_batt` and maps it as follows:
+
+```text
+charge target     → mode 11
+near-zero target  → mode 8
+discharge target  → mode 12
+```
+
+A future controller may use `P_grid` and GoodWe grid-target modes for objectives such as zero-grid/self-consumption. That is intentionally a separate change because grid-target behaviour must first be validated on the GW15K-ETA-G20 and must not silently alter existing control ownership.
+
+## 7. Price sources
 
 EnergyPilot tries runtime price sources in this order:
 
@@ -126,7 +162,7 @@ The configured import addition and export deduction are applied before the dicti
 
 If runtime pricing is enabled but no compatible source exists, EnergyPilot stops with `error_prices` rather than silently optimizing with unintended prices.
 
-## 7. First optimization
+## 8. First optimization
 
 Wait until Home Assistant startup has finished and EnergyPilot telemetry is available. Then press **Optimize now**.
 
@@ -150,7 +186,7 @@ ready
 
 EnergyPilot intentionally does not create an EMHASS plan during Home Assistant startup.
 
-## 8. Enable control
+## 9. Enable control
 
 Confirm:
 
@@ -171,6 +207,7 @@ AUTO performs a fresh optimization first and enables Automatic Control only afte
 Periodic optimization             every 60 minutes
 Optimize now                      immediately
 AUTO                              immediately
+Cost-function change              immediately after saving costfun
 Tomorrow prices available         immediately
 EV charging stops                 immediately when configured
 SOC limit changes                 3 seconds after the final change
@@ -219,7 +256,7 @@ Default deadband:
 
 ## Grid energy foundation
 
-v0.13 exposes the GoodWe smart-meter cumulative grid counters:
+v0.13+ exposes the GoodWe smart-meter cumulative grid counters:
 
 ```text
 36015 total export
@@ -243,6 +280,7 @@ Relevant values include:
 - system power balance;
 - signed grid power;
 - inverter registers 35138 and 35140;
+- battery SOH and optional battery charge/discharge energy accounting;
 - controller command/target;
 - selected EMHASS output entities;
 - EMHASS health/version and HTTP results;
