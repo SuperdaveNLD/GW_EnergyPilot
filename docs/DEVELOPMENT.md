@@ -74,7 +74,7 @@ For each bug or feature:
 7. Check startup and unavailable-device behaviour.
 8. Check config-entry reload/unload behaviour.
 9. Check unique IDs and Recorder/statistics compatibility.
-10. Update docs/changelog for externally visible behaviour.
+10. Update docs/changelog/release notes for externally visible behaviour.
 
 ## Lightweight repository checks
 
@@ -91,7 +91,7 @@ The `Quality` GitHub Actions workflow runs the same checks automatically on push
 The validator currently checks:
 
 - every Modbus register definition is fully covered by a required or optional read block;
-- the second word of uint32/int32/float32 definitions is covered;
+- all words of multi-register values, including uint32/int32/float32/uint64 definitions, are covered;
 - every Modbus read block stays within the 125-register protocol limit;
 - register keys are unique;
 - repository JSON files parse;
@@ -99,7 +99,7 @@ The validator currently checks:
 - the active panel JavaScript file exists;
 - the active frontend `VERSION` matches `manifest.json` when declared.
 
-Unit tests currently cover controller safety/ownership decisions and EMHASS full-config patch preservation. These checks do not replace real Home Assistant lifecycle or hardware validation.
+Unit tests currently cover controller safety/ownership decisions, EMHASS full-config patch preservation, and hardware-independent Modbus decoding/coverage. These checks do not replace real Home Assistant lifecycle or hardware validation.
 
 ## Keep domains separated
 
@@ -134,15 +134,34 @@ Do not delete `orchestrator.py` or `orchestrator_v012.py` while `orchestrator_v0
 
 ### 2. Layered frontend assets
 
-The active dashboard is layered. In v0.15 the entry module imports v0.14, which imports v0.13 and the earlier versioned modules below it. Files that look historical can therefore still be runtime dependencies.
+The active dashboard is layered. In v0.16 the entry module imports v0.15, which imports v0.14, v0.13 and the earlier versioned modules below it. Files that look historical can therefore still be runtime dependencies.
 
 Do not delete a versioned frontend asset based on its filename alone. Trace imports first. The repository validator catches missing relative JavaScript imports, but it does not prove behavioural equivalence after a consolidation.
 
 ### 3. Limited automated runtime coverage
 
-The repository has hardware-independent unit coverage for controller mapping/ownership and EMHASS selected-config patching, plus structural repository checks. It does not yet have a full Home Assistant test harness covering config-entry lifecycle, orchestrator HTTP flows, entity registry migrations, Recorder integration, or real hardware I/O.
+The repository has hardware-independent unit coverage for controller mapping/ownership, EMHASS selected-config patching and selected Modbus decode invariants, plus structural repository checks. It does not yet have a full Home Assistant test harness covering config-entry lifecycle, orchestrator HTTP flows, entity registry migrations, Recorder integration, or real hardware I/O.
 
 Add focused tests before consolidating orchestration or frontend layers.
+
+## Beta hardware-validation workflow
+
+The active installation base is small enough that some read-only diagnostics may be intentionally shipped before extensive field testing.
+
+For this repository, **Beta** means the feature is available for limited field validation but its hardware semantics are not yet extensively confirmed.
+
+A Beta register feature must:
+
+- remain read-only unless separately validated for writes;
+- use optional Modbus blocks;
+- fail independently from required telemetry;
+- be clearly labelled Beta in diagnostics and documentation;
+- stay out of EMS control and ownership decisions;
+- stay out of canonical Recorder-facing energy entities until promoted;
+- include a practical way for testers to copy/report values;
+- record model, firmware and matching SolarGo/SEMS+ values during validation.
+
+Promotion from Beta requires real-installation evidence and an explicit release-note/status change.
 
 ## Resolved maintenance issue: telemetry block duplication
 
@@ -168,11 +187,12 @@ Existing automated coverage includes:
 - disabling Automatic Control returning to mode 1 / 0 W;
 - invalid/unavailable/non-finite `P_batt` handling;
 - EV hold and EV-stop optimization guard behaviour;
-- EMHASS selected-config preservation.
+- EMHASS selected-config preservation;
+- uint64 extended-meter decoding and multi-word register coverage.
 
 Next priorities include:
 
-- register decoding (uint/int/float, scaling and signed values);
+- broader register decoding (uint/int/float, scaling and signed values);
 - orchestrator optimize/publish HTTP success and failure paths;
 - load forecast using register 35172;
 - startup with inverter unavailable;
@@ -187,13 +207,15 @@ The reference hardware is currently:
 
 - GoodWe GW15K-ETA-G20
 
-When validating another model, record at least:
+When validating another model or a Beta register, record at least:
 
 ```text
 inverter model
 firmware version
 battery model
 Modbus connection details
+raw/decoded candidate value
+matching SolarGo/SEMS+ value where relevant
 telemetry differences
 EMS mode 8 behaviour
 EMS mode 11 behaviour
@@ -220,16 +242,18 @@ For such changes:
 Before a release, verify:
 
 - `manifest.json` version;
-- `CHANGELOG.md`;
-- README behaviour and installation instructions;
-- active frontend module/cache-buster;
+- active frontend module/cache-buster and frontend `VERSION`;
+- `CHANGELOG.md` detailed changes;
+- `docs/RELEASE_NOTES.md` user-facing summary and **Beta/Validated** status;
+- README current version/status and behavior;
 - translations for new user-facing entities/options;
 - HACS metadata where relevant;
 - `Quality`, HACS, and hassfest checks;
 - no accidental entity unique-ID changes;
-- no undocumented register-semantic changes.
+- no undocumented register-semantic changes;
+- every unconfirmed hardware value is explicitly labelled Beta and remains within the Beta policy boundary.
 
-Do not merge draft register-validation work into a release merely because static CI is green. Unconfirmed GoodWe register semantics still require appropriate evidence/hardware validation.
+A Beta release may intentionally contain unconfirmed read-only diagnostics. Static CI is sufficient to prove repository consistency, but never to promote those hardware semantics from Beta to confirmed.
 
 ## Documentation ownership
 
@@ -237,8 +261,9 @@ Use these documents for durable project knowledge rather than relying on chat hi
 
 - `AGENTS.md` — instructions to contributors/AI;
 - `docs/ARCHITECTURE.md` — runtime design;
-- `docs/MODBUS.md` — register/control contract;
+- `docs/MODBUS.md` — register/control contract and Beta register status;
 - `docs/ENTITIES.md` — Home Assistant entity contract;
 - `docs/EMHASS_SETUP.md` — operator setup;
 - `docs/KNOWN_ISSUES.md` — field issues outside or adjacent to EnergyPilot runtime code;
-- `CHANGELOG.md` — version history.
+- `docs/RELEASE_NOTES.md` — readable per-version notes and Beta/validation status;
+- `CHANGELOG.md` — detailed technical version history.
