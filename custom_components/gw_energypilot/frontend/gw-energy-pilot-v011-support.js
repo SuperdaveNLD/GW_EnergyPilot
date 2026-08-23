@@ -23,12 +23,14 @@ function snapshot(attrs) {
     ["Work mode 35187", attrs.work_mode_35187],
     ["Operation mode 35188", attrs.operation_mode_35188],
     ["Grid mode 35136", attrs.grid_mode_35136],
-    ["House load 35172", attrs.house_load_register_35172],
+    ["GoodWe load 35172", attrs.house_load_register_35172],
     ["Load phase sum", attrs.house_load_phase_sum],
-    ["Power-balance house load", attrs.house_load_power_balance],
-    ["Meter fast total", attrs.meter_total_power_fast],
-    ["Inverter power", attrs.total_inverter_power],
-    ["AC active power", attrs.ac_active_power],
+    ["System power balance", attrs.system_balance_power ?? attrs.house_load_power_balance],
+    ["Grid meter fast total", attrs.meter_total_power_fast],
+    ["Inverter total power 35138", attrs.total_inverter_power],
+    ["Inverter active power 35140", attrs.ac_active_power],
+    ["Grid energy imported total", attrs.meter_total_energy_import],
+    ["Grid energy exported total", attrs.meter_total_energy_export],
     ["Battery power", attrs.battery_power],
     ["Battery SOC", attrs.battery_soc],
     ["Automatic control", attrs.controller_enabled ? "ON" : "OFF"],
@@ -44,17 +46,32 @@ function snapshot(attrs) {
     ["SOC init", attrs.soc_init],
     ["Orchestrator status", attrs.orchestrator_status],
     ["Last reason", attrs.last_reason],
+    ["Telemetry refresh", attrs.telemetry_refresh_seconds],
+    ["Optimization interval", attrs.optimization_interval_minutes],
+    ["EMHASS health", attrs.emhass_health],
+    ["EMHASS version", attrs.emhass_version],
+    ["Price source", attrs.price_runtime_source],
+    ["Price entity", attrs.price_entity],
     ["Price area", attrs.price_area],
     ["Price points", attrs.price_points],
+    ["Load forecast source", attrs.load_forecast_source],
     ["Load forecast points", attrs.load_forecast_points],
     ["Optimize HTTP", attrs.optimize_http_status],
     ["Publish HTTP", attrs.publish_http_status],
+    ["Parallel GoodWe entries", Array.isArray(attrs.parallel_goodwe_entries) ? attrs.parallel_goodwe_entries.join(", ") : attrs.parallel_goodwe_entries],
     ["Last error", attrs.last_error],
   ];
   return [
-    "GW EnergyPilot diagnostics v0.11",
+    "GW EnergyPilot diagnostics",
     ...fields.map(([label, value]) => `${label}: ${value ?? "—"}`),
   ].join("\n");
+}
+
+function replaceLabel(group, oldLabels, nextLabel) {
+  if (!group) return;
+  for (const item of group.querySelectorAll(".ep-v011-diag-row > span:first-child")) {
+    if (oldLabels.includes(item.textContent?.trim())) item.textContent = nextLabel;
+  }
 }
 
 function enrichDiagnostics(panel, root) {
@@ -64,6 +81,12 @@ function enrichDiagnostics(panel, root) {
   const optimizeId = panel._entityId("optimize_now");
   const attrs = (optimizeId ? panel._state(optimizeId)?.attributes : null) || {};
   const groups = card.querySelectorAll(".ep-v011-diag-group");
+
+  replaceLabel(groups[0], ["House load 35172"], "GoodWe load 35172");
+  replaceLabel(groups[0], ["Power-balance load", "Power-balance house load"], "System power balance");
+  replaceLabel(groups[0], ["Meter fast total"], "Grid meter fast total");
+  replaceLabel(groups[0], ["Inverter power"], "Inverter total 35138");
+  replaceLabel(groups[0], ["AC active power"], "Inverter active 35140");
 
   if (groups[0] && !groups[0].querySelector('[data-v011-extra="app-work"]')) {
     const rows = groups[0].querySelectorAll(".ep-v011-diag-row");
