@@ -11,6 +11,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from .client import GWModbusClient
 from .const import (
     CONF_DEADBAND,
+    CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
     CONF_EV_DEADBAND,
     CONF_EV_MODE_ENTITY,
@@ -35,7 +36,13 @@ from .coordinator import GWEnergyPilotCoordinator
 class GWEnergyPilotController:
     """Translate external EMHASS state into GoodWe EMS commands."""
 
-    def __init__(self, hass: HomeAssistant, entry, client: GWModbusClient, coordinator: GWEnergyPilotCoordinator) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry,
+        client: GWModbusClient,
+        coordinator: GWEnergyPilotCoordinator,
+    ) -> None:
         self.hass = hass
         self.entry = entry
         self.client = client
@@ -49,6 +56,7 @@ class GWEnergyPilotController:
             int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)),
         )
         self._unsubs: list[Callable[[], None]] = []
+        self._ev_was_active = False
 
     @property
     def signal(self) -> str:
@@ -59,13 +67,24 @@ class GWEnergyPilotController:
         """Notify entities that expose controller-owned state."""
         async_dispatcher_send(self.hass, self.signal)
 
+    def _ev_source_ids(self) -> set[str]:
+        """Return configured EV source entity IDs."""
+        entity_ids = {
+            self.entry.options.get(CONF_EV_MODE_ENTITY),
+            self.entry.options.get(CONF_EV_POWER_ENTITY),
+        }
+        entity_ids.discard(None)
+        entity_ids.discard("")
+        return {str(entity_id) for entity_id in entity_ids}
+
     async def async_setup(self) -> None:
         """Subscribe to configured Home Assistant entities."""
+        self._ev_was_active = self.ev_is_active()
+
         entity_ids = {
             self.entry.options.get(CONF_P_BATT_ENTITY),
             self.entry.options.get(CONF_OPTIM_STATUS_ENTITY),
-            self.entry.options.get(CONF_EV_MODE_ENTITY),
-            self.entry.options.get(CONF_EV_POWER_ENTITY),
+            *self._ev_source_ids(),
         }
         entity_ids.discard(None)
         entity_ids.discard("")
@@ -85,12 +104,47 @@ class GWEnergyPilotController:
 
     @callback
     def _async_source_changed(self, event: Event) -> None:
-        """Schedule reevaluation after an input entity changed."""
-        if self.enabled:
-            self.hass.async_create_task(
-                self.async_evaluate(),
-                "gw-energypilot-evaluate",
-            )
+        """Schedule reevaluation after an input entity changed.
+
+        When EV charging stops while the native orchestrator is enabled, keep
+        the already-active Battery Hold command in place until a fresh EMHASS
+        optimization publishes a new P_batt target. The new P_batt state change
+        will then call async_evaluate(). This avoids briefly executing the stale
+        pre-EV battery target before the EV-stop optimization finishes.
+        """
+        if not self.enabled:
+            return
+
+        entity_id = str(event.data.get("entity_id") or "")
+        if entity_id in self._ev_source_ids():
+            ev_active = self.ev_is_active()
+            ev_was_active = self._ev_was_active
+            self._ev_was_active = ev_active
+
+            if ev_active:
+                self.hass.async_create_task(
+                    self.async_evaluate(),
+                    "gw-energypilot-ev-hold",
+                )
+                return
+
+            if (
+                ev_was_active
+                and self.entry.options.get(
+                    CONF_ENABLE_EMHASS_ORCHESTRATOR,
+                    False,
+                )
+            ):
+                self.target_power = 0
+                self.expected_mode = MODE_BATTERY_HOLD
+                self.last_command = "waiting_for_ev_stop_optimization"
+                self._notify_state()
+                return
+
+        self.hass.async_create_task(
+            self.async_evaluate(),
+            "gw-energypilot-evaluate",
+        )
 
     def _state_float(self, entity_id: str | None) -> float | None:
         """Return entity state as float."""
@@ -145,6 +199,7 @@ class GWEnergyPilotController:
     async def async_enable(self) -> None:
         """Enable automatic control."""
         self.enabled = True
+        self._ev_was_active = self.ev_is_active()
         self._notify_state()
         await self.async_evaluate()
 
