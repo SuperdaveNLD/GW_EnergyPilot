@@ -17,10 +17,13 @@ PanelClass.prototype._render = function energyPilotV018Render() {
     strategyNote.innerHTML = "This is one persistent EMHASS setting. Automatic control still uses <strong>P_batt</strong> for battery direction and maximum requested power, but v0.18 also reads <strong>P_grid</strong>: when EMHASS plans battery charging with grid flow around 0 W, EnergyPilot limits mode 11 from the live GoodWe smart meter instead of importing power just to satisfy an optimistic PV forecast.";
   }
 
-  const commandId = this._entityId?.("control_command");
-  const command = commandId ? this._state(commandId)?.state : null;
+  const command = this._stateByKey?.("control_command")?.state;
   const controllerCard = root.querySelector(".panel-card.controller");
-  if (controllerCard && command?.startsWith("grid_neutral") && !controllerCard.querySelector(".ep-v018-grid-neutral-note")) {
+  if (
+    controllerCard &&
+    command?.startsWith("grid_neutral") &&
+    !controllerCard.querySelector(".ep-v018-grid-neutral-note")
+  ) {
     const note = document.createElement("div");
     note.className = "ep-v018-grid-neutral-note";
     note.style.cssText = "margin-top:10px;color:#708ba1;font-size:9px;line-height:1.45";
