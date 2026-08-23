@@ -2,6 +2,21 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.14] - 2026-08-23
+
+### Added
+
+- Optional GoodWe battery energy accounting telemetry from registers `35206` (lifetime charge), `35208` (today charge), `35209` (lifetime discharge), and `35211` (today discharge).
+- Battery SOH and charge/discharge energy values in the Diagnostics snapshot and copied support report.
+- Internal battery accounting groundwork for later cost, revenue, throughput and degradation calculations.
+
+### Changed
+
+- Battery accounting telemetry is intentionally kept out of the normal dashboard and exposed only through diagnostics for now.
+- The `35206-35211` telemetry block is optional so unsupported firmware does not make the main inverter telemetry unavailable.
+- No estimated cycle count or equivalent-full-cycle value is generated yet; EnergyPilot will only add that once usable battery capacity/model semantics are validated.
+- Dashboard frontend moved to `gw-energy-pilot-v014.js`.
+
 ## [0.13] - 2026-08-23
 
 ### Added
