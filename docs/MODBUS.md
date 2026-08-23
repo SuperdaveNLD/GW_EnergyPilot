@@ -58,6 +58,28 @@ These conventions affect dashboard direction and EMHASS/controller logic and mus
 | 47511 | `ems_mode` | uint16 | 1 | EMS mode control/state |
 | 47512 | `ems_setpoint` | uint16 | 1 | EMS power setpoint |
 
+## Candidate SOC-protection diagnostics
+
+v0.14 reads three additional holding registers as **optional, read-only diagnostics**:
+
+| Address | EnergyPilot key | Candidate meaning |
+|---:|---|---|
+| 45356 | `battery_discharge_depth_on_grid` | On-grid battery discharge depth / minimum-SOC related limit |
+| 45358 | `battery_discharge_depth_off_grid` | Off-grid battery discharge depth / reserve related limit |
+| 47500 | `battery_soc_protection` | Battery SOC-protection enable/status |
+
+These meanings are known from related GoodWe ET-family implementations but are **not yet treated as confirmed ETA-G20 semantics**. They are exposed specifically so readings on the primary **GW15K-ETA-G20** can be compared with SolarGo/SEMS+ settings.
+
+Rules until hardware validation is complete:
+
+- read only;
+- never use these values as an EMS control input;
+- never write them from EnergyPilot;
+- keep each register in an isolated optional read block;
+- report the inverter model, firmware and matching SolarGo/SEMS+ setting when validating them.
+
+A missing or rejected candidate register must not make required telemetry unavailable.
+
 ## Load semantics
 
 On the tested GW15K-ETA-G20, register `35172` closely matches the sum of the three load phase registers:
@@ -154,13 +176,16 @@ The required runtime ranges are:
 47509 + 4 words
 ```
 
-The optional diagnostic range is:
+The optional diagnostic ranges are deliberately isolated:
 
 ```text
+45356 + 1 word
+45358 + 1 word
 47000 + 1 word
+47500 + 1 word
 ```
 
-Register `47000` remains optional so an unavailable diagnostic block does not fail the normal telemetry refresh.
+An unavailable optional diagnostic block does not fail the normal telemetry refresh.
 
 The first three required blocks intentionally extend one word beyond the last visible 32-bit register address in the block:
 
