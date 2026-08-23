@@ -123,6 +123,9 @@ EnergyPilot's normal grid-connected operating recommendation is approximately 5â
 Current major actions include:
 
 - Optimize now;
+- EMHASS Profit;
+- EMHASS Cost;
+- EMHASS Self-consumption;
 - Max export;
 - Battery pause/hold;
 - Max charge;
@@ -131,6 +134,33 @@ Current major actions include:
 ### Optimize now
 
 Runs one complete EMHASS optimization/publish cycle and exposes runtime diagnostics as attributes.
+
+### EMHASS cost-function buttons
+
+The three strategy buttons correspond directly to the supported EMHASS `costfun` values:
+
+```text
+profit
+cost
+self-consumption
+```
+
+Each button:
+
+1. reads the complete active EMHASS configuration through `/get-config`;
+2. changes only the top-level `costfun` value;
+3. writes the complete configuration through `/set-config`;
+4. immediately runs and publishes a fresh optimization.
+
+Stable unique-ID suffixes are:
+
+```text
+emhass_costfun_profit
+emhass_costfun_cost
+emhass_costfun_self_consumption
+```
+
+These controls change the EMHASS optimization objective. In v0.14 they do **not** change the GoodWe actuator strategy: Automatic Control still executes the resulting `P_batt` target using the existing mode 8/11/12 mapping. Any future `P_grid`/grid-target controller must be introduced as a separate, validated control-ownership change.
 
 ### Resume AUTO
 
