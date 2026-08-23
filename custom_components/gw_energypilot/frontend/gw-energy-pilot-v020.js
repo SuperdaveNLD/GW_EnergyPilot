@@ -81,7 +81,7 @@ function socConstraintSnapshot(values) {
     `Current battery SOC: ${pct(values.currentSoc)}`,
     `Last EnergyPilot optimization SOC init: ${pct(values.socInit)}`,
     `Configured EnergyPilot final SOC target: ${pct(values.configuredRuntimeFinal)}`,
-    `Last sent runtime final SOC (soc_final): ${pct(values.runtimeFinal)}`,
+    `Last successful EnergyPilot runtime final SOC (soc_final): ${pct(values.runtimeFinal)}`,
     `EMHASS minimum SOC: ${pct(values.emhassMinimum)}`,
     `EMHASS config target SOC (fallback): ${validatedSocDisplay(values.emhassConfigTarget, values.emhassConfigTargetRaw)}`,
     `EMHASS deficit threshold: ${validatedSocDisplay(values.emhassDeficitThreshold, values.emhassDeficitThresholdRaw)}`,
@@ -126,7 +126,7 @@ function updateSocConstraintDiagnostics(panel, root) {
   setRow(
     panel,
     runtimeRow,
-    "Last sent runtime final SOC (soc_final)",
+    "Last successful EnergyPilot runtime final SOC (soc_final)",
     pct(values.runtimeFinal),
   );
   setRow(panel, minimumRow, "EMHASS minimum SOC", pct(values.emhassMinimum));
@@ -157,7 +157,7 @@ function updateSocConstraintDiagnostics(panel, root) {
 
   const note = group.querySelector(".ep-v019-soc-note span");
   if (note) {
-    note.innerHTML = "<strong>Last sent runtime final SOC</strong> is populated only after an EnergyPilot-owned optimization succeeds. In manual-only or externally orchestrated installations the configured EnergyPilot target can therefore differ from the actual EMHASS runtime target. Invalid EMHASS SOC config values are kept as raw diagnostics instead of being presented as valid percentages. GoodWe 45356 remains the inverter-side G20 minimum-SOC setting under field validation.";
+    note.innerHTML = "<strong>Last successful EnergyPilot runtime final SOC</strong> is populated only after an EnergyPilot-owned optimization and publish cycle succeeds. In manual-only or externally orchestrated installations the configured EnergyPilot target can therefore differ from the actual EMHASS runtime target. Invalid EMHASS SOC config values are kept as raw diagnostics instead of being presented as valid percentages. GoodWe 45356 remains the inverter-side G20 minimum-SOC setting under field validation.";
   }
 
   const oldCopy = group.querySelector(".ep-v019-soc-copy");
