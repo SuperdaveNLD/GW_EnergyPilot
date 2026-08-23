@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import Any
 
 from aiohttp import ClientError
@@ -38,6 +39,41 @@ def emhass_cost_function_from_config(config: dict[str, Any]) -> str | None:
     """Return a supported EMHASS cost function from a complete config."""
     value = str(config.get("costfun", "")).strip()
     return value if value in EMHASS_COST_FUNCTIONS else None
+
+
+def _soc_percentage(config: dict[str, Any], key: str) -> float | None:
+    """Decode one EMHASS 0..1 SOC config value to a percentage."""
+    try:
+        value = float(config.get(key))
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value):
+        return None
+    return round(value * 100.0, 2)
+
+
+def emhass_soc_diagnostics_from_config(
+    config: dict[str, Any],
+) -> dict[str, float | None]:
+    """Return SOC-related EMHASS config values with explicit percent semantics.
+
+    These values come from EMHASS config.json. They are deliberately kept
+    separate from EnergyPilot's runtime `soc_final` payload setting.
+    """
+    return {
+        "emhass_minimum_soc_pct": _soc_percentage(
+            config, "battery_minimum_state_of_charge"
+        ),
+        "emhass_maximum_soc_pct": _soc_percentage(
+            config, "battery_maximum_state_of_charge"
+        ),
+        "emhass_config_target_soc_pct": _soc_percentage(
+            config, "battery_target_state_of_charge"
+        ),
+        "emhass_soc_deficit_threshold_pct": _soc_percentage(
+            config, "battery_soc_deficit_threshold"
+        ),
+    }
 
 
 async def async_get_emhass_config(
