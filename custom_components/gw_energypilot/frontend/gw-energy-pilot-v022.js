@@ -208,6 +208,49 @@ function installSmartMeterSetting(panel, root) {
   });
 }
 
+function updateSettingField(root, labelText, nextLabel, description) {
+  for (const field of root.querySelectorAll(".ep-v016-field")) {
+    const label = field.querySelector(".ep-v016-field-label span:first-child");
+    if (label?.textContent?.trim() !== labelText) continue;
+    if (nextLabel) label.textContent = nextLabel;
+    const descriptionNode = field.querySelector(".ep-v016-field-description");
+    if (descriptionNode) descriptionNode.textContent = description;
+    return;
+  }
+}
+
+function relabelSettingsFields(panel, root) {
+  if (!panel.__epV016SettingsOpen) return;
+  if (panel.__epV016SettingsTab === "energypilot") {
+    updateSettingField(
+      root,
+      "Maximum control power",
+      "Maximum control power",
+      "Caps the GoodWe mode-specific setpoint: PCC import/export target with Smart Meter control ON, or direct battery target with it OFF."
+    );
+    updateSettingField(
+      root,
+      "Battery deadband",
+      "Control deadband",
+      "Tolerance around 0 W. Applied to EMHASS P_grid when Smart Meter control is ON and to P_batt when it is OFF."
+    );
+  }
+  if (panel.__epV016SettingsTab === "emhass") {
+    updateSettingField(
+      root,
+      "P_batt output entity",
+      "P_batt output entity",
+      "Published battery plan. Used as the direct actuator target when GoodWe Smart Meter control is OFF; retained as a required plan/diagnostic output when it is ON."
+    );
+    updateSettingField(
+      root,
+      "P_grid output entity",
+      "P_grid output entity",
+      "Published site-grid target. With GoodWe Smart Meter control ON: positive import drives mode 9, negative export drives mode 10, and a target near zero uses mode 1 Auto/self-use."
+    );
+  }
+}
+
 function relabelControllerTarget(panel, root) {
   const command = String(panel._stateByKey?.("control_command")?.state || "");
   const card = root.querySelector(".panel-card.controller");
@@ -245,6 +288,7 @@ PanelClass.prototype._render = function energyPilotV022Render() {
   ensureV022Styles(root);
   enforceFlowDirections(this, root);
   installSmartMeterSetting(this, root);
+  relabelSettingsFields(this, root);
   relabelControllerTarget(this, root);
 
   const versionBadge = root.querySelector(".version");
