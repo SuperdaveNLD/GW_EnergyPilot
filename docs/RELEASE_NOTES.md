@@ -14,6 +14,7 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.21** | 2026-08-23 | **Beta** | Adds a manual 12-mode EMS test pad to the Controller card. Automatic Control locks the pad while still highlighting the live GoodWe mode. With Automatic Control off, testers can select modes 1–12 and set a `0..max_power` manual setpoint using the existing Home Assistant manual-mode/manual-power entities. This is a UI/testing surface only; the Modbus write path, ownership rules and automatic controller are unchanged. |
 | **0.20** | 2026-08-23 | **Beta** | Corrects v0.19 SOC diagnostics after second-tester field data: configured EnergyPilot final SOC is separated from the last value actually sent by EnergyPilot, and invalid raw EMHASS SOC config values are identified as raw diagnostics instead of being rendered as impossible percentages. No optimizer or GoodWe control behavior changes. |
 | **0.19** | 2026-08-23 | **Beta** | Makes the separate SOC layers explicit: current SOC, runtime `soc_init`/`soc_final`, EMHASS minimum/target/deficit threshold and cost, and GoodWe on-grid minimum SOC are shown together. The existing EMHASS `/get-config` refresh is reused; optimization and GoodWe control behavior do not change. |
 | **0.18** | 2026-08-23 | **Beta** | Adds manual, read-back-verified G20 field-test controls for the on-grid minimum SOC floor at `45356` and off-grid minimum SOC floor at `45358` inside GOODWE settings. No automatic control path uses these registers; `47500` remains read-only. |
@@ -34,6 +35,48 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
+
+## v0.21 — Manual 12-mode EMS test pad
+
+v0.21 makes the recently documented GoodWe EMS modes practical to test from the EnergyPilot Controller card without adding a second write path.
+
+The Controller card now contains twelve compact square mode buttons with short hover descriptions. The button that matches the **live `47511` read-back** is highlighted even while Automatic Control is active.
+
+When **Automatic Control is ON**:
+
+- all manual mode buttons are visually greyed/locked;
+- the manual power slider is disabled;
+- the live active GoodWe mode remains highlighted so automatic behavior can still be observed.
+
+When **Automatic Control is OFF**:
+
+- all twelve manual modes become selectable;
+- the slider controls the existing `manual_power` Home Assistant number entity;
+- the slider range is `0 W` through the configured EnergyPilot `max_power` setting;
+- clicking a mode uses the existing `manual_mode` select entity and therefore the existing controller/manual-ownership path;
+- modes `1`, `6`, `7` and `8` continue to force `47512 = 0 W` exactly as before;
+- mode `7` asks for an extra confirmation because forced off-grid operation can materially change inverter topology.
+
+The primary field test requested for this release is:
+
+```text
+Automatic Control OFF
+manual setpoint 0 W
+mode 10 — Grid export target
+```
+
+This tests GoodWe's smart-meter/PCC export-target behavior at a `0 W` export target. Mode 1 can be compared alongside it, but v0.21 does **not** change automatic PV-only or grid-neutral logic based on one installation's observation.
+
+No new Modbus command exists in v0.21. The UI still follows:
+
+```text
+manual slider -> existing number.manual_power
+mode button   -> existing select.manual_mode
+              -> controller.async_manual_command()
+              -> existing GWModbusClient.async_set_mode()
+```
+
+The established EMS write order remains unchanged: power register `47512`, brief wait, then mode register `47511`.
 
 ## v0.20 — SOC diagnostics validity
 

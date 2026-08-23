@@ -75,6 +75,32 @@ EnergyPilot forces `47512 = 0 W` for modes:
 
 Other manual modes use the configured Manual power value as `47512`.
 
+## v0.21 Controller test pad
+
+v0.21 exposes the same existing Home Assistant controls directly in the Controller card as a field-test UI:
+
+```text
+12 square mode buttons -> existing select.manual_mode
+power slider           -> existing number.manual_power
+```
+
+There is no separate Modbus API or alternate controller path.
+
+When **Automatic Control is ON**, the manual controls are greyed/locked but the button matching the live `47511` mode remains highlighted. This lets testers observe which GoodWe mode EnergyPilot is actually using without allowing an accidental manual override.
+
+When **Automatic Control is OFF**, the mode buttons and slider become active. The slider range is derived from the existing Manual power entity, whose maximum is the configured EnergyPilot `max_power` value.
+
+The first requested field comparison is:
+
+```text
+mode 10 + 0 W -> zero-export target at the GoodWe smart meter/PCC
+mode 1 + 0 W  -> normal GoodWe Auto / self-use behavior
+```
+
+This comparison is intentionally manual. A field observation that mode 1 also behaves usefully during PV-surplus charging is not sufficient by itself to change EnergyPilot's automatic controller mapping.
+
+Mode 7 requires an extra confirmation in the dashboard because it can force off-grid operation.
+
 ## Safety
 
 Modes can materially change battery, grid and off-grid behavior. In particular:
