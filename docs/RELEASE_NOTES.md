@@ -14,6 +14,7 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.19** | 2026-08-23 | **Beta** | Makes the separate SOC layers explicit: current SOC, runtime `soc_init`/`soc_final`, EMHASS minimum/target/deficit threshold and cost, and GoodWe on-grid minimum SOC are shown together. The existing EMHASS `/get-config` refresh is reused; optimization and GoodWe control behavior do not change. |
 | **0.18** | 2026-08-23 | **Beta** | Adds manual, read-back-verified G20 field-test controls for the on-grid minimum SOC floor at `45356` and off-grid minimum SOC floor at `45358` inside GOODWE settings. No automatic control path uses these registers; `47500` remains read-only. |
 | **0.17** | 2026-08-23 | **Beta** | Adds the administrator settings gear with EP, EMHASS and GOODWE pages, validates GoodWe connection changes before saving, migrates device identity from mutable `host:slave` to stable config-entry ID, exposes the three SOC Beta candidates as enabled Home Assistant Diagnostic sensors, and makes the active EMHASS optimization strategy stateful/readable from `/get-config`. |
 | **0.16** | 2026-08-23 | **Beta** | Ships read-only G20 SOC-protection candidates `45356/45358/47500` and extended 15 kW+ meter candidates `36104/36120` to the active tester group. Adds UINT64 decoding, beta diagnostics UI and tests. No candidate value is used for control or canonical grid accounting. |
@@ -32,6 +33,31 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
+
+## v0.19 — SOC constraint clarity
+
+v0.19 makes the different SOC concepts visible next to each other so an apparent SOC stop can be traced to the correct layer instead of guessing from a single percentage.
+
+The Diagnostics snapshot now shows:
+
+```text
+Current battery SOC
+Last optimization SOC init
+Runtime final SOC target (soc_final)
+EMHASS minimum SOC
+EMHASS config target SOC (fallback)
+EMHASS deficit threshold
+EMHASS deficit cost
+GoodWe on-grid minimum SOC 45356
+```
+
+The **Runtime final SOC target** is the EnergyPilot config-entry value sent as `soc_final` with every native optimization. EMHASS documents runtime battery parameters as overriding configured values for that run, so this value is intentionally shown separately from `battery_target_state_of_charge` in EMHASS `config.json`.
+
+`battery_target_state_of_charge` remains visible as the EMHASS fallback used when a runtime final SOC is not supplied. The deficit threshold is also shown separately because it is not a hard floor: EMHASS applies `battery_soc_deficit_cost` as a virtual `currency/kWh/h` cost while the battery is below that threshold.
+
+The existing stateful EMHASS strategy refresh already reads the complete `/get-config` payload. v0.19 reuses that same response for these SOC diagnostics, so no extra periodic EMHASS request is added.
+
+The EMHASS settings label **Target final SOC** is clarified as **Runtime final SOC target**. This is a UI/diagnostics clarification only; the optimizer payload, GoodWe EMS mapping and v0.18 manual G20 SOC-floor field-test path are unchanged.
 
 ## v0.18 — Beta G20 minimum-SOC write validation
 
