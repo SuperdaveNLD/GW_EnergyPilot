@@ -83,15 +83,25 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         return self._value
 
     async def async_added_to_hass(self) -> None:
-        """Read the current EMHASS value when the entity is added."""
+        """Schedule the initial EMHASS read without blocking platform setup."""
         await super().async_added_to_hass()
+        self.hass.async_create_task(
+            self._async_background_refresh(),
+            f"GW EnergyPilot read {self.config_key}",
+        )
+
+    async def _async_background_refresh(self) -> None:
+        """Refresh the slider when EMHASS is available."""
         try:
             await self._async_refresh_from_emhass()
-        except HomeAssistantError:
-            # EMHASS may still be starting. The entity remains available with an
-            # unknown value and will be updated when the user changes it or the
-            # integration is reloaded.
-            return
+        except HomeAssistantError as err:
+            # EMHASS may still be starting. The entity is added immediately and
+            # stays unknown until the next integration reload or user change.
+            _LOGGER.debug(
+                "Unable to read EMHASS %s during startup: %s",
+                self.config_key,
+                err,
+            )
 
     async def _async_refresh_from_emhass(self) -> dict:
         config = await async_get_emhass_config(self.hass, self.entry)
@@ -112,9 +122,8 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
                 reason=f"{self.config_key}_changed"
             )
         except HomeAssistantError as err:
-            # The config change itself has already been saved. Keep that success
-            # independent from a temporary optimizer/output failure; the normal
-            # orchestrator status/diagnostics exposes the latter to the user.
+            # The configuration itself is already saved. Report the separate
+            # optimization failure through normal orchestrator diagnostics.
             _LOGGER.warning(
                 "EMHASS optimization after %s change failed: %s",
                 self.config_key,
@@ -132,7 +141,7 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         self.async_write_ha_state()
         self.hass.async_create_task(
             self._async_optimize_after_change(),
-            f"gw-energypilot-{self.config_key}-optimize",
+            f"GW EnergyPilot optimize after {self.config_key} change",
         )
 
     def _validate_against_peer(self, config: dict, value: float) -> None:
@@ -152,12 +161,15 @@ class GWEMHASSMinimumSOCNumber(_GWEMHASSSOCNumber):
 
     def _validate_against_peer(self, config: dict, value: float) -> None:
         try:
-            maximum = float(config.get("battery_maximum_state_of_charge", 1.0)) * 100.0
+            maximum = (
+                float(config.get("battery_maximum_state_of_charge", 1.0)) * 100.0
+            )
         except (TypeError, ValueError):
             maximum = 100.0
         if value > maximum:
             raise HomeAssistantError(
-                f"Minimum battery SOC ({value:.0f}%) cannot exceed maximum SOC ({maximum:.0f}%)"
+                f"Minimum battery SOC ({value:.0f}%) cannot exceed "
+                f"maximum SOC ({maximum:.0f}%)"
             )
 
 
@@ -173,10 +185,13 @@ class GWEMHASSMaximumSOCNumber(_GWEMHASSSOCNumber):
 
     def _validate_against_peer(self, config: dict, value: float) -> None:
         try:
-            minimum = float(config.get("battery_minimum_state_of_charge", 0.0)) * 100.0
+            minimum = (
+                float(config.get("battery_minimum_state_of_charge", 0.0)) * 100.0
+            )
         except (TypeError, ValueError):
             minimum = 0.0
         if value < minimum:
             raise HomeAssistantError(
-                f"Maximum battery SOC ({value:.0f}%) cannot be below minimum SOC ({minimum:.0f}%)"
+                f"Maximum battery SOC ({value:.0f}%) cannot be below "
+                f"minimum SOC ({minimum:.0f}%)"
             )
