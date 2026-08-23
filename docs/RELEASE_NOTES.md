@@ -14,6 +14,7 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.20** | 2026-08-23 | **Beta** | Corrects v0.19 SOC diagnostics after second-tester field data: configured EnergyPilot final SOC is separated from the last value actually sent by EnergyPilot, and invalid raw EMHASS SOC config values are identified as raw diagnostics instead of being rendered as impossible percentages. No optimizer or GoodWe control behavior changes. |
 | **0.19** | 2026-08-23 | **Beta** | Makes the separate SOC layers explicit: current SOC, runtime `soc_init`/`soc_final`, EMHASS minimum/target/deficit threshold and cost, and GoodWe on-grid minimum SOC are shown together. The existing EMHASS `/get-config` refresh is reused; optimization and GoodWe control behavior do not change. |
 | **0.18** | 2026-08-23 | **Beta** | Adds manual, read-back-verified G20 field-test controls for the on-grid minimum SOC floor at `45356` and off-grid minimum SOC floor at `45358` inside GOODWE settings. No automatic control path uses these registers; `47500` remains read-only. |
 | **0.17** | 2026-08-23 | **Beta** | Adds the administrator settings gear with EP, EMHASS and GOODWE pages, validates GoodWe connection changes before saving, migrates device identity from mutable `host:slave` to stable config-entry ID, exposes the three SOC Beta candidates as enabled Home Assistant Diagnostic sensors, and makes the active EMHASS optimization strategy stateful/readable from `/get-config`. |
@@ -33,6 +34,35 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
+
+## v0.20 — SOC diagnostics validity
+
+v0.20 is a narrow diagnostics correction based on a second tester's v0.19 snapshot. That installation showed `orchestrator=manual_only`, `Last success=Never`, an EnergyPilot final-SOC setting of 10%, and raw EMHASS values that rendered as `-90%` and `-690%` in v0.19.
+
+The field data exposed two separate presentation problems:
+
+1. v0.19 displayed the **configured** EnergyPilot final-SOC setting as if it were the runtime `soc_final` used by the last EnergyPilot optimization. On a manual-only installation EnergyPilot may never have sent that value at all.
+2. v0.19 multiplied any finite `/get-config` SOC value by 100. EMHASS documents SOC fractions in the `0..1` range, so finite values outside that range are invalid configuration data rather than valid percentages.
+
+v0.20 therefore shows both concepts separately:
+
+```text
+Configured EnergyPilot final SOC target
+Last sent runtime final SOC (soc_final)
+```
+
+The last-sent value remains blank until an **EnergyPilot-owned** optimization completes successfully. External/manual EMHASS publishing does not populate it.
+
+For EMHASS configuration values, valid `0..1` SOC fractions continue to render as percentages. Invalid finite values are retained for support and shown explicitly, for example:
+
+```text
+EMHASS config target SOC (fallback)   invalid raw -0.9
+EMHASS deficit threshold              invalid raw -6.9
+```
+
+EnergyPilot does not repair, clamp or write those values automatically. Their origin must be diagnosed in the tester's EMHASS configuration/version/migration path.
+
+This release changes diagnostics only. It does not change EMHASS constraints, GoodWe EMS commands, grid-neutral charging, `P_batt` mapping, or the v0.18 `45356/45358` manual field-test path.
 
 ## v0.19 — SOC constraint clarity
 

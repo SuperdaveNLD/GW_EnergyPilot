@@ -51,9 +51,11 @@ def _finite_number(config: dict[str, Any], key: str) -> float | None:
 
 
 def _soc_percentage(config: dict[str, Any], key: str) -> float | None:
-    """Decode one EMHASS 0..1 SOC config value to a percentage."""
+    """Decode one valid EMHASS 0..1 SOC config value to a percentage."""
     value = _finite_number(config, key)
-    return round(value * 100.0, 2) if value is not None else None
+    if value is None or not 0.0 <= value <= 1.0:
+        return None
+    return round(value * 100.0, 2)
 
 
 def emhass_soc_diagnostics_from_config(
@@ -61,9 +63,18 @@ def emhass_soc_diagnostics_from_config(
 ) -> dict[str, float | None]:
     """Return SOC-related EMHASS config values with explicit semantics.
 
+    Percentage fields are exposed only when the raw EMHASS value is inside the
+    documented 0..1 SOC range. Selected raw values are retained separately so
+    support diagnostics can identify invalid or stale EMHASS configuration
+    instead of presenting it as a plausible percentage.
+
     These values come from EMHASS config.json. They are deliberately kept
     separate from EnergyPilot's runtime `soc_final` payload setting.
     """
+    target_raw = _finite_number(config, "battery_target_state_of_charge")
+    deficit_threshold_raw = _finite_number(
+        config, "battery_soc_deficit_threshold"
+    )
     return {
         "emhass_minimum_soc_pct": _soc_percentage(
             config, "battery_minimum_state_of_charge"
@@ -74,9 +85,11 @@ def emhass_soc_diagnostics_from_config(
         "emhass_config_target_soc_pct": _soc_percentage(
             config, "battery_target_state_of_charge"
         ),
+        "emhass_config_target_soc_raw": target_raw,
         "emhass_soc_deficit_threshold_pct": _soc_percentage(
             config, "battery_soc_deficit_threshold"
         ),
+        "emhass_soc_deficit_threshold_raw": deficit_threshold_raw,
         "emhass_soc_deficit_cost": _finite_number(
             config, "battery_soc_deficit_cost"
         ),
