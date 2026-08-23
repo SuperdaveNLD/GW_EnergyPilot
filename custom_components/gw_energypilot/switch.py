@@ -1,5 +1,8 @@
 """Switch platform for GW EnergyPilot."""
 
+from __future__ import annotations
+
+import logging
 from typing import Any, override
 
 from homeassistant.components.switch import SwitchEntity
@@ -11,6 +14,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GWConfigEntry
 from .entity import GWEnergyPilotEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -37,7 +42,7 @@ class GWAutomaticControlSwitch(
 
     @override
     async def async_added_to_hass(self) -> None:
-        """Restore state and subscribe to controller ownership changes."""
+        """Restore ownership without holding platform setup on Modbus I/O."""
         await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(
@@ -48,14 +53,30 @@ class GWAutomaticControlSwitch(
         )
 
         previous = await self.async_get_last_state()
-        if previous is not None and previous.state == STATE_ON:
-            await self.entry.runtime_data.controller.async_enable()
-        else:
-            # First install and a previously disabled switch both start safely
-            # in GoodWe Auto / AI.
-            await self.entry.runtime_data.controller.async_disable()
+        restore_on = previous is not None and previous.state == STATE_ON
 
+        # Publish the switch immediately. The inverter command is restored in a
+        # background task so Home Assistant and the other EnergyPilot entities
+        # do not wait for an occupied or temporarily unavailable Modbus socket.
+        self.entry.runtime_data.controller.enabled = restore_on
         self.async_write_ha_state()
+        self.hass.async_create_task(
+            self._async_apply_restored_state(restore_on),
+            f"GW EnergyPilot restore automatic control ({self.entry.entry_id})",
+        )
+
+    async def _async_apply_restored_state(self, restore_on: bool) -> None:
+        """Apply the restored state after entity setup has completed."""
+        try:
+            if restore_on:
+                await self.entry.runtime_data.controller.async_enable()
+            else:
+                await self.entry.runtime_data.controller.async_disable()
+        except Exception:  # pragma: no cover - defensive background boundary
+            _LOGGER.exception(
+                "Unable to restore GW EnergyPilot automatic control to %s",
+                "ON" if restore_on else "OFF",
+            )
 
     @callback
     def _async_controller_updated(self) -> None:
