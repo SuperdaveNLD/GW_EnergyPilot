@@ -40,6 +40,11 @@ DEFAULT_P_GRID_ENTITY = "sensor.p_grid_forecast"
 DEFAULT_OPTIM_STATUS_ENTITY = "sensor.optim_status"
 DEFAULT_OPTIM_REQUIRED_STATE = "Optimal"
 
+# Kept only for backwards-compatible diagnostics in v0.22. The old 30-second
+# mode-11 grid-neutral feedback loop is no longer scheduled or used by the
+# automatic controller; modes 9/10 now close the PCC loop inside GoodWe.
+GRID_NEUTRAL_CONTROL_INTERVAL_SECONDS = 30
+
 # Existing installations upgrade with the native schedule OFF to avoid running
 # alongside a legacy YAML scheduler. Fresh installations suggest ON in the
 # config flow.
