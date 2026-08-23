@@ -150,14 +150,44 @@ Rules:
 
 EnergyPilot's normal grid-connected operating recommendation is approximately 5–95%, but inverter/SEMS/BMS protection limits remain independent and may be more restrictive.
 
+## EMHASS optimization strategy select
+
+v0.17 exposes one stateful Config-category select with stable unique-ID suffix:
+
+```text
+emhass_cost_function
+```
+
+User-facing options are:
+
+```text
+Profit
+Cost
+Self-consumption
+```
+
+The underlying raw values are `profit`, `cost` and `self-consumption` from EMHASS `costfun`.
+
+Contract:
+
+- read the current value from EMHASS `/get-config` rather than inferring it from the last button press;
+- refresh after EnergyPilot writes EMHASS configuration;
+- periodically refresh so direct EMHASS UI changes can be reflected;
+- validate supported values before writing;
+- update only `costfun` through the existing full-config patch path;
+- run a fresh optimization after saving;
+- if saving succeeds but optimization fails, keep/report the saved strategy rather than pretending the config write failed.
+
+This is optimizer state only. It does not change the GoodWe mode 8/11/12 actuator mapping.
+
 ## Buttons
 
 Current major actions include:
 
 - Optimize now;
-- EMHASS Profit;
-- EMHASS Cost;
-- EMHASS Self-consumption;
+- legacy/backward-compatible EMHASS Profit configuration action;
+- legacy/backward-compatible EMHASS Cost configuration action;
+- legacy/backward-compatible EMHASS Self-consumption configuration action;
 - Max export;
 - Battery pause/hold;
 - Max charge;
@@ -167,24 +197,9 @@ Current major actions include:
 
 Runs one complete EMHASS optimization/publish cycle and exposes runtime diagnostics as attributes.
 
-### EMHASS cost-function buttons
+### Backward-compatible EMHASS cost-function buttons
 
-The three strategy buttons correspond directly to the supported EMHASS `costfun` values:
-
-```text
-profit
-cost
-self-consumption
-```
-
-Each button:
-
-1. reads the complete active EMHASS configuration through `/get-config`;
-2. changes only the top-level `costfun` value;
-3. writes the complete configuration through `/set-config`;
-4. immediately runs and publishes a fresh optimization.
-
-Stable unique-ID suffixes are:
+The v0.15 strategy button unique IDs remain stable:
 
 ```text
 emhass_costfun_profit
@@ -192,7 +207,9 @@ emhass_costfun_cost
 emhass_costfun_self_consumption
 ```
 
-These controls change the EMHASS optimization objective. In v0.15+ they do **not** change the GoodWe actuator strategy: Automatic Control still executes the resulting `P_batt` target using the existing mode 8/11/12 mapping. Any future `P_grid`/grid-target controller must be introduced as a separate, validated control-ownership change.
+They are retained so existing automations do not break. Their names now describe an explicit **Set EMHASS...** configuration action and they use the same canonical safe `costfun` write helper as the stateful select.
+
+New dashboard/state logic should use `select.emhass_cost_function` (actual generated entity ID may differ), because a ButtonEntity cannot represent which strategy is currently active.
 
 ### Resume AUTO
 
@@ -220,10 +237,10 @@ Entity IDs assigned by Home Assistant may differ between installations because u
 
 Before adding one, check:
 
-1. Does an existing entity already represent the same electrical value?
+1. Does an existing entity already represent the same electrical/configuration value?
 2. Is the underlying register semantics validated or explicitly marked Beta?
 3. Should it be enabled by default or diagnostic/disabled by default?
-4. What device class, state class, and unit are correct?
+4. What device class, state class, entity category and unit are correct?
 5. Is long-term statistics support appropriate?
 6. Is its unique ID stable and deterministic?
 7. Does it need a translation key?
