@@ -2,6 +2,25 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Optional diagnostics for the extended GoodWe 15 kW+ smart-meter counters at `36104` (export) and `36120` (import), decoded as 64-bit counters for GW15K-ETA-G20 validation.
+- Extended meter candidates are included in the Optimize/diagnostics snapshot so their values can be compared with the current `36015/36017` counters and SEMS before changing the dashboard source.
+
+### Changed
+
+- Optional Modbus reads reconnect independently after an unsupported optional range, so one rejected diagnostic block does not suppress later optional diagnostics.
+- GoodWe Modbus documentation now states explicitly that the current tested-model list contains **GoodWe GW15K-ETA-G20**, that EnergyPilot is specifically developed for the ETA-G20 generation, and asks users of other models to report model/firmware compatibility.
+- Documented the likely inverter/SEMS SOC-protection layer behind discharge stopping around 10%, while keeping unvalidated GoodWe settings read-only/out of EnergyPilot control.
+
+### Validation required before release
+
+- Compare `36104/36120` against SEMS lifetime grid export/import on the physical GW15K-ETA-G20.
+- If confirmed, promote the extended counters to the canonical grid-energy source while preserving existing entity unique IDs and Recorder history where possible.
+- Do not change the Home/load source: `35172` remains the tested G20 load value; `PV - grid + battery` remains a system-balance diagnostic.
+
 ## [0.13] - 2026-08-23
 
 ### Added
