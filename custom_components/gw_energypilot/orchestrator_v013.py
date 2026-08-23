@@ -11,9 +11,11 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CONF_EMHASS_FALLBACK_LOAD,
     CONF_EMHASS_OPTIMIZATION_INTERVAL,
+    CONF_EMHASS_SOC_FINAL,
     CONF_SCAN_INTERVAL,
     DEFAULT_EMHASS_FALLBACK_LOAD,
     DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
+    DEFAULT_EMHASS_SOC_FINAL,
     DEFAULT_SCAN_INTERVAL,
 )
 from .orchestrator_v012 import GWEnergyPilotOrchestrator as _V012Orchestrator
@@ -37,6 +39,16 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
             {
                 "system_balance_power": balance,
                 "load_forecast_source": "GoodWe load register 35172 + Recorder history",
+                # The base orchestrator sends this same config-entry value as
+                # runtime `soc_final` in every day-ahead optimization payload.
+                # Expose it explicitly so operators can distinguish it from
+                # EMHASS config.json battery_target_state_of_charge.
+                "runtime_soc_final": float(
+                    self.entry.options.get(
+                        CONF_EMHASS_SOC_FINAL,
+                        DEFAULT_EMHASS_SOC_FINAL,
+                    )
+                ),
                 "telemetry_refresh_seconds": int(
                     self.entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
                 ),

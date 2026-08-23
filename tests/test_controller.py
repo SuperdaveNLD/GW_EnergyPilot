@@ -81,9 +81,14 @@ def _load_controller():
         hass.tracked_state_changes.append((tuple(entity_ids), callback_func))
         return lambda: None
 
+    def async_track_time_interval(hass, callback_func, interval, **kwargs):
+        hass.tracked_intervals.append((callback_func, interval, kwargs))
+        return lambda: None
+
     event = _module(
         "homeassistant.helpers.event",
         async_track_state_change_event=async_track_state_change_event,
+        async_track_time_interval=async_track_time_interval,
     )
     helpers.event = event
 
@@ -131,6 +136,7 @@ class FakeHass:
         self.states = FakeStates(states)
         self.dispatched = []
         self.tracked_state_changes = []
+        self.tracked_intervals = []
         self.tasks = []
 
     def async_create_task(self, coroutine, name=None):
@@ -153,9 +159,21 @@ class FakeClient:
         self.calls.append((mode, power))
 
 
+class FakeCoordinatorData:
+    def __init__(self, *, meter_power=0, mode=None, power=None):
+        self.values = {"meter_total_power_fast": meter_power}
+        self.mode = mode
+        self.power = power
+
+
 class FakeCoordinator:
-    def __init__(self):
+    def __init__(self, *, meter_power=0, mode=None, power=None):
         self.refresh_count = 0
+        self.data = FakeCoordinatorData(
+            meter_power=meter_power,
+            mode=mode,
+            power=power,
+        )
 
     async def async_request_refresh(self):
         self.refresh_count += 1
@@ -164,16 +182,35 @@ class FakeCoordinator:
 class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
     """Protect the controller's EMS ownership and power mapping contract."""
 
-    def make_controller(self, *, p_batt="1000", options=None, states=None):
+    def make_controller(
+        self,
+        *,
+        p_batt="1000",
+        p_grid="1000",
+        meter_power=0,
+        coordinator_mode=None,
+        coordinator_power=None,
+        options=None,
+        states=None,
+    ):
         merged_options = {
             const.CONF_P_BATT_ENTITY: "sensor.p_batt",
+            const.CONF_P_GRID_ENTITY: "sensor.p_grid",
             **(options or {}),
         }
-        merged_states = {"sensor.p_batt": p_batt, **(states or {})}
+        merged_states = {
+            "sensor.p_batt": p_batt,
+            "sensor.p_grid": p_grid,
+            **(states or {}),
+        }
         hass = FakeHass(merged_states)
         entry = FakeEntry(merged_options)
         client = FakeClient()
-        coordinator = FakeCoordinator()
+        coordinator = FakeCoordinator(
+            meter_power=meter_power,
+            mode=coordinator_mode,
+            power=coordinator_power,
+        )
         controller = controller_module.GWEnergyPilotController(
             hass,
             entry,
@@ -181,6 +218,20 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
             coordinator,
         )
         return controller, hass, client, coordinator
+
+    async def test_setup_tracks_p_grid_and_30_second_feedback(self):
+        controller, hass, _, _ = self.make_controller()
+
+        await controller.async_setup()
+
+        tracked_entities = set(hass.tracked_state_changes[0][0])
+        self.assertIn("sensor.p_batt", tracked_entities)
+        self.assertIn("sensor.p_grid", tracked_entities)
+        self.assertEqual(len(hass.tracked_intervals), 1)
+        self.assertEqual(
+            hass.tracked_intervals[0][1].total_seconds(),
+            const.GRID_NEUTRAL_CONTROL_INTERVAL_SECONDS,
+        )
 
     async def test_enable_maps_positive_p_batt_to_discharge(self):
         controller, _, client, coordinator = self.make_controller(p_batt="1200")
@@ -196,8 +247,11 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.last_command, "battery_discharge")
         self.assertEqual(coordinator.refresh_count, 1)
 
-    async def test_negative_p_batt_maps_to_charge(self):
-        controller, _, client, coordinator = self.make_controller(p_batt="-900")
+    async def test_negative_p_batt_with_planned_import_maps_to_direct_charge(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="-900",
+            p_grid="1200",
+        )
         controller.enabled = True
 
         await controller.async_evaluate()
@@ -205,6 +259,7 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 900)])
         self.assertEqual(controller.last_command, "battery_charge")
         self.assertEqual(coordinator.refresh_count, 1)
+        self.assertFalse(controller.grid_neutral_active)
 
     async def test_deadband_boundaries_hold_battery(self):
         for p_batt in ("-300", "0", "300"):
@@ -235,7 +290,16 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.target_power, 5000)
 
     async def test_invalid_p_batt_never_writes_modbus(self):
-        for value in ("unknown", "unavailable", "none", "", "not-a-number", "nan", "inf", "-inf"):
+        for value in (
+            "unknown",
+            "unavailable",
+            "none",
+            "",
+            "not-a-number",
+            "nan",
+            "inf",
+            "-inf",
+        ):
             with self.subTest(value=value):
                 controller, _, client, coordinator = self.make_controller(p_batt=value)
                 controller.enabled = True
@@ -338,6 +402,125 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
             "waiting_for_ev_stop_optimization",
         )
         self.assertEqual(hass.tasks, [])
+
+    async def test_zero_grid_charge_trims_existing_mode11_from_actual_import(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="-4420",
+            p_grid="0",
+            meter_power=-3070,
+            coordinator_mode=const.MODE_CHARGE_BATTERY,
+            coordinator_power=4420,
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 1350)])
+        self.assertEqual(controller.target_power, 1350)
+        self.assertEqual(controller.last_command, "grid_neutral_charge")
+        self.assertTrue(controller.grid_neutral_active)
+        self.assertEqual(controller.grid_neutral_charge_cap, 4420)
+        self.assertEqual(controller.grid_neutral_last_meter_power, -3070)
+        self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_zero_grid_charge_ramp_up_is_limited_per_feedback_tick(self):
+        controller, _, client, _ = self.make_controller(
+            p_batt="-4420",
+            p_grid="0",
+            meter_power=3000,
+            coordinator_mode=const.MODE_CHARGE_BATTERY,
+            coordinator_power=1350,
+        )
+        controller.enabled = True
+        controller.grid_neutral_active = True
+
+        await controller._async_grid_neutral_feedback(None)
+
+        self.assertEqual(
+            client.calls,
+            [
+                (
+                    const.MODE_CHARGE_BATTERY,
+                    1350 + const.GRID_NEUTRAL_RAMP_UP_STEP,
+                )
+            ],
+        )
+
+    async def test_zero_grid_charge_import_can_stop_charge_immediately(self):
+        controller, _, client, _ = self.make_controller(
+            p_batt="-4420",
+            p_grid="0",
+            meter_power=-700,
+            coordinator_mode=const.MODE_CHARGE_BATTERY,
+            coordinator_power=550,
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
+        self.assertEqual(controller.last_command, "grid_neutral_hold")
+        self.assertGreaterEqual(
+            controller.grid_neutral_hold_remaining,
+            const.GRID_NEUTRAL_HOLD_SECONDS - 1,
+        )
+
+    async def test_zero_grid_hold_cannot_restart_from_normal_state_event(self):
+        controller, _, client, _ = self.make_controller(
+            p_batt="-4420",
+            p_grid="0",
+            meter_power=2000,
+            coordinator_mode=const.MODE_BATTERY_HOLD,
+            coordinator_power=0,
+        )
+        controller.enabled = True
+        controller.grid_neutral_active = True
+        controller._grid_neutral_hold_until = controller_module.monotonic() - 1
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(controller.expected_mode, const.MODE_BATTERY_HOLD)
+        self.assertEqual(controller.last_command, "grid_neutral_hold")
+        self.assertEqual(controller.grid_neutral_export_samples, 0)
+
+    async def test_zero_grid_hold_needs_two_feedback_samples_to_restart(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="-4420",
+            p_grid="0",
+            meter_power=1200,
+            coordinator_mode=const.MODE_BATTERY_HOLD,
+            coordinator_power=0,
+        )
+        controller.enabled = True
+        controller.grid_neutral_active = True
+        controller._grid_neutral_hold_until = controller_module.monotonic() - 1
+
+        await controller._async_grid_neutral_feedback(None)
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(controller.grid_neutral_export_samples, 1)
+        self.assertEqual(controller.last_command, "grid_neutral_waiting_for_surplus")
+
+        await controller._async_grid_neutral_feedback(None)
+
+        self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 900)])
+        self.assertEqual(controller.grid_neutral_export_samples, 0)
+        self.assertEqual(controller.last_command, "grid_neutral_charge")
+        self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_missing_p_grid_fails_safe_to_hold_during_charge_request(self):
+        controller, _, client, _ = self.make_controller(
+            p_batt="-3000",
+            p_grid="unavailable",
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
+        self.assertEqual(controller.last_command, "waiting_for_p_grid")
+        self.assertFalse(controller.grid_neutral_active)
 
 
 if __name__ == "__main__":
