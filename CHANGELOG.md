@@ -2,6 +2,26 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.19] - 2026-08-23
+
+### Added
+
+- A dedicated **SOC / CONSTRAINT LAYERS** diagnostics group that shows current battery SOC, last optimization `soc_init`, EnergyPilot runtime `soc_final`, EMHASS minimum SOC, EMHASS `battery_target_state_of_charge`, EMHASS SOC-deficit threshold and GoodWe on-grid minimum SOC register `45356` side by side.
+- SOC-related EMHASS config diagnostics are decoded from the same `/get-config` response already used by the stateful cost-function selector; no additional periodic HTTP request is introduced.
+- Unit tests for explicit percentage decoding and invalid/missing EMHASS SOC diagnostic values.
+
+### Changed
+
+- The EMHASS settings label **Target final SOC** is clarified in the dashboard as **Runtime final SOC target**.
+- The setting description now states explicitly that EnergyPilot sends this value as runtime `soc_final` and does not rewrite EMHASS `battery_target_state_of_charge` in `config.json`.
+- The active frontend is `gw-energy-pilot-v019.js`, layered on top of the complete v0.18 G20 field-test controls.
+
+### Safety boundary
+
+- No EMHASS optimization objective, constraint or payload semantics are changed; v0.19 only exposes values that already exist in EnergyPilot or EMHASS.
+- No additional GoodWe registers are read or written.
+- The v0.18 manual Beta write path for `45356/45358`, Automatic Control ownership, EMS modes/registers and `P_batt` mapping are unchanged.
+
 ## [0.18] - 2026-08-23
 
 ### Added
@@ -210,15 +230,11 @@ All notable changes to GW EnergyPilot are documented here.
 
 - Compact live PV / Home / Grid / Battery flow widget.
 
-### Fixed
-
-- Dashboard branding and Home Assistant temperature-unit handling.
-
 ## [0.06] - 2026-08-22
 
 ### Fixed
 
-- Dashboard logo handling and frontend cache busting.
+- Dashboard branding and Home Assistant temperature-unit handling.
 
 ## [0.05] - 2026-08-22
 
