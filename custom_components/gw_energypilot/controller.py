@@ -23,15 +23,19 @@ from .const import (
     CONF_OPTIM_STATUS_ENTITY,
     CONF_P_BATT_ENTITY,
     CONF_P_GRID_ENTITY,
+    CONF_USE_GOODWE_SMART_METER,
     DEFAULT_DEADBAND,
     DEFAULT_EV_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_REQUIRED_STATE,
     DEFAULT_P_BATT_ENTITY,
     DEFAULT_P_GRID_ENTITY,
+    DEFAULT_USE_GOODWE_SMART_METER,
     DOMAIN,
     MODE_AUTO,
     MODE_BATTERY_HOLD,
+    MODE_CHARGE_BATTERY,
+    MODE_DISCHARGE_BATTERY,
     MODE_GRID_EXPORT_TARGET,
     MODE_GRID_IMPORT_TARGET,
 )
@@ -39,24 +43,23 @@ from .coordinator import GWEnergyPilotCoordinator
 
 
 class GWEnergyPilotController:
-    """Translate the EMHASS site-grid plan into GoodWe EMS commands.
+    """Translate the current EMHASS plan into GoodWe EMS commands.
 
-    Automatic execution is intentionally based on EMHASS ``P_grid`` rather
-    than a direct battery-power command. GoodWe modes 9 and 10 close the loop
-    against the inverter's own smart meter / point of common coupling (PCC),
-    so actual PV and house load are accounted for by the inverter itself.
+    Two automatic actuator strategies are intentionally supported:
 
-    EMHASS convention:
-      P_grid > 0 = planned import
-      P_grid < 0 = planned export
+    GoodWe smart meter enabled (default):
+      P_grid > 0 = mode 9 import target at the PCC
+      P_grid < 0 = mode 10 export target at the PCC
+      P_grid ~= 0 = mode 1 GoodWe Auto / self-use balancing
 
-    GoodWe automatic execution:
-      import  -> mode 9,  setpoint = planned import magnitude
-      export  -> mode 10, setpoint = planned export magnitude
-      ~0 W    -> mode 1,  GoodWe self-use / zero-grid balancing
+    GoodWe smart meter disabled:
+      P_batt < 0 = mode 11 direct battery charge target
+      P_batt > 0 = mode 12 direct battery discharge target
+      P_batt ~= 0 = mode 8 Battery Hold
 
-    ``P_batt`` remains a required plan-validity signal and diagnostic reference,
-    but it is no longer written directly as the automatic EMS setpoint.
+    The smart-meter strategy lets GoodWe close the fast control loop against its
+    own meter, so actual DC PV, AC-coupled generation and house load can change
+    without EnergyPilot continuously trimming a battery-power setpoint.
     """
 
     def __init__(
@@ -99,6 +102,17 @@ class GWEnergyPilotController:
     def grid_neutral_hold_remaining(self) -> int:
         """Return zero for the retired v0.18-v0.21 grid-neutral hold loop."""
         return 0
+
+    @property
+    def use_goodwe_smart_meter(self) -> bool:
+        """Return whether Automatic Control should use PCC target modes 9/10."""
+        data = getattr(self.entry, "data", {}) or {}
+        return bool(
+            data.get(
+                CONF_USE_GOODWE_SMART_METER,
+                DEFAULT_USE_GOODWE_SMART_METER,
+            )
+        )
 
     def _notify_state(self) -> None:
         """Notify entities that expose controller-owned state."""
@@ -158,7 +172,7 @@ class GWEnergyPilotController:
 
         When EV charging stops while the native orchestrator is enabled, keep
         Battery Hold in place until a fresh EMHASS optimization publishes a new
-        plan. This avoids briefly executing the stale pre-EV P_grid target.
+        plan. This avoids briefly executing the stale pre-EV target.
         """
         if not self.enabled:
             return
@@ -297,42 +311,44 @@ class GWEnergyPilotController:
             self.enabled = False
             await self._async_apply_command(mode, power, command)
 
-    async def _async_evaluate_locked(self) -> None:
-        """Apply one EMHASS P_grid-to-GoodWe evaluation with control lock held."""
-        if not self.enabled:
-            return
-
-        # Require both outputs from the same optimizer plan. P_grid is the
-        # actuator request; P_batt remains a plan-validity and diagnostic signal.
-        p_batt = self._state_float(self._p_batt_entity_id())
-        if p_batt is None:
-            self.last_command = "waiting_for_p_batt"
-            self._notify_state()
-            return
-
-        p_grid = self._state_float(self._p_grid_entity_id())
-        if p_grid is None:
-            self.last_command = "waiting_for_p_grid"
-            self._notify_state()
-            return
-
-        if not self._optim_is_ready():
-            self.last_command = "waiting_for_optimization"
-            self._notify_state()
-            return
-
-        if self.ev_is_active():
+    async def _async_apply_direct_battery_plan(
+        self,
+        p_batt: float,
+        deadband: float,
+        max_power: int,
+    ) -> None:
+        """Apply the legacy direct P_batt mapping using modes 11/12/8."""
+        power = min(int(abs(p_batt)), max_power)
+        if p_batt > deadband:
             await self._async_apply_command(
-                MODE_BATTERY_HOLD,
-                0,
-                "ev_hold",
+                MODE_DISCHARGE_BATTERY,
+                power,
+                "battery_discharge",
                 skip_if_readback_matches=True,
             )
             return
+        if p_batt < -deadband:
+            await self._async_apply_command(
+                MODE_CHARGE_BATTERY,
+                power,
+                "battery_charge",
+                skip_if_readback_matches=True,
+            )
+            return
+        await self._async_apply_command(
+            MODE_BATTERY_HOLD,
+            0,
+            "battery_hold",
+            skip_if_readback_matches=True,
+        )
 
-        deadband = float(self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
-        max_power = int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
-
+    async def _async_apply_smart_meter_plan(
+        self,
+        p_grid: float,
+        deadband: float,
+        max_power: int,
+    ) -> None:
+        """Apply EMHASS P_grid through GoodWe PCC target modes 9/10/1."""
         if p_grid > deadband:
             power = min(int(abs(p_grid)), max_power)
             await self._async_apply_command(
@@ -353,9 +369,10 @@ class GWEnergyPilotController:
             )
             return
 
-        # Around zero grid flow, let GoodWe's native self-use loop balance the
-        # real site. This uses the same smart meter/PCC feedback as modes 9/10
-        # and naturally accounts for DC PV, AC-coupled PV and actual house load.
+        # Around zero planned grid flow, let GoodWe's native self-use loop
+        # balance the real site. Hardware testing on the ETA-G20 showed mode 1
+        # naturally absorbing PV surplus into the battery while keeping the PCC
+        # close to zero without a second EnergyPilot feedback controller.
         await self._async_apply_command(
             MODE_AUTO,
             0,
@@ -363,7 +380,55 @@ class GWEnergyPilotController:
             skip_if_readback_matches=True,
         )
 
+    async def _async_evaluate_locked(self) -> None:
+        """Apply one EMHASS plan evaluation with control lock held."""
+        if not self.enabled:
+            return
+
+        p_batt = self._state_float(self._p_batt_entity_id())
+        if p_batt is None:
+            self.last_command = "waiting_for_p_batt"
+            self._notify_state()
+            return
+
+        if not self._optim_is_ready():
+            self.last_command = "waiting_for_optimization"
+            self._notify_state()
+            return
+
+        if self.ev_is_active():
+            await self._async_apply_command(
+                MODE_BATTERY_HOLD,
+                0,
+                "ev_hold",
+                skip_if_readback_matches=True,
+            )
+            return
+
+        deadband = float(self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
+        max_power = int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
+
+        if not self.use_goodwe_smart_meter:
+            await self._async_apply_direct_battery_plan(
+                p_batt,
+                deadband,
+                max_power,
+            )
+            return
+
+        p_grid = self._state_float(self._p_grid_entity_id())
+        if p_grid is None:
+            self.last_command = "waiting_for_p_grid"
+            self._notify_state()
+            return
+
+        await self._async_apply_smart_meter_plan(
+            p_grid,
+            deadband,
+            max_power,
+        )
+
     async def async_evaluate(self) -> None:
-        """Apply EMHASS-to-GoodWe automatic grid-target mapping."""
+        """Apply EMHASS-to-GoodWe automatic control mapping."""
         async with self._control_lock:
             await self._async_evaluate_locked()
