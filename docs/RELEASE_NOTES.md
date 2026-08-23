@@ -14,6 +14,7 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.23** | 2026-08-23 | **Beta** | Adds a persistent EnergyPilot accounting layer on top of the existing GoodWe `36017/36015` lifetime counters. Native daily import/export entities now own Today/Yesterday accounting, with optional Recorder bootstrap for existing history. This is the foundation for later interval-based import cost, export revenue and net profit without moving financial logic into the frontend. |
 | **0.22** | 2026-08-23 | **Beta** | Promotes the hardware-validated GoodWe smart-meter/PCC modes into an optional automatic strategy. With **GoodWe smart meter active** enabled, EMHASS `P_grid` drives mode 9 import targets and mode 10 export targets, while near-zero grid flow uses mode 1 Auto/self-use. Disabling the setting restores direct `P_batt` control through modes 11/12/8. Also fixes live-flow particle direction at the active frontend layer. |
 | **0.21** | 2026-08-23 | **Beta** | Adds a manual 12-mode EMS test pad to the Controller card. Automatic Control locks the pad while still highlighting the live GoodWe mode. With Automatic Control off, testers can select modes 1–12 and set a `0..max_power` manual setpoint using the existing Home Assistant manual-mode/manual-power entities. This is a UI/testing surface only; the Modbus write path, ownership rules and automatic controller are unchanged. |
 | **0.20** | 2026-08-23 | **Beta** | Corrects v0.19 SOC diagnostics after second-tester field data: configured EnergyPilot final SOC is separated from the last value actually sent by EnergyPilot, and invalid raw EMHASS SOC config values are identified as raw diagnostics instead of being rendered as impossible percentages. No optimizer or GoodWe control behavior changes. |
@@ -36,6 +37,47 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
+
+## v0.23 — Persistent grid accounting foundation
+
+v0.23 moves daily grid accounting out of the dashboard and into a dedicated EnergyPilot runtime component.
+
+The physical source remains unchanged:
+
+```text
+36017 = lifetime grid import
+36015 = lifetime grid export
+```
+
+EnergyPilot stores the last observed lifetime values and accumulates only positive deltas into its own daily counters. The first public accounting entities are:
+
+```text
+Grid energy imported today
+Grid energy exported today
+```
+
+Both expose the completed previous day through `last_period` and use Home Assistant `total_increasing` energy semantics.
+
+For an existing installation upgrading to v0.23, EnergyPilot can read the canonical counter state at the previous and current local-midnight boundaries from Recorder after the first fresh GoodWe poll. That allows the new accounting store to start with already-existing Today/Yesterday values rather than always beginning at zero at upgrade time.
+
+Recorder is **not** part of the live accounting loop. If Recorder is disabled or the historical boundary states do not exist, EnergyPilot simply establishes the current lifetime counters as a baseline and continues accounting from live GoodWe data.
+
+The dashboard now reads Today/Yesterday from these accounting entities. The 24-hour power graph still uses Recorder because that graph is historical visualization, but it no longer owns the daily energy calculation.
+
+### Why this exists before financial counters
+
+Future dynamic-price accounting needs to value energy at the time it crossed the grid connection, not multiply an end-of-day kWh total by one average price. The v0.23 runtime is therefore the intended insertion point for:
+
+```text
+import_cost += delta_import_kWh * effective_buy_price
+export_revenue += delta_export_kWh * effective_sell_price
+```
+
+Those future calculations can consume exactly the same per-refresh energy deltas already used by the daily counters and the same effective buy/sell price configuration already used by EnergyPilot/EMHASS.
+
+### Safety boundary
+
+v0.23 does not change GoodWe Modbus definitions, read blocks, EMS writes, Automatic Control, or EMHASS optimization behavior. The existing lifetime energy entities and their unique IDs remain untouched. The new accounting path is **Beta** until it has been observed across multiple installations and midnight/restart scenarios.
 
 ## v0.22 — Smart-meter/PCC automatic control
 

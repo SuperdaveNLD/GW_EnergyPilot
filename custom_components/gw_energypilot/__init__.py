@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
+from .accounting import GWEnergyPilotAccounting
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
@@ -36,7 +37,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v022.js?v=0.22-pcc1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v023.js?v=0.23-accounting1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -48,6 +49,7 @@ class GWRuntimeData:
     coordinator: GWEnergyPilotCoordinator
     controller: GWEnergyPilotController
     orchestrator: GWEnergyPilotOrchestrator
+    accounting: GWEnergyPilotAccounting
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -105,9 +107,13 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
     )
 
 
-async def _async_initial_refresh(coordinator: GWEnergyPilotCoordinator) -> None:
-    """Refresh telemetry after entities have been added."""
+async def _async_initial_refresh(
+    coordinator: GWEnergyPilotCoordinator,
+    accounting: GWEnergyPilotAccounting,
+) -> None:
+    """Refresh telemetry, then seed accounting from existing Recorder history."""
     await coordinator.async_refresh()
+    await accounting.async_bootstrap_if_needed()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
@@ -126,22 +132,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     )
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
+    accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
         controller=controller,
         orchestrator=orchestrator,
+        accounting=accounting,
     )
 
+    await accounting.async_prepare()
     await controller.async_setup()
     await orchestrator.async_setup()
     entry.runtime_data.event_unsubs.extend(async_setup_event_triggers(hass, entry))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await accounting.async_start()
     await _async_register_panel(hass)
     entry.async_create_background_task(
         hass,
-        _async_initial_refresh(coordinator),
+        _async_initial_refresh(coordinator, accounting),
         f"GW EnergyPilot initial refresh ({entry.entry_id})",
     )
     return True
@@ -153,6 +163,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     if unload_ok:
         while entry.runtime_data.event_unsubs:
             entry.runtime_data.event_unsubs.pop()()
+        await entry.runtime_data.accounting.async_unload()
         await entry.runtime_data.orchestrator.async_unload()
         await entry.runtime_data.controller.async_unload()
         await entry.runtime_data.client.async_close()
