@@ -10,14 +10,20 @@ function numericState(panel, key) {
   return Number.isFinite(value) ? value : null;
 }
 
-function pct(value, decimals = 1) {
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
-  return Number.isFinite(number) ? `${number.toFixed(decimals)}%` : "—";
+  return Number.isFinite(number) ? number : null;
+}
+
+function pct(value, decimals = 1) {
+  const number = finiteNumber(value);
+  return number === null ? "—" : `${number.toFixed(decimals)}%`;
 }
 
 function decimal(value, decimals = 4) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number.toFixed(decimals) : "—";
+  const number = finiteNumber(value);
+  return number === null ? "—" : number.toFixed(decimals);
 }
 
 function constraintContext(panel) {
@@ -26,18 +32,13 @@ function constraintContext(panel) {
   const strategyState = panel._stateByKey("emhass_cost_function");
   const configAttrs = strategyState?.attributes || {};
   const minimumEntityValue = numericState(panel, "emhass_minimum_soc");
-
-  const socInit = attrs.soc_init === null || attrs.soc_init === undefined
-    ? null
-    : Number(attrs.soc_init) * 100;
-  const runtimeFinal = attrs.runtime_soc_final === null || attrs.runtime_soc_final === undefined
-    ? null
-    : Number(attrs.runtime_soc_final) * 100;
+  const rawSocInit = finiteNumber(attrs.soc_init);
+  const rawRuntimeFinal = finiteNumber(attrs.runtime_soc_final);
 
   return {
     currentSoc: attrs.battery_soc,
-    socInit,
-    runtimeFinal,
+    socInit: rawSocInit === null ? null : rawSocInit * 100,
+    runtimeFinal: rawRuntimeFinal === null ? null : rawRuntimeFinal * 100,
     emhassMinimum: minimumEntityValue ?? configAttrs.emhass_minimum_soc_pct,
     emhassConfigTarget: configAttrs.emhass_config_target_soc_pct,
     emhassDeficitThreshold: configAttrs.emhass_soc_deficit_threshold_pct,
