@@ -39,11 +39,11 @@ DEFAULT_OPTIM_STATUS_ENTITY = "sensor.optim_status"
 DEFAULT_OPTIM_REQUIRED_STATE = "Optimal"
 
 # Existing installations upgrade with the native schedule OFF to avoid running
-# alongside a legacy YAML scheduler. Fresh v0.10 installations suggest ON in
-# the config flow.
+# alongside a legacy YAML scheduler. Fresh installations suggest ON in the
+# config flow.
 DEFAULT_ENABLE_EMHASS_ORCHESTRATOR = False
 DEFAULT_EMHASS_URL = "http://5b918bf2-emhass:5000"
-DEFAULT_EMHASS_OPTIMIZATION_INTERVAL = 15
+DEFAULT_EMHASS_OPTIMIZATION_INTERVAL = 60
 DEFAULT_EMHASS_SOC_FINAL = 0.10
 DEFAULT_EMHASS_FALLBACK_LOAD = 700
 DEFAULT_USE_NORDPOOL_PRICES = True
