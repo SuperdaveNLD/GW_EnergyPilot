@@ -24,6 +24,18 @@ Current general pattern:
 
 If a unique ID must change, implement an explicit entity-registry migration.
 
+### Device identity
+
+Entity unique IDs and Home Assistant device identity are separate contracts.
+
+v0.17 migrates the EnergyPilot device identifier from the legacy mutable connection key:
+
+```text
+{host}:{slave}
+```
+
+to the stable config-entry ID. The migration is performed before platform entities are set up so changing a validated GoodWe host or unit ID through the settings page does not intentionally create a second device.
+
 ## Core telemetry sensors
 
 Important enabled-by-default telemetry includes concepts such as:
@@ -67,12 +79,32 @@ Do not substitute the calculated system balance as the Home/load entity without 
 
 ## Cumulative energy sensors
 
-The native GoodWe grid counters are exposed as Home Assistant energy sensors with `TOTAL_INCREASING` state class:
+The current canonical GoodWe grid counters are exposed as Home Assistant energy sensors with `TOTAL_INCREASING` state class:
 
-- grid energy imported total;
-- grid energy exported total.
+- grid energy imported total (`36017`);
+- grid energy exported total (`36015`).
 
 Preserve their units, device classes, state classes, and unique IDs to protect long-term statistics.
+
+The v0.16+ extended `36104/36120` values remain Beta diagnostics and are deliberately **not** separate Recorder-facing canonical energy entities yet.
+
+## Beta SOC Diagnostic entities
+
+v0.17 exposes three read-only candidate values as enabled-by-default Home Assistant Diagnostic sensors so field testers can see them directly on the device page:
+
+| Register | Key / stable unique-ID suffix | Display name | Unit | Status |
+|---:|---|---|---|---|
+| 45356 | `battery_discharge_depth_on_grid` | Beta on-grid discharge depth (45356) | % | Beta / read-only |
+| 45358 | `battery_discharge_depth_off_grid` | Beta off-grid discharge depth (45358) | % | Beta / read-only |
+| 47500 | `battery_soc_protection` | Beta battery SOC protection (47500) | raw | Beta / read-only |
+
+Their unique IDs follow the normal pattern, for example:
+
+```text
+{config_entry_id}_battery_discharge_depth_on_grid
+```
+
+Beta here means **not yet extensively field-tested**. These entities exist for correlation against SolarGo/SEMS+ and firmware reports. They are not controller inputs, EMHASS constraints or write targets.
 
 ## Automatic Control switch
 
@@ -160,7 +192,7 @@ emhass_costfun_cost
 emhass_costfun_self_consumption
 ```
 
-These controls change the EMHASS optimization objective. In v0.15 they do **not** change the GoodWe actuator strategy: Automatic Control still executes the resulting `P_batt` target using the existing mode 8/11/12 mapping. Any future `P_grid`/grid-target controller must be introduced as a separate, validated control-ownership change.
+These controls change the EMHASS optimization objective. In v0.15+ they do **not** change the GoodWe actuator strategy: Automatic Control still executes the resulting `P_batt` target using the existing mode 8/11/12 mapping. Any future `P_grid`/grid-target controller must be introduced as a separate, validated control-ownership change.
 
 ### Resume AUTO
 
@@ -173,6 +205,8 @@ Manual action buttons intentionally take manual ownership before issuing the EMS
 ## Diagnostic entities
 
 Raw inverter, operating-mode, warning/error, meter-status, and similar sensors may be disabled by default.
+
+The three v0.17 SOC Beta entities are intentionally an exception: they are Diagnostic category **and enabled by default** because current field validation requires testers to compare the values directly with SolarGo/SEMS+.
 
 Do not remove a diagnostic entity merely because it is disabled by default. It may be relied upon for field debugging and compatibility reports.
 
@@ -187,7 +221,7 @@ Entity IDs assigned by Home Assistant may differ between installations because u
 Before adding one, check:
 
 1. Does an existing entity already represent the same electrical value?
-2. Is the underlying register semantics validated?
+2. Is the underlying register semantics validated or explicitly marked Beta?
 3. Should it be enabled by default or diagnostic/disabled by default?
 4. What device class, state class, and unit are correct?
 5. Is long-term statistics support appropriate?
