@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from homeassistant.components import panel_custom
@@ -16,6 +17,7 @@ from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
+from .event_triggers import async_setup_event_triggers
 from .orchestrator import GWEnergyPilotOrchestrator
 
 PLATFORMS: list[Platform] = [
@@ -29,7 +31,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v010.js?v=0.10-auto-price3"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v011.js?v=0.11"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -41,6 +43,7 @@ class GWRuntimeData:
     coordinator: GWEnergyPilotCoordinator
     controller: GWEnergyPilotController
     orchestrator: GWEnergyPilotOrchestrator
+    event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
 type GWConfigEntry = ConfigEntry[GWRuntimeData]
@@ -92,19 +95,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
 
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
-    entry.runtime_data = GWRuntimeData(
+    runtime = GWRuntimeData(
         client=client,
         coordinator=coordinator,
         controller=controller,
         orchestrator=orchestrator,
     )
+    entry.runtime_data = runtime
 
     await controller.async_setup()
     await orchestrator.async_setup()
+    runtime.event_unsubs.extend(async_setup_event_triggers(hass, entry))
 
     # The automatic-control switch restores its previous Home Assistant state.
-    # The optimizer is deliberately independent from that switch: optimization
-    # can continue while GoodWe remains under its own Auto / AI control.
+    # Optimization remains independent from that switch: scheduled, price and
+    # EV-stop optimizations can continue while GoodWe remains under manual or
+    # native GoodWe Auto / AI ownership.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_register_panel(hass)
     return True
@@ -114,6 +120,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     """Unload GW EnergyPilot."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        while entry.runtime_data.event_unsubs:
+            entry.runtime_data.event_unsubs.pop()()
         await entry.runtime_data.orchestrator.async_unload()
         await entry.runtime_data.controller.async_unload()
         await entry.runtime_data.client.async_close()
