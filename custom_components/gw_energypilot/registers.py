@@ -13,6 +13,7 @@ class RegisterDataType(StrEnum):
     INT16 = "int16"
     UINT32 = "uint32"
     INT32 = "int32"
+    UINT64 = "uint64"
     FLOAT32 = "float32"
 
 
@@ -27,7 +28,7 @@ class RegisterDefinition:
     precision: int | None = None
 
 
-# Canonical runtime read layout. Keep the final word of every 32-bit/float
+# Canonical runtime read layout. Keep the final word of every multi-register
 # definition inside its block. All ranges are holding registers and remain
 # below the Modbus 125-register request limit.
 TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
@@ -39,11 +40,14 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (47509, 4),
 )
 
-# Register 47000 is useful diagnostic information but is not available on every
-# tested/related device, so a failure to read this block must not fail the main
-# telemetry refresh.
+# Optional diagnostics must never make normal telemetry unavailable. Register
+# 47000 is not available on every related device. The extended meter range is
+# present in the upstream GoodWe ET implementation for 15 kW+ / extended-meter
+# hardware, but still needs direct validation on the GW15K-ETA-G20 before it is
+# promoted to EnergyPilot's canonical grid-energy source.
 OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (47000, 1),
+    (36092, 32),
 )
 
 
@@ -104,8 +108,9 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("error_message_extended_32bit", 35333, RegisterDataType.UINT32),
     RegisterDefinition("warning_message_extended_32bit", 35335, RegisterDataType.UINT32),
 
-    # Smart meter. GoodWe exposes the cumulative energy registers as IEEE-754
-    # big-endian float32 values scaled by 1000 to kWh.
+    # Smart meter. The legacy cumulative counters are IEEE-754 float32 values
+    # scaled by 1000 to kWh and remain the confirmed EnergyPilot source until
+    # the extended G20 counters below have been checked on real hardware.
     RegisterDefinition("meter_test_status", 36003, RegisterDataType.UINT16),
     RegisterDefinition("meter_communication", 36004, RegisterDataType.UINT16),
     RegisterDefinition("meter_l1_power_fast", 36005, RegisterDataType.INT16),
@@ -125,6 +130,24 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("meter_l1_current", 36055, RegisterDataType.UINT16, 0.1, 1),
     RegisterDefinition("meter_l2_current", 36056, RegisterDataType.UINT16, 0.1, 1),
     RegisterDefinition("meter_l3_current", 36057, RegisterDataType.UINT16, 0.1, 1),
+
+    # Validation candidates for the 15 kW+ extended GoodWe meter layout. The
+    # upstream GoodWe library decodes these as unsigned 64-bit counters / 100.
+    # Keep them explicitly separate until values are confirmed on GW15K-ETA-G20.
+    RegisterDefinition(
+        "meter_total_energy_export_extended",
+        36104,
+        RegisterDataType.UINT64,
+        0.01,
+        3,
+    ),
+    RegisterDefinition(
+        "meter_total_energy_import_extended",
+        36120,
+        RegisterDataType.UINT64,
+        0.01,
+        3,
+    ),
 
     RegisterDefinition("bms_status", 37002, RegisterDataType.UINT16),
     RegisterDefinition("bms_package_temperature", 37003, RegisterDataType.UINT16, 0.1, 1),
@@ -154,6 +177,8 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
 
 def register_word_count(definition: RegisterDefinition) -> int:
     """Return the number of 16-bit Modbus words needed by one definition."""
+    if definition.data_type == RegisterDataType.UINT64:
+        return 4
     if definition.data_type in {
         RegisterDataType.UINT32,
         RegisterDataType.INT32,
