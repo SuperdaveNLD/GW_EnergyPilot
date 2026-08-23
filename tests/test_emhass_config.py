@@ -201,12 +201,13 @@ class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
             emhass_config.emhass_cost_function_from_config({"costfun": "invalid"})
         )
 
-    def test_soc_diagnostics_use_explicit_percentage_semantics(self):
+    def test_soc_diagnostics_use_explicit_semantics(self):
         config = {
             "battery_minimum_state_of_charge": 0.02,
             "battery_maximum_state_of_charge": 0.93,
-            "battery_target_state_of_charge": 0.10,
-            "battery_soc_deficit_threshold": 0.10,
+            "battery_target_state_of_charge": 0.06,
+            "battery_soc_deficit_threshold": 0.07,
+            "battery_soc_deficit_cost": 0.002,
         }
 
         self.assertEqual(
@@ -214,8 +215,9 @@ class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
             {
                 "emhass_minimum_soc_pct": 2.0,
                 "emhass_maximum_soc_pct": 93.0,
-                "emhass_config_target_soc_pct": 10.0,
-                "emhass_soc_deficit_threshold_pct": 10.0,
+                "emhass_config_target_soc_pct": 6.0,
+                "emhass_soc_deficit_threshold_pct": 7.0,
+                "emhass_soc_deficit_cost": 0.002,
             },
         )
 
@@ -224,6 +226,7 @@ class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
             "battery_minimum_state_of_charge": None,
             "battery_maximum_state_of_charge": "invalid",
             "battery_target_state_of_charge": float("nan"),
+            "battery_soc_deficit_cost": float("inf"),
         }
 
         self.assertEqual(
@@ -233,6 +236,7 @@ class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
                 "emhass_maximum_soc_pct": None,
                 "emhass_config_target_soc_pct": None,
                 "emhass_soc_deficit_threshold_pct": None,
+                "emhass_soc_deficit_cost": None,
             },
         )
 
