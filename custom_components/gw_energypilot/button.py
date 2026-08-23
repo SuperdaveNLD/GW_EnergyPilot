@@ -32,6 +32,7 @@ async def async_setup_entry(
             GWMaxExportButton(entry),
             GWBatteryPauseButton(entry),
             GWMaxChargeButton(entry),
+            GWResumeAutoButton(entry),
         ]
     )
 
@@ -144,3 +145,27 @@ class GWMaxChargeButton(_GWManualBatteryButton):
     @property
     def entity_description_key(self) -> str:
         return "max_charge"
+
+
+class GWResumeAutoButton(GWEnergyPilotEntity, ButtonEntity):
+    """Create a fresh EMHASS plan and resume automatic battery control."""
+
+    _attr_translation_key = "resume_auto"
+    _attr_icon = "mdi:autorenew"
+
+    def __init__(self, entry: GWConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_resume_auto"
+
+    async def async_press(self) -> None:
+        """Optimize first, then enable Automatic Control only on success.
+
+        Keeping the controller in its current manual state until EMHASS has
+        produced a fresh P_batt target prevents an old plan from being applied
+        during the transition back to automatic control. If optimization fails,
+        automatic control remains off and the existing manual state is kept.
+        """
+        await self.entry.runtime_data.orchestrator.async_optimize(
+            reason="resume_auto"
+        )
+        await self.entry.runtime_data.controller.async_enable()
