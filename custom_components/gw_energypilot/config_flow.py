@@ -32,6 +32,7 @@ from .const import (
     CONF_OPTIM_REQUIRED_STATE,
     CONF_OPTIM_STATUS_ENTITY,
     CONF_P_BATT_ENTITY,
+    CONF_P_GRID_ENTITY,
     CONF_SCAN_INTERVAL,
     CONF_SELL_PRICE_DEDUCTION,
     CONF_SLAVE,
@@ -50,6 +51,7 @@ from .const import (
     DEFAULT_OPTIM_REQUIRED_STATE,
     DEFAULT_OPTIM_STATUS_ENTITY,
     DEFAULT_P_BATT_ENTITY,
+    DEFAULT_P_GRID_ENTITY,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SELL_PRICE_DEDUCTION,
@@ -89,6 +91,10 @@ def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
             vol.Optional(
                 CONF_P_BATT_ENTITY,
                 default=DEFAULT_P_BATT_ENTITY,
+            ): selector.TextSelector(),
+            vol.Optional(
+                CONF_P_GRID_ENTITY,
+                default=DEFAULT_P_GRID_ENTITY,
             ): selector.TextSelector(),
             vol.Optional(
                 CONF_OPTIM_STATUS_ENTITY,
@@ -261,6 +267,7 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     """Convert stored runtime values to user-facing values."""
     form_options = dict(options)
     form_options.setdefault(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
+    form_options.setdefault(CONF_P_GRID_ENTITY, DEFAULT_P_GRID_ENTITY)
     form_options.setdefault(CONF_OPTIM_STATUS_ENTITY, DEFAULT_OPTIM_STATUS_ENTITY)
     form_options.setdefault(CONF_OPTIM_REQUIRED_STATE, DEFAULT_OPTIM_REQUIRED_STATE)
     form_options.setdefault(CONF_ENABLE_EMHASS_ORCHESTRATOR, True)

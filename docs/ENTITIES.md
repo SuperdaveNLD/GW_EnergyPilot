@@ -57,14 +57,25 @@ A number of raw or diagnostic values are intentionally disabled by default.
 
 ### Grid
 
-Primary grid power uses `meter_total_power_fast` / register `36008`:
+Primary GoodWe grid telemetry uses `meter_total_power_fast` / register `36008`:
 
 ```text
 negative = import
 positive = export
 ```
 
+EMHASS `P_grid` uses the opposite sign convention:
+
+```text
+positive = planned import
+negative = planned export
+```
+
+Do not interchange these two values without applying their documented conventions.
+
 ### Battery
+
+GoodWe battery telemetry and EMHASS `P_batt` use:
 
 ```text
 negative = charging
@@ -76,6 +87,8 @@ positive = discharging
 The primary Home/load telemetry is GoodWe register `35172` (`total_load_power`).
 
 Do not substitute the calculated system balance as the Home/load entity without an intentional architecture change.
+
+Field testing with an external AC-coupled PV inverter has shown that `35172` can become negative while that inverter exports through the GoodWe measurement point. The current orchestrator rejects implausible/negative load values and can therefore fall back to its configured fallback load. Correct AC-coupled load reconstruction is a separate architecture issue from v0.18 grid-neutral charge execution.
 
 ## Cumulative energy sensors
 
@@ -117,6 +130,45 @@ Behaviour contract:
 - state is restored over Home Assistant restarts.
 
 Manual quick actions may switch the controller out of automatic ownership.
+
+### EMHASS automatic-control inputs
+
+Automatic Control uses configurable EMHASS outputs:
+
+```text
+P_batt  default sensor.p_batt_forecast
+P_grid  default sensor.p_grid_forecast
+```
+
+`P_batt` remains the source of battery direction and maximum requested battery power. v0.18 additionally uses `P_grid` to distinguish a planned grid-neutral charge interval from intentional grid charging.
+
+### v0.18 grid-neutral charging
+
+When all of the following are true:
+
+```text
+P_batt < -deadband
+abs(P_grid) <= deadband
+optimization state is ready
+EV hold is not active
+```
+
+EnergyPilot treats `abs(P_batt)` as a **charge cap**, not an unconditional mode-11 setpoint. The current mode-11 setpoint is adjusted from GoodWe smart-meter register `36008` every 30 seconds.
+
+Rules:
+
+- observed grid import reduces charge immediately;
+- observed export may increase charge by at most 1 kW per 30-second feedback tick;
+- charge never exceeds `abs(P_batt)` or the configured controller maximum;
+- the limiter never crosses through zero into discharge;
+- when charge must stop, EnergyPilot uses mode 8 Battery Hold;
+- after a protective stop, hold lasts at least two minutes;
+- after that dwell, two consecutive 30-second samples with clear export are required before mode 11 may restart;
+- unavailable GoodWe meter feedback fails safe to Battery Hold;
+- unavailable `P_grid` during an EMHASS charge request fails safe to Battery Hold;
+- an explicit non-zero EMHASS `P_grid` target preserves the existing direct `P_batt`/mode-11 behavior so intentional grid charging remains possible.
+
+This deliberately does **not** use GoodWe mode 2 for AC-coupled PV that is not visible on the GoodWe PV inputs, and it does not make bidirectional mode 9 the owner of the battery direction.
 
 ## Manual control entities
 
@@ -178,7 +230,7 @@ Contract:
 - run a fresh optimization after saving;
 - if saving succeeds but optimization fails, keep/report the saved strategy rather than pretending the config write failed.
 
-This is optimizer state only. It does not change the GoodWe mode 8/11/12 actuator mapping.
+The strategy changes the optimizer objective. The actuator contract is separately defined by Automatic Control above.
 
 ## Buttons
 
@@ -196,6 +248,8 @@ Current major actions include:
 ### Optimize now
 
 Runs one complete EMHASS optimization/publish cycle and exposes runtime diagnostics as attributes.
+
+From v0.18 those attributes also expose the configured/current `P_grid` target and grid-neutral runtime state (active flag, cap, live meter feedback, hold time and restart evidence) for support snapshots.
 
 ### Backward-compatible EMHASS cost-function buttons
 
