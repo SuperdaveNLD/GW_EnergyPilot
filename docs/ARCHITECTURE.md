@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of GW EnergyPilot **v0.23 Beta**.
+This document describes the current runtime architecture of GW EnergyPilot **v0.24 Beta**.
 
 ## High-level data flow
 
@@ -29,9 +29,10 @@ EMHASS
                       |
           +-----------+-----------+
           |                       |
-GoodWe smart meter ON      GoodWe smart meter OFF
+Smart-meter strategy ON    OFF or not configured
 P_grid actuator plan       P_batt actuator plan
 modes 9 / 10 / 1          modes 11 / 12 / 8
+(explicit opt-in)          (v0.24 compatibility default)
           |                       |
           +-----------+-----------+
                       |
@@ -101,10 +102,12 @@ gw_energypilot/beta_soc/set
 Ownership:
 
 - `ConfigEntry.options` — EP/EMHASS integration options;
-- `ConfigEntry.data` — GoodWe connection plus **GoodWe smart meter active**;
+- `ConfigEntry.data` — GoodWe connection plus optional **GoodWe smart meter active** choice;
 - EMHASS `/get-config` and `/set-config` — live EMHASS configuration such as SOC bounds and `costfun`;
 - GoodWe registers `45356/45358` — inverter-stored manual Beta SOC-floor settings;
 - Home Assistant Store — persistent EnergyPilot runtime/accounting state, never user configuration.
+
+v0.24 compatibility rule: when `CONF_USE_GOODWE_SMART_METER` is absent from `ConfigEntry.data`, the controller must behave exactly like explicit `false` and use direct `P_batt` control. PCC control is explicit opt-in only.
 
 See `docs/SETTINGS.md` and `docs/RUNTIME_STATE.md`.
 
@@ -158,7 +161,7 @@ P_grid < 0 = planned export
 
 ## Persistent grid accounting
 
-v0.23 adds `GWEnergyPilotAccounting` as the single native daily grid-accounting runtime.
+`GWEnergyPilotAccounting` is the single native daily grid-accounting runtime.
 
 Canonical physical sources remain:
 
@@ -198,7 +201,7 @@ When ON, the selected GoodWe strategy determines which optimizer output is the a
 
 ### Strategy A — GoodWe smart meter active = ON
 
-Default:
+This strategy is **explicit opt-in** in v0.24:
 
 ```text
 P_grid > +deadband
@@ -218,7 +221,9 @@ Both `P_batt` and `P_grid` must be finite and optimizer readiness must pass. `P_
 
 Modes 9/10 close the fast loop inside GoodWe against its own smart meter/PCC. EnergyPilot does **not** run the former 30-second mode-11 trim controller in parallel.
 
-### Strategy B — GoodWe smart meter active = OFF
+### Strategy B — GoodWe smart meter active = OFF or missing
+
+This is the **v0.24 compatibility default**:
 
 ```text
 P_batt < -deadband -> mode 11 Battery charge power
@@ -226,7 +231,18 @@ P_batt > +deadband -> mode 12 Battery discharge power
 P_batt inside deadband -> mode 8 Battery Hold
 ```
 
-This fallback requires finite `P_batt` but deliberately does **not** require `P_grid`.
+This path requires finite `P_batt` but deliberately does **not** require `P_grid`.
+
+The missing-value rule is intentional backwards compatibility for config entries created before the v0.22 strategy key existed. Do not change this back to implicit PCC control without an explicit migration/design decision.
+
+Field-regression contract:
+
+```text
+P_batt = +962 W
+P_grid = 0 W (inside deadband)
+strategy key absent
+=> mode 12 / 962 W
+```
 
 ### EV anti-discharge override
 
@@ -317,7 +333,7 @@ All three remain runtime dependencies until intentionally consolidated.
 
 ### Persistent orchestrator runtime evidence
 
-v0.23 gives the active v0.13 orchestrator a `GWEnergyPilotRuntimeStore`.
+The active v0.13 orchestrator uses `GWEnergyPilotRuntimeStore`.
 
 The per-entry Store key is:
 
@@ -341,7 +357,7 @@ PV - grid + battery
 
 is a **system power balance diagnostic**, not a replacement load sensor.
 
-External AC-coupled PV can complicate inverter-local load/forecast semantics. PCC modes 9/10 remain useful because the GoodWe smart meter observes the external generation in the live net-site balance.
+External AC-coupled PV can complicate inverter-local load/forecast semantics. PCC modes 9/10 remain useful when explicitly enabled because the GoodWe smart meter observes the external generation in the live net-site balance.
 
 ## Event-driven optimization
 
@@ -362,22 +378,24 @@ Home Assistant startup deliberately does not start a new optimization.
 The sidebar entry module selected by `__init__.py` is:
 
 ```text
-gw-energy-pilot-v023.js
+gw-energy-pilot-v024.js
 ```
 
 Current upper chain:
 
 ```text
-gw-energy-pilot-v023.js
-  -> gw-energy-pilot-v022-flow-direction.js
-       -> gw-energy-pilot-v022.js
-            -> gw-energy-pilot-v021.js
-                 -> earlier layered dashboard/settings files
+gw-energy-pilot-v024.js
+  -> gw-energy-pilot-v023.js
+       -> gw-energy-pilot-v022-flow-direction.js
+            -> gw-energy-pilot-v022.js
+                 -> gw-energy-pilot-v021.js
+                      -> earlier layered dashboard/settings files
 ```
 
 Responsibilities of the upper layers:
 
-- v0.23 — persistent Today/Yesterday accounting UI and current release badge;
+- v0.24 — release/version wrapper for the control-default compatibility fix;
+- v0.23 — persistent Today/Yesterday accounting UI;
 - flow-direction overlay — removes the layered particle double reversal;
 - v0.22 — Smart Meter strategy UI and PCC/battery target relabelling;
 - v0.21 — manual 12-mode EMS test pad.
@@ -429,3 +447,4 @@ See `docs/MODBUS.md` and `docs/EMS_MODES.md` for the full evidence/status contra
 10. External EV charging schedules remain external; EV anti-discharge may constrain battery direction but never owns the charger.
 11. Derived accounting must consume canonical physical counters rather than replace them.
 12. Persistent runtime history must remain separate from user configuration.
+13. PCC control must never become the default merely because a legacy config entry lacks the strategy key.
