@@ -60,6 +60,12 @@ class GWEnergyPilotController:
     The smart-meter strategy lets GoodWe close the fast control loop against its
     own meter, so actual DC PV, AC-coupled generation and house load can change
     without EnergyPilot continuously trimming a battery-power setpoint.
+
+    Optional EV anti-discharge protection is a directional safety override:
+    while EV charging is active, discharge/neutral plans become Battery Hold,
+    while an explicit EMHASS battery-charge plan remains allowed through direct
+    mode 11. This prevents a PCC target from using the home battery to feed an
+    EV while still allowing GoodWe to charge when the optimizer requests it.
     """
 
     def __init__(
@@ -186,7 +192,7 @@ class GWEnergyPilotController:
             if ev_active:
                 self.hass.async_create_task(
                     self.async_evaluate(),
-                    "gw-energypilot-ev-hold",
+                    "gw-energypilot-ev-anti-discharge",
                 )
                 return
 
@@ -342,6 +348,37 @@ class GWEnergyPilotController:
             skip_if_readback_matches=True,
         )
 
+    async def _async_apply_ev_anti_discharge_plan(
+        self,
+        p_batt: float,
+        deadband: float,
+        max_power: int,
+    ) -> None:
+        """Prevent EV charging from drawing energy out of the home battery.
+
+        P_batt remains the direction guard even when the normal automatic
+        strategy uses P_grid. Only an explicit charge request is allowed while
+        the EV is active. The direct mode-11 charge target guarantees that the
+        EMS command cannot become a battery-discharge request merely to chase a
+        site-level PCC target after EV load changes.
+        """
+        if p_batt < -deadband:
+            power = min(int(abs(p_batt)), max_power)
+            await self._async_apply_command(
+                MODE_CHARGE_BATTERY,
+                power,
+                "ev_charge_allowed",
+                skip_if_readback_matches=True,
+            )
+            return
+
+        await self._async_apply_command(
+            MODE_BATTERY_HOLD,
+            0,
+            "ev_anti_discharge_hold",
+            skip_if_readback_matches=True,
+        )
+
     async def _async_apply_smart_meter_plan(
         self,
         p_grid: float,
@@ -396,17 +433,16 @@ class GWEnergyPilotController:
             self._notify_state()
             return
 
-        if self.ev_is_active():
-            await self._async_apply_command(
-                MODE_BATTERY_HOLD,
-                0,
-                "ev_hold",
-                skip_if_readback_matches=True,
-            )
-            return
-
         deadband = float(self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
         max_power = int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
+
+        if self.ev_is_active():
+            await self._async_apply_ev_anti_discharge_plan(
+                p_batt,
+                deadband,
+                max_power,
+            )
+            return
 
         if not self.use_goodwe_smart_meter:
             await self._async_apply_direct_battery_plan(
