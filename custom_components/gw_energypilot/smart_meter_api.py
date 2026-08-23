@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any
 
 import voluptuous as vol
@@ -26,7 +27,7 @@ def _resolve_entry(hass: HomeAssistant, entry_id: str) -> ConfigEntry | None:
 
 
 def _meter_state(entry: ConfigEntry) -> tuple[bool, float | None]:
-    """Return whether live GoodWe meter telemetry is available and its value."""
+    """Return whether live GoodWe meter telemetry is available and finite."""
     runtime_data = getattr(entry, "runtime_data", None)
     coordinator = getattr(runtime_data, "coordinator", None)
     snapshot = getattr(coordinator, "data", None)
@@ -35,6 +36,8 @@ def _meter_state(entry: ConfigEntry) -> tuple[bool, float | None]:
     try:
         meter_power = float(raw)
     except (TypeError, ValueError):
+        return False, None
+    if not isfinite(meter_power):
         return False, None
     return True, meter_power
 
