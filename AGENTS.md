@@ -50,14 +50,29 @@ EMHASS is an external prerequisite. GW EnergyPilot may integrate with EMHASS, bu
 - Never invent or guess GoodWe register addresses, data types, scales, or sign conventions.
 - `custom_components/gw_energypilot/registers.py` is the canonical source for register definitions and telemetry read blocks.
 - `client.py` must import `TELEMETRY_BLOCKS` and `OPTIONAL_TELEMETRY_BLOCKS`; do not recreate block lists there.
-- Changes to register definitions require evidence from tested hardware, vendor documentation, or repeatable diagnostics.
+- Changes to register definitions require evidence from tested hardware, vendor documentation, upstream implementation evidence, or repeatable diagnostics.
 - Preserve the tested sign conventions unless evidence proves they are wrong:
   - grid power: negative = import, positive = export;
   - battery power: negative = charging, positive = discharging.
 - EMS control currently uses register `47511` for mode and `47512` for power setpoint.
 - Be conservative with write operations: an incorrect EMS write can move significant battery/grid power.
 - Keep `python scripts/validate_repo.py` passing; it verifies that every register definition, including all words of multi-word values, is covered by a configured read block.
-- A draft that introduces unconfirmed register semantics is not release-ready merely because static CI is green; keep it in validation until the required evidence exists.
+
+### Beta register policy
+
+A small active tester group may justify shipping selected unconfirmed values as **Beta diagnostics** before broad field validation.
+
+For Beta hardware semantics:
+
+- Beta means **not yet extensively field-tested**;
+- keep candidate registers read-only unless a separate validated write design exists;
+- keep them in optional read blocks so unsupported firmware cannot fail required telemetry;
+- do not feed Beta values into EMS control, ownership, SOC enforcement, Recorder-facing canonical energy entities, or automatic migration logic;
+- label them clearly as Beta in user-facing diagnostics and documentation;
+- collect inverter model, firmware and matching SolarGo/SEMS+ values when validating;
+- promotion from Beta to confirmed semantics requires real-installation evidence and an intentional code/docs change.
+
+Static CI being green proves repository consistency, not GoodWe register meaning.
 
 ## Control ownership
 
@@ -99,7 +114,7 @@ Until this inheritance chain is deliberately consolidated, changes to orchestrat
 
 ## Frontend
 
-The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`. In v0.15 the active entry point imports v0.14, which imports v0.13 and the earlier layers below it. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
+The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`. In v0.16 the active entry point imports v0.15, which imports v0.14, v0.13 and the earlier layers below it. Do not delete or modify a versioned file merely because its name looks historical. Trace the JavaScript import chain first.
 
 The repository validator checks that relative frontend imports resolve and that the active frontend `VERSION` matches `manifest.json` when the entry module declares one.
 
@@ -132,12 +147,22 @@ When a bug is reported:
 
 - `README.md` — user-facing overview and installation.
 - `docs/ARCHITECTURE.md` — runtime architecture and ownership boundaries.
-- `docs/MODBUS.md` — Modbus semantics and change rules.
+- `docs/MODBUS.md` — Modbus semantics, Beta register status and change rules.
 - `docs/ENTITIES.md` — Home Assistant entity contract.
 - `docs/DEVELOPMENT.md` — contributor workflow and known technical debt.
 - `docs/EMHASS_SETUP.md` — EMHASS setup/operator guidance.
 - `docs/KNOWN_ISSUES.md` — field issues adjacent to or outside EnergyPilot runtime code.
-- `CHANGELOG.md` — release history.
+- `docs/RELEASE_NOTES.md` — user-facing release summaries and Beta/validation status for every version.
+- `CHANGELOG.md` — detailed technical release history.
+
+## Release documentation rule
+
+Every version bump must update both:
+
+1. `CHANGELOG.md` with the detailed technical changes;
+2. `docs/RELEASE_NOTES.md` with the user-facing summary and explicit **Beta** or validation status.
+
+Do not release a version whose manifest/frontend version changed without updating both files.
 
 ## Definition of done
 
@@ -152,4 +177,5 @@ For a substantial change, check at least:
 - relevant unit tests;
 - repository quality checks;
 - README/docs impact;
-- changelog/release impact where appropriate.
+- `CHANGELOG.md` impact;
+- `docs/RELEASE_NOTES.md` impact and Beta status.

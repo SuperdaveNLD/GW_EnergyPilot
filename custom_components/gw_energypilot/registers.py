@@ -13,6 +13,7 @@ class RegisterDataType(StrEnum):
     INT16 = "int16"
     UINT32 = "uint32"
     INT32 = "int32"
+    UINT64 = "uint64"
     FLOAT32 = "float32"
 
 
@@ -27,7 +28,7 @@ class RegisterDefinition:
     precision: int | None = None
 
 
-# Canonical runtime read layout. Keep the final word of every 32-bit/float
+# Canonical runtime read layout. Keep the final word of every multi-register
 # definition inside its block. All ranges are holding registers and remain
 # below the Modbus 125-register request limit.
 TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
@@ -39,14 +40,17 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (47509, 4),
 )
 
-# Battery energy accounting is useful to EnergyPilot but is kept optional until
-# the 35206-35211 counters have been field-validated across the target ETA-G20
-# firmware set. Register 47000 is likewise useful diagnostic information but is
-# not available on every tested/related device. A failure to read either block
-# must not fail the main telemetry refresh.
+# Optional diagnostics must never make normal telemetry unavailable. Battery
+# accounting, candidate SOC-protection values, the app work mode and the
+# extended 15 kW+ smart-meter layout are kept isolated so unsupported firmware
+# can reject one range without breaking the normal coordinator refresh.
 OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (35206, 6),
+    (36092, 32),
+    (45356, 1),
+    (45358, 1),
     (47000, 1),
+    (47500, 1),
 )
 
 
@@ -111,8 +115,9 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("error_message_extended_32bit", 35333, RegisterDataType.UINT32),
     RegisterDefinition("warning_message_extended_32bit", 35335, RegisterDataType.UINT32),
 
-    # Smart meter. GoodWe exposes the cumulative energy registers as IEEE-754
-    # big-endian float32 values scaled by 1000 to kWh.
+    # Smart meter. Legacy counters remain the current user-facing source. The
+    # extended 15 kW+ counters below are beta diagnostics until validated on the
+    # GW15K-ETA-G20 against physical SEMS lifetime totals.
     RegisterDefinition("meter_test_status", 36003, RegisterDataType.UINT16),
     RegisterDefinition("meter_communication", 36004, RegisterDataType.UINT16),
     RegisterDefinition("meter_l1_power_fast", 36005, RegisterDataType.INT16),
@@ -132,6 +137,20 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("meter_l1_current", 36055, RegisterDataType.UINT16, 0.1, 1),
     RegisterDefinition("meter_l2_current", 36056, RegisterDataType.UINT16, 0.1, 1),
     RegisterDefinition("meter_l3_current", 36057, RegisterDataType.UINT16, 0.1, 1),
+    RegisterDefinition(
+        "meter_total_energy_export_extended",
+        36104,
+        RegisterDataType.UINT64,
+        0.01,
+        3,
+    ),
+    RegisterDefinition(
+        "meter_total_energy_import_extended",
+        36120,
+        RegisterDataType.UINT64,
+        0.01,
+        3,
+    ),
 
     RegisterDefinition("bms_status", 37002, RegisterDataType.UINT16),
     RegisterDefinition("bms_package_temperature", 37003, RegisterDataType.UINT16, 0.1, 1),
@@ -151,7 +170,12 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("battery_max_cell_voltage", 37022, RegisterDataType.UINT16, 0.001, 3),
     RegisterDefinition("battery_min_cell_voltage", 37023, RegisterDataType.UINT16, 0.001, 3),
 
+    # Candidate SOC-protection values are beta/read-only diagnostics. They are
+    # not used for controller decisions and EnergyPilot does not write them.
+    RegisterDefinition("battery_discharge_depth_on_grid", 45356, RegisterDataType.UINT16),
+    RegisterDefinition("battery_discharge_depth_off_grid", 45358, RegisterDataType.UINT16),
     RegisterDefinition("app_work_mode", 47000, RegisterDataType.UINT16),
+    RegisterDefinition("battery_soc_protection", 47500, RegisterDataType.UINT16),
     RegisterDefinition("feed_power_enable", 47509, RegisterDataType.UINT16),
     RegisterDefinition("feed_power_parameter", 47510, RegisterDataType.UINT16),
     RegisterDefinition("ems_mode", 47511, RegisterDataType.UINT16),
@@ -161,6 +185,8 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
 
 def register_word_count(definition: RegisterDefinition) -> int:
     """Return the number of 16-bit Modbus words needed by one definition."""
+    if definition.data_type == RegisterDataType.UINT64:
+        return 4
     if definition.data_type in {
         RegisterDataType.UINT32,
         RegisterDataType.INT32,
