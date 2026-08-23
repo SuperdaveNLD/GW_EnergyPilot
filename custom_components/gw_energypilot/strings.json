@@ -149,6 +149,9 @@
     },
     "button": {
       "optimize_now": {"name": "Optimize now"},
+      "emhass_costfun_profit": {"name": "EMHASS profit"},
+      "emhass_costfun_cost": {"name": "EMHASS cost"},
+      "emhass_costfun_self_consumption": {"name": "EMHASS self-consumption"},
       "max_export": {"name": "Maximum export"},
       "battery_pause": {"name": "Pause battery"},
       "max_charge": {"name": "Maximum charge"},
