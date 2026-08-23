@@ -79,22 +79,21 @@ async def _async_validate_connection(host: str, port: int, slave: int) -> None:
         await client.async_close()
 
 
-def _controller_schema(*, orchestrator_default: bool = False) -> vol.Schema:
+def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
     """Return controller and native orchestrator options schema."""
     return vol.Schema(
         {
+            # These output entities are often created only after the first
+            # successful EMHASS publish. Text fields allow the standard IDs to
+            # be configured before they exist in Home Assistant.
             vol.Optional(
                 CONF_P_BATT_ENTITY,
                 default=DEFAULT_P_BATT_ENTITY,
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(multiple=False)
-            ),
+            ): selector.TextSelector(),
             vol.Optional(
                 CONF_OPTIM_STATUS_ENTITY,
                 default=DEFAULT_OPTIM_STATUS_ENTITY,
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(multiple=False)
-            ),
+            ): selector.TextSelector(),
             vol.Optional(
                 CONF_OPTIM_REQUIRED_STATE,
                 default=DEFAULT_OPTIM_REQUIRED_STATE,
@@ -111,7 +110,10 @@ def _controller_schema(*, orchestrator_default: bool = False) -> vol.Schema:
                     unit_of_measurement="kW",
                 )
             ),
-            vol.Required(CONF_DEADBAND, default=DEFAULT_DEADBAND): selector.NumberSelector(
+            vol.Required(
+                CONF_DEADBAND,
+                default=DEFAULT_DEADBAND,
+            ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
                     max=2000,
@@ -120,7 +122,10 @@ def _controller_schema(*, orchestrator_default: bool = False) -> vol.Schema:
                     unit_of_measurement="W",
                 )
             ),
-            vol.Required(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): selector.NumberSelector(
+            vol.Required(
+                CONF_SCAN_INTERVAL,
+                default=DEFAULT_SCAN_INTERVAL,
+            ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=5,
                     max=60,
@@ -133,7 +138,10 @@ def _controller_schema(*, orchestrator_default: bool = False) -> vol.Schema:
                 CONF_ENABLE_EMHASS_ORCHESTRATOR,
                 default=orchestrator_default,
             ): selector.BooleanSelector(),
-            vol.Required(CONF_EMHASS_URL, default=DEFAULT_EMHASS_URL): selector.TextSelector(),
+            vol.Required(
+                CONF_EMHASS_URL,
+                default=DEFAULT_EMHASS_URL,
+            ): selector.TextSelector(),
             vol.Required(
                 CONF_EMHASS_OPTIMIZATION_INTERVAL,
                 default=DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
@@ -210,14 +218,20 @@ def _controller_schema(*, orchestrator_default: bool = False) -> vol.Schema:
                     unit_of_measurement="EUR/kWh",
                 )
             ),
-            vol.Required(CONF_ENABLE_EV_COORDINATION, default=False): selector.BooleanSelector(),
+            vol.Required(
+                CONF_ENABLE_EV_COORDINATION,
+                default=False,
+            ): selector.BooleanSelector(),
             vol.Optional(CONF_EV_MODE_ENTITY): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=False)
             ),
             vol.Optional(CONF_EV_POWER_ENTITY): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=False)
             ),
-            vol.Required(CONF_EV_DEADBAND, default=DEFAULT_EV_DEADBAND): selector.NumberSelector(
+            vol.Required(
+                CONF_EV_DEADBAND,
+                default=DEFAULT_EV_DEADBAND,
+            ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
                     max=3000,
@@ -236,7 +250,10 @@ def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
     max_power_kw = float(options.pop(CONF_MAX_POWER_KW))
     options[CONF_MAX_POWER] = int(round(max_power_kw * 1000))
     soc_final_pct = float(options.pop(CONF_EMHASS_SOC_FINAL_PCT))
-    options[CONF_EMHASS_SOC_FINAL] = min(1.0, max(0.0, soc_final_pct / 100.0))
+    options[CONF_EMHASS_SOC_FINAL] = min(
+        1.0,
+        max(0.0, soc_final_pct / 100.0),
+    )
     return options
 
 
@@ -246,13 +263,16 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     form_options.setdefault(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
     form_options.setdefault(CONF_OPTIM_STATUS_ENTITY, DEFAULT_OPTIM_STATUS_ENTITY)
     form_options.setdefault(CONF_OPTIM_REQUIRED_STATE, DEFAULT_OPTIM_REQUIRED_STATE)
-    form_options.setdefault(CONF_ENABLE_EMHASS_ORCHESTRATOR, False)
+    form_options.setdefault(CONF_ENABLE_EMHASS_ORCHESTRATOR, True)
     form_options.setdefault(CONF_EMHASS_URL, DEFAULT_EMHASS_URL)
     form_options.setdefault(
         CONF_EMHASS_OPTIMIZATION_INTERVAL,
         DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     )
-    form_options.setdefault(CONF_EMHASS_FALLBACK_LOAD, DEFAULT_EMHASS_FALLBACK_LOAD)
+    form_options.setdefault(
+        CONF_EMHASS_FALLBACK_LOAD,
+        DEFAULT_EMHASS_FALLBACK_LOAD,
+    )
     form_options.setdefault(CONF_USE_NORDPOOL_PRICES, DEFAULT_USE_NORDPOOL_PRICES)
     form_options.setdefault(
         CONF_OPTIMIZE_ON_TOMORROW_PRICES,
@@ -265,7 +285,9 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
 
     max_power_w = float(form_options.pop(CONF_MAX_POWER, DEFAULT_MAX_POWER))
     form_options[CONF_MAX_POWER_KW] = max_power_w / 1000
-    soc_final = float(form_options.pop(CONF_EMHASS_SOC_FINAL, DEFAULT_EMHASS_SOC_FINAL))
+    soc_final = float(
+        form_options.pop(CONF_EMHASS_SOC_FINAL, DEFAULT_EMHASS_SOC_FINAL)
+    )
     form_options[CONF_EMHASS_SOC_FINAL_PCT] = soc_final * 100
     return form_options
 
@@ -279,7 +301,10 @@ class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize config flow."""
         self._connection_data: dict[str, Any] = {}
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_user(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Configure Modbus connection."""
         errors: dict[str, str] = {}
 
@@ -304,14 +329,20 @@ class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_HOST): selector.TextSelector(),
-                vol.Required(CONF_PORT, default=DEFAULT_PORT): selector.NumberSelector(
+                vol.Required(
+                    CONF_PORT,
+                    default=DEFAULT_PORT,
+                ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=1,
                         max=65535,
                         mode=selector.NumberSelectorMode.BOX,
                     )
                 ),
-                vol.Required(CONF_SLAVE, default=DEFAULT_SLAVE): selector.NumberSelector(
+                vol.Required(
+                    CONF_SLAVE,
+                    default=DEFAULT_SLAVE,
+                ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=1,
                         max=247,
@@ -320,12 +351,17 @@ class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+            errors=errors,
+        )
 
     async def async_step_controller(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
-        """Configure controller and optional native EMHASS orchestration."""
+        """Configure controller and native EMHASS orchestration."""
         if user_input is not None:
             host = self._connection_data[CONF_HOST]
             return self.async_create_entry(
@@ -349,7 +385,10 @@ class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class GWOptionsFlow(OptionsFlowWithReload):
     """Manage GW EnergyPilot options."""
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_init(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Manage options."""
         if user_input is not None:
             return self.async_create_entry(data=_options_from_form(user_input))
@@ -357,7 +396,10 @@ class GWOptionsFlow(OptionsFlowWithReload):
         schema = self.add_suggested_values_to_schema(
             _controller_schema(
                 orchestrator_default=bool(
-                    self.config_entry.options.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, False)
+                    self.config_entry.options.get(
+                        CONF_ENABLE_EMHASS_ORCHESTRATOR,
+                        True,
+                    )
                 )
             ),
             _options_for_form(dict(self.config_entry.options)),
