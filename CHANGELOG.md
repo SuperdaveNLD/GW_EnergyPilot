@@ -2,6 +2,31 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.18] - 2026-08-23
+
+### Added
+
+- Manual **G20 Beta battery minimum-SOC** controls inside the GOODWE settings page for register `45356` (on-grid) and `45358` (off-grid).
+- Admin-only WebSocket commands `gw_energypilot/beta_soc/get` and `gw_energypilot/beta_soc/set` for the dedicated field-test controls.
+- Verified write support that writes exactly one selected Beta SOC-floor register and immediately reads the same register back before reporting success.
+- Hardware-independent tests for the `45356/45358` write whitelist, bounds validation and verified read-back path.
+
+### Changed
+
+- The current `45356` interpretation is refined from ambiguous "discharge depth" wording to the raw **minimum SOC floor** used by the tested G20. This matches current upstream GoodWe handling where on-grid DoD is `100 - register 45356`.
+- `45358` is treated as the corresponding off-grid minimum-SOC floor for field validation.
+- A successful Beta write updates the coordinator snapshot immediately so the existing Diagnostic entity reflects the verified read-back without waiting for the next normal poll.
+- The active frontend is `gw-energy-pilot-v018.js`, layered on top of the complete v0.17 settings/strategy implementation.
+
+### Beta safety boundary
+
+- The new write path is **manual field-test only** and is not used by Automatic Control, EMHASS, event triggers or any scheduled task.
+- Only the two already-known canonical register definitions `45356` and `45358` are accepted; arbitrary register writes are not exposed.
+- Values are limited to whole percentages from `0` through `100` and the register must already be readable on the current inverter before a write is allowed.
+- Each user action changes exactly one register and requires a separate dashboard confirmation.
+- Register `47500` remains read-only because its G20 semantics are still unresolved and the tested inverter has returned the sentinel-like value `65535`.
+- EMS modes `8/11/12`, registers `47511/47512`, sign conventions, control ownership and canonical grid-energy accounting remain unchanged.
+
 ## [0.17] - 2026-08-23
 
 ### Added
