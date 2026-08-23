@@ -18,7 +18,7 @@ from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .event_triggers import async_setup_event_triggers
-from .orchestrator_v012 import GWEnergyPilotOrchestrator
+from .orchestrator_v013 import GWEnergyPilotOrchestrator
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -31,9 +31,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = (
-    f"{PANEL_STATIC_URL}/gw-energy-pilot-v012-stable.js?v=0.12-stable2"
-)
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v013.js?v=0.13-grid1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -57,13 +55,7 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
         return
 
     await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                PANEL_STATIC_URL,
-                str(FRONTEND_DIR),
-                cache_headers=False,
-            )
-        ]
+        [StaticPathConfig(PANEL_STATIC_URL, str(FRONTEND_DIR), cache_headers=False)]
     )
     await panel_custom.async_register_panel(
         hass=hass,
@@ -90,31 +82,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         port=int(entry.data[CONF_PORT]),
         slave=int(entry.data[CONF_SLAVE]),
     )
-
     coordinator = GWEnergyPilotCoordinator(
         hass,
         client,
-        scan_interval=int(
-            entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-        ),
+        scan_interval=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
     )
-
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
-    runtime = GWRuntimeData(
+    entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
         controller=controller,
         orchestrator=orchestrator,
     )
-    entry.runtime_data = runtime
 
     await controller.async_setup()
     await orchestrator.async_setup()
-    runtime.event_unsubs.extend(async_setup_event_triggers(hass, entry))
+    entry.runtime_data.event_unsubs.extend(async_setup_event_triggers(hass, entry))
 
-    # Add entities immediately. They may briefly be unavailable while the first
-    # Modbus poll runs, but EnergyPilot no longer blocks Home Assistant startup.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_register_panel(hass)
     entry.async_create_background_task(
