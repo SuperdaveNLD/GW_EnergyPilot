@@ -20,6 +20,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
 )
 from .orchestrator_v012 import GWEnergyPilotOrchestrator as _V012Orchestrator
+from .runtime_store import GWEnergyPilotRuntimeStore
 
 LOAD_FORECAST_HOURS = 24
 
@@ -33,6 +34,12 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
         # It represents only a target that completed an EnergyPilot-owned
         # optimization cycle, so manual-only installations start with None.
         self.last_runtime_soc_final: float | None = None
+        self._runtime_store = GWEnergyPilotRuntimeStore(hass, entry.entry_id)
+
+    async def async_setup(self) -> None:
+        """Restore persistent runtime status before starting orchestration."""
+        self.last_success = await self._runtime_store.async_load_last_success()
+        await super().async_setup()
 
     def _configured_runtime_soc_final(self) -> float:
         """Return EnergyPilot's configured runtime soc_final value."""
@@ -76,9 +83,11 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
         return attrs
 
     async def async_optimize(self, reason: str = "manual") -> None:
-        """Record the runtime final SOC only after an EnergyPilot-owned run succeeds."""
+        """Persist runtime evidence only after an EnergyPilot-owned run succeeds."""
         requested_soc_final = self._configured_runtime_soc_final()
         await super().async_optimize(reason=reason)
+        if self.last_success is not None:
+            await self._runtime_store.async_save_last_success(self.last_success)
         self.last_runtime_soc_final = requested_soc_final
         async_dispatcher_send(self.hass, self.signal)
 
