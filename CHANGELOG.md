@@ -2,6 +2,29 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.12] - 2026-08-23
+
+### Added
+
+- EMHASS `/healthz` probe before optimization, with health/version diagnostics.
+- Nord Pool fallback support for sensors exposing `raw_today` and `raw_tomorrow`.
+- Clear `error_prices` state when runtime pricing is enabled without a compatible source.
+- Detection of other active Home Assistant `goodwe` config entries in the support snapshot.
+- Diagnostics visibility toggle in the dashboard layout menu.
+
+### Changed
+
+- EnergyPilot no longer starts an EMHASS optimization during Home Assistant startup.
+- The first Modbus refresh, restored Automatic Control command and EMHASS SOC reads run as background tasks so entity/platform setup does not hold Home Assistant startup open.
+- EMHASS output entity IDs use text inputs and can be saved before EMHASS creates those entities.
+- Native load forecast returned to the validated 24-hour inclusive shape of 25 hourly points.
+- Whole-home demand uses the validated power balance `PV - grid + battery` when those values are available; register 35172 remains visible as a raw diagnostic.
+- EMHASS HTTP/HTML errors are reduced to concise diagnostic messages.
+- Flow particles use full-track position animation with stable phase offsets, and the dashboard rerenders only for relevant entity changes.
+- Optimize and battery-control hover effects no longer move or scale the controls.
+- README and EMHASS documentation now describe a fresh installation only.
+- Dashboard frontend moved to `gw-energy-pilot-v012.js` and reports v0.12.
+
 ## [0.11] - 2026-08-23
 
 ### Added
@@ -31,25 +54,22 @@ All notable changes to GW EnergyPilot are documented here.
 - Battery quick actions are shown directly on the dashboard Battery card.
 - Manual quick actions take manual ownership and disable Automatic Control before applying the requested GoodWe EMS mode.
 - Current GoodWe battery SOC is passed to every optimization as runtime `soc_init`.
-- Recorder-based 48-hour load forecast with current-load fallback for fresh Home Assistant installations.
-- Optional official Home Assistant Nord Pool price retrieval using `nordpool.get_prices_for_date`.
+- Recorder-based load forecast with current-load fallback for fresh Home Assistant installations.
+- Optional Home Assistant Nord Pool price retrieval using `nordpool.get_prices_for_date`.
 - Runtime import-price addition and export-price deduction settings.
-- Configurable **Optimize when tomorrow prices arrive** automation. EnergyPilot auto-detects the official Nord Pool tomorrow-price availability binary sensor and immediately re-optimizes on the OFF -> ON transition.
+- Configurable optimization when tomorrow prices become available.
 - Configurable EMHASS URL, optimization interval, final SOC target and fallback house load.
 - HTTP result validation for both `/action/dayahead-optim` and `/action/publish-data`.
 - Fresh numeric `P_batt` validation after publishing.
 - Orchestrator status/diagnostics exposed on the native Optimize now button and displayed in the dashboard.
-- Safety detection for the legacy `energypilot_emhass_orchestrator.yaml` scheduler to avoid duplicate recurring optimizations.
-- Reusable `gw-energy-pilot-logo.svg` frontend asset while Home Assistant local-brand surfaces continue to use the supported PNG brand files.
+- Reusable `gw-energy-pilot-logo.svg` frontend asset while Home Assistant local-brand surfaces continue to use PNG brand files.
 
 ### Changed
 
-- EMHASS optimization is now a first-class EnergyPilot function and remains independent from the GoodWe Automatic Control switch.
-- When EnergyPilot's official Nord Pool runtime pricing is enabled, `load_cost_forecast` and `prod_price_forecast` are supplied directly to EMHASS, so EMHASS's internal price forecast method is bypassed for those EnergyPilot-triggered runs.
-- Existing v0.09 installations upgrade with the built-in recurring schedule disabled until explicitly enabled, preventing conflicts with an existing YAML scheduler.
-- Flow-direction chevrons were replaced with round moving energy particles so direction is communicated only by movement, not by arrow orientation.
-- Manual EMS mode selection now takes manual ownership instead of competing with Automatic Control.
-- The dashboard frontend moved to `gw-energy-pilot-v010.js` and reports v0.10.
+- EMHASS optimization is a first-class EnergyPilot function and remains independent from the GoodWe Automatic Control switch.
+- When runtime Nord Pool pricing is enabled, `load_cost_forecast` and `prod_price_forecast` are supplied directly to EMHASS.
+- Flow-direction chevrons were replaced with round moving energy particles.
+- Manual EMS mode selection takes manual ownership instead of competing with Automatic Control.
 - EnergyPilot remains the only component that writes GoodWe EMS registers; the optimizer only creates and publishes the power plan.
 
 ## [0.09] - 2026-08-22
@@ -60,20 +80,17 @@ All notable changes to GW EnergyPilot are documented here.
   - `sensor.p_batt_forecast`
   - `sensor.optim_status`
   - required optimization state `Optimal`
-- Tested local EMHASS orchestrator reference at `docs/examples/energypilot_emhass_orchestrator.yaml`.
-- Orchestrator status helpers and validation flow.
-- Recorder-based load forecast for fresh Home Assistant installations with insufficient EMHASS naive-history data.
+- Tested local EMHASS orchestrator reference.
+- Recorder-based load forecast for fresh Home Assistant installations.
 - HTTP response validation for EMHASS optimization and publish calls.
 - Fresh `p_batt_forecast` validation after publishing.
 - Updated installation and EMHASS mapping documentation.
-- Dashboard module wrapper `gw-energy-pilot-v009.js` with v0.09 cache busting/version display.
 
 ### Changed
 
-- EnergyPilot setup now suggests the normal EMHASS output entities automatically instead of requiring manual selection on every installation.
-- Documentation now uses the bootstrap order: install EMHASS, install EnergyPilot, map EMHASS source sensors to EnergyPilot telemetry, optimize/publish, then enable Automatic Control.
-- EMHASS optimization is documented as independent from the EnergyPilot Automatic Control switch.
-- The reference orchestration layer never writes GoodWe registers; EnergyPilot remains the only GoodWe EMS controller.
+- EnergyPilot setup suggests the normal EMHASS output entities automatically.
+- EMHASS optimization is independent from the EnergyPilot Automatic Control switch.
+- The orchestration layer never writes GoodWe registers; EnergyPilot remains the only GoodWe EMS controller.
 
 ## [0.08] - 2026-08-22
 
@@ -86,7 +103,7 @@ All notable changes to GW EnergyPilot are documented here.
 ### Changed
 
 - Automatic Control restores its previous Home Assistant state after reload/restart.
-- First installation still defaults Automatic Control to OFF.
+- First installation defaults Automatic Control to OFF.
 
 ## [0.07] - 2026-08-22
 
