@@ -2,6 +2,25 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.15] - 2026-08-23
+
+### Added
+
+- Three native EMHASS cost-function buttons for `profit`, `cost` and `self-consumption`.
+- Matching one-touch strategy controls in the EnergyPilot EMHASS dashboard card.
+- Regression tests proving selected EMHASS configuration patches preserve unrelated settings.
+
+### Changed
+
+- Selecting an EMHASS cost function reads the complete active configuration, changes only `costfun`, writes the complete configuration back through `/set-config`, and immediately runs/publishes a fresh optimization.
+- Dashboard frontend moved to `gw-energy-pilot-v015.js`, layering the new strategy controls on top of the existing v0.14 battery diagnostics.
+
+### Notes
+
+- GoodWe Automatic Control remains `P_batt`-driven and still uses the existing EMS modes 8, 11 and 12.
+- No GoodWe register definitions, sign conventions, EMS write ordering or control ownership behaviour are changed by v0.15.
+- Candidate SOC-protection and extended-meter register work remains in draft validation PRs pending GW15K-ETA-G20 hardware confirmation.
+
 ## [0.14] - 2026-08-23
 
 ### Added
