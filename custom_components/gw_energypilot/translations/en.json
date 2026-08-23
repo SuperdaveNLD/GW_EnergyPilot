@@ -18,9 +18,10 @@
       },
       "controller": {
         "title": "Configure EnergyPilot and EMHASS",
-        "description": "EMHASS must already be installed, running and configured. Keep Automatic Control OFF until Optimize now completes successfully and publishes a numeric P_batt target.",
+        "description": "EMHASS must already be installed, running and configured. Keep Automatic Control OFF until Optimize now completes successfully and publishes numeric P_batt and P_grid targets.",
         "data": {
           "p_batt_entity": "EMHASS battery power target entity ID",
+          "p_grid_entity": "EMHASS grid power target entity ID",
           "optim_status_entity": "EMHASS optimization status entity ID",
           "optim_required_state": "Required optimization state",
           "max_power_kw": "Maximum inverter power",
@@ -43,12 +44,13 @@
           "ev_deadband": "EV active power threshold"
         },
         "data_description": {
-          "p_batt_entity": "Standard ID: sensor.p_batt_forecast. It can be entered before EMHASS creates the entity.",
+          "p_batt_entity": "Standard ID: sensor.p_batt_forecast. Negative means charge; positive means discharge.",
+          "p_grid_entity": "Standard ID: sensor.p_grid_forecast. Positive means planned import; negative means planned export. A near-zero target enables the grid-neutral charge limiter.",
           "optim_status_entity": "Standard ID: sensor.optim_status. It can be entered before EMHASS creates the entity.",
-          "optim_required_state": "EnergyPilot executes P_batt only when this state matches. Standard: Optimal.",
+          "optim_required_state": "EnergyPilot executes EMHASS targets only when this state matches. Standard: Optimal.",
           "max_power_kw": "Maximum charge or discharge request. Use 15.0 kW only when the inverter, battery and grid allow it.",
-          "deadband": "Targets inside this range around 0 W become Battery Hold. Recommended: 300 W.",
-          "scan_interval": "How often EnergyPilot polls the inverter. Recommended: 10 seconds.",
+          "deadband": "Targets inside this range around 0 W become Battery Hold. The same tolerance is used around a planned zero-grid target. Recommended: 300 W.",
+          "scan_interval": "How often EnergyPilot polls the inverter. Recommended: 10 seconds. Grid-neutral charge correction itself runs every 30 seconds.",
           "enable_emhass_orchestrator": "Runs optimization and publish independently from Automatic Control.",
           "emhass_url": "Default Home Assistant EMHASS add-on URL: http://5b918bf2-emhass:5000.",
           "emhass_optimization_interval": "Periodic fallback interval. Recommended: 60 minutes. Event triggers run immediately.",
@@ -81,6 +83,7 @@
         "description": "Configure GoodWe control, EMHASS orchestration, runtime prices and optional EV coordination.",
         "data": {
           "p_batt_entity": "EMHASS battery power target entity ID",
+          "p_grid_entity": "EMHASS grid power target entity ID",
           "optim_status_entity": "EMHASS optimization status entity ID",
           "optim_required_state": "Required optimization state",
           "max_power_kw": "Maximum inverter power",
@@ -104,11 +107,12 @@
         },
         "data_description": {
           "p_batt_entity": "Standard ID: sensor.p_batt_forecast.",
+          "p_grid_entity": "Standard ID: sensor.p_grid_forecast. Required for grid-neutral charge limiting.",
           "optim_status_entity": "Standard ID: sensor.optim_status.",
           "optim_required_state": "Standard: Optimal.",
           "max_power_kw": "Maximum charge or discharge request in kW.",
           "deadband": "Recommended: 300 W.",
-          "scan_interval": "Recommended: 10 seconds.",
+          "scan_interval": "Recommended: 10 seconds; grid-neutral correction runs every 30 seconds.",
           "enable_emhass_orchestrator": "Enables hourly and event-driven optimization. No plan is created during Home Assistant startup.",
           "emhass_url": "Default: http://5b918bf2-emhass:5000.",
           "emhass_optimization_interval": "Recommended: 60 minutes.",
