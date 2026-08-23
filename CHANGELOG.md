@@ -9,13 +9,15 @@ All notable changes to GW EnergyPilot are documented here.
 - Native EMHASS orchestrator inside GW EnergyPilot; the package YAML is no longer required for normal operation.
 - Native **Optimize now** Home Assistant button entity.
 - **Optimize now** control directly on the built-in EnergyPilot dashboard.
-- Three native one-touch GoodWe battery buttons: **Maximum export**, **Pause battery**, and **Maximum charge**.
+- Four native one-touch GoodWe battery buttons: **Maximum export**, **Pause battery**, **Maximum charge**, and **AUTO**.
+- **AUTO** forces one fresh EMHASS optimization and only resumes Automatic Control after that optimization succeeds.
 - Battery quick actions are shown directly on the dashboard Battery card.
 - Manual quick actions take manual ownership and disable Automatic Control before applying the requested GoodWe EMS mode.
 - Current GoodWe battery SOC is passed to every optimization as runtime `soc_init`.
 - Recorder-based 48-hour load forecast with current-load fallback for fresh Home Assistant installations.
 - Optional official Home Assistant Nord Pool price retrieval using `nordpool.get_prices_for_date`.
 - Runtime import-price addition and export-price deduction settings.
+- Configurable **Optimize when tomorrow prices arrive** automation. EnergyPilot auto-detects the official Nord Pool tomorrow-price availability binary sensor and immediately re-optimizes on the OFF -> ON transition.
 - Configurable EMHASS URL, optimization interval, final SOC target and fallback house load.
 - HTTP result validation for both `/action/dayahead-optim` and `/action/publish-data`.
 - Fresh numeric `P_batt` validation after publishing.
@@ -26,6 +28,7 @@ All notable changes to GW EnergyPilot are documented here.
 ### Changed
 
 - EMHASS optimization is now a first-class EnergyPilot function and remains independent from the GoodWe Automatic Control switch.
+- When EnergyPilot's official Nord Pool runtime pricing is enabled, `load_cost_forecast` and `prod_price_forecast` are supplied directly to EMHASS, so EMHASS's internal price forecast method is bypassed for those EnergyPilot-triggered runs.
 - Existing v0.09 installations upgrade with the built-in recurring schedule disabled until explicitly enabled, preventing conflicts with an existing YAML scheduler.
 - Flow-direction chevrons were replaced with round moving energy particles so direction is communicated only by movement, not by arrow orientation.
 - Manual EMS mode selection now takes manual ownership instead of competing with Automatic Control.
