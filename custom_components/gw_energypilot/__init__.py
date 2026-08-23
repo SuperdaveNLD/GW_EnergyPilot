@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
+from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
@@ -34,7 +35,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v017.js?v=0.17-settings-strategy2"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v018.js?v=0.18-beta-soc-floor1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -55,6 +56,7 @@ type GWConfigEntry = ConfigEntry[GWRuntimeData]
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     """Set up integration-wide dashboard APIs."""
     async_register_settings_api(hass)
+    async_register_beta_soc_api(hass)
     return True
 
 
