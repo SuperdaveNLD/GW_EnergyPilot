@@ -85,7 +85,8 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
     async def async_added_to_hass(self) -> None:
         """Schedule the initial EMHASS read without blocking platform setup."""
         await super().async_added_to_hass()
-        self.hass.async_create_task(
+        self.entry.async_create_background_task(
+            self.hass,
             self._async_background_refresh(),
             f"GW EnergyPilot read {self.config_key}",
         )
@@ -95,8 +96,6 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         try:
             await self._async_refresh_from_emhass()
         except HomeAssistantError as err:
-            # EMHASS may still be starting. The entity is added immediately and
-            # stays unknown until the next integration reload or user change.
             _LOGGER.debug(
                 "Unable to read EMHASS %s during startup: %s",
                 self.config_key,
@@ -122,8 +121,6 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
                 reason=f"{self.config_key}_changed"
             )
         except HomeAssistantError as err:
-            # The configuration itself is already saved. Report the separate
-            # optimization failure through normal orchestrator diagnostics.
             _LOGGER.warning(
                 "EMHASS optimization after %s change failed: %s",
                 self.config_key,
@@ -139,7 +136,8 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         await async_write_emhass_config(self.hass, self.entry, config)
         self._value = value
         self.async_write_ha_state()
-        self.hass.async_create_task(
+        self.entry.async_create_background_task(
+            self.hass,
             self._async_optimize_after_change(),
             f"GW EnergyPilot optimize after {self.config_key} change",
         )
