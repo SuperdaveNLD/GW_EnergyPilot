@@ -4,155 +4,35 @@
     "step": {
       "user": {
         "title": "Connect to your GoodWe ETA inverter",
-        "description": "Connect GW EnergyPilot directly to the GoodWe ETA inverter over Modbus TCP. Before continuing, make sure the inverter uses a static IP address or DHCP reservation so its address cannot change.",
-        "data": {
-          "host": "Inverter IP address",
-          "port": "Modbus TCP port",
-          "slave": "Modbus Unit ID"
-        },
-        "data_description": {
-          "host": "Fixed IP address of the GoodWe ETA inverter. Configure a static IP address or DHCP reservation in your router.",
-          "port": "Modbus TCP port. The normal GoodWe ETA value is 502.",
-          "slave": "Modbus Unit ID. The commonly used GoodWe ETA value is 247."
-        }
+        "description": "Connect directly to the GoodWe ETA over Modbus TCP. Give the inverter a static IP address or DHCP reservation before continuing.",
+        "data": {"host": "Inverter IP address", "port": "Modbus TCP port", "slave": "Modbus Unit ID"},
+        "data_description": {"host": "Fixed IP address of the GoodWe ETA inverter.", "port": "Normal GoodWe ETA value: 502.", "slave": "Common GoodWe ETA value: 247."}
       },
       "controller": {
-        "title": "Configure EMHASS control",
-        "description": "EnergyPilot can run EMHASS optimization and publish natively. New installations enable the built-in orchestrator by default. Keep Automatic Control OFF until the first successful optimization has published a valid P_batt target.",
+        "title": "Configure EnergyPilot and EMHASS",
+        "description": "EMHASS must already be installed, running and configured. Keep Automatic Control OFF until Optimize now completes successfully and publishes a numeric P_batt target.",
         "data": {
-          "p_batt_entity": "EMHASS battery power target",
-          "optim_status_entity": "EMHASS optimization status",
-          "optim_required_state": "Required optimization state",
-          "max_power_kw": "Maximum inverter power",
-          "deadband": "Power deadband",
-          "scan_interval": "Modbus scan interval",
-          "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator",
-          "emhass_url": "EMHASS URL",
-          "emhass_optimization_interval": "Optimization interval",
-          "emhass_soc_final_pct": "Target SOC at end of optimization",
-          "emhass_fallback_load": "Fallback house load",
-          "use_nordpool_prices": "Use official Nord Pool runtime prices",
-          "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive",
-          "nordpool_area": "Nord Pool area",
-          "nordpool_currency": "Nord Pool currency",
-          "buy_price_adder": "Import price addition",
-          "sell_price_deduction": "Export price deduction",
-          "enable_ev_coordination": "Enable EV coordination",
-          "ev_mode_entity": "EV charging mode entity",
-          "ev_power_entity": "EV charging power entity",
-          "ev_deadband": "EV active power threshold"
+          "p_batt_entity": "EMHASS battery power target entity ID", "optim_status_entity": "EMHASS optimization status entity ID", "optim_required_state": "Required optimization state", "max_power_kw": "Maximum inverter power", "deadband": "Power deadband", "scan_interval": "Modbus scan interval", "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator", "emhass_url": "EMHASS URL", "emhass_optimization_interval": "Periodic optimization interval", "emhass_soc_final_pct": "Target SOC at end of optimization", "emhass_fallback_load": "Fallback house load", "use_nordpool_prices": "Use Nord Pool runtime prices", "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive", "nordpool_area": "Nord Pool area", "nordpool_currency": "Nord Pool currency", "buy_price_adder": "Import price addition", "sell_price_deduction": "Export price deduction", "enable_ev_coordination": "Enable EV coordination", "ev_mode_entity": "EV charging mode entity", "ev_power_entity": "EV charging power entity", "ev_deadband": "EV active power threshold"
         },
         "data_description": {
-          "p_batt_entity": "Standard value: sensor.p_batt_forecast. The state must be numeric and expressed in watts.",
-          "optim_status_entity": "Standard value: sensor.optim_status.",
-          "optim_required_state": "EnergyPilot only follows EMHASS when the optimization status matches this value. Standard value: Optimal.",
-          "max_power_kw": "Maximum charge or discharge power EnergyPilot may request from the inverter. For a 15 kW inverter use 15.0 kW.",
-          "deadband": "Targets inside this range around 0 W are treated as Battery Hold. Recommended: 300 W; typical range 200-500 W.",
-          "scan_interval": "How often EnergyPilot refreshes GoodWe ETA telemetry. Recommended: 10 seconds.",
-          "enable_emhass_orchestrator": "Runs optimization independently from Automatic Control. Existing installations should remove the legacy EnergyPilot EMHASS YAML before enabling this schedule.",
-          "emhass_url": "Local EMHASS API base URL. The default is the standard Home Assistant EMHASS add-on hostname.",
-          "emhass_optimization_interval": "Periodic fallback interval. Recommended: 60 minutes. EnergyPilot also optimizes on Optimize now, AUTO resume, tomorrow-price publication and EV charging stop when configured.",
-          "emhass_soc_final_pct": "SOC target passed as soc_final. This does not replace your EMHASS minimum/maximum battery SOC settings.",
-          "emhass_fallback_load": "Used only when current load or Recorder history cannot provide a plausible load forecast.",
-          "use_nordpool_prices": "EnergyPilot requests timestamped prices from Home Assistant's official Nord Pool integration and passes load_cost_forecast and prod_price_forecast at runtime. During these EnergyPilot-managed runs the internal EMHASS price forecast method is therefore not used.",
-          "optimize_on_tomorrow_prices": "Automatically detects the official Nord Pool Tomorrow price available binary sensor. When it changes to ON, EnergyPilot immediately runs one fresh optimization so the new day is included without waiting for the next periodic cycle.",
-          "nordpool_area": "Optional. Leave empty to use the first area returned by the configured Nord Pool integration. Enter e.g. NL when needed.",
-          "nordpool_currency": "Currency requested from Nord Pool. Recommended: EUR.",
-          "buy_price_adder": "Amount added to the Nord Pool spot import price in EUR/kWh for supplier fees, taxes or other variable costs.",
-          "sell_price_deduction": "Amount subtracted from the Nord Pool spot export price in EUR/kWh. The validated Tibber setup used 0.0248 EUR/kWh.",
-          "enable_ev_coordination": "Optional. When enabled, EnergyPilot can react to EV charging and re-optimizes immediately when charging changes from active to stopped.",
-          "ev_mode_entity": "Optional EV charging-state entity.",
-          "ev_power_entity": "Optional EV charging-power entity in watts.",
-          "ev_deadband": "Charging power above this value is considered active EV charging."
+          "p_batt_entity": "Standard ID: sensor.p_batt_forecast. It can be entered before EMHASS creates the entity.", "optim_status_entity": "Standard ID: sensor.optim_status. It can be entered before EMHASS creates the entity.", "optim_required_state": "EnergyPilot executes P_batt only when this state matches. Standard: Optimal.", "max_power_kw": "Maximum charge or discharge request. Use 15.0 kW only when the inverter, battery and grid allow it.", "deadband": "Targets inside this range around 0 W become Battery Hold. Recommended: 300 W.", "scan_interval": "How often EnergyPilot polls the inverter. Recommended: 10 seconds.", "enable_emhass_orchestrator": "Runs optimization and publish independently from Automatic Control.", "emhass_url": "Default Home Assistant EMHASS add-on URL: http://5b918bf2-emhass:5000.", "emhass_optimization_interval": "Periodic fallback interval. Recommended: 60 minutes. Event triggers run immediately.", "emhass_soc_final_pct": "Runtime soc_final target. This does not replace the EMHASS minimum/maximum SOC limits.", "emhass_fallback_load": "Used only when live and historical house-load data are not plausible.", "use_nordpool_prices": "Uses nordpool.get_prices_for_date when available, otherwise a sensor with raw_today/raw_tomorrow. Disable this to use the price method configured inside EMHASS.", "optimize_on_tomorrow_prices": "Immediately creates a new plan when tomorrow prices become available.", "nordpool_area": "Optional market area such as NL. Leave empty to use the detected area/source.", "nordpool_currency": "Requested currency. Recommended: EUR.", "buy_price_adder": "Variable supplier fees, taxes or additions in EUR/kWh.", "sell_price_deduction": "Amount deducted from the market export price in EUR/kWh.", "enable_ev_coordination": "Holds the battery while EV charging is active and re-optimizes when charging stops.", "ev_mode_entity": "Optional EV charging-state entity.", "ev_power_entity": "Optional EV charging-power entity in watts.", "ev_deadband": "Power above this threshold is considered active EV charging."
         }
       }
     },
-    "error": {
-      "cannot_connect": "Unable to connect to the GoodWe ETA inverter or read EMS registers 47511/47512. Verify the inverter IP address, port, Unit ID and Modbus TCP availability."
-    },
-    "abort": {
-      "already_configured": "This GoodWe ETA inverter is already configured."
-    }
+    "error": {"cannot_connect": "Unable to connect to the GoodWe ETA or read EMS registers 47511/47512. Verify IP address, port, Unit ID and Modbus TCP availability."},
+    "abort": {"already_configured": "This GoodWe ETA inverter is already configured."}
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "GW EnergyPilot options",
-        "description": "Configure GoodWe control and the native EMHASS orchestrator. On upgrades, the built-in automatic optimizer schedule remains OFF until you explicitly enable it so it cannot conflict with an existing YAML scheduler.",
-        "data": {
-          "p_batt_entity": "EMHASS battery power target",
-          "optim_status_entity": "EMHASS optimization status",
-          "optim_required_state": "Required optimization state",
-          "max_power_kw": "Maximum inverter power",
-          "deadband": "Power deadband",
-          "scan_interval": "Modbus scan interval",
-          "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator",
-          "emhass_url": "EMHASS URL",
-          "emhass_optimization_interval": "Optimization interval",
-          "emhass_soc_final_pct": "Target SOC at end of optimization",
-          "emhass_fallback_load": "Fallback house load",
-          "use_nordpool_prices": "Use official Nord Pool runtime prices",
-          "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive",
-          "nordpool_area": "Nord Pool area",
-          "nordpool_currency": "Nord Pool currency",
-          "buy_price_adder": "Import price addition",
-          "sell_price_deduction": "Export price deduction",
-          "enable_ev_coordination": "Enable EV coordination",
-          "ev_mode_entity": "EV charging mode entity",
-          "ev_power_entity": "EV charging power entity",
-          "ev_deadband": "EV active power threshold"
-        },
-        "data_description": {
-          "p_batt_entity": "Standard value: sensor.p_batt_forecast.",
-          "optim_status_entity": "Standard value: sensor.optim_status.",
-          "optim_required_state": "Standard value: Optimal.",
-          "max_power_kw": "Maximum charge or discharge power EnergyPilot may request, expressed in kW.",
-          "deadband": "Recommended: 300 W; typical range 200-500 W.",
-          "scan_interval": "Recommended: 10 seconds.",
-          "enable_emhass_orchestrator": "Remove/disable the legacy EnergyPilot EMHASS YAML before enabling this recurring schedule.",
-          "emhass_url": "Default: http://5b918bf2-emhass:5000.",
-          "emhass_optimization_interval": "Recommended: 60 minutes. Event-driven optimizations still run immediately when needed.",
-          "emhass_soc_final_pct": "Default: 10%.",
-          "emhass_fallback_load": "Fallback only; normal operation uses current EnergyPilot load plus Recorder history.",
-          "use_nordpool_prices": "When enabled, EnergyPilot supplies runtime buy/sell forecasts to EMHASS, so EMHASS's internal price forecast method is bypassed for EnergyPilot-triggered runs.",
-          "optimize_on_tomorrow_prices": "Recommended: ON. Re-optimizes immediately when the official Nord Pool integration reports that tomorrow's prices are available.",
-          "nordpool_area": "Optional market area such as NL. Empty uses the first returned area.",
-          "nordpool_currency": "Recommended: EUR.",
-          "buy_price_adder": "Extra import cost added to spot price in EUR/kWh.",
-          "sell_price_deduction": "Export fee/deduction subtracted from spot price in EUR/kWh.",
-          "enable_ev_coordination": "Enable optional EV charging coordination and re-optimization after EV charging stops.",
-          "ev_mode_entity": "Optional EV charging-state entity.",
-          "ev_power_entity": "Optional EV charging-power entity in watts.",
-          "ev_deadband": "Power above this threshold is considered active EV charging."
-        }
-      }
-    }
-  },
+  "options": {"step": {"init": {
+    "title": "GW EnergyPilot options",
+    "description": "Configure GoodWe control, EMHASS orchestration, runtime prices and optional EV coordination.",
+    "data": {"p_batt_entity": "EMHASS battery power target entity ID", "optim_status_entity": "EMHASS optimization status entity ID", "optim_required_state": "Required optimization state", "max_power_kw": "Maximum inverter power", "deadband": "Power deadband", "scan_interval": "Modbus scan interval", "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator", "emhass_url": "EMHASS URL", "emhass_optimization_interval": "Periodic optimization interval", "emhass_soc_final_pct": "Target SOC at end of optimization", "emhass_fallback_load": "Fallback house load", "use_nordpool_prices": "Use Nord Pool runtime prices", "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive", "nordpool_area": "Nord Pool area", "nordpool_currency": "Nord Pool currency", "buy_price_adder": "Import price addition", "sell_price_deduction": "Export price deduction", "enable_ev_coordination": "Enable EV coordination", "ev_mode_entity": "EV charging mode entity", "ev_power_entity": "EV charging power entity", "ev_deadband": "EV active power threshold"},
+    "data_description": {"p_batt_entity": "Standard ID: sensor.p_batt_forecast.", "optim_status_entity": "Standard ID: sensor.optim_status.", "optim_required_state": "Standard: Optimal.", "max_power_kw": "Maximum charge or discharge request in kW.", "deadband": "Recommended: 300 W.", "scan_interval": "Recommended: 10 seconds.", "enable_emhass_orchestrator": "Enables hourly and event-driven optimization. No plan is created during Home Assistant startup.", "emhass_url": "Default: http://5b918bf2-emhass:5000.", "emhass_optimization_interval": "Recommended: 60 minutes.", "emhass_soc_final_pct": "Default: 10%.", "emhass_fallback_load": "Fallback only; normal operation uses calculated house load plus Recorder history.", "use_nordpool_prices": "Disable to let EMHASS use its own configured price method.", "optimize_on_tomorrow_prices": "Recommended: ON.", "nordpool_area": "Optional market area such as NL.", "nordpool_currency": "Recommended: EUR.", "buy_price_adder": "Extra import cost in EUR/kWh.", "sell_price_deduction": "Export deduction in EUR/kWh.", "enable_ev_coordination": "Optional EV hold and stop-triggered re-optimization.", "ev_mode_entity": "Optional EV charging-state entity.", "ev_power_entity": "Optional EV charging-power entity in watts.", "ev_deadband": "Power above this threshold is considered active EV charging."}
+  }}},
   "entity": {
-    "sensor": {
-      "ems_mode": {"name": "EMS mode"},
-      "ems_setpoint": {"name": "EMS setpoint"},
-      "control_command": {"name": "Control command"},
-      "target_power": {"name": "Target power"},
-      "ev_status": {"name": "EV charging status"}
-    },
-    "switch": {
-      "automatic_control": {"name": "Automatic control"}
-    },
-    "number": {
-      "manual_power": {"name": "Manual power"},
-      "emhass_minimum_soc": {"name": "EMHASS minimum battery SOC"},
-      "emhass_maximum_soc": {"name": "EMHASS maximum battery SOC"}
-    },
-    "select": {
-      "manual_mode": {"name": "Manual EMS mode"}
-    },
-    "button": {
-      "optimize_now": {"name": "Optimize now"},
-      "max_export": {"name": "Maximum export"},
-      "battery_pause": {"name": "Pause battery"},
-      "max_charge": {"name": "Maximum charge"},
-      "resume_auto": {"name": "AUTO - optimize and resume"}
-    }
+    "sensor": {"ems_mode": {"name": "EMS mode"}, "ems_setpoint": {"name": "EMS setpoint"}, "control_command": {"name": "Control command"}, "target_power": {"name": "Target power"}, "ev_status": {"name": "EV charging status"}},
+    "switch": {"automatic_control": {"name": "Automatic control"}},
+    "number": {"manual_power": {"name": "Manual power"}, "emhass_minimum_soc": {"name": "EMHASS minimum battery SOC"}, "emhass_maximum_soc": {"name": "EMHASS maximum battery SOC"}},
+    "select": {"manual_mode": {"name": "Manual EMS mode"}},
+    "button": {"optimize_now": {"name": "Optimize now"}, "max_export": {"name": "Maximum export"}, "battery_pause": {"name": "Pause battery"}, "max_charge": {"name": "Maximum charge"}, "resume_auto": {"name": "AUTO - optimize and resume"}}
   }
 }
