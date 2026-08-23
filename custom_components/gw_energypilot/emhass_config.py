@@ -41,21 +41,25 @@ def emhass_cost_function_from_config(config: dict[str, Any]) -> str | None:
     return value if value in EMHASS_COST_FUNCTIONS else None
 
 
-def _soc_percentage(config: dict[str, Any], key: str) -> float | None:
-    """Decode one EMHASS 0..1 SOC config value to a percentage."""
+def _finite_number(config: dict[str, Any], key: str) -> float | None:
+    """Decode one finite numeric EMHASS config value."""
     try:
         value = float(config.get(key))
     except (TypeError, ValueError):
         return None
-    if not math.isfinite(value):
-        return None
-    return round(value * 100.0, 2)
+    return value if math.isfinite(value) else None
+
+
+def _soc_percentage(config: dict[str, Any], key: str) -> float | None:
+    """Decode one EMHASS 0..1 SOC config value to a percentage."""
+    value = _finite_number(config, key)
+    return round(value * 100.0, 2) if value is not None else None
 
 
 def emhass_soc_diagnostics_from_config(
     config: dict[str, Any],
 ) -> dict[str, float | None]:
-    """Return SOC-related EMHASS config values with explicit percent semantics.
+    """Return SOC-related EMHASS config values with explicit semantics.
 
     These values come from EMHASS config.json. They are deliberately kept
     separate from EnergyPilot's runtime `soc_final` payload setting.
@@ -72,6 +76,9 @@ def emhass_soc_diagnostics_from_config(
         ),
         "emhass_soc_deficit_threshold_pct": _soc_percentage(
             config, "battery_soc_deficit_threshold"
+        ),
+        "emhass_soc_deficit_cost": _finite_number(
+            config, "battery_soc_deficit_cost"
         ),
     }
 
