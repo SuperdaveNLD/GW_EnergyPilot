@@ -362,7 +362,26 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.last_command, "waiting_for_optimization")
         self.assertEqual(coordinator.refresh_count, 0)
 
-    async def test_ev_charging_forces_battery_hold(self):
+    async def test_ev_charging_blocks_battery_discharge(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="2500",
+            p_grid="4000",
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+                const.CONF_EV_DEADBAND: 500,
+            },
+            states={"sensor.ev_power": "1200"},
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
+        self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
+        self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_ev_charging_allows_explicit_battery_charge(self):
         controller, _, client, coordinator = self.make_controller(
             p_batt="-2500",
             p_grid="4000",
@@ -377,8 +396,28 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
 
         await controller.async_evaluate()
 
+        self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 2500)])
+        self.assertEqual(controller.last_command, "ev_charge_allowed")
+        self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_ev_charging_neutral_plan_holds_battery(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="100",
+            p_grid="6000",
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+                const.CONF_EV_DEADBAND: 500,
+                const.CONF_DEADBAND: 300,
+            },
+            states={"sensor.ev_power": "1200"},
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
         self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
-        self.assertEqual(controller.last_command, "ev_hold")
+        self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
         self.assertEqual(coordinator.refresh_count, 1)
 
     async def test_disable_returns_to_goodwe_auto(self):
