@@ -29,7 +29,7 @@ custom_components/gw_energypilot/frontend/gw-energy-pilot-settings-v016.js
 custom_components/gw_energypilot/frontend/gw-energy-pilot-v017.js
 ```
 
-The v0.17 entry point layers the settings UI on top of the existing v0.16 Beta diagnostics, so the G20 field-validation tools remain available.
+The v0.17 entry point layers the settings UI on top of the existing v0.16 Beta diagnostics and stateful EMHASS strategy layer, so the G20 field-validation tools remain available.
 
 ## EP page
 
@@ -62,7 +62,11 @@ The EMHASS section currently manages EnergyPilot's integration with EMHASS:
 - import price adder;
 - export price deduction.
 
-The existing live EMHASS minimum/maximum SOC sliders and cost-function buttons remain on the dashboard. They write EMHASS `config.json` through the existing EMHASS API path and are intentionally not duplicated inside the config-entry settings API yet.
+The live EMHASS minimum/maximum SOC sliders and **EMHASS optimization strategy** are deliberately separate from these ConfigEntry options because they write the active EMHASS `config.json` through the existing `/get-config` → `/set-config` path.
+
+The optimization strategy is exposed as one stateful Home Assistant select backed by EMHASS `costfun`. The dashboard highlights its current Profit / Cost / Self-consumption value. The three older v0.15 strategy buttons remain as backward-compatible configuration actions for existing automations.
+
+These live EMHASS controls are intentionally not duplicated inside the ConfigEntry settings WebSocket API.
 
 ## GOODWE page
 
