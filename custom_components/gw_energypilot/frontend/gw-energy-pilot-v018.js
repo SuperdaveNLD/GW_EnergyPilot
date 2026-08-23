@@ -150,6 +150,64 @@ function ensureBetaSocStyles(root) {
   root.appendChild(style);
 }
 
+function betaSnapshotV018(panel) {
+  const optimizeId = panel._entityId("optimize_now");
+  const attrs = (optimizeId ? panel._state(optimizeId)?.attributes : null) || {};
+  const fields = [
+    ["On-grid minimum SOC 45356 %", attrs.battery_discharge_depth_on_grid_45356],
+    ["Off-grid minimum SOC 45358 %", attrs.battery_discharge_depth_off_grid_45358],
+    ["SOC protection candidate 47500", attrs.battery_soc_protection_47500],
+    ["Extended grid export candidate 36104 kWh", attrs.meter_total_energy_export_extended_candidate],
+    ["Extended grid import candidate 36120 kWh", attrs.meter_total_energy_import_extended_candidate],
+    ["Legacy grid export 36015 kWh", attrs.meter_total_energy_export],
+    ["Legacy grid import 36017 kWh", attrs.meter_total_energy_import],
+    ["Battery SOC", attrs.battery_soc],
+    ["EMS mode 47511", attrs.ems_mode],
+    ["EMS setpoint 47512", attrs.ems_setpoint],
+  ];
+  return [
+    `GW EnergyPilot v${VERSION} beta G20 diagnostics`,
+    "45356/45358: manual field-test settings with write + read-back verification.",
+    "47500/36104/36120: read-only Beta diagnostics; no Beta value is an Automatic Control target.",
+    ...fields.map(([label, value]) => `${label}: ${value ?? "—"}`),
+  ].join("\n");
+}
+
+function alignBetaDiagnostics(panel, root) {
+  const labels = {
+    "soc-on-grid": "BETA · On-grid minimum SOC 45356",
+    "soc-off-grid": "BETA · Off-grid minimum SOC 45358",
+  };
+  for (const [marker, label] of Object.entries(labels)) {
+    const rowLabel = root.querySelector(`[data-v016-beta="${marker}"] span`);
+    if (rowLabel) rowLabel.textContent = label;
+  }
+
+  const note = root.querySelector(".ep-v016-beta-note");
+  if (note) {
+    note.textContent = "BETA: 45356/45358 are manual v0.18 minimum-SOC field-test settings with verified read-back. 47500, 36104 and 36120 remain read-only. No Beta value is an Automatic Control target.";
+  }
+
+  const oldCopy = root.querySelector(".ep-v016-copy");
+  if (!oldCopy || oldCopy.dataset.v018Copy === "1") return;
+
+  const button = oldCopy.cloneNode(true);
+  button.dataset.v018Copy = "1";
+  button.textContent = "Copy beta diagnostics";
+  oldCopy.replaceWith(button);
+  button.addEventListener("click", async () => {
+    const text = betaSnapshotV018(panel);
+    try {
+      await navigator.clipboard.writeText(text);
+      const previous = button.textContent;
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = previous; }, 1200);
+    } catch (_err) {
+      window.prompt("Copy EnergyPilot beta diagnostics", text);
+    }
+  });
+}
+
 async function loadBetaSoc(panel, entryId, force = false) {
   if (!panel._hass?.callWS || !entryId || panel.__epV018BetaLoading) return;
   if (!force && panel.__epV018BetaLoadedEntry === entryId && panel.__epV018BetaData) return;
@@ -257,7 +315,7 @@ function renderBetaSocSettings(panel, root) {
             min="0"
             max="100"
             step="1"
-            value="${panel._escape(value ?? "") }"
+            value="${panel._escape(value ?? "")}"
             data-beta-soc-input="${panel._escape(field.key)}"
             ${!available || busy ? "disabled" : ""}
             aria-label="${panel._escape(field.label)}">
@@ -329,6 +387,7 @@ PanelClass.prototype._render = function energyPilotV018Render() {
   const root = this.shadowRoot;
   if (!root) return;
 
+  alignBetaDiagnostics(this, root);
   renderBetaSocSettings(this, root);
 
   const versionBadge = root.querySelector(".version");
