@@ -101,6 +101,30 @@ Preserve their units, device classes, state classes, and unique IDs to protect l
 
 The v0.16+ extended `36104/36120` values remain Beta diagnostics and are deliberately **not** separate Recorder-facing canonical energy entities yet.
 
+### Persistent daily grid accounting
+
+v0.23 adds two EnergyPilot-owned daily accounting entities derived from the canonical lifetime counters above:
+
+| Stable unique-ID suffix | Display name | Unit | State class | Source |
+|---|---|---|---|---|
+| `grid_energy_imported_today` | Grid energy imported today | kWh | `TOTAL_INCREASING` | `meter_total_energy_import` / `36017` |
+| `grid_energy_exported_today` | Grid energy exported today | kWh | `TOTAL_INCREASING` | `meter_total_energy_export` / `36015` |
+
+These are **derived accounting entities**, not alternative GoodWe meter-register interpretations. They do not replace or duplicate the physical lifetime counters.
+
+Contract:
+
+- one persistent accounting runtime exists per GW EnergyPilot config entry;
+- live values are accumulated from positive differences between consecutive canonical GoodWe lifetime-counter samples;
+- a lifetime-counter decrease re-baselines the source and is not treated as negative energy;
+- `last_period` exposes the previous completed local-day value when known;
+- accounting state survives Home Assistant restarts through Home Assistant storage;
+- Recorder may be used once to bootstrap an existing installation at local-midnight boundaries, but Recorder is not part of the live delta loop;
+- the dashboard consumes these entities instead of implementing a second daily accounting algorithm;
+- future import-cost/export-revenue accounting must consume the same accounting deltas rather than reconstructing energy independently.
+
+See `docs/ACCOUNTING.md` for the full accounting and future financial-accounting contract.
+
 ## Beta SOC Diagnostic entities
 
 v0.17 exposes three read-only candidate values as enabled-by-default Home Assistant Diagnostic sensors so field testers can see them directly on the device page:
