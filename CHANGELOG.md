@@ -2,6 +2,36 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.23] - 2026-08-23
+
+### Added
+
+- A per-config-entry **persistent EnergyPilot accounting runtime** backed by Home Assistant storage.
+- Native daily `total_increasing` energy sensors `grid_energy_imported_today` and `grid_energy_exported_today`, each exposing the completed previous-day value as `last_period`.
+- One-time Recorder boundary bootstrap for existing installations so a v0.23 upgrade can recover current-day and previous-day grid totals when canonical counter history is available.
+- Pure accounting-model regression tests covering first-sample baselining, positive lifetime-counter deltas, counter decreases, midnight rollover, stale-start rollover, Recorder seeding and persistence round trips.
+- `docs/ACCOUNTING.md` as the architectural contract for future energy-cost/revenue accounting.
+
+### Changed
+
+- Grid Today/Yesterday values now come from the persistent EnergyPilot accounting backend instead of being calculated independently in the dashboard from Recorder statistic changes.
+- The 24-hour Grid modal keeps Recorder for its power graph, but its daily import/export values are patched from the same accounting entities used by the main Grid card.
+- The active frontend is `gw-energy-pilot-v023.js`, layered on v0.22.
+
+### Accounting contract
+
+- GoodWe `36017` remains the canonical lifetime grid-import source.
+- GoodWe `36015` remains the canonical lifetime grid-export source.
+- EnergyPilot derives only positive per-refresh deltas from those counters; a decrease re-baselines without inventing negative energy or reset semantics.
+- The live accounting loop does not require Recorder. Recorder is only an optional migration/bootstrap source for local-midnight boundary values.
+- The accounting runtime is the future insertion point for interval-based import cost and export revenue using the same energy deltas and the existing EnergyPilot/EMHASS effective price configuration.
+
+### Safety boundary
+
+- No GoodWe register definitions, Modbus read blocks, EMS writes, Automatic Control mapping or EMHASS optimization behavior change.
+- Existing lifetime energy entity unique IDs and long-term statistics remain unchanged.
+- v0.23 remains **Beta** until the new persistent daily accounting path has multi-installation field exposure.
+
 ## [0.22] - 2026-08-23
 
 ### Added
@@ -159,7 +189,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Beta status
 
-- v0.17 remains **Beta** because the new settings UI/device migration has only limited field exposure and the G20 candidate register semantics are still being correlated across the active tester installations.
+- v0.17 remains **Beta** because the new settings UI/device migration has only limited real-installation exposure and the G20 candidate register semantics are still being correlated across the active tester installations.
 - The G20 Beta registers remain read-only and optional.
 - The settings pages and stateful strategy selector do not change GoodWe EMS modes, register write ordering, `P_batt` mapping, sign conventions or controller ownership.
 
