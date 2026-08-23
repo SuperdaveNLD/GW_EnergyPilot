@@ -104,6 +104,10 @@ class GWModbusClient:
         elif definition.data_type == RegisterDataType.FLOAT32:
             raw_bytes = pack(">HH", register_map[address], register_map[address + 1])
             raw = float(unpack(">f", raw_bytes)[0])
+        elif definition.data_type == RegisterDataType.UINT64:
+            raw = 0
+            for offset in range(4):
+                raw = (int(raw) << 16) | register_map[address + offset]
         else:
             raw = (register_map[address] << 16) | register_map[address + 1]
             if definition.data_type == RegisterDataType.INT32:
@@ -158,6 +162,11 @@ class GWModbusClient:
 
             for start, count in OPTIONAL_TELEMETRY_BLOCKS:
                 try:
+                    # A rejected optional range closes the pymodbus client in
+                    # _async_read_block(). Reconnect before the next optional
+                    # range so one unsupported diagnostic does not suppress the
+                    # others or affect the successful required telemetry.
+                    await self._async_ensure_connected()
                     registers = await self._async_read_block(start, count)
                 except GWModbusError as err:
                     _LOGGER.debug(
