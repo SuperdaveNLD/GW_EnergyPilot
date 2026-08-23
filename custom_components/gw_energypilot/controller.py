@@ -288,15 +288,22 @@ class GWEnergyPilotController:
         actual_power = getattr(data, "power", None)
         return actual_power is not None and int(actual_power) == int(power)
 
-    async def _async_apply_command(self, mode: int, power: int, command: str) -> None:
-        """Update controller state and write only when inverter readback differs."""
+    async def _async_apply_command(
+        self,
+        mode: int,
+        power: int,
+        command: str,
+        *,
+        skip_if_readback_matches: bool = False,
+    ) -> None:
+        """Update controller state and optionally suppress duplicate feedback writes."""
         power = max(0, int(power))
         self.target_power = power
         self.expected_mode = mode
         self.last_command = command
         self._notify_state()
 
-        if self._actual_command_matches(mode, power):
+        if skip_if_readback_matches and self._actual_command_matches(mode, power):
             return
         await self.client.async_set_mode(mode, power)
         await self.coordinator.async_request_refresh()
@@ -333,7 +340,12 @@ class GWEnergyPilotController:
         if self._grid_neutral_hold_until <= now:
             self._grid_neutral_hold_until = now + GRID_NEUTRAL_HOLD_SECONDS
         self.grid_neutral_export_samples = 0
-        await self._async_apply_command(MODE_BATTERY_HOLD, 0, command)
+        await self._async_apply_command(
+            MODE_BATTERY_HOLD,
+            0,
+            command,
+            skip_if_readback_matches=True,
+        )
 
     @staticmethod
     def _round_charge_power(power: float, cap: int) -> int:
@@ -379,6 +391,7 @@ class GWEnergyPilotController:
                 MODE_BATTERY_HOLD,
                 0,
                 "grid_neutral_hold",
+                skip_if_readback_matches=True,
             )
             return
 
@@ -391,6 +404,7 @@ class GWEnergyPilotController:
                     MODE_BATTERY_HOLD,
                     0,
                     "grid_neutral_hold",
+                    skip_if_readback_matches=True,
                 )
                 return
 
@@ -405,6 +419,7 @@ class GWEnergyPilotController:
                     MODE_BATTERY_HOLD,
                     0,
                     "grid_neutral_waiting_for_surplus",
+                    skip_if_readback_matches=True,
                 )
                 return
 
@@ -422,6 +437,7 @@ class GWEnergyPilotController:
                 MODE_CHARGE_BATTERY,
                 restart_power,
                 "grid_neutral_charge",
+                skip_if_readback_matches=True,
             )
             return
 
@@ -459,6 +475,7 @@ class GWEnergyPilotController:
             MODE_CHARGE_BATTERY,
             proposed_power,
             "grid_neutral_charge",
+            skip_if_readback_matches=True,
         )
 
     async def _async_evaluate_locked(self) -> None:
