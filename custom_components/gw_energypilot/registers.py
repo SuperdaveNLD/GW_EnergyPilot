@@ -32,7 +32,7 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (35103, 87),  # PV, inverter, load, temperatures, battery, status
     (35212, 9),   # Battery string count + diagnose result
     (35301, 35),  # PV total + extended warning/error registers
-    (36003, 55),  # Smart meter runtime values
+    (36003, 55),  # Smart meter runtime values + cumulative grid energy
     (37002, 22),  # BMS, SOC/SOH, cell temperatures and voltages
     (47000, 1),   # APP / Work mode diagnostic
     (47509, 4),   # Feed-power state + EMS mode/setpoint
@@ -143,7 +143,8 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
         "warning_message_extended_32bit", 35335, RegisterDataType.UINT32
     ),
 
-    # Smart meter
+    # Smart meter. The cumulative import/export counters are 32-bit counters
+    # in Wh units, exposed as kWh by the 0.001 scale.
     RegisterDefinition("meter_test_status", 36003, RegisterDataType.UINT16),
     RegisterDefinition("meter_communication", 36004, RegisterDataType.UINT16),
     RegisterDefinition("meter_l1_power_fast", 36005, RegisterDataType.INT16),
@@ -151,6 +152,12 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("meter_l3_power_fast", 36007, RegisterDataType.INT16),
     RegisterDefinition("meter_total_power_fast", 36008, RegisterDataType.INT16),
     RegisterDefinition("meter_frequency", 36014, RegisterDataType.UINT16, 0.01, 2),
+    RegisterDefinition(
+        "meter_total_energy_export", 36015, RegisterDataType.UINT32, 0.001, 3
+    ),
+    RegisterDefinition(
+        "meter_total_energy_import", 36017, RegisterDataType.UINT32, 0.001, 3
+    ),
     RegisterDefinition("meter_l1_active_power", 36019, RegisterDataType.INT32),
     RegisterDefinition("meter_l2_active_power", 36021, RegisterDataType.INT32),
     RegisterDefinition("meter_l3_active_power", 36023, RegisterDataType.INT32),
