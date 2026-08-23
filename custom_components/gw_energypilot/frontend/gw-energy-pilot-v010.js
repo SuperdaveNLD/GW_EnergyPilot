@@ -119,12 +119,12 @@ function ensureStyles(root) {
       box-shadow: 0 0 10px rgba(255,124,115,.55);
     }
 
-    /* One-touch GoodWe battery control. These are native HA button entities,
-       not frontend-only shortcuts. Every action takes manual ownership and
-       therefore turns EnergyPilot Automatic Control off. */
+    /* One-touch GoodWe battery control. The three manual actions take manual
+       ownership. AUTO creates a fresh EMHASS plan first and only then returns
+       control ownership to the automatic controller. */
     .ep-battery-actions {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 7px;
       margin: 12px 0 9px;
     }
@@ -159,6 +159,11 @@ function ensureStyles(root) {
     }
     .ep-battery-action[data-action="max_export"] {
       color: #79e6fb;
+    }
+    .ep-battery-action[data-action="resume_auto"] {
+      border-color: rgba(37, 235, 171, .34);
+      color: #a2f7d3;
+      background: rgba(9, 67, 65, .44);
     }
     .ep-battery-action.active {
       border-color: rgba(35, 242, 179, .65);
@@ -245,7 +250,7 @@ function ensureStyles(root) {
     @media (max-width: 720px) {
       .ep-v010-emhass-actions { justify-content: flex-start; }
       .panel-card.emhass .section-title-row { align-items: flex-start; }
-      .ep-battery-actions { gap: 5px; }
+      .ep-battery-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
       .ep-battery-action { min-height: 40px; padding: 6px 4px; font-size: 8px; }
     }
   `;
@@ -304,13 +309,15 @@ function installOptimizeNow(panel, root) {
     const tone = orchestratorTone(status);
     const lastSuccess = formatLastSuccess(panel, attrs.last_success);
     const schedule = attrs.automatic_schedule ? "Automatic schedule enabled" : "Manual only";
+    const priceSource = attrs.price_runtime_source === "nordpool" ? "Nord Pool runtime prices" : "EMHASS price configuration";
+    const priceTrigger = attrs.price_refresh_automation ? "price refresh trigger on" : "price refresh trigger off";
     const errorText = attrs.last_error ? ` · ${attrs.last_error}` : "";
     target.insertAdjacentHTML(
       "afterend",
       `<div class="ep-v010-orchestrator ${tone}">
         <div>
           <strong>EnergyPilot orchestrator · ${panel._escape(status)}</strong>
-          <small>${panel._escape(schedule)} · Last success: ${panel._escape(lastSuccess)}${panel._escape(errorText)}</small>
+          <small>${panel._escape(schedule)} · ${panel._escape(priceSource)} · ${panel._escape(priceTrigger)} · Last success: ${panel._escape(lastSuccess)}${panel._escape(errorText)}</small>
         </div>
         <span class="ep-v010-orchestrator-dot"></span>
       </div>`
@@ -344,17 +351,30 @@ function installBatteryQuickActions(panel, root) {
       command: "manual_max_charge",
       title: "GoodWe mode 11 · maximum configured battery charge power",
     },
+    {
+      key: "resume_auto",
+      label: "AUTO",
+      busy: "Optimizing…",
+      command: null,
+      title: "Run one fresh EMHASS optimization, then resume Automatic Control",
+    },
   ];
 
   const currentCommand = panel._textByKey("control_command", "");
+  const automaticEntityId = panel._entityId("automatic_control");
+  const automaticState = automaticEntityId ? panel._state(automaticEntityId) : null;
+  const automaticOn = automaticState?.state === "on";
   const actionWrap = document.createElement("div");
   actionWrap.className = "ep-battery-actions";
 
   for (const definition of definitions) {
     const entityId = panel._entityId(definition.key);
+    const active = definition.key === "resume_auto"
+      ? automaticOn
+      : currentCommand === definition.command;
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `ep-battery-action${currentCommand === definition.command ? " active" : ""}`;
+    button.className = `ep-battery-action${active ? " active" : ""}`;
     button.dataset.action = definition.key;
     button.title = definition.title;
     button.disabled = !entityId;
@@ -370,7 +390,7 @@ function installBatteryQuickActions(panel, root) {
     socTrack.insertAdjacentElement("afterend", actionWrap);
     actionWrap.insertAdjacentHTML(
       "afterend",
-      `<div class="ep-battery-action-note">Manual battery actions disable Automatic Control. Max export uses grid target mode 10; Pause uses Battery Hold mode 8; Max charge uses battery charge mode 11.</div>`
+      `<div class="ep-battery-action-note">Max export, Pause and Max charge switch to manual control. AUTO first forces one fresh EMHASS optimization and only enables Automatic Control after that optimization succeeds.</div>`
     );
   } else {
     card.appendChild(actionWrap);
