@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v016.js?v=0.16-beta-g20-1";
+import "./gw-energy-pilot-v016.js?v=0.16-beta-g20-strategy2";
 import "./gw-energy-pilot-settings-v016.js?v=0.17-settings1";
 
 const VERSION = "0.17";
