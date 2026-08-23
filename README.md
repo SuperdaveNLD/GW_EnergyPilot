@@ -20,7 +20,8 @@ See:
 
 - `docs/RELEASE_NOTES.md` — status and user-facing notes for every version;
 - `CHANGELOG.md` — detailed technical history;
-- `docs/EMS_MODES.md` — exact meaning of GoodWe EMS modes 1–12.
+- `docs/EMS_MODES.md` — exact meaning of GoodWe EMS modes 1–12;
+- `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge ownership, behavior and Grid Rewards use case.
 
 ## Tested hardware
 
@@ -49,7 +50,7 @@ Whether modes 9 / 10 / 11 / 12 work as documented
 - native EMHASS optimization and publishing;
 - stateful EMHASS `profit`, `cost` and `self-consumption` strategy control;
 - optional Nord Pool runtime pricing;
-- optional EV coordination;
+- optional **EV anti-discharge protection**;
 - built-in EnergyPilot dashboard;
 - native grid import/export power and cumulative energy;
 - optional battery accounting diagnostics;
@@ -95,7 +96,7 @@ Use only one integration for continuous direct GoodWe polling/control where prac
 
 The administrator settings gear has three pages:
 
-- **EP** — maximum control power, control deadband, telemetry cadence and EV coordination;
+- **EP** — maximum control power, control deadband, telemetry cadence and EV anti-discharge protection;
 - **EMHASS** — URL, scheduler, output entities, runtime price settings and related EnergyPilot options;
 - **GOODWE** — inverter connection, **GoodWe smart meter active**, and manual G20 minimum-SOC field tests.
 
@@ -167,6 +168,28 @@ P_batt near 0 W    → mode 8  Battery Hold
 This fallback does not require a valid `P_grid` output.
 
 Use it when the GoodWe smart meter is absent/unavailable or while validating another model/firmware.
+
+## EV anti-discharge protection
+
+The EV feature is a directional battery guard, **not an EV charging controller**. The charging station or external charging service keeps full ownership of the EV charging session.
+
+When EV charging is detected:
+
+```text
+EMHASS P_batt requests discharge  → mode 8 Battery Hold
+EMHASS P_batt is neutral          → mode 8 Battery Hold
+EMHASS P_batt requests charge     → mode 11 Battery charge allowed
+```
+
+The reason for this distinction is that an EV can intentionally charge outside the cheapest spot-price period. A concrete example is **Tibber Grid Rewards**, where Tibber can use connected chargers to support grid conditions and reward the customer for that flexibility. In such a session, the home battery must not discharge into the EV merely because the EV is consuming power, but the EV session should also not block a separate EMHASS plan that wants to charge the home battery.
+
+GW EnergyPilot does not integrate with or control Tibber Grid Rewards. It is documented as an example of why EV charging ownership and home-battery optimization must remain separate.
+
+During an active EV session, an explicit home-battery charge request uses direct GoodWe mode 11 even if the normal automatic strategy uses PCC modes 9/10/1. This preserves the anti-discharge guarantee when EV load changes. GoodWe, the BMS and installation protection remain authoritative for hardware limits.
+
+After EV charging stops, the existing fresh-optimization guard remains: when native orchestration is enabled, EnergyPilot waits for a fresh EMHASS plan before normal automatic control resumes.
+
+Full design: `docs/EV_ANTI_DISCHARGE.md`.
 
 ## Manual modes
 
@@ -316,6 +339,7 @@ When SEMS/SEMS+ is used, some users have observed issues with the official GoodW
 - `docs/ARCHITECTURE.md` — runtime structure and ownership;
 - `docs/EMHASS_SETUP.md` — EMHASS installation/output/control setup;
 - `docs/EMS_MODES.md` — modes 1–12;
+- `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge behavior and external Grid Rewards use case;
 - `docs/GRID_NEUTRAL_CHARGING.md` — migration from old mode-11 feedback to v0.22 PCC control;
 - `docs/MODBUS.md` — register semantics and evidence policy;
 - `docs/SETTINGS.md` — configuration ownership/security;
