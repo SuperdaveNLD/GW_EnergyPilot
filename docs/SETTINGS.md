@@ -8,7 +8,7 @@ The settings gear opens three sections:
 - **EMHASS** — EnergyPilot-owned EMHASS connection, scheduling, output mapping and Nord Pool runtime-price settings;
 - **GOODWE** — local GoodWe connection, automatic actuator strategy and manual G20 field-test controls.
 
-v0.23 remains **Beta** because the automatic mode-9/mode-10 strategy and the new persistent/runtime features still have limited multi-installation field exposure.
+v0.24 remains **Beta** because the automatic mode-9/mode-10 strategy and the persistent/runtime features still have limited multi-installation field exposure, and the restored compatibility default needs upgrade field verification.
 
 ## Configuration ownership
 
@@ -28,7 +28,7 @@ custom_components/gw_energypilot/smart_meter_api.py
 custom_components/gw_energypilot/beta_soc_api.py
 ```
 
-The active frontend is layered; v0.23 adds accounting/current-release presentation on top of the v0.22 settings/control implementation rather than creating a second settings page.
+The active frontend is layered; v0.24 adds a thin release wrapper on top of the complete v0.23 dashboard stack.
 
 ## EP page
 
@@ -118,13 +118,13 @@ Only after successful validation does EnergyPilot update/reload the existing con
 
 ## GoodWe smart meter active
 
-v0.22 introduced the dedicated strategy switch on the GOODWE page. The same strategy remains active in v0.23.
+v0.22 introduced the dedicated strategy switch on the GOODWE page. v0.24 keeps both strategies but changes the **missing-value default** back to direct battery control for backwards compatibility.
 
 This value belongs to the GoodWe/config-entry layer, not to EMHASS `config.json`.
 
 ### ON — PCC/grid target control
 
-This is the current default.
+This is an **explicit opt-in** in v0.24.
 
 Automatic Control uses EMHASS `P_grid`:
 
@@ -142,9 +142,9 @@ If the setting is changed while Automatic Control is ON, the dashboard requires 
 
 The EV anti-discharge override is separate from this normal strategy. While EV charging is active, it may use direct mode 11 for an explicit battery-charge request so a changing EV load cannot turn a site-level PCC target into battery discharge.
 
-### OFF — direct battery fallback
+### OFF or not yet configured — direct battery control
 
-Automatic Control uses EMHASS `P_batt`:
+This is the v0.24 compatibility default. Automatic Control uses EMHASS `P_batt`:
 
 ```text
 P_batt < -deadband -> mode 11 Battery charge power
@@ -152,9 +152,11 @@ P_batt > +deadband -> mode 12 Battery discharge power
 P_batt near 0 W    -> mode 8  Battery Hold
 ```
 
-This fallback does not require `P_grid` to be valid.
+This path does not require `P_grid` to be valid.
 
-Use it for installations without a usable GoodWe smart meter or while validating a different ETA-G20/firmware combination.
+Existing installations that predate the v0.22 strategy key therefore keep the historical direct `P_batt` behavior after upgrading to v0.24 unless the operator explicitly enables PCC control.
+
+Use explicit ON only when the GoodWe smart meter is present, its telemetry is valid, and PCC mode 9/10 behavior has been validated for the installation.
 
 The strategy switch affects **Automatic Control only**. Manual mode 9/10/11/12 selections always execute exactly the selected mode.
 
@@ -205,7 +207,7 @@ The v0.17 migration moves legacy devices to the stable identifier before entity 
 
 ## Persistent state is not settings
 
-v0.23 introduces Home Assistant storage for two kinds of EnergyPilot-owned runtime data:
+v0.23 introduced Home Assistant storage for two kinds of EnergyPilot-owned runtime data:
 
 - derived daily grid accounting;
 - small runtime evidence such as orchestrator `last_success`.
@@ -230,7 +232,7 @@ Except for the dedicated manual `45356/45358` write path, Beta register candidat
 
 The mode-9/mode-10 strategy is different: it uses established EMS registers `47511/47512` and the GoodWe smart meter. Its **automatic use** remains Beta because the strategy has limited field exposure, not because new register addresses are being guessed.
 
-The extended `36104/36120` counters remain diagnostics and are not used by the v0.23 canonical accounting runtime.
+The extended `36104/36120` counters remain diagnostics and are not used by the canonical accounting runtime.
 
 ## Security
 
@@ -257,10 +259,10 @@ The Beta SOC API accepts only the fixed register-key whitelist and percentage ra
 - GoodWe connection changes validate first, then reload the existing entry.
 - The GoodWe smart-meter strategy can be changed without a full reload because the controller reads the config-entry data dynamically; when Automatic Control is active the current plan is re-evaluated immediately after the change.
 - Manual `45356/45358` field-test writes do not reload the integration.
-- v0.23 persistent accounting/runtime Stores survive a normal config-entry reload and Home Assistant restart.
+- Persistent accounting/runtime Stores survive a normal config-entry reload and Home Assistant restart.
 
 ## Multiple EnergyPilot entries
 
 The main settings model supports multiple GW EnergyPilot config entries and saves only to the selected entry.
 
-The smart-meter strategy and Beta SOC controls also operate on the selected entry, so one inverter can use PCC modes 9/10 while another remains on direct modes 11/12. Persistent accounting/runtime state is likewise scoped per config-entry ID.
+The smart-meter strategy and Beta SOC controls also operate on the selected entry, so one inverter can explicitly use PCC modes 9/10 while another remains on direct modes 11/12. Persistent accounting/runtime state is likewise scoped per config-entry ID.
