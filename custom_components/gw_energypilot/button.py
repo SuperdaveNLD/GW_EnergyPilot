@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -24,7 +26,7 @@ from .const import (
     MODE_GRID_EXPORT_TARGET,
     MODE_NAMES,
 )
-from .emhass_config import async_patch_emhass_config
+from .emhass_config import async_set_emhass_cost_function
 from .entity import GWEnergyPilotEntity
 
 
@@ -197,8 +199,9 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
 
 
 class _GWEMHASSCostFunctionButton(GWEnergyPilotEntity, ButtonEntity):
-    """Base class for one-touch EMHASS cost-function selection."""
+    """Backward-compatible one-touch EMHASS strategy action."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     cost_function: str
 
     def __init__(self, entry: GWConfigEntry) -> None:
@@ -212,14 +215,20 @@ class _GWEMHASSCostFunctionButton(GWEnergyPilotEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Persist the selected EMHASS objective and create a fresh plan."""
-        await async_patch_emhass_config(
+        await async_set_emhass_cost_function(
             self.hass,
             self.entry,
-            {"costfun": self.cost_function},
+            self.cost_function,
         )
-        await self.entry.runtime_data.orchestrator.async_optimize(
-            reason=f"cost_function_{self.cost_function}"
-        )
+        try:
+            await self.entry.runtime_data.orchestrator.async_optimize(
+                reason=f"cost_function_{self.cost_function}"
+            )
+        except HomeAssistantError as err:
+            raise HomeAssistantError(
+                f"EMHASS cost function '{self.cost_function}' was saved, but "
+                f"the fresh optimization failed: {err}"
+            ) from err
 
 
 class GWEMHASSProfitButton(_GWEMHASSCostFunctionButton):

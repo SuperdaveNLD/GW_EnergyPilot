@@ -73,6 +73,12 @@ def _load_emhass_config():
     )
     helpers.aiohttp_client = aiohttp_client
 
+    dispatcher = _module(
+        "homeassistant.helpers.dispatcher",
+        async_dispatcher_send=lambda *args, **kwargs: None,
+    )
+    helpers.dispatcher = dispatcher
+
     importlib.import_module(f"{PACKAGE_NAME}.const")
     return importlib.import_module(f"{PACKAGE_NAME}.emhass_config")
 
@@ -82,6 +88,7 @@ emhass_config = _load_emhass_config()
 
 class FakeEntry:
     options = {}
+    entry_id = "test-entry"
 
 
 class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
@@ -155,6 +162,44 @@ class EMHASSConfigTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["costfun"], "self-consumption")
         self.assertEqual(result["custom_setting"], "preserve-me")
         self.assertEqual(written, [result])
+
+    async def test_set_cost_function_uses_canonical_safe_patch(self):
+        captured = []
+
+        async def fake_patch(_hass, _entry, updates):
+            captured.append(deepcopy(updates))
+            return {"costfun": updates["costfun"], "keep": True}
+
+        previous_patch = emhass_config.async_patch_emhass_config
+        emhass_config.async_patch_emhass_config = fake_patch
+        try:
+            result = await emhass_config.async_set_emhass_cost_function(
+                object(),
+                FakeEntry(),
+                "self-consumption",
+            )
+        finally:
+            emhass_config.async_patch_emhass_config = previous_patch
+
+        self.assertEqual(captured, [{"costfun": "self-consumption"}])
+        self.assertEqual(result["keep"], True)
+
+    async def test_set_cost_function_rejects_unknown_value(self):
+        with self.assertRaises(emhass_config.HomeAssistantError):
+            await emhass_config.async_set_emhass_cost_function(
+                object(),
+                FakeEntry(),
+                "unknown-strategy",
+            )
+
+    def test_cost_function_reader_only_accepts_supported_values(self):
+        self.assertEqual(
+            emhass_config.emhass_cost_function_from_config({"costfun": "profit"}),
+            "profit",
+        )
+        self.assertIsNone(
+            emhass_config.emhass_cost_function_from_config({"costfun": "invalid"})
+        )
 
 
 if __name__ == "__main__":

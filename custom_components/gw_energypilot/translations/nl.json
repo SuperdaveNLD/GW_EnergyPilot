@@ -32,7 +32,19 @@
     "sensor": {"ems_mode": {"name": "EMS mode"}, "ems_setpoint": {"name": "EMS setpoint"}, "control_command": {"name": "Control command"}, "target_power": {"name": "Target power"}, "ev_status": {"name": "EV charging status"}},
     "switch": {"automatic_control": {"name": "Automatic control"}},
     "number": {"manual_power": {"name": "Manual power"}, "emhass_minimum_soc": {"name": "EMHASS minimum battery SOC"}, "emhass_maximum_soc": {"name": "EMHASS maximum battery SOC"}},
-    "select": {"manual_mode": {"name": "Manual EMS mode"}},
-    "button": {"optimize_now": {"name": "Optimize now"}, "emhass_costfun_profit": {"name": "EMHASS winst"}, "emhass_costfun_cost": {"name": "EMHASS kosten"}, "emhass_costfun_self_consumption": {"name": "EMHASS zelfverbruik"}, "max_export": {"name": "Maximum export"}, "battery_pause": {"name": "Pause battery"}, "max_charge": {"name": "Maximum charge"}, "resume_auto": {"name": "AUTO - optimize and resume"}}
+    "select": {
+      "manual_mode": {"name": "Manual EMS mode"},
+      "emhass_cost_function": {"name": "EMHASS optimalisatiestrategie"}
+    },
+    "button": {
+      "optimize_now": {"name": "Optimize now"},
+      "emhass_costfun_profit": {"name": "Stel EMHASS in op winst"},
+      "emhass_costfun_cost": {"name": "Stel EMHASS in op kosten"},
+      "emhass_costfun_self_consumption": {"name": "Stel EMHASS in op zelfverbruik"},
+      "max_export": {"name": "Maximum export"},
+      "battery_pause": {"name": "Pause battery"},
+      "max_charge": {"name": "Maximum charge"},
+      "resume_auto": {"name": "AUTO - optimize and resume"}
+    }
   }
 }
