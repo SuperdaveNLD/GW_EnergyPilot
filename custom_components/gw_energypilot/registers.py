@@ -39,10 +39,13 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (47509, 4),
 )
 
-# Register 47000 is useful diagnostic information but is not available on every
-# tested/related device, so a failure to read this block must not fail the main
-# telemetry refresh.
+# Battery energy accounting is useful to EnergyPilot but is kept optional until
+# the 35206-35211 counters have been field-validated across the target ETA-G20
+# firmware set. Register 47000 is likewise useful diagnostic information but is
+# not available on every tested/related device. A failure to read either block
+# must not fail the main telemetry refresh.
 OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
+    (35206, 6),
     (47000, 1),
 )
 
@@ -98,6 +101,10 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("battery_current", 35181, RegisterDataType.INT16, 0.1, 1),
     RegisterDefinition("battery_power", 35182, RegisterDataType.INT32),
     RegisterDefinition("battery_mode", 35184, RegisterDataType.UINT16),
+    RegisterDefinition("battery_charge_energy_total", 35206, RegisterDataType.UINT32, 0.1, 1),
+    RegisterDefinition("battery_charge_energy_today", 35208, RegisterDataType.UINT16, 0.1, 1),
+    RegisterDefinition("battery_discharge_energy_total", 35209, RegisterDataType.UINT32, 0.1, 1),
+    RegisterDefinition("battery_discharge_energy_today", 35211, RegisterDataType.UINT16, 0.1, 1),
     RegisterDefinition("battery_strings", 35212, RegisterDataType.UINT16),
 
     RegisterDefinition("warning_message_32bit", 35328, RegisterDataType.UINT32),
