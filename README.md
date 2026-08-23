@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local telemetry, 
 
 ## Status
 
-**Alpha — v0.16 · Beta diagnostics**
+**Alpha — v0.17 · Beta diagnostics**
 
 GW EnergyPilot is being developed specifically around the **new GoodWe ETA G20 generation**.
 
@@ -49,6 +49,7 @@ That feedback will be used to build a real tested-model compatibility list rathe
 - one-touch battery controls;
 - optional EV coordination;
 - built-in EnergyPilot dashboard;
+- dedicated **EP / EMHASS / GOODWE** configuration pages behind a dashboard settings gear;
 - native cumulative grid import/export energy counters;
 - optional battery charge/discharge accounting diagnostics;
 - read-only Beta diagnostics for candidate G20 SOC-protection and extended-meter registers;
@@ -105,7 +106,7 @@ For a Home Assistant custom integration, however, the HTTP request originates fr
 http://5b918bf2-emhass:5000
 ```
 
-If your installation exposes EMHASS through another address, change **EMHASS URL** in EnergyPilot options.
+If your installation exposes EMHASS through another address, change **EMHASS URL** in the EnergyPilot EMHASS configuration page or the normal Home Assistant integration options.
 
 ## EMHASS source mappings
 
@@ -144,6 +145,26 @@ self-consumption
 Selecting one reads the complete current EMHASS configuration, changes only `costfun`, writes the complete configuration back, then immediately creates and publishes a fresh optimization. Unrelated EMHASS settings are preserved.
 
 This changes the optimizer objective only. GoodWe Automatic Control remains `P_batt`-driven and keeps the existing mode 8/11/12 mapping.
+
+## Dedicated configuration pages
+
+v0.17 adds a separate settings gear next to the existing dashboard layout/tune button.
+
+The gear opens three pages:
+
+```text
+EP       controller limits, telemetry cadence and optional EV coordination
+EMHASS   EnergyPilot-owned EMHASS connection, schedule, output mapping and prices
+GOODWE   inverter host, Modbus TCP port and unit ID
+```
+
+These pages update the same Home Assistant `ConfigEntry` used by the normal integration options. They do not create a separate settings database.
+
+GoodWe host/port/unit-ID changes are validated against the inverter before being saved. v0.17 also migrates the Home Assistant device identity away from the mutable `host:slave` pair to the stable EnergyPilot config-entry ID so an IP-address change does not intentionally create a second HA device.
+
+The live EMHASS min/max SOC and cost-function controls keep their existing `config.json` backend path and are not duplicated inside the config-entry settings API.
+
+See `docs/SETTINGS.md` for the architecture and ownership details.
 
 ## Power semantics on the tested GW15K-ETA-G20
 
@@ -227,7 +248,7 @@ The optional block cannot make required inverter telemetry unavailable when unsu
 
 ## Beta G20 field diagnostics
 
-v0.16 ships the following candidate values to the active tester group as **read-only Beta diagnostics**:
+v0.16+ ships the following candidate values to the active tester group as **read-only Beta diagnostics**:
 
 ```text
 45356  candidate on-grid battery discharge-depth / SOC limit
@@ -360,6 +381,7 @@ The sidebar dashboard includes:
 - visible telemetry refresh frequency;
 - Solar, Home, Grid and Battery cards;
 - Controller and EMHASS cards;
+- a settings gear with dedicated EP / EMHASS / GOODWE pages;
 - one-touch EMHASS strategy controls;
 - one-touch battery controls;
 - EMHASS minimum/maximum SOC controls with guidance popup;
@@ -371,7 +393,7 @@ The sidebar dashboard includes:
 - flow animation toggle;
 - copyable diagnostics snapshot.
 
-Dashboard layout is stored per browser.
+Dashboard layout is stored per browser. EnergyPilot configuration remains stored in the Home Assistant config entry, not browser storage.
 
 ## Troubleshooting startup
 
@@ -391,7 +413,7 @@ For the separate SEMS/SEMS+ plugin interoperability issue, see `docs/KNOWN_ISSUE
 
 ## Diagnostics
 
-Use **Copy snapshot** when reporting a normal issue. Include the inverter model and firmware with the snapshot. For v0.16 candidate register validation, use **Copy beta diagnostics** as well.
+Use **Copy snapshot** when reporting a normal issue. Include the inverter model and firmware with the snapshot. For v0.16+ candidate register validation, use **Copy beta diagnostics** as well.
 
 Useful values include:
 
@@ -410,6 +432,7 @@ Useful values include:
 ## Documentation
 
 - `docs/RELEASE_NOTES.md` — version summaries and Beta/validation status;
+- `docs/SETTINGS.md` — dedicated EP / EMHASS / GOODWE configuration architecture;
 - `docs/EMHASS_SETUP.md`;
 - `docs/MODBUS.md`;
 - `docs/KNOWN_ISSUES.md`;
