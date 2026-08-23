@@ -51,7 +51,7 @@
           "scan_interval": "How often EnergyPilot refreshes GoodWe ETA telemetry. Recommended: 10 seconds.",
           "enable_emhass_orchestrator": "Runs optimization independently from Automatic Control. Existing installations should remove the legacy EnergyPilot EMHASS YAML before enabling this schedule.",
           "emhass_url": "Local EMHASS API base URL. The default is the standard Home Assistant EMHASS add-on hostname.",
-          "emhass_optimization_interval": "How often EnergyPilot runs a fresh optimization. Recommended: 15 minutes.",
+          "emhass_optimization_interval": "Periodic fallback interval. Recommended: 60 minutes. EnergyPilot also optimizes on Optimize now, AUTO resume, tomorrow-price publication and EV charging stop when configured.",
           "emhass_soc_final_pct": "SOC target passed as soc_final. This does not replace your EMHASS minimum/maximum battery SOC settings.",
           "emhass_fallback_load": "Used only when current load or Recorder history cannot provide a plausible load forecast.",
           "use_nordpool_prices": "EnergyPilot requests timestamped prices from Home Assistant's official Nord Pool integration and passes load_cost_forecast and prod_price_forecast at runtime. During these EnergyPilot-managed runs the internal EMHASS price forecast method is therefore not used.",
@@ -60,7 +60,7 @@
           "nordpool_currency": "Currency requested from Nord Pool. Recommended: EUR.",
           "buy_price_adder": "Amount added to the Nord Pool spot import price in EUR/kWh for supplier fees, taxes or other variable costs.",
           "sell_price_deduction": "Amount subtracted from the Nord Pool spot export price in EUR/kWh. The validated Tibber setup used 0.0248 EUR/kWh.",
-          "enable_ev_coordination": "Optional. When enabled, EnergyPilot can react to an EV charging state or charging power entity.",
+          "enable_ev_coordination": "Optional. When enabled, EnergyPilot can react to EV charging and re-optimizes immediately when charging changes from active to stopped.",
           "ev_mode_entity": "Optional EV charging-state entity.",
           "ev_power_entity": "Optional EV charging-power entity in watts.",
           "ev_deadband": "Charging power above this value is considered active EV charging."
@@ -111,7 +111,7 @@
           "scan_interval": "Recommended: 10 seconds.",
           "enable_emhass_orchestrator": "Remove/disable the legacy EnergyPilot EMHASS YAML before enabling this recurring schedule.",
           "emhass_url": "Default: http://5b918bf2-emhass:5000.",
-          "emhass_optimization_interval": "Recommended: 15 minutes.",
+          "emhass_optimization_interval": "Recommended: 60 minutes. Event-driven optimizations still run immediately when needed.",
           "emhass_soc_final_pct": "Default: 10%.",
           "emhass_fallback_load": "Fallback only; normal operation uses current EnergyPilot load plus Recorder history.",
           "use_nordpool_prices": "When enabled, EnergyPilot supplies runtime buy/sell forecasts to EMHASS, so EMHASS's internal price forecast method is bypassed for EnergyPilot-triggered runs.",
@@ -120,7 +120,7 @@
           "nordpool_currency": "Recommended: EUR.",
           "buy_price_adder": "Extra import cost added to spot price in EUR/kWh.",
           "sell_price_deduction": "Export fee/deduction subtracted from spot price in EUR/kWh.",
-          "enable_ev_coordination": "Enable optional EV charging coordination.",
+          "enable_ev_coordination": "Enable optional EV charging coordination and re-optimization after EV charging stops.",
           "ev_mode_entity": "Optional EV charging-state entity.",
           "ev_power_entity": "Optional EV charging-power entity in watts.",
           "ev_deadband": "Power above this threshold is considered active EV charging."
@@ -140,7 +140,9 @@
       "automatic_control": {"name": "Automatic control"}
     },
     "number": {
-      "manual_power": {"name": "Manual power"}
+      "manual_power": {"name": "Manual power"},
+      "emhass_minimum_soc": {"name": "EMHASS minimum battery SOC"},
+      "emhass_maximum_soc": {"name": "EMHASS maximum battery SOC"}
     },
     "select": {
       "manual_mode": {"name": "Manual EMS mode"}
