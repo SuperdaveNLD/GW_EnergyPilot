@@ -61,6 +61,7 @@ TEMPERATURE = {
     "suggested_display_precision": 1,
 }
 
+DIAGNOSTIC = {"entity_category": EntityCategory.DIAGNOSTIC}
 DIAGNOSTIC_DISABLED = {
     "entity_category": EntityCategory.DIAGNOSTIC,
     "entity_registry_enabled_default": False,
@@ -138,6 +139,25 @@ TELEMETRY_SENSORS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(key="battery_current", name="Battery current", **CURRENT),
     SensorEntityDescription(key="battery_mode", name="Battery mode", **DIAGNOSTIC_DISABLED),
     SensorEntityDescription(key="battery_strings", name="Battery strings", **DIAGNOSTIC_DISABLED),
+    # Beta register semantics are intentionally visible by default under the
+    # device Diagnostic section for field correlation against SolarGo/SEMS+.
+    SensorEntityDescription(
+        key="battery_discharge_depth_on_grid",
+        name="Beta on-grid discharge depth (45356)",
+        native_unit_of_measurement=PERCENTAGE,
+        **DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="battery_discharge_depth_off_grid",
+        name="Beta off-grid discharge depth (45358)",
+        native_unit_of_measurement=PERCENTAGE,
+        **DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="battery_soc_protection",
+        name="Beta battery SOC protection (47500)",
+        **DIAGNOSTIC,
+    ),
 
     SensorEntityDescription(key="bms_package_temperature", name="BMS package temperature", **TEMPERATURE),
     SensorEntityDescription(key="battery_max_cell_temperature", name="Battery maximum cell temperature", **TEMPERATURE),
