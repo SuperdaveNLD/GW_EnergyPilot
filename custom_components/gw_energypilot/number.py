@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import EntityCategory, PERCENTAGE, UnitOfPower
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_call_later
 
 from . import GWConfigEntry
 from .const import CONF_MAX_POWER, DEFAULT_MAX_POWER
@@ -16,6 +18,8 @@ from .emhass_config import async_get_emhass_config, async_write_emhass_config
 from .entity import GWEnergyPilotEntity
 
 _LOGGER = logging.getLogger(__name__)
+SOC_OPTIMIZE_DEBOUNCE_SECONDS = 3.0
+_SOC_OPTIMIZE_CANCEL: dict[str, Callable[[], None]] = {}
 
 
 async def async_setup_entry(
@@ -115,20 +119,37 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         return config
 
     async def _async_optimize_after_change(self) -> None:
-        """Rebuild the plan after a persistent optimizer constraint changes."""
+        """Rebuild the plan after the user has finished changing SOC limits."""
         try:
             await self.entry.runtime_data.orchestrator.async_optimize(
-                reason=f"{self.config_key}_changed"
+                reason="soc_limits_changed"
             )
         except HomeAssistantError as err:
-            _LOGGER.warning(
-                "EMHASS optimization after %s change failed: %s",
-                self.config_key,
-                err,
+            _LOGGER.warning("EMHASS optimization after SOC change failed: %s", err)
+
+    def _schedule_debounced_optimization(self) -> None:
+        """Run one optimization three seconds after the final SOC change."""
+        entry_id = self.entry.entry_id
+        if cancel := _SOC_OPTIMIZE_CANCEL.pop(entry_id, None):
+            cancel()
+
+        @callback
+        def _start_optimize(_now) -> None:
+            _SOC_OPTIMIZE_CANCEL.pop(entry_id, None)
+            self.entry.async_create_background_task(
+                self.hass,
+                self._async_optimize_after_change(),
+                "GW EnergyPilot optimize after SOC limits settled",
             )
 
+        _SOC_OPTIMIZE_CANCEL[entry_id] = async_call_later(
+            self.hass,
+            SOC_OPTIMIZE_DEBOUNCE_SECONDS,
+            _start_optimize,
+        )
+
     async def async_set_native_value(self, value: float) -> None:
-        """Validate, save the full EMHASS config and update this slider."""
+        """Validate, save EMHASS config and debounce re-optimization."""
         value = min(100.0, max(0.0, float(value)))
         config = await async_get_emhass_config(self.hass, self.entry)
         self._validate_against_peer(config, value)
@@ -136,11 +157,7 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         await async_write_emhass_config(self.hass, self.entry, config)
         self._value = value
         self.async_write_ha_state()
-        self.entry.async_create_background_task(
-            self.hass,
-            self._async_optimize_after_change(),
-            f"GW EnergyPilot optimize after {self.config_key} change",
-        )
+        self._schedule_debounced_optimization()
 
     def _validate_against_peer(self, config: dict, value: float) -> None:
         """Validate min/max ordering in subclasses."""
