@@ -2,6 +2,47 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.23] - 2026-08-23
+
+### Added
+
+- A per-config-entry **persistent EnergyPilot grid-accounting runtime** backed by Home Assistant storage.
+- Native daily `total_increasing` energy sensors `grid_energy_imported_today` and `grid_energy_exported_today`, each exposing the completed previous local day as `last_period`.
+- One-time Recorder boundary bootstrap for existing installations so upgrades can recover current-day and previous-day totals when canonical `36017/36015` history is available.
+- **EV anti-discharge protection** as the clarified user-facing EV behavior while retaining the existing `enable_ev_coordination` config key for backwards compatibility.
+- A persistent runtime store for the orchestrator's last successful EnergyPilot-owned optimize + publish timestamp.
+- Regression coverage for accounting persistence/rollover, EV directional protection and orchestrator runtime-state persistence.
+- `docs/ACCOUNTING.md`, `docs/EV_ANTI_DISCHARGE.md` and `docs/RUNTIME_STATE.md` as explicit architecture/ownership contracts.
+
+### Changed
+
+- Grid Today/Yesterday values now come from the persistent EnergyPilot accounting backend instead of being independently reconstructed by the dashboard from Recorder statistic changes.
+- The 24-hour Grid modal keeps Recorder for its signed power graph, while its daily import/export values come from the same accounting entities as the main Grid card.
+- During active EV charging, discharge and neutral battery plans hold the home battery, while an explicit EMHASS battery-charge plan is allowed through direct GoodWe mode 11. EV-stop fresh-optimization protection remains.
+- The previous successful orchestrator timestamp is restored across config-entry reloads and Home Assistant restarts. Failed later optimizations do not erase the last success.
+- The active frontend is `gw-energy-pilot-v023.js`. It layers persistent Grid accounting on the final flow-direction overlay, which in turn imports the complete v0.22 control/dashboard stack.
+
+### Fixed
+
+- Live-flow particles no longer suffer a layered **double reversal**. The geometry-correct Forward/Reverse keyframe selected from live power direction is authoritative; particle `animation-direction` is forced to normal.
+- Expected visual directions are PV → hub, Grid import → hub, hub → Grid export, hub → Battery charge, Battery discharge → hub, and hub → House load.
+
+### Accounting/runtime contract
+
+- GoodWe `36017` remains the canonical lifetime grid-import source and `36015` remains the canonical lifetime grid-export source.
+- EnergyPilot accumulates only positive per-refresh lifetime-counter deltas; a counter decrease re-baselines instead of creating negative energy or guessing reset semantics.
+- Recorder is optional bootstrap/history infrastructure, not part of the live accounting loop.
+- Persistent runtime history is separate from user configuration: `ConfigEntry.data/options` remain configuration, while `gw_energypilot.runtime.<config_entry_id>` stores small EnergyPilot-owned runtime evidence such as `last_success`.
+
+### Safety boundary
+
+- No new GoodWe register definitions or Modbus read blocks are introduced by the v0.23 consolidation.
+- EMS registers remain `47511`/`47512` and the `47512 -> wait -> 47511` write order is unchanged.
+- The v0.22 automatic actuator strategy remains unchanged: smart-meter ON uses `P_grid -> 9/10/1`; smart-meter OFF uses `P_batt -> 11/12/8`.
+- Existing lifetime grid-energy unique IDs/statistics remain unchanged; the new daily accounting entities use new deterministic unique IDs.
+- Beta `36104/36120` counters remain diagnostics and are not promoted into canonical accounting.
+- v0.23 remains **Beta** until persistent accounting, EV protection, flow visuals and the already-Beta PCC strategy have broader multi-installation exposure.
+
 ## [0.22] - 2026-08-23
 
 ### Added
@@ -159,7 +200,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Beta status
 
-- v0.17 remains **Beta** because the new settings UI/device migration has only limited field exposure and the G20 candidate register semantics are still being correlated across the active tester installations.
+- v0.17 remains **Beta** because the new settings UI/device migration has only limited real-installation exposure and the G20 candidate register semantics are still being correlated across the active tester installations.
 - The G20 Beta registers remain read-only and optional.
 - The settings pages and stateful strategy selector do not change GoodWe EMS modes, register write ordering, `P_batt` mapping, sign conventions or controller ownership.
 

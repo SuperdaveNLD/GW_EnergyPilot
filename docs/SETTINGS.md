@@ -8,16 +8,17 @@ The settings gear opens three sections:
 - **EMHASS** — EnergyPilot-owned EMHASS connection, scheduling, output mapping and Nord Pool runtime-price settings;
 - **GOODWE** — local GoodWe connection, automatic actuator strategy and manual G20 field-test controls.
 
-v0.22 remains **Beta** because the new automatic mode-9/mode-10 strategy still has limited multi-installation field exposure.
+v0.23 remains **Beta** because the automatic mode-9/mode-10 strategy and the new persistent/runtime features still have limited multi-installation field exposure.
 
 ## Configuration ownership
 
 The dashboard does not create a parallel settings database.
 
 - EP/EMHASS options use the existing GW EnergyPilot `ConfigEntry.options`.
-- GoodWe host/port/unit-ID and the v0.22 smart-meter actuator choice use the existing `ConfigEntry.data`.
+- GoodWe host/port/unit-ID and the smart-meter actuator choice use the existing `ConfigEntry.data`.
 - EMHASS live configuration such as SOC bounds and `costfun` remains in EMHASS `config.json` and is changed through `/get-config` → `/set-config`.
 - Beta SOC-floor registers `45356/45358` live in the GoodWe inverter itself.
+- Persistent accounting/runtime history uses Home Assistant storage and is not user configuration.
 
 Backend configuration APIs:
 
@@ -27,7 +28,7 @@ custom_components/gw_energypilot/smart_meter_api.py
 custom_components/gw_energypilot/beta_soc_api.py
 ```
 
-The active frontend is layered; v0.22 adds its controls on top of the existing settings implementation rather than creating a second settings page.
+The active frontend is layered; v0.23 adds accounting/current-release presentation on top of the v0.22 settings/control implementation rather than creating a second settings page.
 
 ## EP page
 
@@ -65,11 +66,11 @@ EMHASS P_batt < -deadband  -> allow home-battery charging via mode 11
 
 This is intentionally directional. The purpose is to prevent the home battery from becoming the energy source for an actively charging EV, not to freeze the battery for the entire EV session.
 
-A real-world reason for this distinction is **Tibber Grid Rewards**. Tibber can use connected chargers to support grid conditions, including changing the timing of EV charging, and reward the customer for that flexibility. An EV can therefore charge for an external grid-service reason even when the normal home-battery economics point in another direction. EnergyPilot should block battery discharge into that EV, while still allowing an independent EMHASS home-battery charge plan.
+A real-world reason for this distinction is **Tibber Grid Rewards**. An external charger/service can intentionally alter EV charging timing for grid-service reasons. EnergyPilot should block home-battery discharge into that EV while still allowing an independent EMHASS home-battery charge plan.
 
-GW EnergyPilot has no Tibber Grid Rewards API dependency and does not control or reproduce Tibber's EV scheduling. Tibber Grid Rewards is documented as a concrete example of the ownership boundary.
+GW EnergyPilot has no Tibber Grid Rewards API dependency and does not control or reproduce external EV scheduling. It is documented only as a concrete ownership example.
 
-When native EMHASS orchestration is enabled, the existing EV-stop behavior remains: after charging stops, EnergyPilot waits for a fresh optimization before returning to normal automatic execution.
+When native EMHASS orchestration is enabled, after EV charging stops EnergyPilot waits for a fresh optimization before returning to normal automatic execution.
 
 See `docs/EV_ANTI_DISCHARGE.md` for the full control contract.
 
@@ -117,13 +118,13 @@ Only after successful validation does EnergyPilot update/reload the existing con
 
 ## GoodWe smart meter active
 
-v0.22 adds a dedicated strategy switch to the GOODWE page.
+v0.22 introduced the dedicated strategy switch on the GOODWE page. The same strategy remains active in v0.23.
 
 This value belongs to the GoodWe/config-entry layer, not to EMHASS `config.json`.
 
 ### ON — PCC/grid target control
 
-This is the v0.22 default.
+This is the current default.
 
 Automatic Control uses EMHASS `P_grid`:
 
@@ -202,6 +203,17 @@ legacy:  gw_energypilot + host:slave
 
 The v0.17 migration moves legacy devices to the stable identifier before entity platform setup. Do not change device identity back to mutable connection information.
 
+## Persistent state is not settings
+
+v0.23 introduces Home Assistant storage for two kinds of EnergyPilot-owned runtime data:
+
+- derived daily grid accounting;
+- small runtime evidence such as orchestrator `last_success`.
+
+These stores are intentionally **not** exposed as editable settings. `ConfigEntry.data/options`, EMHASS config and inverter-stored registers remain the authoritative configuration layers.
+
+See `docs/ACCOUNTING.md` and `docs/RUNTIME_STATE.md`.
+
 ## Beta diagnostics and control boundary
 
 Optional field-validation values include:
@@ -216,7 +228,9 @@ Optional field-validation values include:
 
 Except for the dedicated manual `45356/45358` write path, Beta register candidates do not feed automatic EMS control.
 
-The v0.22 mode-9/mode-10 strategy is different: it uses already-established EMS registers `47511/47512` and the GoodWe smart meter. Its **automatic use** is still labelled Beta because the strategy has limited field exposure, not because new register addresses are being guessed.
+The mode-9/mode-10 strategy is different: it uses established EMS registers `47511/47512` and the GoodWe smart meter. Its **automatic use** remains Beta because the strategy has limited field exposure, not because new register addresses are being guessed.
+
+The extended `36104/36120` counters remain diagnostics and are not used by the v0.23 canonical accounting runtime.
 
 ## Security
 
@@ -243,9 +257,10 @@ The Beta SOC API accepts only the fixed register-key whitelist and percentage ra
 - GoodWe connection changes validate first, then reload the existing entry.
 - The GoodWe smart-meter strategy can be changed without a full reload because the controller reads the config-entry data dynamically; when Automatic Control is active the current plan is re-evaluated immediately after the change.
 - Manual `45356/45358` field-test writes do not reload the integration.
+- v0.23 persistent accounting/runtime Stores survive a normal config-entry reload and Home Assistant restart.
 
 ## Multiple EnergyPilot entries
 
 The main settings model supports multiple GW EnergyPilot config entries and saves only to the selected entry.
 
-The smart-meter strategy and Beta SOC controls also operate on the selected entry, so one inverter can use PCC modes 9/10 while another remains on direct modes 11/12.
+The smart-meter strategy and Beta SOC controls also operate on the selected entry, so one inverter can use PCC modes 9/10 while another remains on direct modes 11/12. Persistent accounting/runtime state is likewise scoped per config-entry ID.

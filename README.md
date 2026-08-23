@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.22 · Beta**
+**v0.23 · Beta**
 
 GW EnergyPilot is developed primarily against the **GoodWe GW15K-ETA-G20** and the current ETA-G20 generation.
 
@@ -21,7 +21,9 @@ See:
 - `docs/RELEASE_NOTES.md` — status and user-facing notes for every version;
 - `CHANGELOG.md` — detailed technical history;
 - `docs/EMS_MODES.md` — exact meaning of GoodWe EMS modes 1–12;
-- `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge ownership, behavior and Grid Rewards use case.
+- `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge ownership and behavior;
+- `docs/ACCOUNTING.md` — persistent grid-accounting architecture;
+- `docs/RUNTIME_STATE.md` — EnergyPilot runtime values that persist across reload/restart.
 
 ## Tested hardware
 
@@ -49,10 +51,12 @@ Whether modes 9 / 10 / 11 / 12 work as documented
 - selectable automatic **PCC smart-meter control** or **direct battery control**;
 - native EMHASS optimization and publishing;
 - stateful EMHASS `profit`, `cost` and `self-consumption` strategy control;
+- persistent last-success runtime history for EnergyPilot-owned optimize/publish cycles;
 - optional Nord Pool runtime pricing;
 - optional **EV anti-discharge protection**;
 - built-in EnergyPilot dashboard;
 - native grid import/export power and cumulative energy;
+- persistent native **Today / Yesterday grid import/export accounting** derived from the canonical lifetime counters;
 - optional battery accounting diagnostics;
 - Beta G20 SOC-protection/extended-meter diagnostics;
 - verified manual `45356/45358` minimum-SOC field-test controls;
@@ -104,13 +108,13 @@ The existing Home Assistant config entry remains the single integration configur
 
 See `docs/SETTINGS.md` for ownership, security and reload behavior.
 
-# Automatic control in v0.22
+# Automatic control
 
-v0.22 has two explicit actuator strategies.
+v0.23 keeps the two explicit actuator strategies introduced and hardware-validated in v0.22.
 
 ## GoodWe smart meter active = ON
 
-This is the default on v0.22 and is intended for installations with a working and validated GoodWe smart meter.
+This is the default and is intended for installations with a working and validated GoodWe smart meter.
 
 Automatic Control executes EMHASS `P_grid` at the point of common coupling:
 
@@ -134,7 +138,7 @@ GoodWe meter telemetry uses the opposite sign:
 36008 > 0 = actual export
 ```
 
-GoodWe modes 9/10 then close the fast loop against the inverter's own smart meter/PCC.
+GoodWe modes 9/10 close the fast loop against the inverter's own smart meter/PCC.
 
 ### Why this is useful
 
@@ -152,8 +156,6 @@ battery charge         ~16.9 kW
 The local PV was added behind the meter on top of the requested grid import.
 
 By contrast, mode 11 at `15 kW` kept the **battery** near 15 kW and let PV reduce the required grid import.
-
-This distinction is the basis of v0.22 control.
 
 ## GoodWe smart meter active = OFF
 
@@ -181,13 +183,9 @@ EMHASS P_batt is neutral          → mode 8 Battery Hold
 EMHASS P_batt requests charge     → mode 11 Battery charge allowed
 ```
 
-The reason for this distinction is that an EV can intentionally charge outside the cheapest spot-price period. A concrete example is **Tibber Grid Rewards**, where Tibber can use connected chargers to support grid conditions and reward the customer for that flexibility. In such a session, the home battery must not discharge into the EV merely because the EV is consuming power, but the EV session should also not block a separate EMHASS plan that wants to charge the home battery.
+This prevents the home battery from becoming the energy source for an actively charging EV without blocking an independent home-battery charge plan.
 
-GW EnergyPilot does not integrate with or control Tibber Grid Rewards. It is documented as an example of why EV charging ownership and home-battery optimization must remain separate.
-
-During an active EV session, an explicit home-battery charge request uses direct GoodWe mode 11 even if the normal automatic strategy uses PCC modes 9/10/1. This preserves the anti-discharge guarantee when EV load changes. GoodWe, the BMS and installation protection remain authoritative for hardware limits.
-
-After EV charging stops, the existing fresh-optimization guard remains: when native orchestration is enabled, EnergyPilot waits for a fresh EMHASS plan before normal automatic control resumes.
+During an active EV session, an explicit home-battery charge request uses direct GoodWe mode 11 even if the normal automatic strategy uses PCC modes 9/10/1. After EV charging stops, native orchestration waits for a fresh EMHASS plan before normal automatic execution resumes.
 
 Full design: `docs/EV_ANTI_DISCHARGE.md`.
 
@@ -233,7 +231,7 @@ The GoodWe meter and EMHASS `P_grid` signs are intentionally opposite. Do not in
 
 The dashboard shows PV, house, grid and battery flow around the EnergyPilot hub.
 
-v0.22 makes particle direction authoritative in the active frontend layer:
+v0.23 removes the layered CSS double-reversal that could make the particles travel opposite to the correctly labelled power direction. The geometry-correct animation keyframe is now authoritative:
 
 ```text
 PV production         → hub
@@ -262,6 +260,8 @@ Recommended publishing behavior when EnergyPilot owns publish-data:
 
 EnergyPilot validates optimizer readiness and finite outputs before automatic EMS execution.
 
+The timestamp of the last successful EnergyPilot-owned optimize + publish cycle is persisted in Home Assistant storage in v0.23. Reloading the integration or restarting Home Assistant therefore no longer resets the dashboard to **Last success: Never** after a previous successful EnergyPilot run.
+
 Full setup: `docs/EMHASS_SETUP.md`.
 
 # GoodWe power semantics
@@ -278,9 +278,9 @@ Load L1 + Load L2 + Load L3
 
 Registers `35138` and `35140` are inverter-side diagnostics and must not be labelled as household consumption.
 
-## Grid energy
+## Grid energy and daily accounting
 
-Canonical Recorder-facing cumulative counters remain:
+Canonical physical lifetime counters remain:
 
 ```text
 36015 = total exported grid energy
@@ -288,6 +288,14 @@ Canonical Recorder-facing cumulative counters remain:
 ```
 
 The extended `36104/36120` values remain Beta diagnostics until physical lifetime correlation is sufficient.
+
+v0.23 adds a persistent accounting runtime that derives positive deltas from the canonical `36015/36017` counters and exposes native daily entities for imported/exported energy. The completed previous local day is exposed as `last_period`.
+
+On upgrade, Recorder may be used **once** to recover current/previous local-midnight boundaries when history is available. Recorder is not part of the live accounting loop. A lifetime counter decrease causes a re-baseline rather than invented negative energy.
+
+The existing 24-hour signed Grid power graph remains Recorder-backed because it is historical visualization, not physical accounting.
+
+See `docs/ACCOUNTING.md`.
 
 # Battery SOC limits
 
@@ -339,8 +347,10 @@ When SEMS/SEMS+ is used, some users have observed issues with the official GoodW
 - `docs/ARCHITECTURE.md` — runtime structure and ownership;
 - `docs/EMHASS_SETUP.md` — EMHASS installation/output/control setup;
 - `docs/EMS_MODES.md` — modes 1–12;
-- `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge behavior and external Grid Rewards use case;
-- `docs/GRID_NEUTRAL_CHARGING.md` — migration from old mode-11 feedback to v0.22 PCC control;
+- `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge behavior;
+- `docs/ACCOUNTING.md` — persistent daily grid-accounting contract;
+- `docs/RUNTIME_STATE.md` — persistent EnergyPilot runtime history;
+- `docs/GRID_NEUTRAL_CHARGING.md` — migration from old mode-11 feedback to PCC control;
 - `docs/MODBUS.md` — register semantics and evidence policy;
 - `docs/SETTINGS.md` — configuration ownership/security;
 - `docs/ENTITIES.md` — Home Assistant entity contract;
