@@ -51,7 +51,12 @@ These conventions affect dashboard direction and EMHASS/controller logic and mus
 | 35301 | `pv_total_power` | uint32 | 1 | Total PV power |
 | 35172 | `total_load_power` | int16 | 1 | GoodWe load power; primary Home/load value on tested G20 |
 | 35182 | `battery_power` | int32 | 1 | Battery power |
+| 35206 | `battery_charge_energy_total` | uint32 | 0.1 | Cumulative battery charge energy in kWh; optional pending broader ETA-G20 field validation |
+| 35208 | `battery_charge_energy_today` | uint16 | 0.1 | Battery charge energy today in kWh; optional pending broader ETA-G20 field validation |
+| 35209 | `battery_discharge_energy_total` | uint32 | 0.1 | Cumulative battery discharge energy in kWh; optional pending broader ETA-G20 field validation |
+| 35211 | `battery_discharge_energy_today` | uint16 | 0.1 | Battery discharge energy today in kWh; optional pending broader ETA-G20 field validation |
 | 37007 | `battery_soc` | uint16 | 1 | Battery state of charge |
+| 37008 | `battery_soh` | uint16 | 1 | Battery state of health |
 | 36008 | `meter_total_power_fast` | int16 | 1 | Primary instantaneous grid power |
 | 36015 | `meter_total_energy_export` | float32 | 0.001 | Cumulative exported grid energy in kWh |
 | 36017 | `meter_total_energy_import` | float32 | 0.001 | Cumulative imported grid energy in kWh |
@@ -97,6 +102,23 @@ GoodWe cumulative grid energy is decoded as IEEE-754 big-endian float32 values a
 ```
 
 Home Assistant exposes these as `total_increasing` energy sensors so Recorder can derive daily/monthly/yearly deltas efficiently.
+
+## Battery energy accounting
+
+GoodWe-compatible ET register documentation and the maintained Python GoodWe implementation identify the battery charge/discharge counters at `35206-35211` as integer energy values with `0.1 kWh` scaling.
+
+EnergyPilot keeps this block optional while it is being validated on additional ETA-G20 firmware revisions. The values are available internally and in the support diagnostics, but are not yet promoted as normal dashboard telemetry or used to calculate a synthetic cycle count.
+
+Current mapping:
+
+```text
+35206-35207  lifetime battery charge energy   uint32 / 10 -> kWh
+35208        battery charge energy today      uint16 / 10 -> kWh
+35209-35210  lifetime battery discharge energy uint32 / 10 -> kWh
+35211        battery discharge energy today   uint16 / 10 -> kWh
+```
+
+Do not derive equivalent full cycles until usable battery capacity/model semantics are available from a validated source or explicit configuration. The BMS SOH value from register `37008` remains a separate measurement and must not be treated as a cycle counter.
 
 ## EMS modes currently used
 
@@ -154,13 +176,14 @@ The required runtime ranges are:
 47509 + 4 words
 ```
 
-The optional diagnostic range is:
+The optional diagnostic/accounting ranges are:
 
 ```text
+35206 + 6 words
 47000 + 1 word
 ```
 
-Register `47000` remains optional so an unavailable diagnostic block does not fail the normal telemetry refresh.
+These remain optional so an unavailable diagnostic/accounting block does not fail the normal telemetry refresh.
 
 The first three required blocks intentionally extend one word beyond the last visible 32-bit register address in the block:
 
