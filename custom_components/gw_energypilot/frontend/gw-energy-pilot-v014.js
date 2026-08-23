@@ -4,11 +4,13 @@ const VERSION = "0.14";
 const PANEL_NAME = "gw-energypilot-panel";
 
 function energyText(value) {
+  if (value === null || value === undefined || value === "") return "—";
   const number = Number(value);
   return Number.isFinite(number) ? `${number.toFixed(number >= 100 ? 0 : 1)} kWh` : "—";
 }
 
 function percentText(value) {
+  if (value === null || value === undefined || value === "") return "—";
   const number = Number(value);
   return Number.isFinite(number) ? `${number.toFixed(0)}%` : "—";
 }
