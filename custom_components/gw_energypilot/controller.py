@@ -82,10 +82,23 @@ class GWEnergyPilotController:
         self._ev_was_active = False
         self._control_lock = asyncio.Lock()
 
+        # Backwards-compatible diagnostics for v0.18-v0.21 support snapshots.
+        # The old 30-second mode-11 feedback controller is not scheduled in
+        # v0.22; these remain inactive so older frontend layers do not break.
+        self.grid_neutral_active = False
+        self.grid_neutral_charge_cap = 0
+        self.grid_neutral_last_meter_power: float | None = None
+        self.grid_neutral_export_samples = 0
+
     @property
     def signal(self) -> str:
         """Dispatcher signal for controller ownership/state changes."""
         return f"{DOMAIN}_{self.entry.entry_id}_controller_update"
+
+    @property
+    def grid_neutral_hold_remaining(self) -> int:
+        """Return zero for the retired v0.18-v0.21 grid-neutral hold loop."""
+        return 0
 
     def _notify_state(self) -> None:
         """Notify entities that expose controller-owned state."""
