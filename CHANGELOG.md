@@ -6,14 +6,14 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Added
 
-- A dedicated **SOC / CONSTRAINT LAYERS** diagnostics group that shows current battery SOC, last optimization `soc_init`, EnergyPilot runtime `soc_final`, EMHASS minimum SOC, EMHASS `battery_target_state_of_charge`, EMHASS SOC-deficit threshold and GoodWe on-grid minimum SOC register `45356` side by side.
+- A dedicated **SOC / CONSTRAINT LAYERS** diagnostics group that shows current battery SOC, last optimization `soc_init`, EnergyPilot runtime `soc_final`, EMHASS minimum SOC, EMHASS `battery_target_state_of_charge`, EMHASS SOC-deficit threshold/cost and GoodWe on-grid minimum SOC register `45356` side by side.
 - SOC-related EMHASS config diagnostics are decoded from the same `/get-config` response already used by the stateful cost-function selector; no additional periodic HTTP request is introduced.
-- Unit tests for explicit percentage decoding and invalid/missing EMHASS SOC diagnostic values.
+- Unit tests for explicit percentage/numeric decoding and invalid/missing EMHASS SOC diagnostic values.
 
 ### Changed
 
 - The EMHASS settings label **Target final SOC** is clarified in the dashboard as **Runtime final SOC target**.
-- The setting description now states explicitly that EnergyPilot sends this value as runtime `soc_final` and does not rewrite EMHASS `battery_target_state_of_charge` in `config.json`.
+- The setting description now states explicitly that EnergyPilot sends this value as runtime `soc_final`, that the runtime value overrides the configured target for that optimization, and that it does not rewrite EMHASS `battery_target_state_of_charge` in `config.json`.
 - The active frontend is `gw-energy-pilot-v019.js`, layered on top of the complete v0.18 G20 field-test controls.
 
 ### Safety boundary
@@ -230,11 +230,15 @@ All notable changes to GW EnergyPilot are documented here.
 
 - Compact live PV / Home / Grid / Battery flow widget.
 
+### Fixed
+
+- Dashboard branding and Home Assistant temperature-unit handling.
+
 ## [0.06] - 2026-08-22
 
 ### Fixed
 
-- Dashboard branding and Home Assistant temperature-unit handling.
+- Dashboard logo handling and frontend cache busting.
 
 ## [0.05] - 2026-08-22
 
