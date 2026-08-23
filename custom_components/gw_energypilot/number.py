@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 import logging
 
@@ -19,6 +20,8 @@ from .entity import GWEnergyPilotEntity
 
 _LOGGER = logging.getLogger(__name__)
 SOC_OPTIMIZE_DEBOUNCE_SECONDS = 3.0
+SOC_STARTUP_RETRY_SECONDS = 15
+SOC_STARTUP_ATTEMPTS = 4
 _SOC_OPTIMIZE_CANCEL: dict[str, Callable[[], None]] = {}
 
 
@@ -96,15 +99,21 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         )
 
     async def _async_background_refresh(self) -> None:
-        """Refresh the slider when EMHASS is available."""
-        try:
-            await self._async_refresh_from_emhass()
-        except HomeAssistantError as err:
-            _LOGGER.debug(
-                "Unable to read EMHASS %s during startup: %s",
-                self.config_key,
-                err,
-            )
+        """Retry startup reads while the EMHASS add-on is becoming ready."""
+        for attempt in range(SOC_STARTUP_ATTEMPTS):
+            try:
+                await self._async_refresh_from_emhass()
+                return
+            except HomeAssistantError as err:
+                if attempt == SOC_STARTUP_ATTEMPTS - 1:
+                    _LOGGER.debug(
+                        "Unable to read EMHASS %s after %s startup attempts: %s",
+                        self.config_key,
+                        SOC_STARTUP_ATTEMPTS,
+                        err,
+                    )
+                    return
+                await asyncio.sleep(SOC_STARTUP_RETRY_SECONDS)
 
     async def _async_refresh_from_emhass(self) -> dict:
         config = await async_get_emhass_config(self.hass, self.entry)
@@ -176,15 +185,12 @@ class GWEMHASSMinimumSOCNumber(_GWEMHASSSOCNumber):
 
     def _validate_against_peer(self, config: dict, value: float) -> None:
         try:
-            maximum = (
-                float(config.get("battery_maximum_state_of_charge", 1.0)) * 100.0
-            )
+            maximum = float(config.get("battery_maximum_state_of_charge", 1.0)) * 100.0
         except (TypeError, ValueError):
             maximum = 100.0
         if value > maximum:
             raise HomeAssistantError(
-                f"Minimum battery SOC ({value:.0f}%) cannot exceed "
-                f"maximum SOC ({maximum:.0f}%)"
+                f"Minimum battery SOC ({value:.0f}%) cannot exceed maximum SOC ({maximum:.0f}%)"
             )
 
 
@@ -200,13 +206,10 @@ class GWEMHASSMaximumSOCNumber(_GWEMHASSSOCNumber):
 
     def _validate_against_peer(self, config: dict, value: float) -> None:
         try:
-            minimum = (
-                float(config.get("battery_minimum_state_of_charge", 0.0)) * 100.0
-            )
+            minimum = float(config.get("battery_minimum_state_of_charge", 0.0)) * 100.0
         except (TypeError, ValueError):
             minimum = 0.0
         if value < minimum:
             raise HomeAssistantError(
-                f"Maximum battery SOC ({value:.0f}%) cannot be below "
-                f"minimum SOC ({minimum:.0f}%)"
+                f"Maximum battery SOC ({value:.0f}%) cannot be below minimum SOC ({minimum:.0f}%)"
             )
