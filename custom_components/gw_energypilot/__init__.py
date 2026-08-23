@@ -18,7 +18,7 @@ from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .event_triggers import async_setup_event_triggers
-from .orchestrator import GWEnergyPilotOrchestrator
+from .orchestrator_v012 import GWEnergyPilotOrchestrator
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -31,7 +31,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v011-support.js?v=0.11-support3"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v012.js?v=0.12-stable1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -76,6 +76,11 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
     )
 
 
+async def _async_initial_refresh(coordinator: GWEnergyPilotCoordinator) -> None:
+    """Refresh telemetry after entities have been added."""
+    await coordinator.async_refresh()
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     """Set up GW EnergyPilot from a config entry."""
     client = GWModbusClient(
@@ -91,7 +96,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
             entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         ),
     )
-    await coordinator.async_config_entry_first_refresh()
 
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
@@ -107,12 +111,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     await orchestrator.async_setup()
     runtime.event_unsubs.extend(async_setup_event_triggers(hass, entry))
 
-    # The automatic-control switch restores its previous Home Assistant state.
-    # Optimization remains independent from that switch: scheduled, price and
-    # EV-stop optimizations can continue while GoodWe remains under manual or
-    # native GoodWe Auto / AI ownership.
+    # Add entities immediately. They may briefly be unavailable while the first
+    # Modbus poll runs, but EnergyPilot no longer blocks Home Assistant startup.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_register_panel(hass)
+    hass.async_create_task(
+        _async_initial_refresh(coordinator),
+        f"GW EnergyPilot initial refresh ({entry.entry_id})",
+    )
     return True
 
 
