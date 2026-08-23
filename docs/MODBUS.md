@@ -20,7 +20,9 @@ Current confirmed development and validation inverter:
 
 Other ETA-G20 models may use closely related telemetry and EMS concepts, but they are not considered tested until verified on real hardware.
 
-The project has a small active tester group. Starting with v0.16, selected candidate registers may be shipped as **Beta read-only diagnostics** so multiple installations can validate them. In this project, Beta means the value has **not yet been extensively field-tested** and must not be treated as confirmed control semantics.
+The project has a small active tester group. Starting with v0.16, selected candidate registers may be shipped as **Beta diagnostics** so multiple installations can validate them. In this project, Beta means the value has **not yet been extensively field-tested** and must not be treated as confirmed automatic-control semantics.
+
+v0.18 adds one deliberately narrow Beta write exception: the already-known SOC-floor registers `45356` and `45358` may be changed manually from the dedicated GOODWE field-test controls, with a fixed key whitelist, percentage validation and immediate read-back verification. They remain completely outside EnergyPilot automatic control and EMHASS.
 
 ## Connection defaults
 
@@ -67,27 +69,49 @@ These conventions affect dashboard direction and EMHASS/controller logic and mus
 | 47511 | `ems_mode` | uint16 | 1 | EMS mode control/state |
 | 47512 | `ems_setpoint` | uint16 | 1 | EMS power setpoint |
 
-## v0.16 Beta G20 diagnostics
+## G20 Beta diagnostics and v0.18 SOC-floor test
 
-The following values are intentionally available for field validation but are **not confirmed production semantics**:
+The following values are available for field validation but are **not all confirmed production semantics**:
 
-| Address | EnergyPilot key | Type | Scale | Candidate meaning |
-|---:|---|---|---:|---|
-| 45356 | `battery_discharge_depth_on_grid` | uint16 | 1 | On-grid battery discharge depth / SOC-limit related setting |
-| 45358 | `battery_discharge_depth_off_grid` | uint16 | 1 | Off-grid battery discharge depth / reserve related setting |
-| 47500 | `battery_soc_protection` | uint16 | 1 | Battery SOC-protection enable/status |
-| 36104 | `meter_total_energy_export_extended` | uint64 | 0.01 | Extended 15 kW+ lifetime grid export counter |
-| 36120 | `meter_total_energy_import_extended` | uint64 | 0.01 | Extended 15 kW+ lifetime grid import counter |
+| Address | EnergyPilot key | Type | Scale | Current Beta meaning | Write policy |
+|---:|---|---|---:|---|---|
+| 45356 | `battery_discharge_depth_on_grid` | uint16 | 1 | Raw on-grid minimum SOC floor; user-facing DoD = `100 - raw` | Manual v0.18 field-test only |
+| 45358 | `battery_discharge_depth_off_grid` | uint16 | 1 | Raw off-grid minimum SOC floor | Manual v0.18 field-test only |
+| 47500 | `battery_soc_protection` | uint16 | 1 | Battery SOC-protection/status candidate | Read-only |
+| 36104 | `meter_total_energy_export_extended` | uint64 | 0.01 | Extended 15 kW+ lifetime grid export counter | Read-only |
+| 36120 | `meter_total_energy_import_extended` | uint64 | 0.01 | Extended 15 kW+ lifetime grid import counter | Read-only |
 
-Rules while these values remain Beta:
+### Why `45356` is treated as minimum SOC
 
-- read only;
-- optional Modbus reads;
-- never use them as EMS control inputs;
-- never write `45356`, `45358` or `47500` from EnergyPilot;
-- `36104/36120` do not replace the canonical Recorder-facing grid-energy sensors;
-- compare values against SolarGo/SEMS+ and report inverter model plus firmware;
-- one unsupported Beta range must not make required telemetry unavailable.
+Current maintained GoodWe implementations define register `45356` as the battery discharge-depth setting, but expose the user-facing on-grid depth of discharge as:
+
+```text
+on-grid DoD = 100 - register 45356
+```
+
+So a raw register value of `10` corresponds to a **10% minimum SOC floor** and 90% depth of discharge. This also matches the reference GW15K-ETA-G20 observation that the battery stopped discharging at approximately 10% while `45356` read `10`.
+
+Independent maintained GoodWe/OpenEMS mappings also associate `45356` with the minimum-SOC-under-limit setting and `45358` with the off-grid counterpart. EnergyPilot therefore keeps the existing internal keys for entity compatibility but presents the raw values as minimum-SOC floors in the v0.18 field-test UI.
+
+### v0.18 write safety contract
+
+The v0.18 test path is intentionally not a generic Modbus editor.
+
+- `registers.py` remains the canonical source for the two addresses;
+- the client derives the write addresses from the existing register definitions instead of duplicating numeric constants;
+- only `battery_discharge_depth_on_grid` and `battery_discharge_depth_off_grid` are whitelisted;
+- values must be whole percentages in the range `0..100`;
+- the selected register must already be present in the coordinator telemetry before the API permits a write;
+- one user action writes exactly one register;
+- the dashboard requires an explicit confirmation for each write;
+- the client reads the same register back immediately after writing;
+- a write is reported successful only when the read-back equals the requested value;
+- verified read-back is reflected in the coordinator immediately and then confirmed again by normal polling;
+- no automatic rollback is attempted after a write error or read-back mismatch; the operator must inspect the current value before retrying.
+
+This path is manual field-validation only. Automatic Control, controller ownership, EMHASS, event triggers and schedulers do not read these values as control targets and do not write them.
+
+Register `47500` is explicitly excluded. On the reference G20 it has returned `65535`, and its firmware-dependent meaning is not sufficiently established for a write path.
 
 ## Load semantics
 
@@ -131,7 +155,7 @@ These are decoded as IEEE-754 big-endian float32 values scaled by `0.001` to kWh
 
 ### Extended 15 kW+ counter validation
 
-On GW15K-ETA-G20 installations, the legacy cumulative counters can be compared with the v0.16 Beta candidates:
+On GW15K-ETA-G20 installations, the legacy cumulative counters can be compared with the Beta candidates:
 
 ```text
 36104 = candidate extended total exported energy
@@ -140,7 +164,7 @@ On GW15K-ETA-G20 installations, the legacy cumulative counters can be compared w
 
 The extended candidates are decoded as unsigned 64-bit big-endian register sequences and scaled by `0.01 kWh`.
 
-They remain diagnostics only until physical SEMS lifetime totals demonstrate that they are the correct G20 source. Promotion must preserve existing Home Assistant unique IDs and Recorder history where practical.
+On the reference GW15K-ETA-G20, both have produced plausible non-zero lifetime values. They remain diagnostics until delta testing against an independent meter/SEMS lifetime source confirms both direction and scaling. Promotion must preserve existing Home Assistant unique IDs and Recorder history where practical.
 
 ## Battery energy accounting
 
@@ -167,15 +191,15 @@ The practical hierarchy is:
 
 ```text
 EMHASS optimizer limit
-GoodWe / SEMS+ inverter limit
+GoodWe / inverter SOC floor
 Battery BMS limit
 
 most restrictive active limit wins
 ```
 
-That is why an inverter configured in SEMS+ to stop discharging around `10%` can refuse a mode-12 discharge request below that point even if EMHASS has a lower minimum SOC target.
+That is why an inverter whose raw on-grid `45356` value is `10` can refuse a mode-12 discharge request below about 10% even if EMHASS has a lower minimum SOC target.
 
-The v0.16 Beta candidate registers `45356`, `45358` and `47500` exist to correlate this layer with actual SolarGo/SEMS+ settings. They are not control registers in EnergyPilot.
+The v0.18 manual test exists specifically to correlate that raw GoodWe floor with observed G20 behavior. It does not make the GoodWe floor an EnergyPilot planning variable. EMHASS remains free to plan within its own configured limits, while the inverter remains the independent hardware enforcement layer.
 
 ## EMS modes currently used
 
@@ -209,6 +233,8 @@ When one of these modes is requested, the Modbus client forces the power setpoin
 
 Changing this order is a control-behaviour change and requires validation on real hardware.
 
+The v0.18 `45356/45358` field-test writes use a separate client method and do not share or alter the EMS write sequence.
+
 ## Read blocks
 
 The client reads contiguous holding-register blocks to reduce individual Modbus requests.
@@ -233,7 +259,7 @@ The required runtime ranges are:
 47509 + 4 words
 ```
 
-The optional diagnostic/accounting ranges in v0.16 are:
+The optional diagnostic/accounting ranges are:
 
 ```text
 35206 + 6 words
