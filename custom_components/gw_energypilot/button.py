@@ -165,6 +165,12 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             "meter_total_power_fast": values.get("meter_total_power_fast"),
             "meter_total_energy_import": values.get("meter_total_energy_import"),
             "meter_total_energy_export": values.get("meter_total_energy_export"),
+            "meter_total_energy_import_extended_candidate": values.get(
+                "meter_total_energy_import_extended"
+            ),
+            "meter_total_energy_export_extended_candidate": values.get(
+                "meter_total_energy_export_extended"
+            ),
             "total_inverter_power": values.get("total_inverter_power"),
             "ac_active_power": values.get("ac_active_power"),
         }
