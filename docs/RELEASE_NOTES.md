@@ -14,6 +14,7 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.22** | 2026-08-23 | **Beta** | Promotes the hardware-validated GoodWe smart-meter/PCC modes into an optional automatic strategy. With **GoodWe smart meter active** enabled, EMHASS `P_grid` drives mode 9 import targets and mode 10 export targets, while near-zero grid flow uses mode 1 Auto/self-use. Disabling the setting restores direct `P_batt` control through modes 11/12/8. Also fixes live-flow particle direction at the active frontend layer. |
 | **0.21** | 2026-08-23 | **Beta** | Adds a manual 12-mode EMS test pad to the Controller card. Automatic Control locks the pad while still highlighting the live GoodWe mode. With Automatic Control off, testers can select modes 1–12 and set a `0..max_power` manual setpoint using the existing Home Assistant manual-mode/manual-power entities. This is a UI/testing surface only; the Modbus write path, ownership rules and automatic controller are unchanged. |
 | **0.20** | 2026-08-23 | **Beta** | Corrects v0.19 SOC diagnostics after second-tester field data: configured EnergyPilot final SOC is separated from the last value actually sent by EnergyPilot, and invalid raw EMHASS SOC config values are identified as raw diagnostics instead of being rendered as impossible percentages. No optimizer or GoodWe control behavior changes. |
 | **0.19** | 2026-08-23 | **Beta** | Makes the separate SOC layers explicit: current SOC, runtime `soc_init`/`soc_final`, EMHASS minimum/target/deficit threshold and cost, and GoodWe on-grid minimum SOC are shown together. The existing EMHASS `/get-config` refresh is reused; optimization and GoodWe control behavior do not change. |
@@ -35,6 +36,107 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
+
+## v0.22 — Smart-meter/PCC automatic control
+
+v0.22 turns the mode-9/mode-10 field tests from v0.21 into an explicit, reversible Automatic Control strategy.
+
+### Hardware behavior confirmed on the reference ETA-G20
+
+The manual v0.21 tests showed that the meaning of `47512` depends strongly on the selected EMS mode:
+
+```text
+mode 9  = target net grid import at the GoodWe smart meter / PCC
+mode 10 = target net grid export at the GoodWe smart meter / PCC
+mode 11 = direct battery charge-power target
+mode 12 = direct battery discharge-power target
+```
+
+Observed examples included:
+
+```text
+mode 10, setpoint 400 W  -> approximately 395 W grid export
+mode 9,  setpoint 400 W  -> approximately 331 W grid import
+mode 9,  setpoint 15 kW  -> approximately 15 kW grid import while DC PV was added on top
+mode 11, setpoint 15 kW  -> battery stayed close to 15 kW charge while PV reduced required grid import
+```
+
+Mode 1 was also observed naturally sending available PV surplus into the battery while keeping the grid close to zero on the reference installation.
+
+### GoodWe smart meter active
+
+The GOODWE settings page now contains a dedicated **GoodWe smart meter active** switch.
+
+With the setting **ON** — the v0.22 default — Automatic Control uses EMHASS `P_grid` as the site-level target:
+
+```text
+P_grid > +deadband  -> mode 9  Grid import target
+P_grid < -deadband  -> mode 10 Grid export target
+P_grid near 0 W     -> mode 1  GoodWe Auto / self-use
+```
+
+EMHASS convention remains:
+
+```text
+P_grid > 0 = planned import
+P_grid < 0 = planned export
+```
+
+The GoodWe smart meter itself still reports the opposite telemetry sign in EnergyPilot:
+
+```text
+meter 36008 < 0 = actual import
+meter 36008 > 0 = actual export
+```
+
+GoodWe therefore performs the fast closed-loop correction at its own PCC. EnergyPilot does not need to keep trimming a mode-11 battery target every 30 seconds when this strategy is enabled.
+
+With the setting **OFF**, the previous direct battery execution remains available:
+
+```text
+P_batt < -deadband -> mode 11 Battery charge power
+P_batt > +deadband -> mode 12 Battery discharge power
+P_batt near 0 W    -> mode 8  Battery Hold
+```
+
+This fallback does not require a valid `P_grid` entity.
+
+### Why this helps external PV
+
+A separate AC-coupled PV inverter can be invisible on the GoodWe DC-PV inputs while still being visible to the GoodWe smart meter. Modes 9 and 10 regulate the net site flow at that meter, so they naturally include externally generated AC power in the same PCC balance.
+
+Directly connected GoodWe PV keeps an efficiency advantage because it reaches the battery through the inverter's DC path. The control objective, however, is the same: the requested import/export value is enforced at the connection point rather than inferred from a forecasted battery-power target.
+
+### Retired v0.18-v0.21 feedback loop
+
+The old 30-second grid-neutral mode-11 correction is no longer scheduled in v0.22. Its diagnostic fields are retained as inactive compatibility values so older frontend/support layers do not break during the transition.
+
+### Flow-direction correction
+
+The live-flow labels already used the validated signs, but the animated particles were assembled through several historical CSS layers. v0.22 makes their direction authoritative in the active frontend layer using explicit **to hub / from hub** classes:
+
+```text
+PV production       -> hub
+Grid import         -> hub
+Grid export         <- hub
+Battery charging    <- hub
+Battery discharging -> hub
+House load          <- hub
+```
+
+Here the arrow points in the direction energy travels relative to the central EnergyPilot hub.
+
+### Beta boundary
+
+v0.22 remains **Beta** because the new automatic strategy selection and mode-9/10 execution have only limited field exposure across installations. The manual 12-mode pad remains available when Automatic Control is off, and switching **GoodWe smart meter active** off restores the established direct mode-11/12/8 control path.
+
+The EMS registers and write order are unchanged:
+
+```text
+write 47512 power
+wait briefly
+write 47511 mode
+```
 
 ## v0.21 — Manual 12-mode EMS test pad
 

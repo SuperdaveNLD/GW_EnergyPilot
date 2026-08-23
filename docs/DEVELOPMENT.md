@@ -4,53 +4,51 @@ This document defines the practical development workflow for GW EnergyPilot.
 
 ## Repository is authoritative
 
-Before changing code, inspect the current `main` branch. Do not assume snippets from an older chat or release still match runtime behaviour.
+Before changing code, inspect the current repository. Do not reconstruct current runtime behavior from older chats or releases.
 
 For AI-assisted work, also read `AGENTS.md` first.
 
-## Current release structure
-
-The Home Assistant integration lives in:
+## Current modules
 
 ```text
 custom_components/gw_energypilot/
 ```
 
-Important modules:
+Important files:
 
 ```text
-__init__.py          config-entry setup, device migration and sidebar panel registration
+__init__.py          config-entry setup, device migration, APIs and sidebar panel
 client.py            asynchronous GoodWe Modbus TCP I/O
 registers.py         canonical register definitions and read blocks
 coordinator.py       periodic telemetry polling
-controller.py        automatic/manual EMS ownership and control
+controller.py        automatic/manual EMS ownership and actuator strategy
 orchestrator.py      base EMHASS orchestration
 orchestrator_v012.py reliability/startup/price refinements
-orchestrator_v013.py G20 load semantics and v0.13 refinements
-emhass_config.py     EMHASS config read/write helpers
-settings_api.py      admin-only dashboard settings API
+orchestrator_v013.py current G20 orchestration subclass
+emhass_config.py     complete EMHASS config read/write helpers
+settings_api.py      EP/EMHASS/GoodWe connection settings
+smart_meter_api.py   v0.22 GoodWe smart-meter actuator strategy
+beta_soc_api.py      manual verified 45356/45358 field-test writes
 event_triggers.py    event-driven optimization hooks
-sensor.py            telemetry/diagnostic sensors
-switch.py            Automatic Control ownership switch
-number.py            manual power and EMHASS SOC controls
-select.py            manual EMS mode selection
+sensor.py            telemetry/diagnostics
+switch.py            Automatic Control ownership
+number.py            manual power + EMHASS SOC controls
+select.py            manual EMS mode + EMHASS strategy
 button.py            optimize/strategy/manual/resume actions
-frontend/            layered sidebar dashboard and settings assets
-tests/               hardware-independent safety/regression tests
+frontend/            layered dashboard/settings assets
+tests/               hardware-independent regression tests
 ```
 
-Repository-level tooling:
+Repository tooling:
 
 ```text
-scripts/validate_repo.py       lightweight consistency checks
-.github/workflows/quality.yml  Python compile + unit tests + repository validation
-.github/workflows/hacs.yml     HACS validation
-.github/workflows/hassfest.yml Home Assistant hassfest validation
+scripts/validate_repo.py
+.github/workflows/quality.yml
+.github/workflows/hacs.yml
+.github/workflows/hassfest.yml
 ```
 
-## Active orchestration chain
-
-The active runtime class comes from:
+## Active orchestrator chain
 
 ```text
 orchestrator_v013.py
@@ -58,63 +56,163 @@ orchestrator_v013.py
         inherits orchestrator.py
 ```
 
-Never change only the base file without checking whether a subclass overrides the same behaviour.
+All three remain active runtime code. Check subclasses before modifying base behavior.
 
-This layered implementation is valid current code but is also technical debt. A future release may consolidate it after behaviour is covered by tests.
+## Active frontend chain
 
-## Active frontend structure
-
-v0.17 deliberately layers the settings UI on top of the existing dashboard releases:
+v0.22 top level:
 
 ```text
-gw-energy-pilot-v017.js
-  -> gw-energy-pilot-v016.js              G20 Beta diagnostics
-       -> gw-energy-pilot-v015.js         EMHASS strategy controls
-  -> gw-energy-pilot-settings-v016.js     EP / EMHASS / GOODWE settings implementation
+gw-energy-pilot-v022.js
+  -> gw-energy-pilot-v021.js        manual 12-mode EMS pad
+       -> gw-energy-pilot-v020.js   SOC diagnostics validity
+            -> earlier layered dashboard/settings assets
 ```
 
-The lower files import earlier dashboard layers. Do not remove versioned frontend files based on filenames alone.
+The older filenames are not dead assets. Trace imports before deleting/consolidating anything.
+
+The v0.22 layer owns current Smart Meter strategy UI, PCC/battery target relabelling and authoritative particle direction.
+
+## Automatic-control contract
+
+v0.22 has two explicit actuator strategies.
+
+### GoodWe smart meter active = ON
+
+Default on v0.22:
+
+```text
+EMHASS P_grid > +deadband  -> mode 9  Grid import target
+EMHASS P_grid < -deadband  -> mode 10 Grid export target
+EMHASS P_grid near 0 W     -> mode 1  GoodWe Auto / AI
+```
+
+`P_grid` sign:
+
+```text
+positive = planned import
+negative = planned export
+```
+
+GoodWe meter sign is opposite:
+
+```text
+36008 negative = actual import
+36008 positive = actual export
+```
+
+Both `P_batt` and `P_grid` are validated as finite plan outputs. `P_grid` is the actuator request. GoodWe modes 9/10 close the fast loop at the PCC.
+
+The former v0.18-v0.21 30-second mode-11 grid-neutral correction is not scheduled in this strategy. Do not add a competing feedback loop without an explicit redesign and new hardware evidence.
+
+### GoodWe smart meter active = OFF
+
+Fallback:
+
+```text
+P_batt < -deadband -> mode 11 Battery charge power
+P_batt > +deadband -> mode 12 Battery discharge power
+P_batt near 0 W    -> mode 8  Battery Hold
+```
+
+This fallback deliberately works without a valid `P_grid` entity.
+
+### Manual ownership
+
+Manual commands never inherit or reinterpret the automatic strategy. Manual mode 9 is mode 9, manual mode 11 is mode 11, etc.
+
+Automatic Control OFF returns the inverter to mode 1 / 0 W.
+
+EV coordination can temporarily take Battery Hold ownership.
+
+## Hardware evidence behind v0.22
+
+Reference GW15K-ETA-G20 field tests established:
+
+```text
+mode 10 setpoint 400 W -> ~395 W grid export
+mode 9  setpoint 400 W -> ~331 W grid import
+mode 9  setpoint 15 kW -> ~15 kW grid import + local DC PV; battery ~16.9 kW charge
+mode 11 setpoint 15 kW -> battery ~15 kW charge; PV reduces required grid import
+mode 1                 -> observed self-use / near-zero-grid with PV surplus charging
+```
+
+Therefore:
+
+```text
+9 / 10  = PCC/grid targets
+11 / 12 = direct battery-power targets
+```
+
+Do not use a mode-9 setpoint as a battery-power limit.
+
+## Modbus safety
+
+`registers.py` is canonical for register definitions/read blocks.
+
+Never guess GoodWe addresses, data widths, scales or sign conventions.
+
+EMS contract:
+
+```text
+47511 = mode
+47512 = non-negative mode-specific power/setpoint magnitude
+```
+
+Write order remains:
+
+```text
+write 47512
+brief wait
+write 47511
+```
+
+Do not reorder this without hardware validation.
 
 ## Dedicated settings architecture
 
-The dashboard gear uses admin-only WebSocket commands from `settings_api.py`:
+Dashboard APIs are admin-only.
 
 ```text
 gw_energypilot/settings/get
 gw_energypilot/settings/update
+
+gw_energypilot/smart_meter/get
+gw_energypilot/smart_meter/set
+
+gw_energypilot/beta_soc/get
+gw_energypilot/beta_soc/set
 ```
 
-The existing Home Assistant config entry remains the only configuration source.
+Storage rules:
 
-Rules:
+- EP/EMHASS integration options: `ConfigEntry.options`;
+- GoodWe connection + smart-meter actuator choice: `ConfigEntry.data`;
+- EMHASS SOC/cost-function config: EMHASS `/get-config` → `/set-config`;
+- 45356/45358: GoodWe inverter registers.
 
-- EP/EMHASS settings reuse the existing config-flow validation/conversion path;
-- GOODWE host/port/unit-ID changes must pass real Modbus setup validation before save;
-- a successful update modifies the existing entry and requests a reload;
-- device identity uses `(DOMAIN, config_entry_id)`, not mutable connection settings;
-- v0.17 migrates a legacy `(DOMAIN, host:slave)` device identifier before platform setup;
-- existing entity unique IDs remain `{entry_id}_{entity_key}`.
+Do not create a second settings database.
 
-See `docs/SETTINGS.md`.
+GoodWe connection changes require real connection validation before save.
+
+Device identity remains `(DOMAIN, config_entry_id)`; do not revert to mutable host/unit-ID identity.
 
 ## Development workflow
 
-For each bug or feature:
+For each change:
 
-1. Inspect the current implementation.
-2. Trace the exact runtime path.
-3. Confirm whether the issue belongs to GoodWe I/O, Home Assistant state, device/entity migration, controller ownership, settings API, EMHASS orchestration, or frontend presentation.
-4. Reproduce with diagnostics/logs where possible.
-5. Apply the smallest robust fix.
-6. Run the lightweight repository checks and unit tests.
-7. Check startup and unavailable-device behaviour.
-8. Check config-entry reload/unload behaviour.
-9. Check unique IDs, device identifiers and Recorder/statistics compatibility.
-10. Update docs/changelog/release notes for externally visible behaviour.
+1. Inspect current code and documentation.
+2. Trace runtime caller/listener/entity/settings paths.
+3. Identify whether the issue is Modbus, Home Assistant state, controller ownership, EMHASS, settings API or frontend-only.
+4. Use hardware evidence for control/register semantics.
+5. Apply the smallest robust change.
+6. Add focused regression coverage.
+7. Check unavailable/invalid input behavior.
+8. Preserve entity/device IDs and Recorder/statistics contracts.
+9. Update docs/changelog/release notes when behavior changes.
+10. Require Quality, HACS and hassfest before merge.
 
-## Lightweight repository checks
-
-Run:
+## Local/CI checks
 
 ```text
 python -m compileall -q custom_components/gw_energypilot scripts tests
@@ -122,195 +220,110 @@ python -m unittest discover -s tests -v
 python scripts/validate_repo.py
 ```
 
-The `Quality` GitHub Actions workflow runs the same checks automatically on pushes and pull requests.
+Quality runs these automatically.
 
-The validator currently checks:
+The repository validator covers:
 
-- every Modbus register definition is fully covered by a required or optional read block;
-- all words of multi-register values, including uint32/int32/float32/uint64 definitions, are covered;
-- every Modbus read block stays within the 125-register protocol limit;
-- register keys are unique;
-- repository JSON files parse;
-- relative frontend JavaScript imports point to existing files;
-- the active panel JavaScript file exists;
-- the active frontend `VERSION` matches `manifest.json` when declared;
-- every changelog version appears on the release-notes page with an explicit status.
+- Modbus register/read-block coverage including multi-word values;
+- block length limits;
+- unique register keys;
+- JSON parsing;
+- frontend relative-import resolution;
+- active frontend existence/version match;
+- changelog/release-notes version coverage.
 
-Unit tests currently cover controller safety/ownership decisions, EMHASS full-config patch preservation, and hardware-independent Modbus decoding/coverage. These checks do not replace real Home Assistant lifecycle, settings API or hardware validation.
+Static checks prove repository consistency, not physical GoodWe behavior.
 
-## Keep domains separated
+## Current test priorities
 
-A useful debugging split is:
+Existing tests should cover at least:
+
+- smart-meter ON: P_grid → mode 9/10/1;
+- smart-meter OFF: P_batt → mode 11/12/8;
+- maximum setpoint clamp;
+- invalid/non-finite optimizer outputs;
+- optimizer readiness;
+- manual ownership;
+- Automatic Control disable → mode 1 / 0 W;
+- EV hold and fresh-plan behavior;
+- duplicate command suppression;
+- EMHASS complete-config preservation;
+- Modbus decode/register-block invariants.
+
+Next useful coverage:
+
+- smart-meter WebSocket API authorization/state change;
+- full Home Assistant config-entry lifecycle;
+- device-registry migration;
+- settings API reload behavior;
+- orchestrator HTTP success/failure;
+- Recorder/statistics integration;
+- frontend behavior in a browser test harness.
+
+## Live-flow presentation contract
+
+Frontend energy particles must follow live telemetry signs, not selected EMS mode:
 
 ```text
-GoodWe telemetry problem
-  -> client.py / registers.py / coordinator.py
-
-Home Assistant entity/device problem
-  -> sensor.py / switch.py / number.py / select.py / button.py / entity.py / __init__.py
-
-Dashboard settings problem
-  -> settings_api.py + config_flow.py + settings frontend layer
-
-Battery control problem
-  -> controller.py + client.py
-
-Optimization problem
-  -> orchestrator*.py + emhass_config.py + event_triggers.py
-
-Dashboard-only problem
-  -> active frontend JS modules + entity attributes
+PV production         -> hub
+Grid import           -> hub
+Grid export           hub -> grid
+Battery charging      hub -> battery
+Battery discharging   battery -> hub
+House consumption     hub -> house
 ```
 
-Do not solve a presentation issue by changing Modbus semantics unless the underlying data is actually wrong.
+If labels and particles disagree, fix the frontend direction layer; do not change Modbus sign semantics without hardware evidence.
+
+## Beta hardware policy
+
+Beta means **not extensively field-tested**.
+
+For candidate registers:
+
+- use optional reads;
+- keep read-only unless a separately validated write path exists;
+- never feed unconfirmed values into automatic control;
+- label Beta visibly;
+- collect model/firmware and SolarGo/SEMS+ correlation;
+- promote only through an intentional code/docs release change.
+
+The v0.22 mode-9/10 automatic strategy is Beta for a different reason: the underlying EMS modes/registers have strong reference-hardware evidence, but the new automatic usage has limited installation exposure. The direct 11/12/8 strategy remains a reversible fallback.
 
 ## Known technical debt
 
-### 1. Layered orchestrator versions
-
-The v0.12 and v0.13 modules subclass earlier orchestration code. This made incremental releases safer, but future maintenance would benefit from a tested consolidation into a single implementation.
-
-Do not delete `orchestrator.py` or `orchestrator_v012.py` while `orchestrator_v013.py` inherits from them.
-
-### 2. Layered frontend assets
-
-The active dashboard is layered, including a dedicated settings implementation layer in v0.17. Files that look historical can still be runtime dependencies.
-
-Do not delete a versioned frontend asset based on its filename alone. Trace imports first. The repository validator catches missing relative JavaScript imports, but it does not prove behavioural equivalence after a consolidation.
-
-### 3. Limited automated runtime coverage
-
-The repository has hardware-independent unit coverage for controller mapping/ownership, EMHASS selected-config patching and selected Modbus decode invariants, plus structural repository checks. It does not yet have a full Home Assistant test harness covering config-entry lifecycle, settings WebSocket behavior, device-registry migration, orchestrator HTTP flows, entity registry migrations, Recorder integration, or real hardware I/O.
-
-Add focused tests before consolidating orchestration or frontend layers.
-
-## Beta hardware-validation workflow
-
-The active installation base is small enough that some read-only diagnostics may be intentionally shipped before extensive field testing.
-
-For this repository, **Beta** means the feature is available for limited field validation but has not yet been extensively confirmed in real installations.
-
-A Beta register feature must:
-
-- remain read-only unless separately validated for writes;
-- use optional Modbus blocks;
-- fail independently from required telemetry;
-- be clearly labelled Beta in diagnostics, Home Assistant entities and documentation;
-- stay out of EMS control and ownership decisions;
-- stay out of canonical Recorder-facing energy entities until promoted;
-- include a practical way for testers to copy/report values;
-- record model, firmware and matching SolarGo/SEMS+ values during validation.
-
-The v0.17 settings UI/device migration is also marked Beta until it has broader real-installation exposure.
-
-Promotion from Beta requires real-installation evidence and an explicit release-note/status change.
-
-## Resolved maintenance issue: telemetry block duplication
-
-Telemetry block ownership is centralized in `registers.py`:
-
-```text
-TELEMETRY_BLOCKS
-OPTIONAL_TELEMETRY_BLOCKS
-```
-
-`client.py` imports those constants instead of maintaining duplicate ranges.
-
-The active runtime ranges were preserved during this refactor. Blocks ending in a multi-word value include all required words. The validator prevents a future register definition from being added without full block coverage.
-
-## Testing priorities
-
-Existing automated coverage includes:
-
-- controller `P_batt` to EMS mapping;
-- deadband behaviour;
-- maximum power clamping;
-- manual ownership versus Automatic Control;
-- disabling Automatic Control returning to mode 1 / 0 W;
-- invalid/unavailable/non-finite `P_batt` handling;
-- EV hold and EV-stop optimization guard behaviour;
-- EMHASS selected-config preservation;
-- uint64 extended-meter decoding and multi-word register coverage.
-
-Next priorities include:
-
-- device-registry migration from legacy `host:slave` to config-entry ID;
-- settings API authorization, validation and reload behavior;
-- broader register decoding (uint/int/float, scaling and signed values);
-- orchestrator optimize/publish HTTP success and failure paths;
-- load forecast using register 35172;
-- startup with inverter unavailable;
-- startup with EMHASS unavailable;
-- config-entry reload/unload;
-- entity unique-ID stability and migrations;
-- Recorder/statistics interactions.
-
-## Hardware validation
-
-The reference hardware is currently:
-
-- GoodWe GW15K-ETA-G20
-
-When validating another model or a Beta register, record at least:
-
-```text
-inverter model
-firmware version
-battery model
-Modbus connection details
-raw/decoded candidate value
-matching SolarGo/SEMS+ value where relevant
-telemetry differences
-EMS mode 8 behaviour
-EMS mode 11 behaviour
-EMS mode 12 behaviour
-register/sign differences
-```
-
-Do not mark the whole ETA family as tested based on one unit.
-
-## Control changes require extra care
-
-Changes involving registers `47511` or `47512`, EMS modes, setpoints, charge/discharge direction, or maximum power can command significant real power.
-
-For such changes:
-
-- verify sign conventions;
-- keep power bounded;
-- prefer a non-automatic/manual validation path first;
-- confirm the inverter's resulting mode and telemetry;
-- ensure failure cannot leave two control paths fighting each other.
+1. Layered orchestrator inheritance should eventually be consolidated after tests.
+2. Layered frontend assets should eventually be consolidated after behavior coverage.
+3. Full Home Assistant/runtime/browser testing remains limited.
+4. Legacy `grid_neutral_*` diagnostic fields remain temporarily as inactive compatibility attributes after retirement of the old feedback loop.
 
 ## Release checklist
 
-Before a release, verify:
+Before release verify:
 
-- `manifest.json` version;
-- active frontend module/cache-buster and frontend `VERSION`;
-- `CHANGELOG.md` detailed changes;
-- `docs/RELEASE_NOTES.md` user-facing summary and **Beta/Validated** status;
-- README current version/status and behavior;
-- `docs/SETTINGS.md` when the settings contract changes;
-- translations for new user-facing entities/options;
-- HACS metadata where relevant;
-- `Quality`, HACS, and hassfest checks;
-- no accidental entity unique-ID or device-identifier changes;
-- any intentional device migration follows a current Home Assistant registry migration pattern;
-- no undocumented register-semantic changes;
-- every unconfirmed hardware value is explicitly labelled Beta and remains within the Beta policy boundary.
+- manifest version;
+- active frontend + cache-buster + `VERSION`;
+- controller strategy and fallback tests;
+- no unintended `client.py`/register/write-order changes;
+- README current behavior;
+- `CHANGELOG.md`;
+- `docs/RELEASE_NOTES.md` and Beta/Validated status;
+- `docs/EMS_MODES.md` for control changes;
+- `docs/SETTINGS.md` for settings changes;
+- translations/standard HA option descriptions where relevant;
+- Quality, HACS and hassfest;
+- exact tested PR head before merge.
 
-A Beta release may intentionally contain unconfirmed read-only diagnostics. Static CI is sufficient to prove repository consistency, but never to promote those hardware semantics from Beta to confirmed.
+## Durable documentation map
 
-## Documentation ownership
-
-Use these documents for durable project knowledge rather than relying on chat history:
-
-- `AGENTS.md` — instructions to contributors/AI;
-- `docs/ARCHITECTURE.md` — runtime design;
-- `docs/MODBUS.md` — register/control contract and Beta register status;
-- `docs/ENTITIES.md` — Home Assistant entity/device contract;
+- `AGENTS.md` — contributor/AI rules;
+- `docs/ARCHITECTURE.md` — runtime structure;
+- `docs/MODBUS.md` — register contract;
+- `docs/EMS_MODES.md` — all 12 EMS modes/current automatic strategy;
 - `docs/EMHASS_SETUP.md` — operator setup;
-- `docs/SETTINGS.md` — dedicated settings behavior and migration;
-- `docs/KNOWN_ISSUES.md` — field issues outside or adjacent to EnergyPilot runtime code;
-- `docs/RELEASE_NOTES.md` — readable per-version notes and Beta/validation status;
-- `CHANGELOG.md` — detailed technical version history.
+- `docs/GRID_NEUTRAL_CHARGING.md` — old loop → v0.22 PCC migration;
+- `docs/SETTINGS.md` — settings ownership/security;
+- `docs/ENTITIES.md` — entity/device contract;
+- `docs/KNOWN_ISSUES.md` — field issues;
+- `docs/RELEASE_NOTES.md` — release summaries/status;
+- `CHANGELOG.md` — detailed history.

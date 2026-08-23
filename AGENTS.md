@@ -54,9 +54,12 @@ EMHASS is an external prerequisite. GW EnergyPilot may integrate with EMHASS, bu
 - `client.py` must import `TELEMETRY_BLOCKS` and `OPTIONAL_TELEMETRY_BLOCKS`; do not recreate block lists there.
 - Changes to register definitions require evidence from tested hardware, vendor documentation, upstream implementation evidence, or repeatable diagnostics.
 - Preserve the tested sign conventions unless evidence proves they are wrong:
-  - grid power: negative = import, positive = export;
+  - GoodWe grid meter power: negative = import, positive = export;
   - battery power: negative = charging, positive = discharging.
-- EMS control currently uses register `47511` for mode and `47512` for power setpoint.
+- EMHASS `P_grid` uses the opposite sign from GoodWe meter telemetry:
+  - EMHASS `P_grid` positive = planned import;
+  - EMHASS `P_grid` negative = planned export.
+- EMS control uses register `47511` for mode and `47512` for the non-negative mode-specific power magnitude.
 - Be conservative with write operations: an incorrect EMS write can move significant battery/grid power.
 - Keep `python scripts/validate_repo.py` passing; it verifies that every register definition, including all words of multi-word values, is covered by a configured read block.
 
@@ -80,12 +83,36 @@ Static CI being green proves repository consistency, not GoodWe register meaning
 
 Automatic and manual control must remain explicit.
 
-- Automatic Control ON: EnergyPilot may translate a valid EMHASS `P_batt` target into GoodWe EMS commands.
-- Automatic Control OFF: the controller returns the inverter to GoodWe Auto / AI (`mode 1`, `0 W`).
+- Automatic Control OFF returns the inverter to GoodWe Auto / AI (`mode 1`, `0 W`).
 - Manual quick actions take manual ownership before writing their requested EMS mode.
 - EV coordination may temporarily hold the battery and trigger a fresh optimization after charging stops.
+- Do not introduce code paths that silently fight each other for EMS ownership.
 
-Do not introduce code paths that silently fight each other for EMS ownership.
+### Automatic actuator strategy
+
+v0.22 supports two deliberate automatic actuator strategies selected by the GoodWe config-entry setting **GoodWe smart meter active**.
+
+When the setting is **ON** (default):
+
+```text
+EMHASS P_grid > +deadband  -> GoodWe mode 9  Grid import target
+EMHASS P_grid < -deadband  -> GoodWe mode 10 Grid export target
+EMHASS P_grid near 0 W     -> GoodWe mode 1  Auto / self-use
+```
+
+GoodWe modes 9/10 close the fast control loop against the inverter's own smart meter/PCC. Do not reintroduce a second 30-second EnergyPilot mode-11 trimming loop on top of this strategy without new hardware evidence and an explicit design change.
+
+When the setting is **OFF**:
+
+```text
+EMHASS P_batt < -deadband -> GoodWe mode 11 direct battery charge
+EMHASS P_batt > +deadband -> GoodWe mode 12 direct battery discharge
+EMHASS P_batt near 0 W    -> GoodWe mode 8  Battery Hold
+```
+
+The direct battery fallback must remain usable even when `P_grid` is missing/unavailable.
+
+Manual mode 9/10/11/12 commands always mean exactly the mode selected by the operator; the automatic strategy setting must not remap manual commands.
 
 ## EMHASS rules
 
@@ -93,27 +120,33 @@ Do not introduce code paths that silently fight each other for EMS ownership.
 - Use the configured EMHASS base URL; do not assume `localhost` works from Home Assistant Core.
 - Preserve unrelated EMHASS configuration when changing selected settings.
 - `/set-config` must receive the complete intended configuration; read the current config first when patching selected values.
-- Do not execute a stale `P_batt` target after a condition that requires re-optimization.
+- Do not execute stale `P_batt` or `P_grid` output after a condition that requires re-optimization.
 - Treat optimizer readiness and numeric output validation as safety gates.
-- Strategy/cost-function changes alter the optimizer objective only; do not silently change the GoodWe actuator/control primitive at the same time.
+- When GoodWe smart-meter control is enabled, `P_grid` is the automatic actuator plan and `P_batt` remains a required plan-validity/diagnostic output.
+- When GoodWe smart-meter control is disabled, `P_batt` is the actuator plan and a valid `P_grid` is not required.
+- Strategy/cost-function changes alter the optimizer objective only; do not silently change the GoodWe actuator strategy at the same time.
 
 Existing setup/operator guidance lives in `docs/EMHASS_SETUP.md`.
 
-## Dedicated settings API
+## Dedicated settings APIs
 
-v0.17 adds dashboard configuration through:
+Dashboard configuration uses:
 
 ```text
 custom_components/gw_energypilot/settings_api.py
+custom_components/gw_energypilot/smart_meter_api.py
+custom_components/gw_energypilot/beta_soc_api.py
 ```
 
 Rules:
 
-- `gw_energypilot/settings/get` and `gw_energypilot/settings/update` remain admin-only;
+- dashboard write APIs remain admin-only;
 - the existing Home Assistant `ConfigEntry` is the single configuration source;
 - do not add a parallel settings database;
 - EP/EMHASS option writes must preserve the existing config-flow validation/conversion path;
 - GoodWe host/port/unit-ID changes must be validated against the inverter before storage;
+- the smart-meter actuator selection is GoodWe hardware/config-entry data, not EMHASS config;
+- changing the smart-meter setting while Automatic Control is active may immediately re-evaluate the current plan and must remain explicit in the UI;
 - connection changes update the existing entry and reload it;
 - preserve the stable config-entry-based device identifier and existing entity unique IDs.
 
@@ -138,14 +171,16 @@ Until this inheritance chain is deliberately consolidated, changes to orchestrat
 
 The sidebar panel module is selected in `__init__.py`. Multiple versioned JavaScript files exist in `frontend/`.
 
-Current top-level chain in v0.17:
+Current top-level chain in v0.22:
 
 ```text
-gw-energy-pilot-v017.js
-  -> gw-energy-pilot-v016.js          Beta G20 diagnostics
-       -> gw-energy-pilot-v015.js     EMHASS strategy controls
-  -> gw-energy-pilot-settings-v016.js dedicated settings implementation
+gw-energy-pilot-v022.js
+  -> gw-energy-pilot-v021.js          manual 12-mode EMS test pad
+       -> gw-energy-pilot-v020.js     SOC diagnostics validity layer
+            -> earlier layered frontend chain
 ```
+
+The v0.22 layer also adds the GoodWe smart-meter strategy toggle and authoritative live-flow particle directions. Do not edit an older layer merely to change current runtime behaviour unless the import chain and override order have been checked.
 
 The lower versioned files themselves import earlier layers. Do not delete or modify a versioned file merely because its name looks historical. Trace the complete import chain first.
 
@@ -182,6 +217,7 @@ When a bug is reported:
 - `README.md` — user-facing overview and installation.
 - `docs/ARCHITECTURE.md` — runtime architecture and ownership boundaries.
 - `docs/MODBUS.md` — Modbus semantics, Beta register status and change rules.
+- `docs/EMS_MODES.md` — compact 12-mode GoodWe EMS control contract and current automatic strategy.
 - `docs/ENTITIES.md` — Home Assistant entity/device contract.
 - `docs/DEVELOPMENT.md` — contributor workflow and known technical debt.
 - `docs/EMHASS_SETUP.md` — EMHASS setup/operator guidance.

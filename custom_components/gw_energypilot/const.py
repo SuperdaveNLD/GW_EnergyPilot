@@ -4,6 +4,7 @@ DOMAIN = "gw_energypilot"
 NAME = "GW EnergyPilot"
 
 CONF_SLAVE = "slave"
+CONF_USE_GOODWE_SMART_METER = "use_goodwe_smart_meter"
 CONF_P_BATT_ENTITY = "p_batt_entity"
 CONF_P_GRID_ENTITY = "p_grid_entity"
 CONF_OPTIM_STATUS_ENTITY = "optim_status_entity"
@@ -31,6 +32,7 @@ CONF_SELL_PRICE_DEDUCTION = "sell_price_deduction"
 
 DEFAULT_PORT = 502
 DEFAULT_SLAVE = 247
+DEFAULT_USE_GOODWE_SMART_METER = True
 DEFAULT_MAX_POWER = 15000
 DEFAULT_DEADBAND = 300
 DEFAULT_EV_DEADBAND = 500
@@ -40,14 +42,10 @@ DEFAULT_P_GRID_ENTITY = "sensor.p_grid_forecast"
 DEFAULT_OPTIM_STATUS_ENTITY = "sensor.optim_status"
 DEFAULT_OPTIM_REQUIRED_STATE = "Optimal"
 
-# Grid-neutral charging uses the GoodWe smart meter as slow feedback while
-# preserving EMHASS as the source of charge direction and maximum charge power.
-# Reductions are immediate; increases are intentionally slower to avoid chasing
-# short AC-coupled PV fluctuations and repeatedly toggling charge/hold modes.
+# Kept only for backwards-compatible diagnostics in v0.22. The old 30-second
+# mode-11 grid-neutral feedback loop is no longer scheduled or used when GoodWe
+# smart-meter control is enabled; modes 9/10 close the PCC loop inside GoodWe.
 GRID_NEUTRAL_CONTROL_INTERVAL_SECONDS = 30
-GRID_NEUTRAL_HOLD_SECONDS = 120
-GRID_NEUTRAL_RESTART_SAMPLES = 2
-GRID_NEUTRAL_RAMP_UP_STEP = 1000
 
 # Existing installations upgrade with the native schedule OFF to avoid running
 # alongside a legacy YAML scheduler. Fresh installations suggest ON in the
@@ -69,6 +67,7 @@ REGISTER_EMS_POWER = 47512
 
 MODE_AUTO = 1
 MODE_BATTERY_HOLD = 8
+MODE_GRID_IMPORT_TARGET = 9
 MODE_GRID_EXPORT_TARGET = 10
 MODE_CHARGE_BATTERY = 11
 MODE_DISCHARGE_BATTERY = 12
