@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local telemetry, 
 
 ## Status
 
-**Alpha — v0.13**
+**Alpha — v0.15**
 
 GW EnergyPilot is being developed specifically around the **new GoodWe ETA G20 generation**.
 
@@ -39,12 +39,14 @@ That feedback will be used to build a real tested-model compatibility list rathe
 - direct local Modbus TCP telemetry;
 - GoodWe EMS mode and power control;
 - native EMHASS optimization and publishing;
+- one-touch EMHASS `profit`, `cost` and `self-consumption` strategy controls;
 - optional Nord Pool runtime prices;
 - automatic `P_batt` execution;
 - one-touch battery controls;
 - optional EV coordination;
 - built-in EnergyPilot dashboard;
 - native cumulative grid import/export energy counters;
+- optional battery charge/discharge accounting diagnostics;
 - interactive 24-hour Grid history and daily import/export totals;
 - copyable diagnostics snapshot.
 
@@ -124,6 +126,20 @@ positive battery power = discharging
 
 EnergyPilot passes live battery SOC to EMHASS as `soc_init` for every optimization.
 
+## EMHASS strategy controls
+
+v0.15 exposes three one-touch EMHASS objectives:
+
+```text
+profit
+cost
+self-consumption
+```
+
+Selecting one reads the complete current EMHASS configuration, changes only `costfun`, writes the complete configuration back, then immediately creates and publishes a fresh optimization. Unrelated EMHASS settings are preserved.
+
+This changes the optimizer objective only. GoodWe Automatic Control remains `P_batt`-driven and keeps the existing mode 8/11/12 mapping.
+
 ## Power semantics on the tested GW15K-ETA-G20
 
 Several GoodWe registers represent different electrical measurement points. They must not all be interpreted as household consumption.
@@ -147,7 +163,7 @@ Register `35172` is GoodWe's load value. On the tested GW15K-ETA-G20 it closely 
 Load L1 + Load L2 + Load L3
 ```
 
-For that reason v0.13 uses `35172` as the Home/load value and for the EMHASS load model.
+For that reason v0.13+ uses `35172` as the Home/load value and for the EMHASS load model.
 
 ### System power balance
 
@@ -178,7 +194,7 @@ This keeps the normal dashboard lightweight.
 
 ## Grid history and energy totals
 
-The Grid card is interactive in v0.13. Click it to open:
+The Grid card is interactive. Click it to open:
 
 - signed grid-power graph for the previous 24 hours;
 - energy imported today;
@@ -196,7 +212,13 @@ EnergyPilot reads the GoodWe meter's native cumulative registers:
 
 They are exposed as `total_increasing` kWh sensors so Home Assistant Recorder can calculate daily/monthly/yearly changes efficiently. The dashboard does **not** continuously scan history. The 24-hour graph is requested only when opened and daily totals are cached.
 
-After first installing v0.13, yesterday's value becomes complete after Recorder has observed the cumulative counters across a midnight boundary.
+After first installation, yesterday's value becomes complete after Recorder has observed the cumulative counters across a midnight boundary.
+
+## Battery accounting diagnostics
+
+v0.14+ reads the GoodWe battery charge/discharge accounting block `35206-35211` as optional diagnostics. These values are useful for support and later energy/cost accounting, but are deliberately not used for EMS control or synthetic cycle-count calculations.
+
+The optional block cannot make required inverter telemetry unavailable when unsupported by another firmware/model.
 
 ## Future energy-cost accounting
 
@@ -209,7 +231,7 @@ meter delta export × active sell price → cumulative export revenue
 
 The buy/sell price will use the same Nord Pool source plus the EnergyPilot import/export adjustments already used by EMHASS. Persistent cumulative cost/revenue sensors can then let Recorder return today, yesterday, month and year totals with cheap `change` queries.
 
-A separate Cost card should only appear when a usable runtime price source is configured. This is intentionally not added to v0.13 yet; the Grid energy foundation is implemented first.
+A separate Cost card should only appear when a usable runtime price source is configured.
 
 ## Battery SOC limits
 
@@ -264,6 +286,7 @@ Default scheduling:
 Periodic optimization             every 60 minutes
 Optimize now                      immediately
 AUTO                              optimize, then resume automatic control
+Cost-function change              optimize immediately after saving costfun
 Tomorrow prices available         immediately
 EV charging stops                 immediately when configured
 SOC limit changes                 3 seconds after final change
@@ -308,9 +331,11 @@ The sidebar dashboard includes:
 - visible telemetry refresh frequency;
 - Solar, Home, Grid and Battery cards;
 - Controller and EMHASS cards;
+- one-touch EMHASS strategy controls;
 - one-touch battery controls;
 - EMHASS minimum/maximum SOC controls with guidance popup;
 - interactive Grid detail;
+- battery accounting diagnostics;
 - thermal/BMS information;
 - draggable ordering and per-card visibility;
 - flow animation toggle;
@@ -332,6 +357,8 @@ If the inverter sleeps or becomes unreachable at night, a separate GoodWe integr
 
 If EnergyPilot replaces the old GoodWe integration, disable the old integration rather than letting both poll the same device.
 
+For the separate SEMS/SEMS+ plugin interoperability issue, see `docs/KNOWN_ISSUES.md`.
+
 ## Diagnostics
 
 Use **Copy snapshot** when reporting an issue. Include the inverter model and firmware with the snapshot.
@@ -343,7 +370,7 @@ Useful values include:
 - system power balance;
 - signed grid meter value;
 - 35138/35140 inverter diagnostics;
-- battery power/SOC and BMS limits;
+- battery power/SOC/SOH, BMS limits and optional charge/discharge accounting;
 - selected EMHASS entities;
 - EMHASS health/version and HTTP results;
 - price and load point counts;
@@ -352,6 +379,7 @@ Useful values include:
 ## Documentation
 
 - `docs/EMHASS_SETUP.md`
+- `docs/KNOWN_ISSUES.md`
 - `CHANGELOG.md`
 - EMHASS documentation: https://emhass.readthedocs.io/
 - Home Assistant developer documentation: https://developers.home-assistant.io/
