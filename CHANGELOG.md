@@ -2,6 +2,29 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.16] - 2026-08-23
+
+### Added
+
+- A dedicated settings gear in the EnergyPilot dashboard header for Home Assistant administrators.
+- Separate in-dashboard configuration pages for **EP**, **EMHASS** and **GOODWE**.
+- An admin-only EnergyPilot WebSocket settings API that reads and updates the existing Home Assistant config entry instead of creating a second configuration store.
+- GoodWe connection validation before host, port or Modbus unit-ID changes are saved.
+- Multi-entry selection in the settings page for installations with more than one GW EnergyPilot config entry.
+
+### Changed
+
+- EnergyPilot controller, telemetry and EV options can be maintained from the EP settings page.
+- EnergyPilot-owned EMHASS connection, schedule, output mapping and Nord Pool options can be maintained from the EMHASS settings page.
+- GoodWe Modbus host, port and unit ID can be maintained from the GOODWE settings page and trigger an integration reload after validation.
+- Dashboard frontend moved to `gw-energy-pilot-v016.js`, layered on top of all v0.15 functionality.
+
+### Notes
+
+- Existing Home Assistant config-flow/options remain supported and use the same config entry as the new pages.
+- EMHASS min/max SOC and cost-function controls remain live on the dashboard while those runtime EMHASS controls are migrated into the dedicated EMHASS configuration page.
+- The settings pages do not add or change GoodWe register definitions or EMS control semantics.
+
 ## [0.15] - 2026-08-23
 
 ### Added
