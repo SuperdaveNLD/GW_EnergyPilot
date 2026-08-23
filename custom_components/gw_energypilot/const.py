@@ -4,6 +4,7 @@ DOMAIN = "gw_energypilot"
 NAME = "GW EnergyPilot"
 
 CONF_SLAVE = "slave"
+CONF_USE_GOODWE_SMART_METER = "use_goodwe_smart_meter"
 CONF_P_BATT_ENTITY = "p_batt_entity"
 CONF_P_GRID_ENTITY = "p_grid_entity"
 CONF_OPTIM_STATUS_ENTITY = "optim_status_entity"
@@ -31,6 +32,7 @@ CONF_SELL_PRICE_DEDUCTION = "sell_price_deduction"
 
 DEFAULT_PORT = 502
 DEFAULT_SLAVE = 247
+DEFAULT_USE_GOODWE_SMART_METER = True
 DEFAULT_MAX_POWER = 15000
 DEFAULT_DEADBAND = 300
 DEFAULT_EV_DEADBAND = 500
@@ -41,8 +43,8 @@ DEFAULT_OPTIM_STATUS_ENTITY = "sensor.optim_status"
 DEFAULT_OPTIM_REQUIRED_STATE = "Optimal"
 
 # Kept only for backwards-compatible diagnostics in v0.22. The old 30-second
-# mode-11 grid-neutral feedback loop is no longer scheduled or used by the
-# automatic controller; modes 9/10 now close the PCC loop inside GoodWe.
+# mode-11 grid-neutral feedback loop is no longer scheduled or used when GoodWe
+# smart-meter control is enabled; modes 9/10 close the PCC loop inside GoodWe.
 GRID_NEUTRAL_CONTROL_INTERVAL_SECONDS = 30
 
 # Existing installations upgrade with the native schedule OFF to avoid running
