@@ -14,11 +14,40 @@ class ControllerStrategyTests(unittest.IsolatedAsyncioTestCase):
         helper = ControllerSafetyTests(methodName="test_positive_p_grid_maps_to_mode9_import_target")
         return helper.make_controller(**kwargs)
 
-    async def test_smart_meter_enabled_is_default_and_uses_mode9(self):
+    async def test_missing_setting_defaults_to_direct_mode11_charge(self):
         controller, _, client, _ = self.make_controller(
             p_batt="-4200",
             p_grid="3500",
         )
+        controller.entry.data = {}
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertFalse(controller.use_goodwe_smart_meter)
+        self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 4200)])
+        self.assertEqual(controller.last_command, "battery_charge")
+
+    async def test_missing_setting_defaults_to_direct_mode12_discharge(self):
+        controller, _, client, _ = self.make_controller(
+            p_batt="962",
+            p_grid="0",
+        )
+        controller.entry.data = {}
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertFalse(controller.use_goodwe_smart_meter)
+        self.assertEqual(client.calls, [(const.MODE_DISCHARGE_BATTERY, 962)])
+        self.assertEqual(controller.last_command, "battery_discharge")
+
+    async def test_smart_meter_explicitly_enabled_uses_mode9(self):
+        controller, _, client, _ = self.make_controller(
+            p_batt="-4200",
+            p_grid="3500",
+        )
+        controller.entry.data = {const.CONF_USE_GOODWE_SMART_METER: True}
         controller.enabled = True
 
         await controller.async_evaluate()
