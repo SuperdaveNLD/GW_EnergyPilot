@@ -2,6 +2,33 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.24] - 2026-08-23
+
+### Fixed
+
+- Restored the backwards-compatible automatic-control default for installations that do not have an explicit `use_goodwe_smart_meter` config-entry value. Missing configuration now follows EMHASS `P_batt` through direct GoodWe modes `11/12/8` instead of silently switching to PCC `P_grid` control.
+- Fixed the field-reported case where EMHASS requested battery discharge (`P_batt = +962 W`) while planned grid flow remained inside the control deadband: v0.23 selected `grid_zero_auto` / mode `1`; v0.24 now selects direct mode `12` at the requested battery power unless PCC control was explicitly enabled.
+- Added regression coverage for both missing-setting charge/discharge behavior and explicit Smart Meter/PCC opt-in.
+
+### Changed
+
+- **GoodWe smart meter active** remains available and hardware-validated as an explicit opt-in strategy. An explicit `true` still maps `P_grid` to modes `9/10/1`; an explicit `false` or missing value maps `P_batt` to modes `11/12/8`.
+- The active frontend is `gw-energy-pilot-v024.js`, a thin release wrapper over the complete v0.23 dashboard stack.
+
+### Log review
+
+- The supplied Home Assistant startup log contained no GW EnergyPilot runtime exception, Modbus transport failure or failed `47511/47512` write attributable to this regression.
+- A separate legacy Home Assistant script named `GoodWe ETA EMS normaal` was rejected by Home Assistant because its YAML structure was invalid. That script is outside GW EnergyPilot and is not part of this controller fix.
+- Unrelated Audi, OpenAI dependency, ONVIF, template-sensor and other custom-integration warnings/errors were not changed by this release.
+
+### Safety / compatibility
+
+- No GoodWe register definitions or Modbus read blocks change.
+- EMS registers remain `47511`/`47512`; write order remains `47512 -> wait -> 47511`.
+- Explicit PCC-control installations retain their selected strategy.
+- Manual EMS modes, entity unique IDs, device identity, accounting stores and orchestrator runtime state are unchanged.
+- v0.24 remains **Beta** while the restored default is field-verified after upgrade from v0.23.
+
 ## [0.23] - 2026-08-23
 
 ### Added

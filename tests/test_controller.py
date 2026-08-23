@@ -140,9 +140,14 @@ class FakeHass:
 
 
 class FakeEntry:
-    def __init__(self, options=None):
+    def __init__(self, options=None, data=None):
         self.entry_id = "test-entry"
         self.options = dict(options or {})
+        # The controller safety suite exercises the explicit PCC strategy unless
+        # a strategy-specific test deliberately replaces/clears entry.data.
+        if data is None:
+            data = {const.CONF_USE_GOODWE_SMART_METER: True}
+        self.data = dict(data)
 
 
 class FakeClient:

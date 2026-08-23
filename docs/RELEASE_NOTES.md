@@ -15,6 +15,7 @@ This page is the user-facing release index for every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.24** | 2026-08-23 | **Beta** | Fixes the v0.22/v0.23 automatic-control compatibility regression: when no explicit GoodWe smart-meter strategy is stored, Automatic Control again follows EMHASS `P_batt` through modes 11/12/8. PCC `P_grid` control through modes 9/10/1 remains available only when explicitly enabled. |
 | **0.23** | 2026-08-23 | **Beta** | Consolidated release: persistent native Today/Yesterday grid accounting from canonical GoodWe lifetime counters; directional EV anti-discharge protection that still allows an explicit home-battery charge plan; persistent orchestrator `last_success` across reload/restart; and the final live-flow particle double-reversal fix. Existing v0.22 PCC 9/10 control remains unchanged. |
 | **0.22** | 2026-08-23 | **Beta** | Promotes hardware-validated GoodWe smart-meter/PCC modes into an optional automatic strategy. Smart-meter ON maps EMHASS `P_grid` to modes 9/10/1; OFF restores direct `P_batt` control through modes 11/12/8. |
 | **0.21** | 2026-08-23 | **Beta** | Adds the manual 12-mode EMS test pad, live mode highlight, hover descriptions and a `0..max_power` manual setpoint slider. |
@@ -38,6 +39,72 @@ This page is the user-facing release index for every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS mapping and EV coordination groundwork. |
+
+# v0.24 — Automatic-control compatibility fix
+
+v0.24 is a focused control regression release. It does not introduce new GoodWe register semantics or a new actuator primitive.
+
+## What was wrong
+
+v0.22 introduced **GoodWe smart meter active** and set the missing-value default to ON. Existing installations created before that setting existed therefore silently started using the `P_grid` PCC strategy after upgrading, even though the operator had never selected it.
+
+With PCC control active, a plan such as:
+
+```text
+P_batt = +962 W   (EMHASS wants battery discharge)
+P_grid ≈ 0 W      (inside the configured grid deadband)
+```
+
+was intentionally translated by the v0.22/v0.23 PCC strategy to:
+
+```text
+mode 1
+setpoint 0 W
+command grid_zero_auto
+```
+
+That is internally consistent with the PCC strategy, but it is not backwards-compatible with an installation that previously expected `P_batt` to own battery direction.
+
+## v0.24 behavior
+
+When `use_goodwe_smart_meter` is **missing** or explicitly `false`:
+
+```text
+P_batt < -deadband -> mode 11 Battery charge power
+P_batt > +deadband -> mode 12 Battery discharge power
+P_batt near 0 W    -> mode 8  Battery Hold
+```
+
+When `use_goodwe_smart_meter` is explicitly `true`:
+
+```text
+P_grid > +deadband -> mode 9  Grid import target
+P_grid < -deadband -> mode 10 Grid export target
+P_grid near 0 W    -> mode 1  GoodWe Auto / self-use
+```
+
+This preserves the validated PCC feature while making it an explicit opt-in instead of a silent upgrade behavior.
+
+## Field-log review
+
+The Home Assistant log supplied with this regression report contains no GW EnergyPilot runtime exception, Modbus transport error or failed EnergyPilot EMS write that explains the mode mismatch. The evidence is consistent with a controller strategy selection problem rather than a failed `47511/47512` write.
+
+The same log does contain a separate Home Assistant script validation error for a legacy script named **GoodWe ETA EMS normaal**. Home Assistant rejected its YAML structure and disabled it. That script is not part of the GW EnergyPilot integration and is not the cause of this v0.24 controller fix.
+
+Other Audi, OpenAI dependency, ONVIF, template-sensor and unrelated custom-integration errors in that startup log are outside this release scope.
+
+## Compatibility and safety
+
+- no new GoodWe register addresses;
+- no Modbus telemetry block changes;
+- EMS registers remain `47511` and `47512`;
+- write order remains power/setpoint first, brief wait, then mode;
+- explicit Smart Meter/PCC opt-in remains unchanged;
+- manual EMS commands remain direct operator commands;
+- entity unique IDs and device identity remain unchanged;
+- persistent grid accounting and orchestrator runtime stores are unchanged.
+
+v0.24 remains **Beta** while this corrected upgrade/default behavior receives field verification.
 
 # v0.23 — Complete Beta release
 

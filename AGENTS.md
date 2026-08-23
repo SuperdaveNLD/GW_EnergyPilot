@@ -22,7 +22,7 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.23 Beta
+v0.24 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot may integrate with EMHASS but must not install or silently replace it.
@@ -108,7 +108,9 @@ Automatic and manual control must remain explicit.
 
 ### Automatic actuator strategy
 
-With **GoodWe smart meter active = ON**:
+v0.24 restores backwards-compatible strategy selection. A missing `use_goodwe_smart_meter` value must behave the same as explicit OFF. Never silently opt an existing installation into PCC control.
+
+With **GoodWe smart meter active = ON** (explicit opt-in):
 
 ```text
 P_grid > +deadband  -> mode 9  Grid import target
@@ -118,7 +120,7 @@ P_grid near 0 W     -> mode 1  Auto / self-use
 
 GoodWe closes the fast loop against its own smart meter/PCC. `P_batt` remains a required plan-validity/diagnostic output.
 
-With **GoodWe smart meter active = OFF**:
+With **GoodWe smart meter active = OFF or missing** (compatibility default):
 
 ```text
 P_batt < -deadband -> mode 11 Battery charge power
@@ -126,7 +128,18 @@ P_batt > +deadband -> mode 12 Battery discharge power
 P_batt near 0 W    -> mode 8  Battery Hold
 ```
 
-This fallback must remain usable when `P_grid` is missing/unavailable.
+This direct path must remain usable when `P_grid` is missing/unavailable.
+
+Regression contract from v0.24 field report:
+
+```text
+P_batt = +962 W
+P_grid = approximately 0 W
+smart-meter strategy missing
+=> mode 12, setpoint 962 W
+```
+
+An explicit stored `true` must continue to use the PCC strategy.
 
 ### EV anti-discharge protection
 
@@ -181,7 +194,7 @@ See `docs/RUNTIME_STATE.md`.
 
 ## Persistent grid accounting
 
-v0.23 adds `GWEnergyPilotAccounting` and `accounting_model.py`.
+`GWEnergyPilotAccounting` and `accounting_model.py` own the native daily grid-accounting runtime.
 
 Canonical physical inputs remain:
 
@@ -219,6 +232,7 @@ Rules:
 - do not add a parallel settings database;
 - GoodWe connection changes must be validated before storage;
 - smart-meter actuator selection is GoodWe/config-entry data, not EMHASS config;
+- a missing smart-meter actuator selection must remain direct `P_batt` control in v0.24+;
 - preserve stable device identity and entity unique IDs.
 
 See `docs/SETTINGS.md`.
@@ -233,7 +247,7 @@ orchestrator_v013.GWEnergyPilotOrchestrator
        -> orchestrator.GWEnergyPilotOrchestrator
 ```
 
-`orchestrator_v013.py` also owns v0.23 runtime-store restore/save timing.
+`orchestrator_v013.py` also owns runtime-store restore/save timing.
 
 Until intentionally consolidated, inspect all three layers for orchestration changes.
 
@@ -241,19 +255,21 @@ Until intentionally consolidated, inspect all three layers for orchestration cha
 
 The active top-level module is selected in `__init__.py`.
 
-v0.23 upper chain:
+v0.24 upper chain:
 
 ```text
-gw-energy-pilot-v023.js
-  -> gw-energy-pilot-v022-flow-direction.js
-       -> gw-energy-pilot-v022.js
-            -> gw-energy-pilot-v021.js
-                 -> earlier layered frontend files
+gw-energy-pilot-v024.js
+  -> gw-energy-pilot-v023.js
+       -> gw-energy-pilot-v022-flow-direction.js
+            -> gw-energy-pilot-v022.js
+                 -> gw-energy-pilot-v021.js
+                      -> earlier layered frontend files
 ```
 
 Responsibilities:
 
-- v0.23: persistent Grid Today/Yesterday UI + release badge;
+- v0.24: release/version wrapper for the control-default regression fix;
+- v0.23: persistent Grid Today/Yesterday UI;
 - flow-direction overlay: remove double reversal;
 - v0.22: Smart Meter strategy UI + PCC/battery target labeling;
 - v0.21: manual 12-mode EMS test pad.

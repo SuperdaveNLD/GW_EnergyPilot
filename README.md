@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.23 · Beta**
+**v0.24 · Beta**
 
 GW EnergyPilot is developed primarily against the **GoodWe GW15K-ETA-G20** and the current ETA-G20 generation.
 
@@ -93,7 +93,7 @@ Use only one integration for continuous direct GoodWe polling/control where prac
 9. Configure EMHASS source/output entities.
 10. Press **Optimize now**.
 11. Verify numeric `P_batt`, `P_grid` and expected optimization status.
-12. Choose the correct GoodWe automatic strategy under dashboard gear → **GOODWE**.
+12. Choose the correct GoodWe automatic strategy under dashboard gear → **GOODWE**. Direct `P_batt` control is the compatibility default; PCC control must be explicitly enabled.
 13. Enable Automatic Control.
 
 ## Dashboard settings
@@ -110,11 +110,27 @@ See `docs/SETTINGS.md` for ownership, security and reload behavior.
 
 # Automatic control
 
-v0.23 keeps the two explicit actuator strategies introduced and hardware-validated in v0.22.
+v0.24 keeps both actuator strategies introduced in v0.22, but restores the backwards-compatible default: **direct EMHASS `P_batt` control is used when the GoodWe smart-meter strategy has not been explicitly selected.**
+
+## GoodWe smart meter active = OFF or not configured
+
+This is the v0.24 compatibility default.
+
+Automatic Control executes EMHASS `P_batt` directly:
+
+```text
+P_batt < -deadband → mode 11 Battery charge power
+P_batt > +deadband → mode 12 Battery discharge power
+P_batt near 0 W    → mode 8  Battery Hold
+```
+
+This path does not require a valid `P_grid` output.
+
+It preserves the historical EnergyPilot behavior for installations created before the v0.22 strategy setting existed. For example, `P_batt = +962 W` with `P_grid` near zero now maps to **mode 12 at 962 W** unless PCC control was explicitly enabled.
 
 ## GoodWe smart meter active = ON
 
-This is the default and is intended for installations with a working and validated GoodWe smart meter.
+This is an explicit opt-in intended only for installations with a working and validated GoodWe smart meter.
 
 Automatic Control executes EMHASS `P_grid` at the point of common coupling:
 
@@ -156,20 +172,6 @@ battery charge         ~16.9 kW
 The local PV was added behind the meter on top of the requested grid import.
 
 By contrast, mode 11 at `15 kW` kept the **battery** near 15 kW and let PV reduce the required grid import.
-
-## GoodWe smart meter active = OFF
-
-Automatic Control falls back to direct EMHASS `P_batt` execution:
-
-```text
-P_batt < -deadband → mode 11 Battery charge power
-P_batt > +deadband → mode 12 Battery discharge power
-P_batt near 0 W    → mode 8  Battery Hold
-```
-
-This fallback does not require a valid `P_grid` output.
-
-Use it when the GoodWe smart meter is absent/unavailable or while validating another model/firmware.
 
 ## EV anti-discharge protection
 
@@ -260,7 +262,7 @@ Recommended publishing behavior when EnergyPilot owns publish-data:
 
 EnergyPilot validates optimizer readiness and finite outputs before automatic EMS execution.
 
-The timestamp of the last successful EnergyPilot-owned optimize + publish cycle is persisted in Home Assistant storage in v0.23. Reloading the integration or restarting Home Assistant therefore no longer resets the dashboard to **Last success: Never** after a previous successful EnergyPilot run.
+The timestamp of the last successful EnergyPilot-owned optimize + publish cycle is persisted in Home Assistant storage since v0.23. Reloading the integration or restarting Home Assistant therefore no longer resets the dashboard to **Last success: Never** after a previous successful EnergyPilot run.
 
 Full setup: `docs/EMHASS_SETUP.md`.
 
@@ -368,7 +370,7 @@ Before enabling Automatic Control verify:
 - correct grid and battery signs;
 - correct maximum power setting;
 - correct EMHASS outputs;
-- GoodWe smart meter presence/status when PCC control is enabled;
+- GoodWe smart meter presence/status before explicitly enabling PCC control;
 - battery/BMS/SOC limits;
 - grid connection and contract limits.
 
