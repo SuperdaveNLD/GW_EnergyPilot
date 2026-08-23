@@ -2,6 +2,28 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.16] - 2026-08-23
+
+### Added
+
+- Read-only beta diagnostics for candidate GoodWe SOC-protection registers `45356`, `45358` and `47500`.
+- Read-only beta diagnostics for the extended 15 kW+ smart-meter lifetime counters at `36104` (export) and `36120` (import).
+- Unsigned 64-bit Modbus decoding for the extended meter counters.
+- A dedicated BETA diagnostics block and Copy beta diagnostics action in the dashboard.
+- Unit tests for UINT64 decoding, four-word register coverage and beta optional-read block coverage.
+
+### Changed
+
+- Candidate registers are now shipped to the small active tester group instead of remaining isolated in draft branches.
+- Every candidate remains optional and read-only; unsupported firmware cannot make normal required telemetry unavailable.
+- Legacy `36015/36017` remain the canonical grid-energy source until the extended counters are validated against physical SEMS lifetime totals.
+
+### Safety boundary
+
+- `45356`, `45358` and `47500` are not used by controller logic and are never written by EnergyPilot.
+- `36104/36120` are diagnostics only and do not alter Recorder-facing grid energy entities.
+- EMS modes, setpoints, sign conventions, write ordering and automatic-control ownership are unchanged.
+
 ## [0.15] - 2026-08-23
 
 ### Added
@@ -19,7 +41,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - GoodWe Automatic Control remains `P_batt`-driven and still uses the existing EMS modes 8, 11 and 12.
 - No GoodWe register definitions, sign conventions, EMS write ordering or control ownership behaviour are changed by v0.15.
-- Candidate SOC-protection and extended-meter register work remains in draft validation PRs pending GW15K-ETA-G20 hardware confirmation.
+- Candidate SOC-protection and extended-meter register work remained in draft validation PRs until v0.16.
 
 ## [0.14] - 2026-08-23
 
