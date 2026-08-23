@@ -33,15 +33,16 @@ sensor.py            telemetry/diagnostic sensors
 switch.py            Automatic Control ownership switch
 number.py            manual power and EMHASS SOC controls
 select.py            manual EMS mode selection
-button.py            optimize/manual/resume actions
-frontend/            sidebar dashboard assets
+button.py            optimize/strategy/manual/resume actions
+frontend/            layered sidebar dashboard assets
+tests/               hardware-independent safety/regression tests
 ```
 
 Repository-level tooling:
 
 ```text
 scripts/validate_repo.py       lightweight consistency checks
-.github/workflows/quality.yml  Python compile + repository validation
+.github/workflows/quality.yml  Python compile + unit tests + repository validation
 .github/workflows/hacs.yml     HACS validation
 .github/workflows/hassfest.yml Home Assistant hassfest validation
 ```
@@ -69,7 +70,7 @@ For each bug or feature:
 3. Confirm whether the issue belongs to GoodWe I/O, Home Assistant state, controller ownership, EMHASS orchestration, or frontend presentation.
 4. Reproduce with diagnostics/logs where possible.
 5. Apply the smallest robust fix.
-6. Run the lightweight repository checks.
+6. Run the lightweight repository checks and unit tests.
 7. Check startup and unavailable-device behaviour.
 8. Check config-entry reload/unload behaviour.
 9. Check unique IDs and Recorder/statistics compatibility.
@@ -80,7 +81,8 @@ For each bug or feature:
 Run:
 
 ```text
-python -m compileall -q custom_components/gw_energypilot scripts
+python -m compileall -q custom_components/gw_energypilot scripts tests
+python -m unittest discover -s tests -v
 python scripts/validate_repo.py
 ```
 
@@ -97,7 +99,7 @@ The validator currently checks:
 - the active panel JavaScript file exists;
 - the active frontend `VERSION` matches `manifest.json` when declared.
 
-These are repository-consistency checks, not full Home Assistant or hardware tests.
+Unit tests currently cover controller safety/ownership decisions and EMHASS full-config patch preservation. These checks do not replace real Home Assistant lifecycle or hardware validation.
 
 ## Keep domains separated
 
@@ -132,19 +134,19 @@ Do not delete `orchestrator.py` or `orchestrator_v012.py` while `orchestrator_v0
 
 ### 2. Layered frontend assets
 
-The active dashboard is also layered. The v0.13 entry module imports earlier versioned modules, so several files that look historical are still runtime dependencies.
+The active dashboard is layered. In v0.15 the entry module imports v0.14, which imports v0.13 and the earlier versioned modules below it. Files that look historical can therefore still be runtime dependencies.
 
-Do not delete a versioned frontend asset based on its filename alone. Trace imports first. The repository validator now catches missing relative JavaScript imports, but it does not prove behavioural equivalence after a consolidation.
+Do not delete a versioned frontend asset based on its filename alone. Trace imports first. The repository validator catches missing relative JavaScript imports, but it does not prove behavioural equivalence after a consolidation.
 
 ### 3. Limited automated runtime coverage
 
-The repository now has lightweight structural checks, but it does not yet have a Home Assistant test harness covering controller, orchestrator, entity lifecycle, or hardware I/O behaviour.
+The repository has hardware-independent unit coverage for controller mapping/ownership and EMHASS selected-config patching, plus structural repository checks. It does not yet have a full Home Assistant test harness covering config-entry lifecycle, orchestrator HTTP flows, entity registry migrations, Recorder integration, or real hardware I/O.
 
-Future work should add focused tests before consolidating orchestration or frontend layers.
+Add focused tests before consolidating orchestration or frontend layers.
 
 ## Resolved maintenance issue: telemetry block duplication
 
-Telemetry block ownership is now centralized in `registers.py`:
+Telemetry block ownership is centralized in `registers.py`:
 
 ```text
 TELEMETRY_BLOCKS
@@ -153,25 +155,31 @@ OPTIONAL_TELEMETRY_BLOCKS
 
 `client.py` imports those constants instead of maintaining duplicate ranges.
 
-The active runtime ranges were preserved exactly during this refactor. In particular, blocks ending in a 32-bit value include the second register word. The validator prevents a future register definition from being added without full block coverage.
+The active runtime ranges were preserved during this refactor. Blocks ending in a multi-word value include all required words. The validator prevents a future register definition from being added without full block coverage.
 
 ## Testing priorities
 
-The project should progressively add automated coverage for:
+Existing automated coverage includes:
 
-- register decoding (uint/int/float, scaling and signed values);
 - controller `P_batt` to EMS mapping;
 - deadband behaviour;
 - maximum power clamping;
 - manual ownership versus Automatic Control;
 - disabling Automatic Control returning to mode 1 / 0 W;
-- unavailable `P_batt` / optimizer state;
-- EV hold and EV-stop optimization behaviour;
-- EMHASS config preservation;
+- invalid/unavailable/non-finite `P_batt` handling;
+- EV hold and EV-stop optimization guard behaviour;
+- EMHASS selected-config preservation.
+
+Next priorities include:
+
+- register decoding (uint/int/float, scaling and signed values);
+- orchestrator optimize/publish HTTP success and failure paths;
 - load forecast using register 35172;
 - startup with inverter unavailable;
 - startup with EMHASS unavailable;
-- entity unique-ID stability.
+- config-entry reload/unload;
+- entity unique-ID stability and migrations;
+- Recorder/statistics interactions.
 
 ## Hardware validation
 
@@ -221,6 +229,8 @@ Before a release, verify:
 - no accidental entity unique-ID changes;
 - no undocumented register-semantic changes.
 
+Do not merge draft register-validation work into a release merely because static CI is green. Unconfirmed GoodWe register semantics still require appropriate evidence/hardware validation.
+
 ## Documentation ownership
 
 Use these documents for durable project knowledge rather than relying on chat history:
@@ -230,4 +240,5 @@ Use these documents for durable project knowledge rather than relying on chat hi
 - `docs/MODBUS.md` — register/control contract;
 - `docs/ENTITIES.md` — Home Assistant entity contract;
 - `docs/EMHASS_SETUP.md` — operator setup;
+- `docs/KNOWN_ISSUES.md` — field issues outside or adjacent to EnergyPilot runtime code;
 - `CHANGELOG.md` — version history.
