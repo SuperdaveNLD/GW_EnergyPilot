@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 import logging
+from struct import pack, unpack
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
@@ -36,32 +37,32 @@ class GWETAData:
         return int(value) if value is not None else None
 
 
-# Contiguous blocks keep Modbus traffic low. Counts include the second word of
-# every 32-bit value at the end of a block.
 TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
-    (35103, 88),  # through 35190; includes 32-bit error message at 35189
-    (35212, 10),  # through 35221; includes 32-bit diagnose result at 35220
-    (35301, 36),  # through 35336; includes 32-bit warning at 35335
-    (36003, 55),  # through 36057
-    (37002, 22),  # through 37023
-    (47509, 4),   # through 47512
+    (35103, 88),
+    (35212, 10),
+    (35301, 36),
+    (36003, 55),
+    (37002, 22),
+    (47509, 4),
 )
 
-# Useful troubleshooting registers that are not required for control. A
-# firmware that does not expose one of these must not make EnergyPilot fail.
 OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
-    (47000, 1),   # APP / Work mode diagnostic
+    (47000, 1),
 )
 
 
 class GWModbusClient:
-    """Async Modbus TCP client for a GoodWe ETA inverter."""
+    """Async Modbus TCP client for a GoodWe ETA G20 inverter."""
 
     def __init__(self, host: str, port: int, slave: int) -> None:
         self.host = host
         self.port = port
         self.slave = slave
-        self._client = AsyncModbusTcpClient(host, port=port, timeout=5, retries=3)
+        # G20 is a local LAN device. Long retry chains make an inverter that is
+        # asleep/offline look like a Home Assistant startup problem. A short
+        # timeout lets the coordinator mark telemetry unavailable and retry on
+        # the normal polling schedule instead.
+        self._client = AsyncModbusTcpClient(host, port=port, timeout=3, retries=1)
         self._lock = asyncio.Lock()
 
     async def async_connect(self) -> None:
@@ -102,21 +103,24 @@ class GWModbusClient:
         register_map: dict[int, int],
         definition: RegisterDefinition,
     ) -> int | float:
-        """Decode one value using Home Assistant Modbus-style big-endian words."""
+        """Decode one GoodWe holding-register value."""
         address = definition.address
         if definition.data_type in (RegisterDataType.UINT16, RegisterDataType.INT16):
-            raw = register_map[address]
+            raw: int | float = register_map[address]
             if definition.data_type == RegisterDataType.INT16:
-                raw = cls._unsigned_to_signed(raw, 16)
+                raw = cls._unsigned_to_signed(int(raw), 16)
+        elif definition.data_type == RegisterDataType.FLOAT32:
+            raw_bytes = pack(">HH", register_map[address], register_map[address + 1])
+            raw = float(unpack(">f", raw_bytes)[0])
         else:
             raw = (register_map[address] << 16) | register_map[address + 1]
             if definition.data_type == RegisterDataType.INT32:
-                raw = cls._unsigned_to_signed(raw, 32)
+                raw = cls._unsigned_to_signed(int(raw), 32)
 
-        value = raw * definition.scale
+        value = float(raw) * definition.scale
         if definition.precision is not None:
             return round(value, definition.precision)
-        if definition.scale == 1:
+        if definition.scale == 1 and definition.data_type != RegisterDataType.FLOAT32:
             return int(value)
         return value
 
@@ -129,18 +133,27 @@ class GWModbusClient:
                 device_id=self.slave,
             )
         except (ModbusException, OSError) as err:
+            self._client.close()
             raise GWModbusError(str(err)) from err
 
-        self._validate_response(response, f"reading registers {start}-{start + count - 1}")
+        try:
+            self._validate_response(
+                response, f"reading registers {start}-{start + count - 1}"
+            )
+        except GWModbusError:
+            self._client.close()
+            raise
+
         registers = getattr(response, "registers", None)
         if registers is None or len(registers) != count:
+            self._client.close()
             raise GWModbusError(
                 f"Register block {start}-{start + count - 1} returned an unexpected length"
             )
         return [int(register) for register in registers]
 
     async def async_read_data(self) -> GWETAData:
-        """Read the GoodWe ETA runtime telemetry used by EnergyPilot."""
+        """Read GoodWe ETA G20 runtime telemetry used by EnergyPilot."""
         async with self._lock:
             await self._async_ensure_connected()
 
@@ -174,8 +187,6 @@ class GWModbusClient:
                         definition,
                     )
                 except KeyError:
-                    # Only optional definitions can be absent because mandatory
-                    # block failures raise before decoding starts.
                     continue
 
             return GWETAData(values=values)
@@ -212,4 +223,5 @@ class GWModbusClient:
                 )
                 self._validate_response(response, "writing EMS mode")
             except (ModbusException, OSError) as err:
+                self._client.close()
                 raise GWModbusError(str(err)) from err
