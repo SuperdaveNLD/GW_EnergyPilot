@@ -104,6 +104,10 @@ class GWModbusClient:
         elif definition.data_type == RegisterDataType.FLOAT32:
             raw_bytes = pack(">HH", register_map[address], register_map[address + 1])
             raw = float(unpack(">f", raw_bytes)[0])
+        elif definition.data_type == RegisterDataType.UINT64:
+            raw = 0
+            for offset in range(4):
+                raw = (int(raw) << 16) | register_map[address + offset]
         else:
             raw = (register_map[address] << 16) | register_map[address + 1]
             if definition.data_type == RegisterDataType.INT32:
