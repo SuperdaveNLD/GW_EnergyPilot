@@ -26,6 +26,13 @@ function decimal(value, decimals = 4) {
   return number === null ? "—" : number.toFixed(decimals);
 }
 
+function validatedSocDisplay(percentValue, rawValue) {
+  const percent = finiteNumber(percentValue);
+  if (percent !== null) return pct(percent);
+  const raw = finiteNumber(rawValue);
+  return raw === null ? "—" : `invalid raw ${raw}`;
+}
+
 function constraintContext(panel) {
   const optimizeId = panel._entityId("optimize_now");
   const attrs = (optimizeId ? panel._state(optimizeId)?.attributes : null) || {};
@@ -34,14 +41,20 @@ function constraintContext(panel) {
   const minimumEntityValue = numericState(panel, "emhass_minimum_soc");
   const rawSocInit = finiteNumber(attrs.soc_init);
   const rawRuntimeFinal = finiteNumber(attrs.runtime_soc_final);
+  const rawConfiguredRuntimeFinal = finiteNumber(attrs.configured_runtime_soc_final);
 
   return {
     currentSoc: attrs.battery_soc,
     socInit: rawSocInit === null ? null : rawSocInit * 100,
     runtimeFinal: rawRuntimeFinal === null ? null : rawRuntimeFinal * 100,
+    configuredRuntimeFinal: rawConfiguredRuntimeFinal === null
+      ? null
+      : rawConfiguredRuntimeFinal * 100,
     emhassMinimum: minimumEntityValue ?? configAttrs.emhass_minimum_soc_pct,
     emhassConfigTarget: configAttrs.emhass_config_target_soc_pct,
+    emhassConfigTargetRaw: configAttrs.emhass_config_target_soc_raw,
     emhassDeficitThreshold: configAttrs.emhass_soc_deficit_threshold_pct,
+    emhassDeficitThresholdRaw: configAttrs.emhass_soc_deficit_threshold_raw,
     emhassDeficitCost: configAttrs.emhass_soc_deficit_cost,
     goodweOnGridMinimum: attrs.battery_discharge_depth_on_grid_45356,
   };
@@ -55,11 +68,12 @@ function socConstraintSnapshot(values) {
   return [
     "GW EnergyPilot SOC constraint diagnostics",
     `Current battery SOC: ${pct(values.currentSoc)}`,
-    `Last optimization SOC init: ${pct(values.socInit)}`,
-    `Runtime final SOC target (soc_final): ${pct(values.runtimeFinal)}`,
+    `Last EnergyPilot optimization SOC init: ${pct(values.socInit)}`,
+    `Configured EnergyPilot final SOC target: ${pct(values.configuredRuntimeFinal)}`,
+    `Last sent runtime final SOC (soc_final): ${pct(values.runtimeFinal)}`,
     `EMHASS minimum SOC: ${pct(values.emhassMinimum)}`,
-    `EMHASS config target SOC (fallback): ${pct(values.emhassConfigTarget)}`,
-    `EMHASS deficit threshold: ${pct(values.emhassDeficitThreshold)}`,
+    `EMHASS config target SOC (fallback): ${validatedSocDisplay(values.emhassConfigTarget, values.emhassConfigTargetRaw)}`,
+    `EMHASS deficit threshold: ${validatedSocDisplay(values.emhassDeficitThreshold, values.emhassDeficitThresholdRaw)}`,
     `EMHASS deficit cost: ${decimal(values.emhassDeficitCost)} currency/kWh/h`,
     `GoodWe on-grid minimum SOC 45356: ${pct(values.goodweOnGridMinimum)}`,
   ].join("\n");
@@ -113,15 +127,16 @@ function installSocConstraintDiagnostics(panel, root) {
   group.innerHTML = `
     <div class="ep-v011-diag-group-title">SOC / CONSTRAINT LAYERS</div>
     ${diagRow(panel, "Current battery SOC", pct(values.currentSoc), "current")}
-    ${diagRow(panel, "Last optimization SOC init", pct(values.socInit), "init")}
-    ${diagRow(panel, "Runtime final SOC target (soc_final)", pct(values.runtimeFinal), "runtime-final")}
+    ${diagRow(panel, "Last EnergyPilot optimization SOC init", pct(values.socInit), "init")}
+    ${diagRow(panel, "Configured EnergyPilot final SOC target", pct(values.configuredRuntimeFinal), "configured-runtime-final")}
+    ${diagRow(panel, "Last sent runtime final SOC (soc_final)", pct(values.runtimeFinal), "runtime-final")}
     ${diagRow(panel, "EMHASS minimum SOC", pct(values.emhassMinimum), "minimum")}
-    ${diagRow(panel, "EMHASS config target SOC (fallback)", pct(values.emhassConfigTarget), "config-target")}
-    ${diagRow(panel, "EMHASS deficit threshold", pct(values.emhassDeficitThreshold), "deficit")}
+    ${diagRow(panel, "EMHASS config target SOC (fallback)", validatedSocDisplay(values.emhassConfigTarget, values.emhassConfigTargetRaw), "config-target")}
+    ${diagRow(panel, "EMHASS deficit threshold", validatedSocDisplay(values.emhassDeficitThreshold, values.emhassDeficitThresholdRaw), "deficit")}
     ${diagRow(panel, "EMHASS deficit cost", `${decimal(values.emhassDeficitCost)} currency/kWh/h`, "deficit-cost")}
     ${diagRow(panel, "GoodWe on-grid minimum SOC 45356", pct(values.goodweOnGridMinimum), "goodwe")}
     <div class="ep-v019-soc-note">
-      <span><strong>Runtime final SOC</strong> is sent as <code>soc_final</code> and overrides the EMHASS config target for that EnergyPilot run. The deficit threshold adds a virtual cost below that SOC; it is not a hard floor. GoodWe 45356 is the inverter-side G20 minimum-SOC setting currently under field validation.</span>
+      <span><strong>Last sent runtime final SOC</strong> is populated only after an EnergyPilot-owned optimization succeeds. A manual-only installation may therefore show a configured EnergyPilot target while last sent remains blank. Invalid EMHASS SOC config values are shown as raw diagnostics instead of being presented as valid percentages. GoodWe 45356 remains the inverter-side G20 minimum-SOC setting under field validation.</span>
       <button type="button" class="ep-v019-soc-copy">Copy SOC constraints</button>
     </div>`;
   grid.appendChild(group);
@@ -146,11 +161,11 @@ function clarifyFinalSocSetting(root) {
   if (!field) return;
 
   const label = field.querySelector(".ep-v016-field-label span:first-child");
-  if (label) label.textContent = "Runtime final SOC target";
+  if (label) label.textContent = "EnergyPilot runtime final SOC target";
 
   const description = field.querySelector(".ep-v016-field-description");
   if (description) {
-    description.textContent = "Sent to EMHASS as runtime soc_final for every EnergyPilot optimization. This runtime value overrides the EMHASS config target for that run and does not rewrite battery_target_state_of_charge in config.json.";
+    description.textContent = "Used as runtime soc_final when EnergyPilot runs an optimization. This value does not prove it was sent: manual-only or externally orchestrated EMHASS can use a different runtime target. It does not rewrite battery_target_state_of_charge in config.json.";
   }
 }
 
