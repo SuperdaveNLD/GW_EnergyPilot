@@ -2,6 +2,34 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.21] - 2026-08-23
+
+### Added
+
+- A compact **12-mode manual EMS test pad** inside the Controller card, using the same mode numbering and labels as the Home Assistant manual EMS select.
+- Hover descriptions for all twelve GoodWe EMS modes so the operator can distinguish PV-priority limits, inverter-level grid scheduling, PCC grid targets and direct battery-power modes.
+- A manual power slider from `0 W` to the configured EnergyPilot `max_power` value, backed by the existing `manual_power` Home Assistant number entity.
+- Live highlighting of the actual GoodWe EMS mode read back from register `47511`, including while Automatic Control is active.
+
+### Changed
+
+- When Automatic Control is ON, the new manual mode pad and slider are visually locked/greyed while the actual active mode remains highlighted.
+- When Automatic Control is OFF, clicking a mode uses the existing `manual_mode` select and existing controller manual-ownership path; no second Modbus control API is introduced.
+- Modes `1`, `6`, `7` and `8` continue to force a `0 W` setpoint. Mode `7` adds a dedicated confirmation before forced off-grid operation.
+- The active frontend is `gw-energy-pilot-v021.js`, layered on top of v0.20.
+
+### Beta test focus
+
+- Primary field test: Automatic Control OFF, manual setpoint `0 W`, mode `10` (**Grid export target**) to observe zero-export behavior at the GoodWe smart meter/PCC.
+- Mode `1` (**GoodWe Auto / AI**) can be compared manually with mode 10, but this release does not change automatic PV-only/grid-neutral behavior based on that observation.
+
+### Safety boundary
+
+- No GoodWe register definition changes.
+- No change to the existing `47512 -> wait -> 47511` EMS write order.
+- No change to Automatic Control mapping, grid-neutral charging, EMHASS ownership, sign conventions or power clamps.
+- The test pad is only a UI surface over the existing `manual_power` and `manual_mode` entities.
+
 ## [0.20] - 2026-08-23
 
 ### Fixed
