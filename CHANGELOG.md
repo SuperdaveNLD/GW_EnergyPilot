@@ -11,17 +11,23 @@ All notable changes to GW EnergyPilot are documented here.
 - Unsigned 64-bit Modbus decoding for the extended meter counters.
 - A dedicated BETA diagnostics block and Copy beta diagnostics action in the dashboard.
 - Unit tests for UINT64 decoding, four-word register coverage and beta optional-read block coverage.
+- A stateful **EMHASS optimization strategy** select that reads the active `costfun` from EMHASS and exposes the raw value as an entity attribute.
+- Clear dashboard strategy state with an `ACTIVE` badge and checkmark on the selected `Profit`, `Cost` or `Self-consumption` option.
+- Periodic and post-write synchronization so strategy changes made through EnergyPilot or directly in the EMHASS UI are reflected in Home Assistant.
 
 ### Changed
 
 - Candidate registers are now shipped to the small active tester group instead of remaining isolated in draft branches.
 - Every candidate remains optional and read-only; unsupported firmware cannot make normal required telemetry unavailable.
 - Legacy `36015/36017` remain the canonical grid-energy source until the extended counters are validated against physical SEMS lifetime totals.
+- The three v0.15 EMHASS strategy button unique IDs are retained for backwards compatibility, but are categorized and named as configuration actions instead of looking like three persistent modes.
+- Strategy selection now distinguishes between a successful `costfun` save and a subsequent optimization failure: the selected strategy remains active when the config write succeeded.
 
 ### Safety boundary
 
 - `45356`, `45358` and `47500` are not used by controller logic and are never written by EnergyPilot.
 - `36104/36120` are diagnostics only and do not alter Recorder-facing grid energy entities.
+- EMHASS strategy selection changes the optimizer objective only; GoodWe Automatic Control remains `P_batt` driven with the existing mode 8/11/12 mapping.
 - EMS modes, setpoints, sign conventions, write ordering and automatic-control ownership are unchanged.
 
 ## [0.15] - 2026-08-23
