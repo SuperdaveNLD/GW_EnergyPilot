@@ -115,7 +115,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     # Modbus poll runs, but EnergyPilot no longer blocks Home Assistant startup.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_register_panel(hass)
-    hass.async_create_task(
+    entry.async_create_background_task(
+        hass,
         _async_initial_refresh(coordinator),
         f"GW EnergyPilot initial refresh ({entry.entry_id})",
     )
