@@ -7,13 +7,14 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 ## Status definitions
 
 - **Validated** — the release does not intentionally introduce unconfirmed hardware semantics. It has passed the repository Quality, HACS and hassfest checks. This does not mean the project has been tested across every ETA-G20 model or firmware version.
-- **Beta** — the release intentionally includes functionality that has not yet been extensively field-tested. Beta hardware values stay read-only/optional until enough real-installation evidence exists to promote them. New Beta UI/configuration paths likewise need broader real-installation exposure before promotion.
+- **Beta** — the release intentionally includes functionality that has not yet been extensively field-tested. Beta hardware values stay read-only/optional until enough real-installation evidence exists to promote them. New Beta UI/configuration and control paths likewise need broader real-installation exposure before promotion.
 - **Historical** — older development milestone retained for version history; current support and testing focus is on the latest release.
 
 ## Version overview
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.18** | 2026-08-23 | **Beta** | Adds EMHASS `P_grid` awareness and a 30-second smart-meter feedback limiter for charge intervals that EMHASS planned around 0 W grid flow. Prevents optimistic PV forecasts from becoming unintended grid charging and uses a 2-minute/two-sample anti-flap restart guard. Intentional non-zero-grid charging remains supported. |
 | **0.17** | 2026-08-23 | **Beta** | Adds the administrator settings gear with EP, EMHASS and GOODWE pages, validates GoodWe connection changes before saving, migrates device identity from mutable `host:slave` to stable config-entry ID, exposes the three SOC Beta candidates as enabled Home Assistant Diagnostic sensors, and makes the active EMHASS optimization strategy stateful/readable from `/get-config`. |
 | **0.16** | 2026-08-23 | **Beta** | Ships read-only G20 SOC-protection candidates `45356/45358/47500` and extended 15 kW+ meter candidates `36104/36120` to the active tester group. Adds UINT64 decoding, beta diagnostics UI and tests. No candidate value is used for control or canonical grid accounting. |
 | **0.15** | 2026-08-23 | **Validated** | Adds EMHASS `profit`, `cost` and `self-consumption` strategy controls. Preserves unrelated EMHASS config and immediately re-optimizes after a strategy change. GoodWe `P_batt` control remains unchanged. |
@@ -31,6 +32,35 @@ This page gives a user-facing summary of every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS `P_batt` mapping and EV coordination. |
+
+## v0.18 — Beta grid-neutral charge execution
+
+v0.18 addresses a confirmed execution mismatch on an installation with external AC-coupled PV. EMHASS planned roughly `P_batt = -4.42 kW` and `P_grid = 0 W` because its PV forecast expected enough local generation, but the fixed GoodWe mode-11 setpoint imported about 3.1 kW when the actual external PV was much lower.
+
+The new controller reads the standard EMHASS `sensor.p_grid_forecast` in addition to `sensor.p_batt_forecast`. When EMHASS asks the battery to charge **and** plans grid flow around zero, `abs(P_batt)` becomes a maximum charge cap rather than an unconditional charge command. The actual charge setpoint is trimmed from the live GoodWe smart meter (`36008`).
+
+### Stability / anti-flap rules
+
+- smart-meter correction runs every 30 seconds while this mode is active;
+- observed import reduces charge immediately;
+- upward charge movement is capped at 1 kW per 30-second feedback tick;
+- when local surplus is insufficient, the battery switches to mode 8 Battery Hold instead of crossing into discharge;
+- a stopped charge remains in hold for at least two minutes;
+- after the dwell, two consecutive 30-second samples with clear export are required before charge may restart;
+- normal Home Assistant state events cannot bypass that restart evidence;
+- missing `P_grid` or live meter feedback during the protected case fails safe to hold.
+
+This preserves EMHASS ownership of the economic intent. A meaningful non-zero `P_grid` during a charge interval still allows the existing direct mode-11 behavior, so intentional cheap-grid charging is not blocked.
+
+### Control boundary
+
+v0.18 does not introduce or guess new GoodWe registers. It deliberately does not use mode 2 for the validated external-AC-PV layout because the GoodWe's own PV inputs report 0 W, and it does not make bidirectional mode 9 responsible for battery direction.
+
+The separate observation that external AC-coupled PV can drive GoodWe load register `35172` negative—and therefore make the current load forecaster fall back to its configured fallback load—is documented but not changed in this release.
+
+### Why v0.18 is Beta
+
+The control logic has regression coverage, including the measured 4.42 kW / 3.07 kW-import case, but the 30-second feedback dynamics and anti-flap thresholds still need real-weather field exposure on the GW15K-ETA-G20 installation before the behavior is promoted from Beta.
 
 ## v0.17 — Beta settings UI, stateful strategy and field diagnostics
 
