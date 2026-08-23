@@ -2,6 +2,32 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.18] - 2026-08-23
+
+### Added
+
+- Configurable EMHASS `P_grid` output entity with standard default `sensor.p_grid_forecast`.
+- Grid-neutral charge execution for intervals where EMHASS requests battery charging while planning grid flow around 0 W.
+- A 30-second GoodWe smart-meter feedback loop that trims the mode-11 charge setpoint without adding extra Modbus polling.
+- Anti-flap state around charge/hold transitions: a stopped grid-neutral charge remains in Battery Hold for at least two minutes and requires two consecutive feedback samples with clear export before charging can restart.
+- Controller regression coverage for the real field case where EMHASS forecasted about 5.1 kW PV / -4.42 kW battery charge while actual AC-coupled PV was much lower and mode 11 imported the difference from the grid.
+
+### Changed
+
+- During planned-zero-grid charging, `abs(P_batt)` is now the maximum allowed charge power rather than an unconditional mode-11 setpoint.
+- Actual GoodWe smart-meter power (`36008`, positive export / negative import) determines the current charge setpoint during that interval.
+- Grid import is corrected immediately; charge increases are limited to 1 kW per 30-second feedback tick to avoid chasing short AC-coupled PV fluctuations.
+- If the live meter is unavailable during grid-neutral charging, EnergyPilot fails safe to Battery Hold.
+- If `P_grid` is unavailable while EMHASS requests charging, EnergyPilot holds instead of guessing whether grid charging was intended.
+- Explicit non-zero EMHASS grid targets continue to use the existing direct `P_batt` mode-11 mapping, preserving intentional grid charging.
+- The active frontend is `gw-energy-pilot-v018.js`.
+
+### Control boundary
+
+- This release does not use GoodWe PV-priority mode 2; the validated field case uses an external AC-coupled PV inverter that the GoodWe PV inputs report as 0 W.
+- This release does not switch Automatic Control to bidirectional GoodWe grid-target mode 9. EMHASS still decides charge/discharge direction; the smart meter only limits charging when EMHASS itself planned near-zero grid flow.
+- Existing discharge mapping, EV hold behavior, manual controls, GoodWe register definitions and EMS write ordering remain unchanged.
+
 ## [0.17] - 2026-08-23
 
 ### Added
