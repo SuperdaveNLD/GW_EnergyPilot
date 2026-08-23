@@ -1,35 +1,44 @@
 # EMHASS setup for GW EnergyPilot
 
-EMHASS creates the battery plan. GW EnergyPilot supplies live inputs, runs optimization/publish, validates the result and maps the current `P_batt` target to the GoodWe ETA.
+EMHASS creates the battery plan. GW EnergyPilot supplies live inputs, runs optimization/publish, validates the result and maps the current `P_batt` target to the GoodWe ETA-G20.
+
+The primary tested development inverter is **GoodWe GW15K-ETA-G20**.
 
 ## 1. Install EMHASS first
 
 Install the EMHASS App/Add-on, enable **Start on boot** and **Watchdog**, and start it.
 
-Confirm that the EMHASS web interface opens before installing GW EnergyPilot.
+Confirm that the EMHASS web interface opens before configuring EnergyPilot.
 
-## 2. Install and connect GW EnergyPilot
+EMHASS documentation commonly uses `http://localhost:5000`. For requests originating from Home Assistant Core, current HAOS networking can make `localhost` unsuitable for reaching another add-on container. EnergyPilot therefore defaults to the internal EMHASS add-on hostname:
 
-1. Install GW EnergyPilot through HACS.
-2. Restart Home Assistant.
-3. Add **GW EnergyPilot** under **Settings → Devices & services**.
-4. Enter the fixed inverter IP address, port `502` and Unit ID `247` unless your installation uses different values.
-5. Keep **Automatic Control OFF** during setup.
-6. Verify battery SOC, battery power, PV power and grid power.
+```text
+http://5b918bf2-emhass:5000
+```
 
-Disable the separate Home Assistant `goodwe` integration when it polls the same inverter. Concurrent polling can occupy the GoodWe connection and delay startup or telemetry.
+Change the URL in EnergyPilot options when your EMHASS installation uses another address.
 
-## 3. Map EMHASS inputs to EnergyPilot
+## 2. Connect GW EnergyPilot
 
-Use the actual entity IDs created on your Home Assistant instance.
+1. Add GW EnergyPilot under **Settings → Devices & services**.
+2. Enter the fixed inverter IP address.
+3. Use port `502` and Unit ID `247` unless your inverter uses different values.
+4. Keep **Automatic Control OFF** during setup.
+5. Verify battery SOC, battery power, PV power, GoodWe load and grid power.
 
-| EMHASS parameter | Suggested EnergyPilot source |
+If another Home Assistant integration with domain `goodwe` polls the same inverter, disable it when EnergyPilot replaces it. An unavailable/sleeping inverter can otherwise leave that separate integration in a long retry cycle during Home Assistant startup.
+
+## 3. Map EMHASS inputs
+
+Use the actual entity IDs shown by Home Assistant. Stable EnergyPilot unique keys are listed below; the generated entity ID can vary if Home Assistant has already assigned names.
+
+| EMHASS parameter | EnergyPilot source |
 |---|---|
-| `sensor_power_photovoltaics` | `sensor.gw_energypilot_pv_total_power` |
-| `sensor_power_load_no_var_loads` | `sensor.gw_energypilot_total_load_power` or another validated whole-home sensor |
-| `sensor_power_battery` | `sensor.gw_energypilot_battery_power` |
-| `sensor_battery_state_of_charge` | `sensor.gw_energypilot_battery_state_of_charge` |
-| `var_model` | the same validated whole-home load sensor |
+| `sensor_power_photovoltaics` | PV total power (`pv_total_power`) |
+| `sensor_power_load_no_var_loads` | GoodWe load register 35172 (`total_load_power`) |
+| `sensor_power_battery` | Battery power (`battery_power`) |
+| `sensor_battery_state_of_charge` | Battery SOC (`battery_soc`) |
+| `var_model` | the same GoodWe load entity |
 | `sensor_power_photovoltaics_forecast` | normally `sensor.p_pv_forecast` |
 
 Battery sign convention:
@@ -39,21 +48,29 @@ negative battery power = charging
 positive battery power = discharging
 ```
 
-EnergyPilot sends the current battery SOC as runtime `soc_init` for every optimization.
+EnergyPilot sends current battery SOC as runtime `soc_init` for every optimization.
 
-### House-load source
+### Why v0.13 uses register 35172 for load
 
-GoodWe register `35172` is available as a raw diagnostic sensor. EnergyPilot also calculates whole-home demand as:
+On the tested GW15K-ETA-G20:
+
+```text
+GoodWe load 35172 ≈ Load L1 + Load L2 + Load L3
+```
+
+EnergyPilot also calculates:
 
 ```text
 PV - grid + battery
 ```
 
-This calculated value is used by the native orchestrator when PV, grid and battery values are valid. It avoids depending solely on register `35172` where AC-coupled PV or firmware behaviour makes that register incomplete.
+That second value is retained as a **system power balance** diagnostic. It is not substituted into the EMHASS house-load model because it can also contain inverter conversion/auxiliary differences and depends on the electrical measurement points.
+
+Registers `35138` and `35140` are inverter-side power diagnostics and should not be treated as inverter self-consumption.
 
 ## 4. Recommended EMHASS settings
 
-Use the battery and inverter limits that match the actual hardware. For an installation without deferrable loads, all per-load arrays should be empty.
+Use the actual battery and inverter limits for your installation. For a configuration without deferrable loads, all per-load arrays should be empty.
 
 Recommended publishing setting:
 
@@ -61,18 +78,18 @@ Recommended publishing setting:
 "continual_publish": false
 ```
 
-EnergyPilot publishes only after a successful optimization, preventing an old plan from being published after a failed run.
+EnergyPilot publishes only after a successful optimization. This prevents a stale plan from being republished after a failed run.
 
-Normal output entities:
+Normal EMHASS output entity IDs are:
 
 ```text
 sensor.p_batt_forecast
 sensor.optim_status
 ```
 
-These IDs are prefilled in EnergyPilot as text and can be saved before EMHASS creates the entities.
+They can be entered in EnergyPilot before EMHASS creates them.
 
-## 5. Configure the EnergyPilot orchestrator
+## 5. EnergyPilot orchestrator settings
 
 Recommended starting values:
 
@@ -84,7 +101,7 @@ Target SOC at end                     10%
 Fallback house load                   700 W
 Use runtime Nord Pool prices          ON when a supported source exists
 Optimize when tomorrow prices arrive  ON
-Nord Pool area                        blank or the required area, e.g. NL
+Nord Pool area                        blank or required area such as NL
 Nord Pool currency                    EUR
 Import price addition                 contract dependent
 Export price deduction                contract dependent
@@ -92,13 +109,13 @@ Export price deduction                contract dependent
 
 ## 6. Price sources
 
-EnergyPilot tries price sources in this order:
+EnergyPilot tries runtime price sources in this order:
 
-1. Home Assistant action `nordpool.get_prices_for_date`;
-2. a sensor with `raw_today` and `raw_tomorrow` attributes;
-3. EMHASS's internal price configuration when runtime prices are disabled.
+1. Home Assistant `nordpool.get_prices_for_date`;
+2. a sensor with `raw_today` and `raw_tomorrow`;
+3. EMHASS internal pricing when runtime pricing is disabled.
 
-With runtime prices enabled, EnergyPilot supplies:
+With runtime prices enabled EnergyPilot supplies:
 
 ```text
 load_cost_forecast
@@ -107,13 +124,11 @@ prod_price_forecast
 
 The configured import addition and export deduction are applied before the dictionaries are sent to EMHASS.
 
-If runtime pricing is enabled but no compatible source exists, EnergyPilot stops with a clear `error_prices` status instead of running EMHASS with unintended fallback prices.
+If runtime pricing is enabled but no compatible source exists, EnergyPilot stops with `error_prices` rather than silently optimizing with unintended prices.
 
-## 7. Run the first optimization
+## 7. First optimization
 
-Wait until Home Assistant startup has finished and EnergyPilot telemetry is available.
-
-Then press **Optimize now** in the EnergyPilot dashboard.
+Wait until Home Assistant startup has finished and EnergyPilot telemetry is available. Then press **Optimize now**.
 
 Successful flow:
 
@@ -128,50 +143,65 @@ HTTP 2xx
         ↓
 POST /action/publish-data
         ↓
-fresh numeric P_batt + expected optimization status
+fresh numeric P_batt + expected optimization state
         ↓
 ready
 ```
 
-The orchestrator intentionally does not run during Home Assistant startup.
+EnergyPilot intentionally does not create an EMHASS plan during Home Assistant startup.
 
 ## 8. Enable control
 
-After the first successful run, confirm:
+Confirm:
 
 ```text
-sensor.p_batt_forecast   numeric
-sensor.optim_status      Optimal
-Orchestrator             ready
-Expected EMS mode        matches the P_batt sign
+P_batt forecast      numeric
+Optimization status Optimal
+Orchestrator         ready
+Expected EMS mode    matches P_batt sign
 ```
 
 Then enable **Automatic Control** or press **AUTO**.
 
-The AUTO button performs a fresh optimization first and enables Automatic Control only after success.
+AUTO performs a fresh optimization first and enables Automatic Control only after success.
 
-## Scheduling and triggers
+## Scheduling
 
 ```text
 Periodic optimization             every 60 minutes
 Optimize now                      immediately
-AUTO button                       immediately
-Tomorrow prices become available immediately
-EV charging stops                 immediately, when configured
-Minimum/maximum SOC changes       immediately
+AUTO                              immediately
+Tomorrow prices available         immediately
+EV charging stops                 immediately when configured
+SOC limit changes                 3 seconds after the final change
 Home Assistant startup            no optimization
 ```
 
+The SOC debounce prevents a slider movement such as 5% → 10% from starting optimizer jobs at every intermediate step.
+
 ## Minimum and maximum SOC
 
-The dashboard sliders write:
+The dashboard controls write EMHASS parameters:
 
 ```text
 battery_minimum_state_of_charge
 battery_maximum_state_of_charge
 ```
 
-EnergyPilot reads the complete configuration with `/get-config`, changes only the selected field and writes the complete configuration through `/set-config`. A fresh optimization is requested afterwards.
+EnergyPilot reads the complete EMHASS configuration through `/get-config`, modifies the selected field and writes the complete configuration back through `/set-config`.
+
+For normal grid-connected cycling, EnergyPilot suggests approximately:
+
+```text
+minimum 5%
+maximum 95%
+```
+
+This is an EnergyPilot operating recommendation, not a hardware override.
+
+GoodWe/SEMS+ and the battery BMS have separate protection limits. Those limits remain authoritative. A GoodWe on-grid minimum SOC of 10% can therefore prevent further discharge at about 10% even when EMHASS requests a lower target.
+
+Off-grid reserve should be configured separately. Current GoodWe ETA-G20 documentation recommends a much higher minimum reserve for off-grid operation.
 
 ## Output mapping
 
@@ -187,43 +217,63 @@ Default deadband:
 300 W
 ```
 
+## Grid energy foundation
+
+v0.13 exposes the GoodWe smart-meter cumulative grid counters:
+
+```text
+36015 total export
+36017 total import
+```
+
+They are Home Assistant `total_increasing` kWh sensors. Recorder can therefore calculate today, yesterday, month and year changes without repeatedly integrating every historical power sample.
+
+The dashboard's Grid detail graph uses 5-minute Recorder power statistics only when the user opens the Grid card. Daily import/export values are cached for five minutes.
+
+These counters are also the intended foundation for future Nord Pool cost/revenue sensors.
+
 ## Diagnostics
 
-Use **Copy snapshot** on the Diagnostics card. The snapshot includes:
+Use **Copy snapshot** when reporting an issue and include the inverter model/firmware.
+
+Relevant values include:
 
 - GoodWe EMS mode and setpoint;
-- raw and calculated house power;
-- controller command, target and expected mode;
-- selected EMHASS entities and states;
+- register 35172 and load-phase sum;
+- system power balance;
+- signed grid power;
+- inverter registers 35138 and 35140;
+- controller command/target;
+- selected EMHASS output entities;
 - EMHASS health/version and HTTP results;
 - load and price point counts;
-- detected price source;
 - other active `goodwe` config entries.
 
 ## Common failures
 
 ### `waiting_for_home_assistant`
 
-Home Assistant startup is still in progress. Wait until startup is complete.
+Home Assistant startup is still in progress.
 
 ### `waiting_for_goodwe`
 
-EnergyPilot has not completed a successful Modbus refresh. Verify the inverter address and disable another integration polling the same GoodWe.
+EnergyPilot has not completed a successful Modbus refresh. Verify inverter address, Modbus availability and whether another client is polling the same inverter.
 
 ### `error_prices`
 
-Runtime pricing is enabled but no supported price source was found. Configure Nord Pool or disable runtime pricing.
+Runtime pricing is enabled but no supported price source was found.
 
 ### `error_optimization`
 
-The EMHASS request failed. Copy the Diagnostics snapshot and inspect the concise error message. Verify EMHASS inputs, forecast settings and battery/inverter limits.
+EMHASS rejected or failed the optimization. Copy the Diagnostics snapshot and verify EMHASS inputs, forecast settings and constraints.
 
 ### `stale_output`
 
-Optimization and publish returned successfully, but no fresh numeric `P_batt` entity became available.
+Optimization and publish returned successfully, but no fresh numeric `P_batt` became available.
 
 ## References
 
+- EMHASS usage: https://emhass.readthedocs.io/en/latest/usage_guide.html
 - EMHASS configuration: https://emhass.readthedocs.io/en/latest/config.html
 - EMHASS runtime data: https://emhass.readthedocs.io/en/latest/passing_data.html
-- Home Assistant Nord Pool: https://www.home-assistant.io/integrations/nordpool/
+- Home Assistant developer documentation: https://developers.home-assistant.io/
