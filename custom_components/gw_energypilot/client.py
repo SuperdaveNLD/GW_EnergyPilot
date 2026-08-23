@@ -11,7 +11,13 @@ from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 from .const import MODES_ZERO_POWER, REGISTER_EMS_MODE, REGISTER_EMS_POWER
-from .registers import REGISTER_DEFINITIONS, RegisterDataType, RegisterDefinition
+from .registers import (
+    OPTIONAL_TELEMETRY_BLOCKS,
+    REGISTER_DEFINITIONS,
+    TELEMETRY_BLOCKS,
+    RegisterDataType,
+    RegisterDefinition,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,20 +41,6 @@ class GWETAData:
     def power(self) -> int | None:
         value = self.values.get("ems_setpoint")
         return int(value) if value is not None else None
-
-
-TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
-    (35103, 88),
-    (35212, 10),
-    (35301, 36),
-    (36003, 55),
-    (37002, 22),
-    (47509, 4),
-)
-
-OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
-    (47000, 1),
-)
 
 
 class GWModbusClient:
