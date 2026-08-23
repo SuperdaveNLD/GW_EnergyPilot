@@ -2,6 +2,33 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.17] - 2026-08-23
+
+### Added
+
+- A dedicated settings gear beside the existing dashboard-layout control.
+- Separate in-dashboard configuration pages for **EP**, **EMHASS** and **GOODWE**.
+- Admin-only WebSocket settings commands that read and update the existing GW EnergyPilot config entry.
+- GoodWe connection validation before inverter host, Modbus port or unit-ID changes are stored.
+- Multi-entry selection for installations with more than one GW EnergyPilot config entry.
+- `docs/SETTINGS.md` documenting settings ownership, authorization, reloads and device-registry compatibility.
+
+### Changed
+
+- EnergyPilot controller, telemetry and optional EV-coordination settings can be maintained from the EP page.
+- EnergyPilot-owned EMHASS connection, scheduling, output mapping and Nord Pool settings can be maintained from the EMHASS page.
+- GoodWe connection settings can be maintained from the GOODWE page without creating a second configuration store.
+- The legacy mutable `host:slave` Home Assistant device identifier is migrated to the stable config-entry ID before entity setup, preventing connection-address changes from creating a duplicate device.
+- Empty optional EV entity fields are normalized before the existing options schema is validated.
+- Dashboard frontend moved to `gw-energy-pilot-v017.js`, layered on top of the v0.16 Beta G20 diagnostics.
+
+### Safety and compatibility
+
+- Existing entity unique IDs remain unchanged.
+- v0.16 candidate SOC and extended-meter registers remain read-only Beta diagnostics and are not promoted by this release.
+- Legacy `36015/36017` remain the canonical grid-energy source while the extended G20 counters are hardware-validated.
+- EMS modes, setpoints, write ordering, sign conventions and automatic-control ownership are unchanged.
+
 ## [0.16] - 2026-08-23
 
 ### Added
