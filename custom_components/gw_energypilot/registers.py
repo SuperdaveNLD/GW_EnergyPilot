@@ -39,11 +39,14 @@ TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
     (47509, 4),
 )
 
-# Register 47000 is useful diagnostic information but is not available on every
-# tested/related device, so a failure to read this block must not fail the main
-# telemetry refresh.
+# Optional diagnostics are deliberately isolated from required telemetry. Some
+# related GoodWe models/firmware do not expose every register, so failure of one
+# optional read must never make the normal coordinator refresh unavailable.
 OPTIONAL_TELEMETRY_BLOCKS: tuple[tuple[int, int], ...] = (
+    (45356, 1),  # candidate on-grid battery discharge-depth / minimum-SOC limit
+    (45358, 1),  # candidate off-grid battery discharge-depth / minimum-SOC limit
     (47000, 1),
+    (47500, 1),  # candidate battery SOC-protection enable/status
 )
 
 
@@ -144,7 +147,12 @@ REGISTER_DEFINITIONS: tuple[RegisterDefinition, ...] = (
     RegisterDefinition("battery_max_cell_voltage", 37022, RegisterDataType.UINT16, 0.001, 3),
     RegisterDefinition("battery_min_cell_voltage", 37023, RegisterDataType.UINT16, 0.001, 3),
 
+    # Candidate protection registers are read-only diagnostics until their ETA-G20
+    # semantics are confirmed on tested hardware. Do not use them for control.
+    RegisterDefinition("battery_discharge_depth_on_grid", 45356, RegisterDataType.UINT16),
+    RegisterDefinition("battery_discharge_depth_off_grid", 45358, RegisterDataType.UINT16),
     RegisterDefinition("app_work_mode", 47000, RegisterDataType.UINT16),
+    RegisterDefinition("battery_soc_protection", 47500, RegisterDataType.UINT16),
     RegisterDefinition("feed_power_enable", 47509, RegisterDataType.UINT16),
     RegisterDefinition("feed_power_parameter", 47510, RegisterDataType.UINT16),
     RegisterDefinition("ems_mode", 47511, RegisterDataType.UINT16),
