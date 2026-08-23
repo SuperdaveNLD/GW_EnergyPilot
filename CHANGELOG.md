@@ -2,6 +2,18 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.14] - 2026-08-23
+
+### Added
+
+- Read-only candidate SOC-protection diagnostics for GoodWe registers `45356`, `45358` and `47500`.
+- Diagnostics-card and Copy snapshot output for the candidate on-grid discharge depth, off-grid discharge depth and SOC-protection status values.
+
+### Changed
+
+- The three candidate protection registers are read as isolated optional Modbus blocks so unsupported model/firmware combinations cannot make normal telemetry unavailable.
+- Their ETA-G20 semantics remain explicitly unconfirmed until validated against SolarGo/SEMS+ on tested hardware; EnergyPilot does not write or use these registers for control.
+
 ## [0.13] - 2026-08-23
 
 ### Added
