@@ -34,7 +34,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v017.js?v=0.17-settings-beta1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v017.js?v=0.17-settings-strategy2"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -61,6 +61,10 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
 def _migrate_device_identifier(hass: HomeAssistant, entry: GWConfigEntry) -> None:
     """Move the legacy mutable host:slave device identifier to entry_id."""
     registry = dr.async_get(hass)
+    stable_identifier = (DOMAIN, entry.entry_id)
+    if registry.async_get_device_by_identifier(stable_identifier, entry.entry_id):
+        return
+
     legacy_identifier = (
         DOMAIN,
         f"{entry.data[CONF_HOST]}:{entry.data[CONF_SLAVE]}",
@@ -72,7 +76,7 @@ def _migrate_device_identifier(hass: HomeAssistant, entry: GWConfigEntry) -> Non
     if device is not None:
         registry.async_update_device(
             device.id,
-            new_identifiers={(DOMAIN, entry.entry_id)},
+            new_identifiers={stable_identifier},
         )
 
 
