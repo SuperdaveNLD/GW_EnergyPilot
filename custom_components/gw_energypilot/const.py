@@ -5,6 +5,7 @@ NAME = "GW EnergyPilot"
 
 CONF_SLAVE = "slave"
 CONF_USE_GOODWE_SMART_METER = "use_goodwe_smart_meter"
+CONF_CONTROL_STRATEGY = "control_strategy"
 CONF_P_BATT_ENTITY = "p_batt_entity"
 CONF_P_GRID_ENTITY = "p_grid_entity"
 CONF_OPTIM_STATUS_ENTITY = "optim_status_entity"
@@ -16,6 +17,15 @@ CONF_MAX_POWER = "max_power"
 CONF_DEADBAND = "deadband"
 CONF_EV_DEADBAND = "ev_deadband"
 CONF_SCAN_INTERVAL = "scan_interval"
+
+CONTROL_STRATEGY_BATTERY = "battery"
+CONTROL_STRATEGY_GRID = "grid"
+CONTROL_STRATEGY_HYBRID = "hybrid"
+CONTROL_STRATEGIES = {
+    CONTROL_STRATEGY_BATTERY,
+    CONTROL_STRATEGY_GRID,
+    CONTROL_STRATEGY_HYBRID,
+}
 
 # Built-in EMHASS orchestration.
 CONF_ENABLE_EMHASS_ORCHESTRATOR = "enable_emhass_orchestrator"
@@ -32,10 +42,10 @@ CONF_SELL_PRICE_DEDUCTION = "sell_price_deduction"
 
 DEFAULT_PORT = 502
 DEFAULT_SLAVE = 247
-# v0.24 restores the pre-v0.22 compatibility default: an installation that
-# never explicitly selected the PCC strategy follows EMHASS P_batt through
-# direct battery modes 11/12/8. PCC modes 9/10/1 remain an explicit opt-in.
+# Existing installations without an explicit strategy retain the legacy
+# boolean mapping: False = battery control, True = grid control.
 DEFAULT_USE_GOODWE_SMART_METER = False
+DEFAULT_CONTROL_STRATEGY = CONTROL_STRATEGY_BATTERY
 DEFAULT_MAX_POWER = 15000
 DEFAULT_DEADBAND = 300
 DEFAULT_EV_DEADBAND = 500
