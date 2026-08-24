@@ -3,48 +3,164 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to your GoodWe ETA inverter",
-        "description": "Connect directly to the GoodWe ETA over Modbus TCP. Give the inverter a static IP address or DHCP reservation before continuing.",
-        "data": {"host": "Inverter IP address", "port": "Modbus TCP port", "slave": "Modbus Unit ID"},
-        "data_description": {"host": "Fixed IP address of the GoodWe ETA inverter.", "port": "Normal GoodWe ETA value: 502.", "slave": "Common GoodWe ETA value: 247."}
-      },
-      "controller": {
-        "title": "Configure EnergyPilot and EMHASS",
-        "description": "EMHASS must already be installed, running and configured. Keep Automatic Control OFF until Optimize now completes successfully and publishes numeric P_batt and P_grid targets.",
+        "title": "Verbinden met je GoodWe ETA-omvormer",
+        "description": "Maak rechtstreeks verbinding met de GoodWe ETA via Modbus TCP. Geef de omvormer een vast IP-adres of DHCP-reservering voordat je doorgaat.",
         "data": {
-          "p_batt_entity": "EMHASS battery power target entity ID", "p_grid_entity": "EMHASS grid power target entity ID", "optim_status_entity": "EMHASS optimization status entity ID", "optim_required_state": "Required optimization state", "max_power_kw": "Maximum inverter power", "deadband": "Power deadband", "scan_interval": "Modbus scan interval", "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator", "emhass_url": "EMHASS URL", "emhass_optimization_interval": "Periodic optimization interval", "emhass_soc_final_pct": "Target SOC at end of optimization", "emhass_fallback_load": "Fallback house load", "use_nordpool_prices": "Use Nord Pool runtime prices", "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive", "nordpool_area": "Nord Pool area", "nordpool_currency": "Nord Pool currency", "buy_price_adder": "Import price addition", "sell_price_deduction": "Export price deduction", "enable_ev_coordination": "Enable EV coordination", "ev_mode_entity": "EV charging mode entity", "ev_power_entity": "EV charging power entity", "ev_deadband": "EV active power threshold"
+          "host": "IP-adres omvormer",
+          "port": "Modbus TCP-poort",
+          "slave": "Modbus unit-ID"
         },
         "data_description": {
-          "p_batt_entity": "Standard ID: sensor.p_batt_forecast. Negatief betekent laden; positief betekent ontladen.", "p_grid_entity": "Standard ID: sensor.p_grid_forecast. Positief is geplande import, negatief geplande export. Een target rond 0 W activeert de grid-neutral charge limiter.", "optim_status_entity": "Standard ID: sensor.optim_status. It can be entered before EMHASS creates the entity.", "optim_required_state": "EnergyPilot executes EMHASS targets only when this state matches. Standard: Optimal.", "max_power_kw": "Maximum charge or discharge request. Use 15.0 kW only when the inverter, battery and grid allow it.", "deadband": "Targets inside this range around 0 W become Battery Hold. Dezelfde tolerantie geldt voor een geplande 0 W gridtarget. Recommended: 300 W.", "scan_interval": "How often EnergyPilot polls the inverter. Recommended: 10 seconds. Grid-neutral charge correction runs every 30 seconds.", "enable_emhass_orchestrator": "Runs optimization and publish independently from Automatic Control.", "emhass_url": "Default Home Assistant EMHASS add-on URL: http://5b918bf2-emhass:5000.", "emhass_optimization_interval": "Periodic fallback interval. Recommended: 60 minutes. Event triggers run immediately.", "emhass_soc_final_pct": "Runtime soc_final target. This does not replace the EMHASS minimum/maximum SOC limits.", "emhass_fallback_load": "Used only when live and historical house-load data are not plausible.", "use_nordpool_prices": "Uses nordpool.get_prices_for_date when available, otherwise a sensor with raw_today/raw_tomorrow. Disable this to use the price method configured inside EMHASS.", "optimize_on_tomorrow_prices": "Immediately creates a new plan when tomorrow prices become available.", "nordpool_area": "Optional market area such as NL. Leave empty to use the detected area/source.", "nordpool_currency": "Requested currency. Recommended: EUR.", "buy_price_adder": "Variable supplier fees, taxes or additions in EUR/kWh.", "sell_price_deduction": "Amount deducted from the market export price in EUR/kWh.", "enable_ev_coordination": "Holds the battery while EV charging is active and re-optimizes when charging stops.", "ev_mode_entity": "Optional EV charging-state entity.", "ev_power_entity": "Optional EV charging-power entity in watts.", "ev_deadband": "Power above this threshold is considered active EV charging."
+          "host": "Vast IP-adres van de GoodWe ETA-omvormer.",
+          "port": "Normale GoodWe ETA-waarde: 502.",
+          "slave": "Veelgebruikte GoodWe ETA-waarde: 247."
+        }
+      },
+      "controller": {
+        "title": "EnergyPilot en EMHASS configureren",
+        "description": "EMHASS moet al geïnstalleerd, actief en geconfigureerd zijn. Laat Automatische regeling UIT totdat Nu optimaliseren succesvol is afgerond en numerieke P_batt- en P_grid-doelen zijn gepubliceerd. De GoodWe smart-meter regelstrategie kan daarna worden gekozen onder de GOODWE-instellingen van het dashboard.",
+        "data": {
+          "p_batt_entity": "Entiteits-ID voor EMHASS accuvermogensdoel",
+          "p_grid_entity": "Entiteits-ID voor EMHASS netvermogensdoel",
+          "optim_status_entity": "Entiteits-ID voor EMHASS-optimalisatiestatus",
+          "optim_required_state": "Vereiste optimalisatiestatus",
+          "max_power_kw": "Maximaal regelsetpoint",
+          "deadband": "Regeldodeband",
+          "scan_interval": "Modbus-scaninterval",
+          "enable_emhass_orchestrator": "Ingebouwde EMHASS-orchestrator inschakelen",
+          "emhass_url": "EMHASS-URL",
+          "emhass_optimization_interval": "Periodiek optimalisatie-interval",
+          "emhass_soc_final_pct": "Doel-SOC aan het einde van de optimalisatie",
+          "emhass_fallback_load": "Fallback huisverbruik",
+          "use_nordpool_prices": "Nord Pool-runtimeprijzen gebruiken",
+          "optimize_on_tomorrow_prices": "Optimaliseren wanneer morgenprijzen beschikbaar zijn",
+          "nordpool_area": "Nord Pool-regio",
+          "nordpool_currency": "Nord Pool-valuta",
+          "buy_price_adder": "Opslag importprijs",
+          "sell_price_deduction": "Aftrek exportprijs",
+          "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
+          "ev_mode_entity": "Entiteit voor EV-laadmodus",
+          "ev_power_entity": "Entiteit voor EV-laadvermogen",
+          "ev_deadband": "Drempel voor actieve EV-lading"
+        },
+        "data_description": {
+          "p_batt_entity": "Standaard-ID: sensor.p_batt_forecast. Negatief betekent gepland laden; positief betekent gepland ontladen. Dit is het directe actuatordoel wanneer GoodWe smart-meterregeling UIT staat.",
+          "p_grid_entity": "Standaard-ID: sensor.p_grid_forecast. Positief betekent geplande import; negatief geplande export. Met GoodWe smart-meterregeling AAN stuurt dit modi 9/10 aan en modus 1 rond nul.",
+          "optim_status_entity": "Standaard-ID: sensor.optim_status. Deze kan worden ingevuld voordat EMHASS de entiteit heeft aangemaakt.",
+          "optim_required_state": "EnergyPilot voert EMHASS-doelen alleen uit wanneer deze status overeenkomt. Standaard: Optimal.",
+          "max_power_kw": "Begrenst het modespecifieke GoodWe-setpoint: PCC import-/exportdoel met smart-meterregeling AAN, of direct accudoel met deze regeling UIT.",
+          "deadband": "Tolerantie rond 0 W. Wordt toegepast op P_grid met smart-meterregeling AAN en op P_batt wanneer deze UIT staat. Aanbevolen: 300 W.",
+          "scan_interval": "Hoe vaak EnergyPilot de omvormer uitleest. Aanbevolen: 10 seconden.",
+          "enable_emhass_orchestrator": "Voert optimalisatie en publicatie onafhankelijk van Automatische regeling uit.",
+          "emhass_url": "Standaard Home Assistant EMHASS add-on-URL: http://5b918bf2-emhass:5000.",
+          "emhass_optimization_interval": "Periodiek fallback-interval. Aanbevolen: 60 minuten. Gebeurtenistriggers starten direct.",
+          "emhass_soc_final_pct": "Runtime soc_final-doel. Dit vervangt de minimale/maximale SOC-limieten van EMHASS niet.",
+          "emhass_fallback_load": "Wordt alleen gebruikt wanneer actuele en historische huisbelasting niet bruikbaar zijn.",
+          "use_nordpool_prices": "Gebruikt nordpool.get_prices_for_date indien beschikbaar, anders een sensor met raw_today/raw_tomorrow. Schakel dit uit om de in EMHASS geconfigureerde prijsmethode te gebruiken.",
+          "optimize_on_tomorrow_prices": "Maakt direct een nieuw plan wanneer de prijzen voor morgen beschikbaar worden.",
+          "nordpool_area": "Optionele marktregio zoals NL. Laat leeg om de gedetecteerde regio/bron te gebruiken.",
+          "nordpool_currency": "Gevraagde valuta. Aanbevolen: EUR.",
+          "buy_price_adder": "Variabele leverancierskosten, belastingen of toeslagen in EUR/kWh.",
+          "sell_price_deduction": "Bedrag dat van de marktprijs voor teruglevering wordt afgetrokken in EUR/kWh.",
+          "enable_ev_coordination": "Voorkomt ontladen van de thuisaccu tijdens actief EV-laden en optimaliseert opnieuw wanneer het laden stopt.",
+          "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
+          "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
       }
     },
-    "error": {"cannot_connect": "Unable to connect to the GoodWe ETA or read EMS registers 47511/47512. Verify IP address, port, Unit ID and Modbus TCP availability."},
-    "abort": {"already_configured": "This GoodWe ETA inverter is already configured."}
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken met de GoodWe ETA of EMS-registers 47511/47512 niet uitlezen. Controleer IP-adres, poort, unit-ID en beschikbaarheid van Modbus TCP."
+    },
+    "abort": {
+      "already_configured": "Deze GoodWe ETA-omvormer is al geconfigureerd."
+    }
   },
-  "options": {"step": {"init": {
-    "title": "GW EnergyPilot options",
-    "description": "Configure GoodWe control, EMHASS orchestration, runtime prices and optional EV coordination.",
-    "data": {"p_batt_entity": "EMHASS battery power target entity ID", "p_grid_entity": "EMHASS grid power target entity ID", "optim_status_entity": "EMHASS optimization status entity ID", "optim_required_state": "Required optimization state", "max_power_kw": "Maximum inverter power", "deadband": "Power deadband", "scan_interval": "Modbus scan interval", "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator", "emhass_url": "EMHASS URL", "emhass_optimization_interval": "Periodic optimization interval", "emhass_soc_final_pct": "Target SOC at end of optimization", "emhass_fallback_load": "Fallback house load", "use_nordpool_prices": "Use Nord Pool runtime prices", "optimize_on_tomorrow_prices": "Optimize when tomorrow prices arrive", "nordpool_area": "Nord Pool area", "nordpool_currency": "Nord Pool currency", "buy_price_adder": "Import price addition", "sell_price_deduction": "Export price deduction", "enable_ev_coordination": "Enable EV coordination", "ev_mode_entity": "EV charging mode entity", "ev_power_entity": "EV charging power entity", "ev_deadband": "EV active power threshold"},
-    "data_description": {"p_batt_entity": "Standard ID: sensor.p_batt_forecast.", "p_grid_entity": "Standard ID: sensor.p_grid_forecast. Nodig voor grid-neutraal laden.", "optim_status_entity": "Standard ID: sensor.optim_status.", "optim_required_state": "Standard: Optimal.", "max_power_kw": "Maximum charge or discharge request in kW.", "deadband": "Recommended: 300 W.", "scan_interval": "Recommended: 10 seconds; grid-neutral correction runs every 30 seconds.", "enable_emhass_orchestrator": "Enables hourly and event-driven optimization. No plan is created during Home Assistant startup.", "emhass_url": "Default: http://5b918bf2-emhass:5000.", "emhass_optimization_interval": "Recommended: 60 minutes.", "emhass_soc_final_pct": "Default: 10%.", "emhass_fallback_load": "Fallback only; normal operation uses calculated house load plus Recorder history.", "use_nordpool_prices": "Disable to let EMHASS use its own configured price method.", "optimize_on_tomorrow_prices": "Recommended: ON.", "nordpool_area": "Optional market area such as NL.", "nordpool_currency": "Recommended: EUR.", "buy_price_adder": "Extra import cost in EUR/kWh.", "sell_price_deduction": "Export deduction in EUR/kWh.", "enable_ev_coordination": "Optional EV hold and stop-triggered re-optimization.", "ev_mode_entity": "Optional EV charging-state entity.", "ev_power_entity": "Optional EV charging-power entity in watts.", "ev_deadband": "Power above this threshold is considered active EV charging."}
-  }}},
+  "options": {
+    "step": {
+      "init": {
+        "title": "GW EnergyPilot-opties",
+        "description": "Configureer EnergyPilot, EMHASS-orchestratie, runtimeprijzen en optionele EV-ontlaadbeveiliging. De GoodWe smart-meter regelstrategie wordt ingesteld op de GOODWE-pagina van het dashboard.",
+        "data": {
+          "p_batt_entity": "Entiteits-ID voor EMHASS accuvermogensdoel",
+          "p_grid_entity": "Entiteits-ID voor EMHASS netvermogensdoel",
+          "optim_status_entity": "Entiteits-ID voor EMHASS-optimalisatiestatus",
+          "optim_required_state": "Vereiste optimalisatiestatus",
+          "max_power_kw": "Maximaal regelsetpoint",
+          "deadband": "Regeldodeband",
+          "scan_interval": "Modbus-scaninterval",
+          "enable_emhass_orchestrator": "Ingebouwde EMHASS-orchestrator inschakelen",
+          "emhass_url": "EMHASS-URL",
+          "emhass_optimization_interval": "Periodiek optimalisatie-interval",
+          "emhass_soc_final_pct": "Doel-SOC aan het einde van de optimalisatie",
+          "emhass_fallback_load": "Fallback huisverbruik",
+          "use_nordpool_prices": "Nord Pool-runtimeprijzen gebruiken",
+          "optimize_on_tomorrow_prices": "Optimaliseren wanneer morgenprijzen beschikbaar zijn",
+          "nordpool_area": "Nord Pool-regio",
+          "nordpool_currency": "Nord Pool-valuta",
+          "buy_price_adder": "Opslag importprijs",
+          "sell_price_deduction": "Aftrek exportprijs",
+          "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
+          "ev_mode_entity": "Entiteit voor EV-laadmodus",
+          "ev_power_entity": "Entiteit voor EV-laadvermogen",
+          "ev_deadband": "Drempel voor actieve EV-lading"
+        },
+        "data_description": {
+          "p_batt_entity": "Standaard-ID: sensor.p_batt_forecast. Directe accu-actuator wanneer GoodWe smart-meterregeling UIT staat.",
+          "p_grid_entity": "Standaard-ID: sensor.p_grid_forecast. PCC import-/exportdoel wanneer GoodWe smart-meterregeling AAN staat.",
+          "optim_status_entity": "Standaard-ID: sensor.optim_status.",
+          "optim_required_state": "Standaard: Optimal.",
+          "max_power_kw": "Maximaal modespecifiek GoodWe-setpoint in kW.",
+          "deadband": "Aanbevolen: 300 W. Geldt voor P_grid in PCC-regeling of P_batt in directe accuregeling.",
+          "scan_interval": "Aanbevolen: 10 seconden.",
+          "enable_emhass_orchestrator": "Schakelt periodieke en gebeurtenisgestuurde optimalisatie in. Tijdens het opstarten van Home Assistant wordt geen plan aangemaakt.",
+          "emhass_url": "Standaard: http://5b918bf2-emhass:5000.",
+          "emhass_optimization_interval": "Aanbevolen: 60 minuten.",
+          "emhass_soc_final_pct": "Standaard: 10%.",
+          "emhass_fallback_load": "Alleen fallback; normaal gebruikt EnergyPilot GoodWe-belasting plus Recorder-historie.",
+          "use_nordpool_prices": "Schakel uit om EMHASS de eigen geconfigureerde prijsmethode te laten gebruiken.",
+          "optimize_on_tomorrow_prices": "Aanbevolen: AAN.",
+          "nordpool_area": "Optionele marktregio zoals NL.",
+          "nordpool_currency": "Aanbevolen: EUR.",
+          "buy_price_adder": "Extra importkosten in EUR/kWh.",
+          "sell_price_deduction": "Aftrek op teruglevering in EUR/kWh.",
+          "enable_ev_coordination": "Optionele EV-ontlaadbeveiliging en heroptimalisatie na stoppen met laden.",
+          "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
+          "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
+        }
+      }
+    }
+  },
   "entity": {
-    "sensor": {"ems_mode": {"name": "EMS mode"}, "ems_setpoint": {"name": "EMS setpoint"}, "control_command": {"name": "Control command"}, "target_power": {"name": "Target power"}, "ev_status": {"name": "EV charging status"}},
-    "switch": {"automatic_control": {"name": "Automatic control"}},
-    "number": {"manual_power": {"name": "Manual power"}, "emhass_minimum_soc": {"name": "EMHASS minimum battery SOC"}, "emhass_maximum_soc": {"name": "EMHASS maximum battery SOC"}},
+    "sensor": {
+      "ems_mode": {"name": "EMS-modus"},
+      "ems_setpoint": {"name": "EMS-setpoint"},
+      "control_command": {"name": "Regelcommando"},
+      "target_power": {"name": "Doelvermogen"},
+      "ev_status": {"name": "EV-laadstatus"}
+    },
+    "switch": {
+      "automatic_control": {"name": "Automatische regeling"}
+    },
+    "number": {
+      "manual_power": {"name": "Handmatig vermogen"},
+      "emhass_minimum_soc": {"name": "Minimale EMHASS-accu-SOC"},
+      "emhass_maximum_soc": {"name": "Maximale EMHASS-accu-SOC"}
+    },
     "select": {
-      "manual_mode": {"name": "Manual EMS mode"},
-      "emhass_cost_function": {"name": "EMHASS optimalisatiestrategie"}
+      "manual_mode": {"name": "Handmatige EMS-modus"},
+      "emhass_cost_function": {"name": "EMHASS-optimalisatiestrategie"}
     },
     "button": {
-      "optimize_now": {"name": "Optimize now"},
-      "emhass_costfun_profit": {"name": "Stel EMHASS in op winst"},
-      "emhass_costfun_cost": {"name": "Stel EMHASS in op kosten"},
-      "emhass_costfun_self_consumption": {"name": "Stel EMHASS in op zelfverbruik"},
-      "max_export": {"name": "Maximum export"},
-      "battery_pause": {"name": "Pause battery"},
-      "max_charge": {"name": "Maximum charge"},
-      "resume_auto": {"name": "AUTO - optimize and resume"}
+      "optimize_now": {"name": "Nu optimaliseren"},
+      "emhass_costfun_profit": {"name": "EMHASS instellen op winst"},
+      "emhass_costfun_cost": {"name": "EMHASS instellen op kosten"},
+      "emhass_costfun_self_consumption": {"name": "EMHASS instellen op zelfverbruik"},
+      "max_export": {"name": "Maximale export"},
+      "battery_pause": {"name": "Accu pauzeren"},
+      "max_charge": {"name": "Maximaal laden"},
+      "resume_auto": {"name": "AUTO - optimaliseren en hervatten"}
     }
   }
 }
