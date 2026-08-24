@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.26 remains **Beta** while Hybrid control, extended-meter accounting, Battery & Price visualization and synchronized minimum-SOC handling receive broader field exposure.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.27 remains **Beta** while Hybrid control, extended-meter accounting, Battery & Price visualization and synchronized minimum-SOC handling receive broader field exposure.
 
 ## Ownership
 
@@ -25,7 +25,7 @@ gw_energypilot/optimization_log/get
 gw_energypilot/battery_price/get
 ```
 
-The active v0.26 frontend is `gw-energy-pilot-v026-complete.js`. It layers the language-aware Battery & Price interface over the previous dashboard and applies the synchronized minimum-SOC presentation at the top level.
+The active v0.27 frontend is `gw-energy-pilot-v027.js`. It keeps the complete v0.26 language-aware Battery & Price/minimum-SOC presentation and corrects the Hybrid strategy explanation at the active top layer.
 
 ## EP page
 
@@ -142,13 +142,15 @@ P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 **Hybrid control**
 
 ```text
-P_batt requests charge -> mode 11 direct battery charge
-else P_grid requests export -> mode 10 grid export target
+P_grid > +deadband -> mode 9 Grid import target (buy/import)
+else P_batt > +deadband -> mode 12 Battery discharge power (sell/discharge)
 else P_batt near 0 W -> mode 8 Battery Hold
 otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-The explicit export request is evaluated before neutral battery hold. With both `P_batt` and `P_grid` around zero, Hybrid therefore selects mode 8 instead of mode 1 so GoodWe Auto cannot independently charge or discharge against a neutral EMHASS battery plan.
+Hybrid therefore combines the GoodWe smart-meter/PCC loop for **buying** with direct battery-power control for **selling**. The mode-9 setpoint comes from the EMHASS `P_grid` import magnitude; the mode-12 setpoint comes from the EMHASS `P_batt` discharge magnitude.
+
+A battery-charge request without planned grid import falls through to GoodWe mode 1/self-use. This deliberately lets GoodWe absorb locally available PV without forcing the battery to the forecast-sized `P_batt` charging setpoint. A neutral battery plan remains mode 8.
 
 When no explicit `control_strategy` exists, backwards compatibility remains:
 
