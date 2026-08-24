@@ -9,6 +9,13 @@ from typing import Any, Mapping
 
 
 ROUND_DIGITS = 6
+SOURCE_LEGACY = "legacy_36015_36017"
+SOURCE_EXTENDED = "extended_36104_36120"
+LEGACY_IMPORT_KEY = "meter_total_energy_import"
+LEGACY_EXPORT_KEY = "meter_total_energy_export"
+EXTENDED_IMPORT_KEY = "meter_total_energy_import_extended"
+EXTENDED_EXPORT_KEY = "meter_total_energy_export_extended"
+VALID_SOURCES = {SOURCE_LEGACY, SOURCE_EXTENDED}
 
 
 def _nonnegative_number(value: Any) -> float | None:
@@ -26,6 +33,37 @@ def _rounded(value: float) -> float:
     return round(value, ROUND_DIGITS)
 
 
+def select_meter_totals(
+    values: Mapping[str, Any],
+    current_source: str | None = None,
+) -> tuple[str, float, float] | None:
+    """Select one coherent GoodWe lifetime-counter pair for accounting.
+
+    The ETA/ET upstream implementation enables the 64-bit extended meter layout
+    for platform 745 and rated power >= 15 kW. Prefer that pair when available.
+    Once extended accounting is active, a transient missing optional block must
+    not make accounting flap back to the legacy pair; wait for the preferred
+    source to return instead.
+    """
+    extended_import = _nonnegative_number(values.get(EXTENDED_IMPORT_KEY))
+    extended_export = _nonnegative_number(values.get(EXTENDED_EXPORT_KEY))
+    legacy_import = _nonnegative_number(values.get(LEGACY_IMPORT_KEY))
+    legacy_export = _nonnegative_number(values.get(LEGACY_EXPORT_KEY))
+
+    if current_source == SOURCE_EXTENDED:
+        if extended_import is None or extended_export is None:
+            return None
+        return SOURCE_EXTENDED, extended_import, extended_export
+
+    if extended_import is not None and extended_export is not None:
+        return SOURCE_EXTENDED, extended_import, extended_export
+
+    if legacy_import is not None and legacy_export is not None:
+        return SOURCE_LEGACY, legacy_import, legacy_export
+
+    return None
+
+
 @dataclass(slots=True)
 class GridAccountingState:
     """Persistent EnergyPilot grid-accounting state."""
@@ -37,6 +75,7 @@ class GridAccountingState:
     yesterday_export_kwh: float | None = None
     last_import_total_kwh: float | None = None
     last_export_total_kwh: float | None = None
+    source_pair: str | None = None
     bootstrap_complete: bool = False
 
     @classmethod
@@ -52,6 +91,7 @@ class GridAccountingState:
         last_import = _nonnegative_number(data.get("last_import_total_kwh"))
         last_export = _nonnegative_number(data.get("last_export_total_kwh"))
         stored_day = data.get("day")
+        source_pair = data.get("source_pair")
 
         if stored_day is not None:
             try:
@@ -60,6 +100,9 @@ class GridAccountingState:
                 stored_day = None
             else:
                 stored_day = str(stored_day)
+
+        if source_pair not in VALID_SOURCES:
+            source_pair = None
 
         return cls(
             day=stored_day,
@@ -77,6 +120,7 @@ class GridAccountingState:
             last_export_total_kwh=(
                 _rounded(last_export) if last_export is not None else None
             ),
+            source_pair=source_pair,
             bootstrap_complete=bool(data.get("bootstrap_complete", False)),
         )
 
@@ -90,6 +134,7 @@ class GridAccountingState:
             "yesterday_export_kwh": self.yesterday_export_kwh,
             "last_import_total_kwh": self.last_import_total_kwh,
             "last_export_total_kwh": self.last_export_total_kwh,
+            "source_pair": self.source_pair,
             "bootstrap_complete": self.bootstrap_complete,
         }
 
@@ -150,8 +195,6 @@ def seed_daily_totals(
     state.yesterday_export_kwh = (
         _rounded(yesterday_export) if yesterday_export is not None else None
     )
-    # The first live Modbus sample after bootstrap becomes the baseline. This
-    # deliberately avoids double-counting the final Recorder interval.
     state.last_import_total_kwh = None
     state.last_export_total_kwh = None
     state.bootstrap_complete = True
@@ -170,16 +213,18 @@ def apply_meter_totals(
     *,
     import_total_kwh: Any,
     export_total_kwh: Any,
+    source_pair: str = SOURCE_LEGACY,
 ) -> bool:
-    """Apply one pair of canonical GoodWe lifetime-counter samples."""
+    """Apply one coherent pair of GoodWe lifetime-counter samples."""
     import_total = _nonnegative_number(import_total_kwh)
     export_total = _nonnegative_number(export_total_kwh)
-    if import_total is None or export_total is None:
+    if import_total is None or export_total is None or source_pair not in VALID_SOURCES:
         return False
 
     day_text = current_day.isoformat()
     if state.day is None:
         state.day = day_text
+        state.source_pair = source_pair
         state.last_import_total_kwh = _rounded(import_total)
         state.last_export_total_kwh = _rounded(export_total)
         return True
@@ -191,18 +236,18 @@ def apply_meter_totals(
             previous_day = None
 
         if previous_day == current_day - timedelta(days=1):
-            import_delta = _delta(import_total, state.last_import_total_kwh)
-            export_delta = _delta(export_total, state.last_export_total_kwh)
+            same_source = state.source_pair == source_pair
+            import_delta = (
+                _delta(import_total, state.last_import_total_kwh) if same_source else 0.0
+            )
+            export_delta = (
+                _delta(export_total, state.last_export_total_kwh) if same_source else 0.0
+            )
             state.yesterday_import_kwh = state.today_import_kwh
             state.yesterday_export_kwh = state.today_export_kwh
-            # A normal 10-second sample can straddle midnight. Attribute that
-            # tiny boundary interval to the new day instead of dropping energy.
             state.today_import_kwh = _rounded(import_delta)
             state.today_export_kwh = _rounded(export_delta)
         else:
-            # A multi-day gap cannot be allocated safely without historical
-            # timestamps. Start clean instead of assigning an offline delta to
-            # the wrong day.
             state.yesterday_import_kwh = None
             state.yesterday_export_kwh = None
             state.today_import_kwh = 0.0
@@ -210,6 +255,13 @@ def apply_meter_totals(
             state.bootstrap_complete = False
 
         state.day = day_text
+        state.source_pair = source_pair
+        state.last_import_total_kwh = _rounded(import_total)
+        state.last_export_total_kwh = _rounded(export_total)
+        return True
+
+    if state.source_pair != source_pair:
+        state.source_pair = source_pair
         state.last_import_total_kwh = _rounded(import_total)
         state.last_export_total_kwh = _rounded(export_total)
         return True
