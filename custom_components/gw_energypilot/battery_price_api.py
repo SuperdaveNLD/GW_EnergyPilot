@@ -156,7 +156,7 @@ async def _async_battery_plan_payload(
         "last_updated": state.last_updated.isoformat() if state is not None else None,
         "schedule_attribute": schedule_attribute,
         "forecast_source": forecast_source,
-        "forecast_error": official["error"] if not official_points else None,
+        "forecast_error": official["error"] if not points else None,
         "generated_at": official["generated_at"],
         "emhass_schema_version": official["emhass_schema_version"],
         "points": points,
