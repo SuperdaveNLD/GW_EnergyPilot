@@ -88,11 +88,11 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the current value read from EMHASS config.json."""
+        """Return the current synchronized SOC value."""
         return self._value
 
     async def async_added_to_hass(self) -> None:
-        """Schedule the initial EMHASS read without blocking platform setup."""
+        """Schedule the initial configuration read without blocking platform setup."""
         await super().async_added_to_hass()
         self.entry.async_create_background_task(
             self.hass,
@@ -101,7 +101,7 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
         )
 
     async def _async_background_refresh(self) -> None:
-        """Retry startup reads while the EMHASS add-on is becoming ready."""
+        """Retry startup reads while GoodWe and EMHASS are becoming ready."""
         for attempt in range(SOC_STARTUP_ATTEMPTS):
             try:
                 await self._async_refresh_from_emhass()
@@ -109,7 +109,7 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
             except HomeAssistantError as err:
                 if attempt == SOC_STARTUP_ATTEMPTS - 1:
                     _LOGGER.debug(
-                        "Unable to read EMHASS %s after %s startup attempts: %s",
+                        "Unable to synchronize %s after %s startup attempts: %s",
                         self.config_key,
                         SOC_STARTUP_ATTEMPTS,
                         err,
@@ -233,6 +233,27 @@ class GWEMHASSMinimumSOCNumber(_GWEMHASSSOCNumber):
             ) from err
         self._publish_goodwe_on_grid_floor(readback)
         return readback
+
+    async def _async_refresh_from_emhass(self) -> dict:
+        """Use GoodWe as startup source of truth and mirror its floor to EMHASS."""
+        config = await async_get_emhass_config(self.hass, self.entry)
+        minimum_soc = self._goodwe_on_grid_floor()
+        if minimum_soc is None:
+            raise HomeAssistantError(
+                "GoodWe on-grid minimum SOC is not available yet"
+            )
+        self._validate_against_peer(config, minimum_soc)
+        required = round(minimum_soc / 100.0, 4)
+        try:
+            current = float(config.get(self.config_key))
+        except (TypeError, ValueError):
+            current = None
+        if current != required:
+            config[self.config_key] = required
+            await async_write_emhass_config(self.hass, self.entry, config)
+        self._value = float(minimum_soc)
+        self.async_write_ha_state()
+        return config
 
     async def async_set_native_value(self, value: float) -> None:
         """Synchronize one explicit minimum-SOC change across both systems.
