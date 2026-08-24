@@ -145,7 +145,6 @@ class GWEnergyPilotDebugRuntime:
         options = entry.options
         return {
             "entry_id": entry.entry_id,
-            "entry_title": entry.title,
             "loaded": True,
             "home_assistant": {
                 "core_state": state_value,
@@ -188,8 +187,16 @@ class GWEnergyPilotDebugRuntime:
         return self.snapshot()
 
     def clear(self) -> dict[str, Any]:
-        """Clear the current capture buffer."""
+        """Clear captured events and preserve a new baseline if still active."""
+        active = self.log.enabled
+        baseline = self.current_snapshot() if active else None
         self.log.clear()
+        if active:
+            self.log.record(
+                "session",
+                "buffer_cleared",
+                {"baseline": baseline or {}},
+            )
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
@@ -245,6 +252,9 @@ class GWEnergyPilotDebugRuntime:
 
     @callback
     def _async_controller_updated(self) -> None:
+        runtime = self._runtime()
+        coordinator = getattr(runtime, "coordinator", None)
+        data = getattr(coordinator, "data", None)
         self.log.record(
             "controller",
             "state_changed",
@@ -252,16 +262,8 @@ class GWEnergyPilotDebugRuntime:
                 **self._controller_snapshot(),
                 "sources": self._sources_snapshot(),
                 "goodwe_readback": {
-                    "mode": getattr(
-                        getattr(self._runtime().coordinator, "data", None),
-                        "mode",
-                        None,
-                    ),
-                    "setpoint": getattr(
-                        getattr(self._runtime().coordinator, "data", None),
-                        "power",
-                        None,
-                    ),
+                    "mode": getattr(data, "mode", None),
+                    "setpoint": getattr(data, "power", None),
                 },
             },
         )
