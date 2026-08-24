@@ -33,7 +33,7 @@ Release documentation:
 - Read-only backend price-series API using the same EnergyPilot price path as EMHASS.
 - Synchronized normal on-grid minimum SOC: one explicit minimum-SOC change updates and verifies GoodWe register `45356`, then writes the same value to EMHASS.
 - GoodWe rollback attempt if the subsequent EMHASS minimum-SOC write fails.
-- Separate on-grid `45356` dashboard field-test control removed; off-grid `45358` remains independent.
+- The legacy direct **Battery minimum SOC limits** field-test panel is no longer shown; normal on-grid minimum SOC uses the synchronized control path.
 - Existing Battery/Grid/Hybrid Automatic Control, accounting and optimization-log behavior retained.
 
 ## Tested hardware
@@ -60,7 +60,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - Battery & Price visualization;
 - EV anti-discharge protection;
 - synchronized normal on-grid minimum SOC between EMHASS and GoodWe `45356`;
-- independent Beta off-grid minimum-SOC `45358` field test;
+- low-level Beta SOC API retained for diagnostics/backwards-compatible tooling;
 - built-in EnergyPilot dashboard and support diagnostics.
 
 ## Requirements
@@ -184,7 +184,7 @@ If `45356` is unavailable, neither system is changed. If EMHASS fails after a ve
 
 There is no startup/background SOC synchronization.
 
-`45358` remains an independent off-grid Beta field test. Maximum SOC remains EMHASS-only.
+The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains EMHASS-only.
 
 ## Battery & Price chart
 
