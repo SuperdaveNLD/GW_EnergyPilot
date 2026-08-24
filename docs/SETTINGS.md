@@ -144,8 +144,11 @@ P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 ```text
 P_batt requests charge -> mode 11 direct battery charge
 else P_grid requests export -> mode 10 grid export target
+else P_batt near 0 W -> mode 8 Battery Hold
 otherwise -> mode 1 GoodWe Auto / self-use
 ```
+
+The explicit export request is evaluated before neutral battery hold. With both `P_batt` and `P_grid` around zero, Hybrid therefore selects mode 8 instead of mode 1 so GoodWe Auto cannot independently charge or discharge against a neutral EMHASS battery plan.
 
 When no explicit `control_strategy` exists, backwards compatibility remains:
 
