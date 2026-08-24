@@ -1,0 +1,26 @@
+<svg viewBox="0 0 800 256" role="img" aria-label="GW EnergyPilot" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgd" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c2f56"/>
+      <stop offset="1" stop-color="#061327"/>
+    </linearGradient>
+    <linearGradient id="glowd" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#20dcff"/>
+      <stop offset="0.52" stop-color="#19e1d5"/>
+      <stop offset="1" stop-color="#22f59c"/>
+    </linearGradient>
+    <filter id="shadowd" x="-45%" y="-45%" width="190%" height="190%">
+      <feGaussianBlur stdDeviation="2.6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g transform="translate(16 16) scale(2.24)">
+    <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#bgd)" stroke="#15527d" stroke-width="2"/>
+    <circle cx="50" cy="50" r="31" fill="none" stroke="#18dfff" stroke-width="5" opacity=".92" filter="url(#shadowd)"/>
+    <path d="M58 20 41 47h13l-8 19 23-29H56l8-17Z" fill="#22f59c" filter="url(#shadowd)"/>
+    <text x="50" y="68" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="26" font-weight="900" letter-spacing="-2" fill="url(#glowd)" filter="url(#shadowd)">GW</text>
+  </g>
+  <text x="268" y="158" font-family="Arial,Helvetica,sans-serif" font-size="72" font-weight="800" letter-spacing="-3" fill="#eefcff">
+    GW <tspan font-weight="650">Energy</tspan><tspan fill="#22f59c" font-weight="800">Pilot</tspan>
+  </text>
+</svg>
