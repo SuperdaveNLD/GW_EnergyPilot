@@ -22,7 +22,7 @@ from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .event_triggers import async_setup_event_triggers
-from .orchestrator_v013 import GWEnergyPilotOrchestrator
+from .orchestrator_v014 import GWEnergyPilotOrchestrator
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
 
@@ -107,13 +107,9 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
     )
 
 
-async def _async_initial_refresh(
-    coordinator: GWEnergyPilotCoordinator,
-    accounting: GWEnergyPilotAccounting,
-) -> None:
-    """Refresh telemetry, then seed accounting from existing Recorder history."""
+async def _async_initial_refresh(coordinator: GWEnergyPilotCoordinator) -> None:
+    """Request the first GoodWe telemetry refresh in the background."""
     await coordinator.async_refresh()
-    await accounting.async_bootstrap_if_needed()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
@@ -151,7 +147,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     await _async_register_panel(hass)
     entry.async_create_background_task(
         hass,
-        _async_initial_refresh(coordinator, accounting),
+        _async_initial_refresh(coordinator),
         f"GW EnergyPilot initial refresh ({entry.entry_id})",
     )
     return True
