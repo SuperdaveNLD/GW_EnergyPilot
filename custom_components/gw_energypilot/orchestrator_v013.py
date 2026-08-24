@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import logging
 import math
+import time
 from typing import Any
 
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -19,8 +21,11 @@ from .const import (
     DEFAULT_EMHASS_SOC_FINAL,
     DEFAULT_SCAN_INTERVAL,
 )
+from .optimization_log import GWEnergyPilotOptimizationLog
 from .orchestrator_v012 import GWEnergyPilotOrchestrator as _V012Orchestrator
 from .runtime_store import GWEnergyPilotRuntimeStore
+
+_LOGGER = logging.getLogger(__name__)
 
 LOAD_FORECAST_HOURS = 24
 
@@ -35,6 +40,7 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
         # optimization cycle, so manual-only installations start with None.
         self.last_runtime_soc_final: float | None = None
         self._runtime_store = GWEnergyPilotRuntimeStore(hass, entry.entry_id)
+        self._optimization_log = GWEnergyPilotOptimizationLog(hass, entry.entry_id)
 
     async def async_setup(self) -> None:
         """Restore persistent runtime status before starting orchestration."""
@@ -82,13 +88,75 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
         )
         return attrs
 
+    async def _async_log_optimization(
+        self,
+        *,
+        started_at: datetime,
+        started_monotonic: float,
+        reason: str,
+        requested_soc_final: float,
+        current_load: float | None,
+        success: bool,
+        error: str | None,
+    ) -> None:
+        """Persist one bounded diagnostic record without affecting control flow."""
+        finished_at = dt_util.utcnow()
+        record = {
+            "started_at": started_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "duration_seconds": round(time.monotonic() - started_monotonic, 3),
+            "reason": reason,
+            "success": success,
+            "soc_init": self.last_soc_init,
+            "soc_final": requested_soc_final,
+            "current_load": current_load,
+            "price_source": getattr(self, "last_price_source", None),
+            "price_area": self.last_price_area,
+            "price_points": self.last_price_points,
+            "load_forecast_points": self.last_load_points,
+            "p_batt": self.last_p_batt if success else None,
+            "optimize_http_status": self.optimize_http_status,
+            "publish_http_status": self.publish_http_status,
+            "error": error,
+        }
+        try:
+            await self._optimization_log.async_append(record)
+        except Exception:  # noqa: BLE001 - diagnostics must never break optimization
+            _LOGGER.exception("Unable to persist EnergyPilot optimization history")
+
     async def async_optimize(self, reason: str = "manual") -> None:
-        """Persist runtime evidence only after an EnergyPilot-owned run succeeds."""
+        """Persist runtime evidence and a bounded log for every optimization attempt."""
         requested_soc_final = self._configured_runtime_soc_final()
-        await super().async_optimize(reason=reason)
+        started_at = dt_util.utcnow()
+        started_monotonic = time.monotonic()
+        current_load = self._coordinator_number("total_load_power")
+
+        try:
+            await super().async_optimize(reason=reason)
+        except Exception as err:
+            await self._async_log_optimization(
+                started_at=started_at,
+                started_monotonic=started_monotonic,
+                reason=reason,
+                requested_soc_final=requested_soc_final,
+                current_load=current_load,
+                success=False,
+                error=str(err),
+            )
+            raise
+
         if self.last_success is not None:
             await self._runtime_store.async_save_last_success(self.last_success)
         self.last_runtime_soc_final = requested_soc_final
+        await self._async_log_optimization(
+            started_at=started_at,
+            started_monotonic=started_monotonic,
+            reason=reason,
+            requested_soc_final=requested_soc_final,
+            current_load=current_load,
+            success=True,
+            error=None,
+        )
         async_dispatcher_send(self.hass, self.signal)
 
     def _build_load_forecast(
