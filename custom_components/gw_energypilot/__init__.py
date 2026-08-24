@@ -22,6 +22,7 @@ from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
+from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
 from .orchestrator_v026 import GWEnergyPilotOrchestrator
@@ -39,7 +40,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v027-battery-plan.js?v=0.27-plan1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v027-emhass-sync.js?v=0.27-sync1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -65,6 +66,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     async_register_smart_meter_api(hass)
     async_register_optimization_log_api(hass)
     async_register_battery_price_api(hass)
+    async_register_emhass_sync_api(hass)
     return True
 
 
