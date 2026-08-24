@@ -2,6 +2,29 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.25] - 2026-08-24
+
+### Added
+
+- Added `optimization_log.py`, a dedicated per-config-entry Home Assistant `Store` containing the newest 50 EnergyPilot-owned optimization attempts.
+- Every manual, scheduled and event-triggered optimization now records start/end time, duration, trigger reason, success/failure, SOC inputs, current load, price source/point count, load-forecast point count, published `P_batt`, EMHASS HTTP statuses and any error message.
+- Added an admin-only `gw_energypilot/optimization_log/get` WebSocket API.
+- Added a read-only **LOG** page to the existing EnergyPilot Settings menu, with newest runs first and manual refresh.
+- Added regression coverage for persistence, the 50-record ring buffer, successful-run logging and failed-run logging.
+
+### Changed
+
+- Optimization history is deliberately stored separately from `gw_energypilot.runtime.<config_entry_id>` so the existing `last_success` compatibility contract remains unchanged.
+- A diagnostic-log write failure is logged but cannot turn an otherwise successful EMHASS optimization into a control failure.
+- The active frontend is `gw-energy-pilot-v025.js`, layered on v0.24 and adding only the Settings optimization-log view plus the v0.25 version wrapper.
+
+### Safety / compatibility
+
+- No GoodWe register definitions, Modbus read blocks, EMS writes, controller mappings or automatic-control strategy change.
+- Existing entity IDs, unique IDs, device identity, config-entry data/options, accounting stores and the `last_success` runtime store remain unchanged.
+- The optimization log is read-only from the dashboard and retains at most 50 records per EnergyPilot config entry.
+- v0.25 remains **Beta** while the new diagnostic history receives field exposure.
+
 ## [0.24] - 2026-08-23
 
 ### Fixed
