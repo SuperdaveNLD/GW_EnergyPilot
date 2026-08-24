@@ -9,19 +9,20 @@ GW EnergyPilot keeps configuration and runtime history separate.
 - EMHASS remains the source of optimizer configuration and published plan outputs.
 - Small EnergyPilot-owned runtime history that must survive an integration reload or Home Assistant restart is stored with Home Assistant's `Store` helper.
 
-The runtime store is per GW EnergyPilot config entry:
+Two per-config-entry stores are used for orchestrator runtime evidence:
 
 ```text
 gw_energypilot.runtime.<config_entry_id>
+gw_energypilot.optimization_log.<config_entry_id>
 ```
 
-It is not a second configuration database and must not contain user settings that belong in the config entry.
+They are not configuration databases and must not contain user settings that belong in the config entry.
 
 ## Last successful optimization
 
 Issue #24 exposed that `last_success` previously existed only in the in-memory orchestrator object. A config-entry reload created a new orchestrator and initialized the value to `None`, which made the dashboard display `Last success: Never` even after a previously successful EnergyPilot-owned optimization.
 
-The runtime store now persists:
+The runtime store persists:
 
 ```json
 {
@@ -40,8 +41,34 @@ Behavior contract:
 
 Malformed or timezone-less stored timestamps are ignored safely and do not block integration startup.
 
+## Optimization history
+
+v0.25 adds a separate bounded optimization-history store owned by `optimization_log.py`.
+
+The newest 50 EnergyPilot-owned optimization attempts are retained. Both successful and failed attempts are recorded so manual, periodic and event-triggered runs can be compared after the fact.
+
+Each record contains diagnostic context available to EnergyPilot at run time, including:
+
+```text
+started_at / finished_at
+duration_seconds
+reason
+success
+soc_init / soc_final
+current_load
+price_source / price_area / price_points
+load_forecast_points
+p_batt
+optimize_http_status / publish_http_status
+error
+```
+
+The history is chronological, oldest first, and automatically drops the oldest entry when the 51st record is written. A failure to write diagnostic history is logged but must never turn an otherwise successful optimization into a control failure.
+
+The optimization log is deliberately separate from `last_success`: failed runs are valuable diagnostic evidence, while `last_success` must continue to represent the most recent completed optimize + publish cycle only.
+
 ## Scope
 
-Only durable runtime evidence belongs here. Current persisted state is intentionally limited to `last_success`. Future runtime fields may be added to the same versioned store when they have a clear persistence requirement.
+Only durable runtime evidence belongs in these stores. User configuration remains in the Home Assistant config entry.
 
-This storage layer does not change GoodWe Modbus registers, EMS ownership, controller behavior, EMHASS optimization inputs, entity IDs or unique IDs.
+These storage layers do not change GoodWe Modbus registers, EMS ownership, controller behavior, EMHASS optimization inputs, entity IDs or unique IDs.
