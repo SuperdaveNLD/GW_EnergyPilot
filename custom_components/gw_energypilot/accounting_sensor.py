@@ -8,7 +8,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, Sen
 from homeassistant.const import UnitOfEnergy
 
 from . import GWConfigEntry
-from .accounting import EXPORT_DAILY_KEY, IMPORT_DAILY_KEY
+from .accounting import EXPORT_DAILY_KEY, GRID_POWER_KEY, IMPORT_DAILY_KEY
 from .entity import GWEnergyPilotEntity
 
 
@@ -40,17 +40,16 @@ class GWGridDailyEnergySensor(GWEnergyPilotEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         state = self.entry.runtime_data.accounting.state
-        if self._direction == "import":
-            last_period = state.yesterday_import_kwh
-            source = "meter_total_energy_import"
-        else:
-            last_period = state.yesterday_export_kwh
-            source = "meter_total_energy_export"
+        last_period = (
+            state.yesterday_import_kwh
+            if self._direction == "import"
+            else state.yesterday_export_kwh
+        )
         return {
             "last_period": last_period,
             "accounting_day": state.day,
-            "source": source,
-            "bootstrap_complete": state.bootstrap_complete,
+            "source": GRID_POWER_KEY,
+            "integration_method": "linear signed-power trapezoid",
         }
 
     async def async_added_to_hass(self) -> None:
