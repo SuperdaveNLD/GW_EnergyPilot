@@ -179,7 +179,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - A compact **12-mode manual EMS test pad** inside the Controller card, using the same mode numbering and labels as the Home Assistant manual EMS select.
 - Hover descriptions for all twelve GoodWe EMS modes so the operator can distinguish PV-priority limits, inverter-level grid scheduling, PCC grid targets and direct battery-power modes.
-- A manual power slider from `0 W` to the configured EnergyPilot `max_power` value, backed by the existing Home Assistant manual power entity.
+- A manual power slider from `0 W` to the configured EnergyPilot `max_power` value, backed by the existing `manual_power` Home Assistant number entity.
 - Live highlighting of the actual GoodWe EMS mode read back from register `47511`, including while Automatic Control is active.
 
 ### Changed
@@ -192,12 +192,14 @@ All notable changes to GW EnergyPilot are documented here.
 ### Beta test focus
 
 - Primary field test: Automatic Control OFF, manual setpoint `0 W`, mode `10` (**Grid export target**) to observe zero-export behavior at the GoodWe smart meter/PCC.
-- Mode `1` (**GoodWe Auto / AI**) can be compared alongside it, but v0.21 does not change automatic PV-only or grid-neutral behavior based on one installation's observation.
+- Mode `1` (**GoodWe Auto / AI**) can be compared manually with mode 10, but this release does not change automatic PV-only/grid-neutral behavior based on that observation.
 
 ### Safety boundary
 
-- No new Modbus command exists in v0.21; the UI remains a surface over existing entities and controller/manual-ownership behavior.
-- No change to the established `47512 -> wait -> 47511` EMS write order.
+- No GoodWe register definition changes.
+- No change to the existing `47512 -> wait -> 47511` EMS write order.
+- No change to Automatic Control mapping, grid-neutral charging, EMHASS ownership, sign conventions or power clamps.
+- The test pad is only a UI surface over the existing `manual_power` and `manual_mode` entities.
 
 ## [0.20] - 2026-08-23
 
@@ -282,7 +284,7 @@ All notable changes to GW EnergyPilot are documented here.
 - GoodWe host/port/unit-ID changes can now be made from the dashboard and reload the existing integration after successful validation.
 - EP controller/telemetry/EV options and EnergyPilot-owned EMHASS orchestration/price options can be maintained from the dashboard settings pages.
 - The dashboard now highlights the active Profit / Cost / Self-consumption strategy instead of presenting three ambiguous stateless actions.
-- The strategy select refreshes after EnergyPilot writes EMHASS configuration and periodically so direct EMHASS UI changes are reflected in Home Assistant.
+- The strategy select refreshes after EnergyPilot EMHASS config writes and periodically so direct EMHASS UI changes are reflected in Home Assistant.
 - Existing v0.15 cost-function button unique IDs remain available for backwards-compatible automations and are classified as explicit configuration actions.
 - A successful `costfun` save is distinguished from a later fresh-optimization failure; the saved strategy remains visible even when re-optimization fails.
 - The active frontend is `gw-energy-pilot-v017.js`, layering the settings UI on top of all v0.16 Beta diagnostics and strategy readback behavior.
