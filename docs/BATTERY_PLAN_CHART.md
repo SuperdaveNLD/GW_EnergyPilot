@@ -90,6 +90,18 @@ The chart offers an Apple-style segmented size selector:
 
 The selection is stored in the existing browser-local dashboard preference object. It does not add a Home Assistant entity or configuration-entry field. On narrow screens Compact remains full width to preserve readability.
 
+## Window controls
+
+v0.28 also adds macOS-style traffic-light controls to the Battery · Plan · Price card:
+
+- **red** — hide the card immediately;
+- **yellow** — switch the card to Compact size;
+- **green** — open the detailed graph window.
+
+Hiding the card uses the same existing browser-local dashboard `hidden` preference as the Layout & visibility menu. It does not delete data or change Home Assistant configuration. A hidden Battery · Plan · Price card can be restored from the dashboard layout menu.
+
+The detailed graph uses the same visual controls: red closes the window, yellow closes it and returns the dashboard card to Compact size, and green toggles the detailed window between its normal and maximized presentation. Escape and backdrop-click closing remain supported.
+
 ## Read-only API
 
 The existing command remains:
