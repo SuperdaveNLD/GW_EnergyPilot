@@ -19,6 +19,50 @@ spec.loader.exec_module(module)
 
 
 class BatteryPlanTests(unittest.TestCase):
+    def test_parses_official_emhass_api_plan(self):
+        points = module.normalize_emhass_api_plan(
+            {
+                "status": "ok",
+                "generated_at": "2026-08-24T15:00:00Z",
+                "emhass_schema_version": "1.0",
+                "plan": [
+                    {"timestamp": "2026-08-24T15:00:00Z", "P_batt": -4200},
+                    {"timestamp": "2026-08-24T15:15:00Z", "P_batt": "3500"},
+                ],
+            }
+        )
+
+        self.assertEqual(
+            points,
+            [
+                {"start": "2026-08-24T15:00:00+00:00", "value_w": -4200.0},
+                {"start": "2026-08-24T15:15:00+00:00", "value_w": 3500.0},
+            ],
+        )
+
+    def test_official_plan_ignores_invalid_rows_and_no_run(self):
+        self.assertEqual(
+            module.normalize_emhass_api_plan(
+                {"status": "no-run", "plan": None}
+            ),
+            [],
+        )
+        self.assertEqual(
+            module.normalize_emhass_api_plan(
+                {
+                    "status": "ok",
+                    "plan": [
+                        None,
+                        {"timestamp": "invalid", "P_batt": 1000},
+                        {"timestamp": "2026-08-24T15:00:00Z", "P_batt": "nan"},
+                        {"timestamp": "2026-08-24T15:15:00Z", "P_batt": -2500},
+                        {"timestamp": "2026-08-24T15:15:00Z", "P_batt": -3000},
+                    ],
+                }
+            ),
+            [{"start": "2026-08-24T15:15:00+00:00", "value_w": -3000.0}],
+        )
+
     def test_parses_current_emhass_battery_schedule(self):
         attributes = {
             "battery_scheduled_power": [
