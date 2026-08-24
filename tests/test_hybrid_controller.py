@@ -202,6 +202,34 @@ class HybridControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 3600)])
         self.assertEqual(controller.last_command, "hybrid_grid_export")
 
+    async def test_hybrid_neutral_battery_plan_uses_mode8_hold(self):
+        controller, client = make_controller(
+            strategy_data={
+                const.CONF_CONTROL_STRATEGY: const.CONTROL_STRATEGY_HYBRID,
+            },
+            p_batt=0,
+            p_grid=0,
+        )
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
+        self.assertEqual(controller.last_command, "hybrid_battery_hold")
+
+    async def test_hybrid_export_wins_over_neutral_battery_hold(self):
+        controller, client = make_controller(
+            strategy_data={
+                const.CONF_CONTROL_STRATEGY: const.CONTROL_STRATEGY_HYBRID,
+            },
+            p_batt=0,
+            p_grid=-3600,
+        )
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 3600)])
+        self.assertEqual(controller.last_command, "hybrid_grid_export")
+
     async def test_hybrid_uses_auto_for_normal_self_use(self):
         controller, client = make_controller(
             strategy_data={
