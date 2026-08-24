@@ -30,6 +30,16 @@ Stopping capture retains the completed session in memory until it is cleared, th
 
 The configured GoodWe host/IP and EMHASS URL are deliberately excluded from the debug report.
 
+## Dashboard window controls
+
+v0.31 also makes the macOS-style traffic-light controls visible on **all normal dashboard cards**, rather than only wiring the earlier implementation to the Battery · Plan · Price card.
+
+- **Red** hides the card through the existing Dashboard layout visibility state. Hidden cards can be restored from the Dashboard layout menu.
+- **Yellow** collapses or restores the card to a compact title/window bar.
+- **Green** toggles the card between its normal grid span and full dashboard width.
+
+Collapse/full-width state is browser-local presentation state. It does not create Home Assistant entities or modify the integration config entry. The existing Battery-only traffic-light controls are removed from the card before the v0.31 controls are attached, preventing duplicate buttons.
+
 ## Storage and safety
 
 - Debug capture is administrator-only and **OFF by default**.
@@ -39,10 +49,11 @@ The configured GoodWe host/IP and EMHASS URL are deliberately excluded from the 
 - No GoodWe register definitions or read blocks change.
 - No EMS write behavior changes.
 - No EMHASS configuration or optimization is changed or triggered by debug logging.
+- Dashboard window controls only alter browser-local presentation/visibility state.
 - Existing entity IDs, unique IDs, config entries, runtime/accounting stores and the persistent optimization history are preserved.
 
 See `docs/DEBUG_LOG.md` for the full support/debug architecture.
 
 ## Validation status
 
-**Beta.** The debug subsystem is designed as an observer-only support feature, but the new dashboard workflow and collected field data still require broader real-installation validation.
+**Beta.** The debug subsystem is designed as an observer-only support feature, and the dashboard window controls reuse existing local layout state, but the new dashboard workflow and collected field data still require broader real-installation validation.
