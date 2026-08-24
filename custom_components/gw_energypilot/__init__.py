@@ -22,6 +22,7 @@ from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .event_triggers import async_setup_event_triggers
+from .optimization_log_api import async_register_optimization_log_api
 from .orchestrator_v013 import GWEnergyPilotOrchestrator
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
@@ -61,6 +62,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     async_register_settings_api(hass)
     async_register_beta_soc_api(hass)
     async_register_smart_meter_api(hass)
+    async_register_optimization_log_api(hass)
     return True
 
 
