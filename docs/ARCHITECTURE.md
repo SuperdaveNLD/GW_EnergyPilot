@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.28 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.30 Beta**.
 
 ## High-level flow
 
@@ -149,20 +149,30 @@ market - sell deduction = effective prod_price
 
 `battery_price_api.py` exposes read-only chart data. Dashboard reads do not launch an optimization. The v0.27 chart layer also combines actual battery history, historical published `P_batt` targets, the current future EMHASS forecast and native GoodWe day-energy counters without creating another Modbus control path.
 
+v0.29 adds explicit administrator-triggered EMHASS required-config synchronization. It reads the complete live EMHASS configuration, merges only EnergyPilot-owned required mappings, writes the complete configuration and verifies it by reading back. EMHASS remains an external prerequisite and unrelated configuration is preserved.
+
 ## Battery plan / actual / price frontend
 
 Active top-level module:
 
 ```text
-gw-energy-pilot-v028.js
-    -> gw-energy-pilot-v027-battery-plan.js
-        -> v0.27/v0.26 support, chart and language layers
-            -> existing historical frontend chain
+gw-energy-pilot-v030.js
+    -> gw-energy-pilot-v029.js
+        -> gw-energy-pilot-v028-consolidated.js
+            -> gw-energy-pilot-v028-window-controls.js
+                -> gw-energy-pilot-v028.js
+                    -> gw-energy-pilot-v027-battery-plan.js
+                        -> v0.27/v0.26 support, chart and language layers
+                            -> existing historical frontend chain
 ```
 
-The v0.28 layer owns only the corrected Hybrid 9/12 explanation and final release badge. The v0.27 layer owns Battery plan/actual/price presentation and S/M/L sizing. Earlier layers retain compact Support diagnostics, synchronized minimum-SOC presentation and Dutch/English localization.
+The v0.27 layer owns Battery plan/actual/price presentation and S/M/L sizing. Its enhanced-card installer is explicitly idempotent: if layered/cache-busted render wrappers invoke it more than once in one render chain, the first enhanced card remains canonical and extra enhanced cards are removed instead of appended.
 
-This layering remains technical debt: new releases should avoid adding another behavioral monkey-patch layer unless needed for a bounded compatibility fix. A future frontend consolidation should preserve behavior under browser-level regression tests before deleting historical assets.
+The v0.28 layers own corrected Hybrid 9/12 presentation, chart/window refinements and Apple/macOS-style controls. v0.29 owns EMHASS synchronization UI and the final flow-animation direction guard.
+
+v0.30 is a bounded compatibility/stability layer. After the complete previous render chain finishes, it reconciles `.ep-v027-battery-plan-card` instances and keeps exactly one card. If duplicate cards are already present in an open browser session, it prefers the instance already decorated with `.ep-v028-window-controls`. The v0.30 wrapper also guards against installing its own render wrapper more than once.
+
+This layered frontend remains technical debt. A future frontend consolidation should preserve current behavior under browser-level regression tests before deleting historical assets. Presentation fixes must not change GoodWe register/control semantics.
 
 ## Synchronized minimum SOC
 
@@ -227,6 +237,8 @@ gw_energypilot/beta_soc/get
 gw_energypilot/beta_soc/set
 gw_energypilot/optimization_log/get
 gw_energypilot/battery_price/get
+gw_energypilot/emhass_sync/get
+gw_energypilot/emhass_sync/apply
 ```
 
 Configuration-changing APIs are administrator-protected. Read-only presentation APIs do not gain hardware-write authority.
@@ -247,6 +259,7 @@ Entity unique IDs remain config-entry based. Host/unit-ID changes must not creat
 register/transport problem -> registers.py / client.py / coordinator.py
 controller decision        -> controller.py
 EMHASS optimization        -> orchestrator*.py / emhass_config.py
+EMHASS config sync         -> emhass_sync.py / emhass_sync_api.py
 battery/price chart data   -> orchestrator_v026.py / price_series.py / battery_price_api.py
 SOC synchronization        -> number.py + existing verified client 45356 helper
 daily grid totals          -> accounting.py / accounting_model.py
