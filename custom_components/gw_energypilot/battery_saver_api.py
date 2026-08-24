@@ -22,7 +22,7 @@ from .battery_saver import (
     number_of_batteries,
 )
 from .const import CONF_BATTERY_SAVER_MODE, DOMAIN
-from .emhass_config import async_get_emhass_config
+from .emhass_config import async_get_emhass_config, async_write_emhass_config
 
 GOODWE_ON_GRID_MINIMUM_SOC_KEY = "battery_discharge_depth_on_grid"
 
@@ -106,6 +106,34 @@ def _payload(entry: ConfigEntry, config: dict[str, Any]) -> dict[str, Any]:
 async def _async_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     config = await async_get_emhass_config(hass, entry)
     return _payload(entry, config)
+
+
+async def _async_restore_battery_saver_config(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    previous: dict[str, Any],
+) -> str | None:
+    """Restore only Battery Saver-owned EMHASS fields after a failed apply.
+
+    Required EnergyPilot contract corrections such as continual_publish and the
+    synchronized hard minimum SOC intentionally remain in place.
+    """
+    try:
+        current = await async_get_emhass_config(hass, entry)
+        changed = False
+        for key in BATTERY_SAVER_CONFIG_KEYS:
+            if key in previous:
+                if current.get(key) != previous[key]:
+                    current[key] = previous[key]
+                    changed = True
+            elif key in current:
+                current.pop(key, None)
+                changed = True
+        if changed:
+            await async_write_emhass_config(hass, entry, current)
+    except HomeAssistantError as err:
+        return str(err)
+    return None
 
 
 @websocket_api.require_admin
@@ -195,6 +223,8 @@ async def websocket_set_battery_saver(
         return
 
     old_options = dict(entry.options)
+    previous_profile = getattr(orchestrator, "last_battery_saver_profile", None)
+    previous_effective_soc = getattr(orchestrator, "last_effective_soc_final", None)
     new_options = dict(old_options)
     new_options[CONF_BATTERY_SAVER_MODE] = mode
     hass.config_entries.async_update_entry(entry, options=new_options)
@@ -203,10 +233,19 @@ async def websocket_set_battery_saver(
         await orchestrator.async_optimize(reason="battery_saver_changed")
         refreshed_config = await async_get_emhass_config(hass, entry)
     except (HomeAssistantError, ValueError) as err:
-        # Do not leave a mode persisted if its first application failed. Existing
-        # customer behavior remains intact until a complete profile+plan succeeds.
+        # Do not leave a mode or its penalty values active if the first complete
+        # profile+plan cycle failed. Restore only the Battery Saver-owned fields;
+        # required config repairs remain valid independently of the chosen mode.
         hass.config_entries.async_update_entry(entry, options=old_options)
-        connection.send_error(msg["id"], "apply_failed", str(err))
+        orchestrator.last_battery_saver_profile = previous_profile
+        orchestrator.last_effective_soc_final = previous_effective_soc
+        rollback_error = await _async_restore_battery_saver_config(
+            hass, entry, config
+        )
+        message = str(err)
+        if rollback_error:
+            message += f"; Battery Saver EMHASS rollback also failed: {rollback_error}"
+        connection.send_error(msg["id"], "apply_failed", message)
         return
 
     connection.send_result(msg["id"], _payload(entry, refreshed_config))
