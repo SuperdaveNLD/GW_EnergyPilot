@@ -2,8 +2,11 @@ name: Publish release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "*.*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,12 +18,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Validate release tag
+      - name: Resolve release version
+        id: release
         shell: bash
         run: |
           set -euo pipefail
@@ -30,14 +29,21 @@ jobs:
           import re
           from pathlib import Path
 
-          tag = os.environ["GITHUB_REF_NAME"]
-          manifest = json.loads(
-              Path("custom_components/gw_energypilot/manifest.json").read_text(
-                  encoding="utf-8"
-              )
-          )
-          version = str(manifest.get("version", "")).strip()
+          version = str(
+              json.loads(
+                  Path("custom_components/gw_energypilot/manifest.json").read_text(
+                      encoding="utf-8"
+                  )
+              ).get("version", "")
+          ).strip()
+          ref_type = os.environ.get("GITHUB_REF_TYPE", "")
+          ref_name = os.environ.get("GITHUB_REF_NAME", "")
+          tag = ref_name if ref_type == "tag" else version
 
+          if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", version):
+              raise SystemExit(
+                  f"Manifest version {version!r} is invalid; use a numeric version such as 0.30"
+              )
           if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", tag):
               raise SystemExit(
                   f"Release tag {tag!r} is invalid; use a numeric tag such as 0.30"
@@ -47,50 +53,76 @@ jobs:
                   f"Release tag {tag!r} must match manifest version {version!r}"
               )
 
-          print(f"Release version validated: {version}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"tag={tag}\n")
+          print(f"Release version resolved: {tag}")
           PY
 
+      - name: Check whether release already exists
+        id: release_status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "needs_publish=false" >> "$GITHUB_OUTPUT"
+            echo "GitHub release $RELEASE_TAG already exists; validation/publish can be skipped."
+          else
+            echo "needs_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: steps.release_status.outputs.needs_publish == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: Compile Python sources
+        if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m compileall -q custom_components/gw_energypilot scripts tests
 
       - name: Run unit tests
+        if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m unittest discover -s tests -v
 
       - name: Validate repository invariants
+        if: steps.release_status.outputs.needs_publish == 'true'
         run: python scripts/validate_repo.py
 
       - name: HACS validation
+        if: steps.release_status.outputs.needs_publish == 'true'
         uses: hacs/action@main
         with:
           category: integration
 
       - name: Hassfest validation
+        if: steps.release_status.outputs.needs_publish == 'true'
         uses: home-assistant/actions/hassfest@master
 
       - name: Publish GitHub release
+        if: steps.release_status.outputs.needs_publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
 
-          tag="${GITHUB_REF_NAME}"
+          tag="$RELEASE_TAG"
           notes_file="docs/RELEASE_NOTES_V${tag//./}.md"
-          title="GW EnergyPilot v${tag}"
+          title="GW EnergyPilot v${tag} Beta"
 
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "GitHub release $tag already exists; nothing to publish."
-            exit 0
+          args=("$tag" --title "$title")
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            args+=(--verify-tag)
+          else
+            args+=(--target "$GITHUB_SHA")
           fi
 
           if [[ -f "$notes_file" ]]; then
-            gh release create "$tag" \
-              --verify-tag \
-              --title "$title" \
-              --notes-file "$notes_file"
+            gh release create "${args[@]}" --notes-file "$notes_file"
           else
-            gh release create "$tag" \
-              --verify-tag \
-              --title "$title" \
-              --generate-notes
+            gh release create "${args[@]}" --generate-notes
           fi

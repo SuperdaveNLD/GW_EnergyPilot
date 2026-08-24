@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.30** | 2026-08-24 | **Beta** | Standardizes numeric GitHub Releases for HACS/Home Assistant so updates show `0.30` instead of a shortened commit SHA, with validated release automation and a synchronized v0.30 frontend badge. |
 | **0.29** | 2026-08-24 | **Beta** | Adds safe EMHASS required-config synchronization and recommended defaults, resolves current EnergyPilot entity IDs from the Home Assistant registry, and adds a final live-flow double-reversal guard. |
 | **0.28** | 2026-08-24 | **Beta** | Corrects Hybrid control to mode-9 buying / mode-12 selling and repairs the Battery · Plan · Price chart: canonical EMHASS battery schedule, historical-plan continuity, visible plan overlays, active-interval clipping and stepwise market prices. |
 | **0.27** | 2026-08-24 | **Beta** | Resizable Battery plan/actual/price chart, historical active `P_batt` targets plus current EMHASS future forecast, native GoodWe battery-day counters, compact support diagnostics and corrected Hybrid neutral hold behavior. |
@@ -44,6 +45,28 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.30 — Versioned HACS/Home Assistant releases
+
+v0.30 standardizes the release path so HACS/Home Assistant can present a normal GW EnergyPilot version instead of a shortened Git commit SHA.
+
+The release contract is now:
+
+```text
+manifest version: 0.30
+GitHub release:   0.30
+HACS / HA:        0.30
+```
+
+The release workflow verifies that the numeric version matches `manifest.json`, then runs Python compilation, unit tests, repository invariants, HACS validation and Hassfest before creating the GitHub Release. A new manifest version reaching `main` can create the matching release/tag automatically; manually pushed numeric tags are still accepted when they exactly match the manifest version.
+
+GW EnergyPilot does not create a competing Home Assistant `update` entity. HACS remains responsible for update discovery and installation.
+
+The active frontend wrapper is `gw-energy-pilot-v030.js` and reports `v0.30 BETA` while retaining the complete v0.29 dashboard/control implementation underneath.
+
+No GoodWe register, Modbus read block, EMS mapping, entity unique ID, EMHASS objective or persistent runtime/accounting contract changes in this release.
+
+See `docs/RELEASE_NOTES_V030.md` and `docs/RELEASE_WORKFLOW.md` for the release-specific and publishing details.
 
 # v0.29 — EMHASS configuration sync and frontend stabilization
 
