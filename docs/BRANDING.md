@@ -1,22 +1,41 @@
 # GW EnergyPilot branding
 
-GW EnergyPilot ships local Home Assistant brand assets in:
+GW EnergyPilot v0.31 ships a complete local Home Assistant brand set in:
 
 ```text
 custom_components/gw_energypilot/brand/
 ├── icon.png
-└── logo.png
+├── icon@2x.png
+├── dark_icon.png
+├── dark_icon@2x.png
+├── logo.png
+└── dark_logo.png
 ```
 
-Home Assistant 2026.3 and newer supports local brand images for custom integrations through its Brands Proxy API. The supported local brand files are PNG files (`icon.png`, `dark_icon.png`, `logo.png`, `dark_logo.png` and optional `@2x` variants).
+Home Assistant 2026.3 and newer supports local brand images for custom integrations through its Brands Proxy API. The integration therefore deploys PNG files in `brand/` and keeps the scalable SVG masters outside that directory.
 
-SVG is not a supported Home Assistant integration-brand format. For that reason the EnergyPilot SVG is stored separately for EnergyPilot-owned frontend surfaces:
+The icon assets use the GW EnergyPilot square mark. `icon.png` and `dark_icon.png` are 256×256; their `@2x` variants are 512×512. The landscape light/dark logos are 800×256.
+
+SVG is not a supported Home Assistant integration-brand format. The scalable EnergyPilot masters are stored for EnergyPilot-owned frontend/documentation surfaces:
 
 ```text
 custom_components/gw_energypilot/frontend/gw-energy-pilot-logo.svg
+custom_components/gw_energypilot/frontend/gw-energy-pilot-wordmark.svg
+custom_components/gw_energypilot/frontend/gw-energy-pilot-wordmark-dark.svg
 ```
 
-The built-in EnergyPilot dashboard also keeps its important logo marks self-contained/inline so browser caching or a missing external image cannot remove the dashboard identity.
+The built-in EnergyPilot dashboard also keeps important identity marks self-contained/inline so browser caching or a missing external image cannot remove dashboard identity.
+
+## Palette
+
+```text
+Deep navy      #061327
+Navy           #0C2F56
+Border blue    #15527D
+Cyan           #20DCFF
+Aqua           #19E1D5
+Energy green   #22F59C
+```
 
 ## HACS placeholder icon
 
