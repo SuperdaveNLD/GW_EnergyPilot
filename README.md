@@ -123,8 +123,11 @@ This requires a working/validated GoodWe smart meter.
 ```text
 P_batt requests charge -> mode 11 direct battery charge
 else P_grid requests export -> mode 10 grid export target
+else P_batt near 0 W -> mode 8 Battery Hold
 otherwise -> mode 1 GoodWe Auto / self-use
 ```
+
+A neutral EMHASS battery plan therefore remains neutral instead of handing battery direction back to GoodWe Auto. An explicit grid-export request still takes priority over the neutral hold branch.
 
 EV anti-discharge remains a higher-priority directional safety override.
 
