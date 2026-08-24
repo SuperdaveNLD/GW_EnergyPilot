@@ -2,6 +2,39 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.26] - 2026-08-24
+
+### Added
+
+- Added a full-width **Battery & Price** dashboard card that overlays actual battery charging/discharging with the timestamped electricity market price for the current local day.
+- Added a centered zero-line chart: GoodWe battery charging (`battery_power < 0`) is shown below zero, discharging (`battery_power > 0`) above zero, and a thin cyan market-price line uses the right-hand currency/kWh axis.
+- Added an expandable read-only detail graph, a dashboard visibility toggle, a current-time marker, and summary chips for approximately charged/discharged energy plus the current market price.
+- Added the read-only `gw_energypilot/battery_price/get` WebSocket command and a short in-memory orchestrator price cache.
+- Added Dutch/English chart text alongside the broader Home Assistant language-aware v0.26 frontend.
+- Added pure regression coverage for timestamp sorting, configured buy/sell adjustments, negative market prices, partial series and invalid price rows.
+- Added `docs/BATTERY_PRICE_CHART.md` as the chart/data-ownership contract.
+
+### Changed
+
+- Battery bars use the existing GoodWe `battery_power` entity through Home Assistant Recorder 5-minute mean statistics; no duplicate battery-power entity or Modbus path is introduced.
+- The market-price line is reconstructed from the exact effective `load_cost` and `prod_price` maps produced by the existing EnergyPilot price-source path, rather than discovering or calculating prices independently in the browser.
+- The price payload also keeps effective buy and sell values for later tooltip and financial-accounting work, while the visible line remains the direction-neutral market price.
+- The chart covers local 00:00–24:00. Actual battery history stops at the current time, while available price points can continue through the remainder of the day.
+- The active frontend is `gw-energy-pilot-v026-battery-price.js`, layered over the complete language-aware v0.26 dashboard.
+
+### Data-quality boundary
+
+- **Charged today** and **Discharged today** are approximate integrations of the displayed Recorder 5-minute mean battery-power buckets. They are visualization summaries, not replacement accounting entities.
+- If Recorder battery history is unavailable, the price line can still render. If timestamped runtime prices are unavailable, the battery bars remain usable and the card explains why the line is absent.
+- Dashboard reads never start an EMHASS optimization. A stale price cache is refreshed through the same orchestrator price method only when no optimization is already retrieving prices.
+
+### Safety / compatibility
+
+- No GoodWe register definition, Modbus read block, EMS mode/write, Automatic Control mapping or EMHASS optimization objective changes.
+- No existing entity ID, unique ID, device identity, accounting store or optimization-log contract changes.
+- Price display is read-only. Future persistent import-cost/export-revenue counters must consume selected grid-accounting deltas and effective prices in the backend, not reconstruct financial totals from this chart.
+- v0.26 remains **Beta** while localization and the new Recorder/price visualization receive multi-installation field exposure.
+
 ## [0.25] - 2026-08-24
 
 ### Added
@@ -146,7 +179,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - A compact **12-mode manual EMS test pad** inside the Controller card, using the same mode numbering and labels as the Home Assistant manual EMS select.
 - Hover descriptions for all twelve GoodWe EMS modes so the operator can distinguish PV-priority limits, inverter-level grid scheduling, PCC grid targets and direct battery-power modes.
-- A manual power slider from `0 W` to the configured EnergyPilot `max_power` value, backed by the existing `manual_power` Home Assistant number entity.
+- A manual power slider from `0 W` to the configured EnergyPilot `max_power` value, backed by the existing Home Assistant manual power entity.
 - Live highlighting of the actual GoodWe EMS mode read back from register `47511`, including while Automatic Control is active.
 
 ### Changed
@@ -159,14 +192,12 @@ All notable changes to GW EnergyPilot are documented here.
 ### Beta test focus
 
 - Primary field test: Automatic Control OFF, manual setpoint `0 W`, mode `10` (**Grid export target**) to observe zero-export behavior at the GoodWe smart meter/PCC.
-- Mode `1` (**GoodWe Auto / AI**) can be compared manually with mode 10, but this release does not change automatic PV-only/grid-neutral behavior based on that observation.
+- Mode `1` (**GoodWe Auto / AI**) can be compared alongside it, but v0.21 does not change automatic PV-only or grid-neutral behavior based on one installation's observation.
 
 ### Safety boundary
 
-- No GoodWe register definition changes.
-- No change to the existing `47512 -> wait -> 47511` EMS write order.
-- No change to Automatic Control mapping, grid-neutral charging, EMHASS ownership, sign conventions or power clamps.
-- The test pad is only a UI surface over the existing `manual_power` and `manual_mode` entities.
+- No new Modbus command exists in v0.21; the UI remains a surface over existing entities and controller/manual-ownership behavior.
+- No change to the established `47512 -> wait -> 47511` EMS write order.
 
 ## [0.20] - 2026-08-23
 
@@ -251,7 +282,7 @@ All notable changes to GW EnergyPilot are documented here.
 - GoodWe host/port/unit-ID changes can now be made from the dashboard and reload the existing integration after successful validation.
 - EP controller/telemetry/EV options and EnergyPilot-owned EMHASS orchestration/price options can be maintained from the dashboard settings pages.
 - The dashboard now highlights the active Profit / Cost / Self-consumption strategy instead of presenting three ambiguous stateless actions.
-- The strategy select refreshes after EnergyPilot EMHASS config writes and periodically so direct EMHASS UI changes are reflected in Home Assistant.
+- The strategy select refreshes after EnergyPilot writes EMHASS configuration and periodically so direct EMHASS UI changes are reflected in Home Assistant.
 - Existing v0.15 cost-function button unique IDs remain available for backwards-compatible automations and are classified as explicit configuration actions.
 - A successful `costfun` save is distinguished from a later fresh-optimization failure; the saved strategy remains visible even when re-optimization fails.
 - The active frontend is `gw-energy-pilot-v017.js`, layering the settings UI on top of all v0.16 Beta diagnostics and strategy readback behavior.
