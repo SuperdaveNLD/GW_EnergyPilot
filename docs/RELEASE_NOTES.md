@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.26** | 2026-08-24 | **Beta** | Follows the active Home Assistant language for the current Dutch/English dashboard and settings surfaces, and adds a full-width Battery & Price graph with actual 5-minute charging/discharging bars, a market-price line, current-time marker, approximate daily battery-energy summaries and an expandable detail view. |
 | **0.25** | 2026-08-24 | **Beta** | Consolidates three explicit Automatic Control strategies including Hybrid control, fixes persistent Today/Yesterday accounting on applicable 15 kW+ ETA/ET meters by selecting the populated extended `36104/36120` pair safely, and adds persistent 50-run EMHASS optimization history with a read-only Settings LOG page. |
 | **0.24** | 2026-08-23 | **Beta** | Restores backwards-compatible direct `P_batt` control when no explicit smart-meter strategy is stored; PCC `P_grid` control remains explicit opt-in. |
 | **0.23** | 2026-08-23 | **Beta** | Adds persistent native Today/Yesterday grid accounting, directional EV anti-discharge protection, persistent orchestrator `last_success`, and the final live-flow particle direction fix. |
@@ -40,6 +41,71 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.26 — Home Assistant language and Battery & Price graph
+
+v0.26 adds a language-aware presentation layer and the first combined operational/price visualization to the EnergyPilot dashboard.
+
+## Home Assistant language
+
+The current dashboard, settings and optimization-log surfaces follow the active Home Assistant language for Dutch and English. English remains the fallback. This changes presentation only; it does not rename entities or alter configuration/control semantics.
+
+## Battery & Price card
+
+A new full-width card shows the current Home Assistant local day from 00:00 through 24:00.
+
+```text
+battery_power < 0 W -> charging bar below zero
+battery_power > 0 W -> discharging bar above zero
+market price         -> thin line on the right currency/kWh axis
+```
+
+Battery bars come from the existing GoodWe battery-power entity using Home Assistant Recorder 5-minute mean statistics. Actual bars stop at the current time. Available price points can continue through the remainder of the day, and a vertical `NOW` marker separates observed operation from future price slots.
+
+The card includes:
+
+- separate Charging / Discharging / Market price legend items;
+- approximate **Charged today** and **Discharged today** summaries derived from the displayed 5-minute mean buckets;
+- the current market price;
+- an expand action for a larger read-only graph;
+- a visibility toggle in the existing dashboard layout menu.
+
+The approximate battery-energy summaries are visualization aids. They do not replace the persistent grid-accounting entities or GoodWe lifetime/today battery diagnostics.
+
+## Canonical price ownership
+
+The browser does not implement a second Nord Pool/price-source path. The active v0.26 orchestrator caches the same effective timestamped maps used by EnergyPilot for EMHASS:
+
+```text
+market price + buy adder      = effective load_cost
+market price - sell deduction = effective prod_price
+```
+
+The read-only command:
+
+```text
+gw_energypilot/battery_price/get
+```
+
+returns market, effective buy and effective sell values plus source/currency metadata. The graph draws the direction-neutral market price. Effective values remain available for later financial-accounting work.
+
+Dashboard reads do not launch an optimization. When needed, a stale cache is refreshed through the same price-source method used by the orchestrator, and duplicate reads are avoided while an optimization is already retrieving prices.
+
+## Graceful degradation
+
+- Without sufficient Recorder battery statistics, the price line remains available and the card identifies the missing history.
+- Without timestamped runtime prices, actual battery bars remain available and the card identifies why the price line is absent.
+- The chart refreshes on a five-minute frontend cache rather than repeating history/price requests on every five-second dashboard render.
+
+## Safety and compatibility
+
+- no GoodWe register additions or changes;
+- no Modbus read-block changes;
+- no EMS/control write changes;
+- no Automatic Control or EMHASS objective changes;
+- no entity unique-ID, device identity, accounting-store or optimization-log changes;
+- financial cost/revenue totals remain future backend accounting work and are not inferred from chart data;
+- v0.26 remains **Beta** pending multi-installation validation of localization and the combined Recorder/price visualization.
 
 # v0.25 — Hybrid control, 15 kW+ accounting and optimization history
 
