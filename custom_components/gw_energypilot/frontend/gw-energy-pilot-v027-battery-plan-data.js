@@ -15,13 +15,13 @@ const TEXT = {
     chargedToday: "Charged today", dischargedToday: "Discharged today",
     plannedCharge: "Plan charge", plannedDischarge: "Plan discharge",
     currentPrice: "Current price", goodweCounter: "GoodWe day counter",
-    graphEstimate: "Graph estimate ± {value}", approximate: "Approx. from Recorder",
-    planHistory: "Past plan = Recorder history of the published P_batt target; future plan = current EMHASS forecast horizon.",
-    energySource: "Daily totals use GoodWe 35208/35211 when available. Recorder integration remains visible as a comparison.",
+    graphEstimate: "Recorder power integral {value}", approximate: "Approx. from Recorder",
+    planHistory: "Past plan = Recorder history of the published P_batt target; future plan = current EMHASS battery schedule.",
+    energySource: "Daily totals use GoodWe 35208/35211 when available. Recorder power integration remains visible as a comparison.",
     noActual: "Recorder has not collected enough actual battery-power statistics yet.",
-    noPlan: "No usable EMHASS P_batt history or forecast horizon is available yet.",
+    noPlan: "No usable EMHASS P_batt history or battery schedule is available yet.",
     noPrice: "The market-price line is unavailable until timestamped runtime prices can be loaded.",
-    discrepancy: "The native GoodWe day counter and the visual 5-minute integration differ. The counter is used for the headline total.",
+    discrepancy: "The native GoodWe day counter and Recorder power integral use different measurement paths and can differ. The GoodWe counter remains the headline total.",
     now: "NOW", updated: "updated {time}", waiting: "waiting for data",
     expand: "Open large graph", details: "Open detailed graph", close: "Close",
     compact: "Compact", normal: "Normal", large: "Large",
@@ -36,13 +36,13 @@ const TEXT = {
     chargedToday: "Vandaag geladen", dischargedToday: "Vandaag ontladen",
     plannedCharge: "Gepland laden", plannedDischarge: "Gepland ontladen",
     currentPrice: "Huidige prijs", goodweCounter: "GoodWe-dagteller",
-    graphEstimate: "Grafiekbenadering ± {value}", approximate: "Benadering uit Recorder",
-    planHistory: "Verleden plan = Recorder-historie van het gepubliceerde P_batt-doel; toekomst = de actuele EMHASS-forecast.",
-    energySource: "Dagtotalen gebruiken GoodWe 35208/35211 wanneer beschikbaar. De Recorder-integratie blijft zichtbaar als vergelijking.",
+    graphEstimate: "Recorder-vermogensintegratie {value}", approximate: "Benadering uit Recorder",
+    planHistory: "Verleden plan = Recorder-historie van het gepubliceerde P_batt-doel; toekomst = het actuele EMHASS-accuschema.",
+    energySource: "Dagtotalen gebruiken GoodWe 35208/35211 wanneer beschikbaar. De Recorder-vermogensintegratie blijft zichtbaar als vergelijking.",
     noActual: "Recorder heeft nog onvoldoende statistieken van het werkelijke accuvermogen.",
-    noPlan: "Er is nog geen bruikbare EMHASS P_batt-historie of forecast-horizon beschikbaar.",
+    noPlan: "Er is nog geen bruikbare EMHASS P_batt-historie of accuschema beschikbaar.",
     noPrice: "De marktprijslijn verschijnt zodra tijdgebonden runtimeprijzen beschikbaar zijn.",
-    discrepancy: "De GoodWe-dagteller en de visuele 5-minutenintegratie verschillen. Voor het hoofdtotaal wordt de inverterteller gebruikt.",
+    discrepancy: "De GoodWe-dagteller en Recorder-vermogensintegratie gebruiken verschillende meetpaden en kunnen afwijken. Voor het hoofdtotaal blijft de GoodWe-teller leidend.",
     now: "NU", updated: "bijgewerkt {time}", waiting: "wachten op gegevens",
     expand: "Open grote grafiek", details: "Open gedetailleerde grafiek", close: "Sluiten",
     compact: "Klein", normal: "Normaal", large: "Groot",
@@ -109,16 +109,21 @@ function normalizeFuturePlan(points, startMs, endMs) {
 
 function normalizeHistoryRows(payload, entityId, startMs, endMs) {
   const rows = entityId ? payload?.[entityId] || [] : [];
-  return rows
-    .map((row) => ({
-      t: timestampMs(
-        row.last_updated ?? row.last_changed ?? row.last_reported ??
-        row.lu ?? row.lc ?? row.lr ?? row.timestamp
-      ),
-      w: finiteNumber(row.state ?? row.s),
-    }))
-    .filter((p) => p.t !== null && p.w !== null && p.t >= startMs && p.t < endMs)
-    .sort((a, b) => a.t - b.t);
+  const byTimestamp = new Map();
+  for (const row of rows) {
+    const rawTimestamp = timestampMs(
+      row.last_updated ?? row.last_changed ?? row.last_reported ??
+      row.lu ?? row.lc ?? row.lr ?? row.timestamp
+    );
+    const w = finiteNumber(row.state ?? row.s);
+    if (rawTimestamp === null || w === null || rawTimestamp >= endMs) continue;
+    // Home Assistant include_start_time_state intentionally returns the last
+    // state from before the requested window with its original timestamp.
+    // That state was active at local midnight, so retain it at the boundary.
+    const t = Math.max(startMs, rawTimestamp);
+    byTimestamp.set(t, { t, w });
+  }
+  return [...byTimestamp.values()].sort((a, b) => a.t - b.t);
 }
 
 function integrateMeanBuckets(rows, rangeStartMs, rangeEndMs, minutes = 5) {
@@ -340,11 +345,17 @@ export function energyComparison(data) {
 }
 
 export function planEnergy(data) {
-  if (!data) return { charged: 0, discharged: 0 };
-  const past = integrateStepPlan(data.historicalPlanRows || [], data.startMs, data.nowMs);
-  const future = integrateStepPlan(
-    (data.futurePlanPoints || []).filter((p) => p.t >= data.nowMs),
-    data.nowMs, data.endMs
-  );
-  return { charged: past.charged + future.charged, discharged: past.discharged + future.discharged };
+  if (!data) return { charged: null, discharged: null, available: false };
+  const historical = data.historicalPlanRows || [];
+  const futurePoints = (data.futurePlanPoints || []).filter((p) => p.t >= data.nowMs);
+  if (!historical.length && !futurePoints.length) {
+    return { charged: null, discharged: null, available: false };
+  }
+  const past = integrateStepPlan(historical, data.startMs, data.nowMs);
+  const future = integrateStepPlan(futurePoints, data.nowMs, data.endMs);
+  return {
+    charged: past.charged + future.charged,
+    discharged: past.discharged + future.discharged,
+    available: true,
+  };
 }
