@@ -20,8 +20,6 @@ jobs:
 
       - name: Resolve release version
         id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -60,44 +58,51 @@ jobs:
           print(f"Release version resolved: {tag}")
           PY
 
-          tag="${{ steps.release.outputs.tag }}"
-          if gh release view "$tag" >/dev/null 2>&1; then
+      - name: Check whether release already exists
+        id: release_status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "needs_publish=false" >> "$GITHUB_OUTPUT"
-            echo "GitHub release $tag already exists; validation/publish can be skipped."
+            echo "GitHub release $RELEASE_TAG already exists; validation/publish can be skipped."
           else
             echo "needs_publish=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Python
-        if: steps.release.outputs.needs_publish == 'true'
+        if: steps.release_status.outputs.needs_publish == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
       - name: Compile Python sources
-        if: steps.release.outputs.needs_publish == 'true'
+        if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m compileall -q custom_components/gw_energypilot scripts tests
 
       - name: Run unit tests
-        if: steps.release.outputs.needs_publish == 'true'
+        if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m unittest discover -s tests -v
 
       - name: Validate repository invariants
-        if: steps.release.outputs.needs_publish == 'true'
+        if: steps.release_status.outputs.needs_publish == 'true'
         run: python scripts/validate_repo.py
 
       - name: HACS validation
-        if: steps.release.outputs.needs_publish == 'true'
+        if: steps.release_status.outputs.needs_publish == 'true'
         uses: hacs/action@main
         with:
           category: integration
 
       - name: Hassfest validation
-        if: steps.release.outputs.needs_publish == 'true'
+        if: steps.release_status.outputs.needs_publish == 'true'
         uses: home-assistant/actions/hassfest@master
 
       - name: Publish GitHub release
-        if: steps.release.outputs.needs_publish == 'true'
+        if: steps.release_status.outputs.needs_publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
