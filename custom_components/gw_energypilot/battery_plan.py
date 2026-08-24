@@ -8,6 +8,12 @@ from typing import Any, Mapping
 
 
 _TIMESTAMP_KEYS = ("date", "start", "timestamp", "time")
+_SCHEDULE_ATTRIBUTE_KEYS = (
+    # Current EMHASS power-publish contract (RetrieveHass type_var="batt").
+    "battery_scheduled_power",
+    # Backwards-compatible/custom payload fallback used by earlier chart code.
+    "forecasts",
+)
 _VALUE_FALLBACK_KEYS = (
     "value",
     "state",
@@ -52,20 +58,31 @@ def _timestamp(value: Any) -> tuple[str, float] | None:
     return parsed.isoformat(), parsed.timestamp()
 
 
+def emhass_schedule_attribute(attributes: Mapping[str, Any] | None) -> str | None:
+    """Return the first supported EMHASS battery-schedule attribute name."""
+    if not attributes:
+        return None
+    for key in _SCHEDULE_ATTRIBUTE_KEYS:
+        if isinstance(attributes.get(key), list):
+            return key
+    return None
+
+
 def normalize_emhass_forecasts(
     entity_id: str,
     attributes: Mapping[str, Any] | None,
 ) -> list[dict[str, Any]]:
     """Return sorted ``P_batt`` forecast points from an EMHASS entity.
 
-    EMHASS publishes the horizon in the ``forecasts`` attribute. Each row uses
-    ``date`` plus a value key derived from the configured entity id. The parser
-    also accepts conservative fallback keys so custom/older payloads degrade
-    without making the dashboard fail.
+    Current EMHASS publishes battery-power horizons in the
+    ``battery_scheduled_power`` attribute. ``forecasts`` remains accepted as a
+    conservative compatibility fallback for older/custom publishers. Each row
+    uses ``date`` plus a value key derived from the configured entity id.
     """
-    if not attributes:
+    schedule_attribute = emhass_schedule_attribute(attributes)
+    if schedule_attribute is None or attributes is None:
         return []
-    rows = attributes.get("forecasts")
+    rows = attributes.get(schedule_attribute)
     if not isinstance(rows, list):
         return []
 
