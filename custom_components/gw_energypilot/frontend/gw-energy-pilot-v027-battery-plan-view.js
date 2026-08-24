@@ -1,7 +1,9 @@
 import {
   currentPrice, energyComparison, formatEnergy, formatPower, formatPrice, formatTime,
   inferredPlanInterval, nicePowerPeak, planEnergy, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.27-plan1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.28-chart1";
+
+const ACTUAL_IDLE_W = 50;
 
 function priceRange(points) {
   if (!points?.length) return null;
@@ -27,6 +29,31 @@ function dimensions(size, modal) {
     return { width: 760, height: 215, left: 45, right: 55, top: 26, bottom: 38, xTicks: [0, 12, 24] };
   }
   return { width: 920, height: 340, left: 58, right: 72, top: 36, bottom: 46, xTicks: [0, 6, 12, 18, 24] };
+}
+
+function inferredPriceInterval(points) {
+  const intervals = [];
+  for (let index = 1; index < (points || []).length; index += 1) {
+    const delta = points[index].t - points[index - 1].t;
+    if (delta > 0 && delta <= 2 * 60 * 60 * 1000) intervals.push(delta);
+  }
+  intervals.sort((a, b) => a - b);
+  return intervals.length ? intervals[Math.floor(intervals.length / 2)] : 60 * 60 * 1000;
+}
+
+function steppedPricePath(points, x, priceY, endMs) {
+  if (!points?.length) return "";
+  const sorted = [...points].sort((a, b) => a.t - b.t);
+  let path = `M${x(sorted[0].t).toFixed(1)},${priceY(sorted[0].market).toFixed(1)}`;
+  for (let index = 1; index < sorted.length; index += 1) {
+    const point = sorted[index];
+    const xx = x(point.t).toFixed(1);
+    path += ` H${xx} V${priceY(point.market).toFixed(1)}`;
+  }
+  const last = sorted[sorted.length - 1];
+  const lastEnd = Math.min(endMs, last.t + inferredPriceInterval(sorted));
+  if (lastEnd > last.t) path += ` H${x(lastEnd).toFixed(1)}`;
+  return path;
 }
 
 function chartSvg(panel, data, size, modal) {
@@ -59,15 +86,17 @@ function chartSvg(panel, data, size, modal) {
 
   const actualSlot = plotW * (5 * 60 * 1000) / Math.max(1, data.endMs - data.startMs);
   const actualWidth = Math.max(1.4, actualSlot * 0.56);
-  const actualBars = (data.actualRows || []).map((point) => {
-    const xx = x(point.t) - actualWidth / 2;
-    const yy = powerY(point.w);
-    const rectY = Math.min(yy, zeroY);
-    const rectH = Math.max(1, Math.abs(zeroY - yy));
-    const color = point.w < 0 ? "#27dfc2" : "#ffa52f";
-    const label = point.w < 0 ? t(panel, "actualCharge") : t(panel, "actualDischarge");
-    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${actualWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="1.5" fill="${color}" opacity=".92"><title>${panel._escape(`${formatTime(point.t)} · ${label} · ${formatPower(point.w)}`)}</title></rect>`;
-  }).join("");
+  const actualBars = (data.actualRows || [])
+    .filter((point) => Math.abs(point.w) >= ACTUAL_IDLE_W)
+    .map((point) => {
+      const xx = x(point.t) - actualWidth / 2;
+      const yy = powerY(point.w);
+      const rectY = Math.min(yy, zeroY);
+      const rectH = Math.max(1, Math.abs(zeroY - yy));
+      const color = point.w < 0 ? "#27dfc2" : "#ffa52f";
+      const label = point.w < 0 ? t(panel, "actualCharge") : t(panel, "actualDischarge");
+      return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${actualWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="1.5" fill="${color}" opacity=".92"><title>${panel._escape(`${formatTime(point.t)} · ${label} · ${formatPower(point.w)}`)}</title></rect>`;
+    }).join("");
 
   const past = data.historicalPlanRows || [];
   const historicalPlan = past.map((point, index) => {
@@ -79,8 +108,8 @@ function chartSvg(panel, data, size, modal) {
     const yy = powerY(point.w);
     const rectY = Math.min(yy, zeroY);
     const rectH = Math.max(1, Math.abs(zeroY - yy));
-    const color = point.w < 0 ? "#43e7ca" : "#ffb354";
-    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="2.5" fill="${color}" fill-opacity=".085" stroke="${color}" stroke-opacity=".32" stroke-width=".8"><title>${panel._escape(`${formatTime(startT)}–${formatTime(endT)} · ${t(panel, "plan")} · ${formatPower(point.w)}`)}</title></rect>`;
+    const color = point.w < 0 ? "#43e7ca" : point.w > 0 ? "#ffb354" : "#a7c3cf";
+    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="2.5" fill="${color}" fill-opacity=".025" stroke="${color}" stroke-opacity=".82" stroke-width="1.15" stroke-dasharray="4 3"><title>${panel._escape(`${formatTime(startT)}–${formatTime(endT)} · ${t(panel, "plan")} · ${formatPower(point.w)}`)}</title></rect>`;
   }).join("");
 
   const future = data.futurePlanPoints || [];
@@ -96,13 +125,11 @@ function chartSvg(panel, data, size, modal) {
     const yy = powerY(point.w);
     const rectY = Math.min(yy, zeroY);
     const rectH = Math.max(1, Math.abs(zeroY - yy));
-    const color = point.w < 0 ? "#43e7ca" : "#ffb354";
-    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="3" fill="${color}" fill-opacity=".075" stroke="${color}" stroke-opacity=".55" stroke-width="1" stroke-dasharray="5 4"><title>${panel._escape(`${formatTime(point.t)} · ${t(panel, "future")} · ${formatPower(point.w)}`)}</title></rect>`;
+    const color = point.w < 0 ? "#43e7ca" : point.w > 0 ? "#ffb354" : "#a7c3cf";
+    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="3" fill="${color}" fill-opacity=".085" stroke="${color}" stroke-opacity=".90" stroke-width="1.2" stroke-dasharray="6 4"><title>${panel._escape(`${formatTime(point.t)} · ${t(panel, "future")} · ${formatPower(point.w)}`)}</title></rect>`;
   }).join("");
 
-  const pricePath = data.pricePoints?.length >= 2
-    ? data.pricePoints.map((p, index) => `${index ? "L" : "M"}${x(p.t).toFixed(1)},${priceY(p.market).toFixed(1)}`).join(" ")
-    : "";
+  const pricePath = steppedPricePath(data.pricePoints || [], x, priceY, data.endMs);
   const priceLine = pricePath ? `<path d="${pricePath}" fill="none" stroke="#55e8ff" stroke-width="${size === "compact" && !modal ? 2 : 2.5}" stroke-linejoin="round" stroke-linecap="round" filter="url(#epV027PriceGlow)"/>` : "";
   const priceDots = (data.pricePoints || []).map((p) => `<circle cx="${x(p.t).toFixed(1)}" cy="${priceY(p.market).toFixed(1)}" r="5" fill="transparent"><title>${panel._escape(`${formatTime(p.t)} · ${formatPrice(panel, p.market, data.payload?.currency)}`)}</title></circle>`).join("");
   const priceFractions = size === "compact" && !modal ? [0, .5, 1] : [0, .25, .5, .75, 1];
@@ -117,7 +144,7 @@ function chartSvg(panel, data, size, modal) {
   const currency = panel._escape(data.payload?.currency || "EUR");
   const titles = size === "compact" && !modal ? "" : `<text x="${left}" y="17" fill="#d9eaf2" font-size="11">${panel._escape(t(panel, "powerAxis"))}</text><text x="${width - right}" y="17" text-anchor="end" fill="#62e2f5" font-size="11">${panel._escape(t(panel, "priceAxis", { currency }))}</text>`;
 
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="${panel._escape(t(panel, "subtitle"))}"><defs><filter id="epV027PriceGlow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${titles}${grid}${powerTicks}${historicalPlan}${futurePlan}${actualBars}${priceLine}${priceDots}${priceTicks}${nowLine}</svg>`;
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="${panel._escape(t(panel, "subtitle"))}"><defs><filter id="epV027PriceGlow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${titles}${grid}${powerTicks}${actualBars}${historicalPlan}${futurePlan}${priceLine}${priceDots}${priceTicks}${nowLine}</svg>`;
 }
 
 function sourceLine(panel, native, graphValue) {
@@ -179,7 +206,7 @@ export function ensureStyles(root) {
     .ep-v027-size-control{display:flex;align-items:center;padding:3px;border:1px solid rgba(255,255,255,.075);border-radius:999px;background:rgba(1,12,28,.42);box-shadow:inset 0 1px 8px rgba(0,0,0,.20)}.ep-v027-size-control button{width:29px;height:27px;border:0;border-radius:999px;background:transparent;color:#7793a7;font:700 9px -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease}.ep-v027-size-control button.active{background:rgba(255,255,255,.13);color:#f0fbff;box-shadow:0 1px 8px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.12)}
     .ep-v027-expand{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;border:1px solid rgba(72,198,235,.22);background:rgba(9,47,74,.50);color:#c3eff8;cursor:pointer;font-size:17px;transition:background .16s ease,border-color .16s ease,transform .16s ease}.ep-v027-expand:hover{background:rgba(12,66,94,.68);border-color:rgba(73,225,248,.42);transform:translateY(-1px)}
     .ep-v027-chart{margin-top:8px;border-radius:15px;background:rgba(1,12,28,.25);overflow:hidden}.ep-v027-chart.size-compact{min-height:160px}.ep-v027-chart.size-normal{min-height:260px}.ep-v027-chart.size-large{min-height:360px}.ep-v027-chart svg{display:block}.ep-v027-empty{min-height:190px;display:grid;place-items:center;color:#7895aa;font-size:10px}
-    .ep-v027-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px 19px;margin:5px 0 12px;color:#91a9ba;font-size:9px}.ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-legend i{display:inline-block}.ep-v027-legend i.actual-charge,.ep-v027-legend i.actual-discharge{width:9px;height:9px;border-radius:3px;background:#27dfc2}.ep-v027-legend i.actual-discharge{background:#ffa52f}.ep-v027-legend i.actual-combined{width:15px;height:9px;border-radius:3px;background:linear-gradient(90deg,#27dfc2 0 50%,#ffa52f 50% 100%)}.ep-v027-legend i.plan{width:16px;height:8px;border:1px dashed #88aebd;border-radius:3px;background:rgba(255,255,255,.025)}.ep-v027-legend i.price{width:18px;height:2px;border-radius:999px;background:#55e8ff;box-shadow:0 0 8px rgba(85,232,255,.42)}
+    .ep-v027-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px 19px;margin:5px 0 12px;color:#91a9ba;font-size:9px}.ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-legend i{display:inline-block}.ep-v027-legend i.actual-charge,.ep-v027-legend i.actual-discharge{width:9px;height:9px;border-radius:3px;background:#27dfc2}.ep-v027-legend i.actual-discharge{background:#ffa52f}.ep-v027-legend i.actual-combined{width:15px;height:9px;border-radius:3px;background:linear-gradient(90deg,#27dfc2 0 50%,#ffa52f 50% 100%)}.ep-v027-legend i.plan{width:18px;height:0;border-top:1px dashed #a8c5d1}.ep-v027-legend i.price{width:18px;height:2px;border-radius:999px;background:#55e8ff;box-shadow:0 0 8px rgba(85,232,255,.42)}
     .ep-v027-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ep-v027-summary.with-plan{grid-template-columns:repeat(5,minmax(0,1fr))}.ep-v027-chip{min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid rgba(255,255,255,.055);border-radius:13px;background:rgba(255,255,255,.022);box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}.ep-v027-icon{width:29px;height:29px;flex:0 0 29px;display:grid;place-items:center;border-radius:50%;border:1px solid rgba(39,224,193,.62);color:#42ebce;font-size:14px}.ep-v027-chip.discharge .ep-v027-icon{border-color:rgba(255,165,47,.66);color:#ffb34a}.ep-v027-chip.price .ep-v027-icon{border-color:rgba(85,232,255,.62);color:#64e9fb}.ep-v027-chip.plan-charge .ep-v027-icon,.ep-v027-chip.plan-discharge .ep-v027-icon{border-color:rgba(171,205,220,.38);color:#a8c5d1}.ep-v027-chip small{display:block;color:#849dae;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ep-v027-chip strong{display:block;margin-top:2px;color:#eff9fd;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ep-v027-chip em{display:block;margin-top:2px;color:#607c90;font-size:7px;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ep-v027-notes{margin-top:9px;color:#617f94;font-size:8px;line-height:1.5}.ep-v027-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px}.ep-v027-footer-actions{display:flex;align-items:center;gap:12px}.ep-v027-footer button{border:0;padding:0;background:transparent;color:#70d5eb;cursor:pointer;font:inherit;font-size:8px}.ep-v027-footer span{color:#607d92;font-size:8px}
     .ep-v027-battery-plan-card.size-compact .ep-v027-subtitle{max-width:340px}.ep-v027-battery-plan-card.size-compact .ep-v027-notes{display:none}.ep-v027-battery-plan-card.size-compact .ep-v027-legend{gap:7px 12px;margin:3px 0 9px}.ep-v027-battery-plan-card.size-compact .ep-v027-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip{padding:8px;gap:7px}.ep-v027-battery-plan-card.size-compact .ep-v027-icon{width:25px;height:25px;flex-basis:25px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip strong{font-size:12px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip em{display:none}
