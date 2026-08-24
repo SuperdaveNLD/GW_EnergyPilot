@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.30** | 2026-08-24 | **Beta** | Fixes duplicate Battery · Plan · Price cards after hide/restore, hardens the layered frontend render lifecycle, and prepares the v0.30 dashboard branding/release wrapper. |
 | **0.29** | 2026-08-24 | **Beta** | Adds safe EMHASS required-config synchronization and recommended defaults, resolves current EnergyPilot entity IDs from the Home Assistant registry, and adds a final live-flow double-reversal guard. |
 | **0.28** | 2026-08-24 | **Beta** | Corrects Hybrid control to mode-9 buying / mode-12 selling and repairs the Battery · Plan · Price chart: canonical EMHASS battery schedule, historical-plan continuity, visible plan overlays, active-interval clipping and stepwise market prices. |
 | **0.27** | 2026-08-24 | **Beta** | Resizable Battery plan/actual/price chart, historical active `P_batt` targets plus current EMHASS future forecast, native GoodWe battery-day counters, compact support diagnostics and corrected Hybrid neutral hold behavior. |
@@ -44,6 +45,50 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.30 — Dashboard card stability and prepared branding package
+
+v0.30 is a bounded frontend-stability release on top of the complete v0.29 feature set. It addresses the live dashboard duplication reported in issue #46 without changing inverter or optimizer behavior.
+
+## Battery · Plan · Price duplicate-card fix
+
+The reported sequence was:
+
+1. hide **Battery · Plan · Price** with the red Apple/macOS-style card control;
+2. open **Dashboard → Layout & visibility**;
+3. re-enable **Battery & price**;
+4. observe two copies of the same chart.
+
+The root cause is the layered versioned frontend render chain. During a cache-busted/live-upgrade browser session, the v0.27 `installEnhancedCard()` render wrapper can be registered/invoked more than once. The first invocation replaces the legacy v0.26 chart, while a later invocation no longer sees that legacy selector and can append a second enhanced card.
+
+v0.30 fixes this at two levels:
+
+- the v0.27 enhanced-card installer is now idempotent. If an enhanced card already exists, it keeps the first canonical card, removes extra enhanced copies and returns instead of appending another card;
+- the v0.30 top-level render wrapper performs a final reconciliation after the complete previous frontend chain. If duplicates already exist in an open browser session, it keeps exactly one and prefers the instance already decorated with the v0.28 window controls.
+
+The v0.30 wrapper also carries its own installation guard so loading the same release wrapper again under a different cache-busting URL does not stack another v0.30 `_render` wrapper.
+
+This preserves S/M/L sizing, chart data loading, refresh, the detail modal, browser-local visibility preferences and the red/yellow/green window controls.
+
+## Prepared v0.30 frontend package
+
+The active panel entry point is `gw-energy-pilot-v030.js` with manifest version `0.30`. The prepared branch also includes light/dark frontend wordmark SVG assets for the v0.30 branding package.
+
+The complete v0.29 functionality remains underneath the v0.30 wrapper: safe administrator-triggered EMHASS required-config synchronization, recommended EMHASS defaults, runtime entity-registry resolution and the live-flow direction guard. v0.28 Hybrid 9/12 behavior and the repaired Battery · Plan · Price data/timeline remain unchanged.
+
+## Safety and compatibility
+
+- No new or guessed GoodWe register definitions or Modbus read blocks.
+- EMS registers remain `47511` / `47512` with the established `47512 -> wait -> 47511` write order.
+- Battery strategy remains `P_batt -> 11/12/8`.
+- Grid strategy remains `P_grid -> 9/10/1`.
+- Hybrid remains mode-9 buying/import from `P_grid` and mode-12 selling/discharge from `P_batt`.
+- EV anti-discharge remains a higher-priority directional override.
+- Existing entity IDs, unique IDs, stable device identity and persistent runtime/accounting/log stores remain unchanged.
+- EMHASS configuration synchronization and optimization objectives are unchanged.
+- EMHASS remains an external prerequisite and is not installed by GW EnergyPilot.
+
+v0.30 remains **Beta** while the hide/restore lifecycle fix and prepared branding assets receive live installation validation.
 
 # v0.29 — EMHASS configuration sync and frontend stabilization
 
