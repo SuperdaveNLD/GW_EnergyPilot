@@ -17,6 +17,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .accounting import GWEnergyPilotAccounting
 from .battery_price_api import async_register_battery_price_api
+from .battery_saver_api import async_register_battery_saver_api
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
@@ -27,7 +28,7 @@ from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
-from .orchestrator_v026 import GWEnergyPilotOrchestrator
+from .orchestrator_v031 import GWEnergyPilotOrchestrator
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
 
@@ -42,7 +43,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v031-window-controls.js?v=0.31-window2"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v031-battery-saver.js?v=0.31-battery-saver1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -70,6 +71,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     async_register_optimization_log_api(hass)
     async_register_debug_log_api(hass)
     async_register_battery_price_api(hass)
+    async_register_battery_saver_api(hass)
     async_register_emhass_sync_api(hass)
     return True
 
