@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.26 · Beta**
+**v0.27 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -26,15 +26,13 @@ Release documentation:
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.26 highlights
+## v0.27 highlights
 
-- Home Assistant language-aware dashboard with Dutch and English support.
-- Full-width **Battery & Price** graph comparing actual battery power with market price for the current local day.
-- Read-only backend price-series API using the same EnergyPilot price path as EMHASS.
-- Synchronized normal on-grid minimum SOC: one explicit minimum-SOC change updates and verifies GoodWe register `45356`, then writes the same value to EMHASS.
-- GoodWe rollback attempt if the subsequent EMHASS minimum-SOC write fails.
-- Separate on-grid `45356` dashboard field-test control removed; off-grid `45358` remains independent.
-- Existing Battery/Grid/Hybrid Automatic Control, accounting and optimization-log behavior retained.
+- Corrected **Hybrid control**: buying/import uses GoodWe mode `9` from EMHASS `P_grid`; selling/discharging uses mode `12` from EMHASS `P_batt`.
+- Neutral Hybrid battery plans remain mode `8` Battery Hold.
+- Hybrid charging without planned grid import falls back to GoodWe mode `1` self-use so local PV surplus can be absorbed without forcing a forecast-sized battery charge.
+- Battery control remains `P_batt -> 11/12/8`; Grid control remains `P_grid -> 9/10/1`.
+- v0.26 language-aware UI, Battery & Price graph, persistent accounting/logging and synchronized on-grid minimum SOC remain intact.
 
 ## Tested hardware
 
@@ -121,13 +119,15 @@ This requires a working/validated GoodWe smart meter.
 ### Hybrid control
 
 ```text
-P_batt requests charge -> mode 11 direct battery charge
-else P_grid requests export -> mode 10 grid export target
+P_grid > +deadband -> mode 9 Grid import target (buy/import)
+else P_batt > +deadband -> mode 12 Battery discharge power (sell/discharge)
 else P_batt near 0 W -> mode 8 Battery Hold
 otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-A neutral EMHASS battery plan therefore remains neutral instead of handing battery direction back to GoodWe Auto. An explicit grid-export request still takes priority over the neutral hold branch.
+Hybrid is deliberately asymmetric. Buying is controlled at the PCC through mode 9 and the EMHASS `P_grid` magnitude. Selling is controlled through direct battery discharge mode 12 and the EMHASS `P_batt` magnitude.
+
+A Hybrid charging plan with no planned grid import falls back to GoodWe self-use. That lets locally available PV flow to the battery according to the inverter's own fast control instead of forcing the battery to the forecast-sized EMHASS charging value. A neutral EMHASS battery plan remains neutral through mode 8.
 
 EV anti-discharge remains a higher-priority directional safety override.
 
