@@ -40,6 +40,17 @@ class GridAccountingModelTests(unittest.TestCase):
         )
         self.assertEqual(selected, (model.SOURCE_LEGACY, 100.0, 50.0))
 
+    def test_empty_extended_pair_does_not_override_populated_legacy(self):
+        selected = model.select_meter_totals(
+            {
+                model.LEGACY_IMPORT_KEY: 100.0,
+                model.LEGACY_EXPORT_KEY: 50.0,
+                model.EXTENDED_IMPORT_KEY: 0.0,
+                model.EXTENDED_EXPORT_KEY: 0.0,
+            }
+        )
+        self.assertEqual(selected, (model.SOURCE_LEGACY, 100.0, 50.0))
+
     def test_active_extended_source_does_not_flap_to_legacy(self):
         selected = model.select_meter_totals(
             {
