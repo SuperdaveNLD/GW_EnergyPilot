@@ -2,6 +2,34 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.30] - 2026-08-24
+
+### Added
+
+- Added the v0.30 frontend release wrapper and switched the prepared release branch to manifest/panel version `0.30`.
+- Added light/dark frontend wordmark SVG assets for the v0.30 branding package.
+- Added a frontend regression contract that verifies the Battery · Plan · Price installer remains idempotent and that the v0.30 release layer keeps a final duplicate-card reconciliation guard.
+
+### Fixed
+
+- Fixed issue #46 where **Battery · Plan · Price** could appear twice after the red card-close control was used and the card was restored through **Dashboard → Layout & visibility**.
+- Made `installEnhancedCard()` idempotent. If a cache-busted/layered frontend render invokes the v0.27 installer more than once, the first enhanced card remains canonical and later invocations remove extra enhanced cards instead of appending another one.
+- Added a final v0.30 reconciliation pass that repairs duplicate Battery · Plan · Price cards already present in an open browser session and prefers the instance already carrying the v0.28 Apple/macOS-style window controls.
+- Guarded the v0.30 render wrapper itself against repeated installation in the same browser session.
+
+### Changed
+
+- The active dashboard entry module is `gw-energy-pilot-v030.js`; the complete v0.29/v0.28/v0.27 frontend behavior remains underneath it.
+- README and architecture documentation now describe the v0.30 frontend chain and the duplicate-card ownership contract.
+
+### Safety / compatibility
+
+- This is a presentation/render-lifecycle fix only; no GoodWe register definitions, Modbus read blocks, EMS modes/setpoints or write ordering change.
+- Existing entity IDs, unique IDs, config-entry identity and persistent accounting/runtime/log stores remain unchanged.
+- Battery control remains `P_batt -> 11/12/8`; Grid control remains `P_grid -> 9/10/1`; Hybrid remains mode-9 buying / mode-12 selling; EV anti-discharge remains a higher-priority safety override.
+- EMHASS synchronization, optimizer configuration and objective semantics are unchanged.
+- v0.30 remains **Beta** while the dashboard hide/restore fix and prepared branding assets receive live installation validation.
+
 ## [0.29] - 2026-08-24
 
 ### Added
