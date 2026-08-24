@@ -2,6 +2,37 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.29] - 2026-08-24
+
+### Added
+
+- Added **Restore recommended defaults** to the EMHASS settings page. It fills the EnergyPilot form with the current canonical defaults for review without saving automatically.
+- Added administrator-triggered **Synchronize required config** for EMHASS. The workflow reads the complete live configuration, merges only EnergyPilot-required mappings, writes the complete configuration and verifies it with a second read.
+- Added runtime Home Assistant entity-registry resolution for EnergyPilot PV total power, GoodWe load power, battery power and battery SOC so renamed entity IDs are synchronized instead of guessed.
+- Added dedicated `docs/EMHASS_CONFIG_SYNC.md` and `docs/RELEASE_NOTES_V029.md` documentation for the synchronization contract, upgrade path and release scope.
+- Added a v0.29 frontend release wrapper so HACS installations already on v0.28 receive an explicit new integration version.
+
+### Fixed
+
+- Added a final live-flow animation guard that forces the existing geometry-correct particle keyframes to use `animation-direction: normal`, preventing later frontend layers from reversing an already-correct direction a second time.
+
+### Changed
+
+- Canonical EnergyPilot EMHASS outputs remain `sensor.p_batt_forecast`, `sensor.p_grid_forecast` and `sensor.optim_status` with required state `Optimal`.
+- EMHASS synchronization preserves unrelated configuration, custom PV forecast mappings and custom `var_model` values where safe; multi-battery sensor lists are not rewritten.
+- Issue #22 is closed without a new EnergyPilot residual-grid-capacity allocator because the dynamic grid/import limit is already enforced by GoodWe itself.
+- Issue #30 remains open: negative raw EMHASS SOC-related values are not guessed into percentages or silently rewritten until their exact semantics/source are established.
+- v0.29 includes the complete v0.28 Hybrid 9/12 control, Battery · Plan · Price repairs, Max Charge SOC guard and Apple-style Battery/Plan window controls.
+
+### Safety / compatibility
+
+- No new or guessed GoodWe register definitions or Modbus read blocks.
+- EMS remains on `47511/47512` with the established `47512 -> wait -> 47511` write order.
+- EMHASS synchronization is an explicit administrator action and does not automatically run an optimization or write a GoodWe register.
+- Existing entity IDs, unique IDs, stable device identity and persistent accounting/runtime/log store contracts remain unchanged.
+- Battery control remains `P_batt -> 11/12/8`; Grid control remains `P_grid -> 9/10/1`; EV anti-discharge remains a higher-priority safety override.
+- v0.29 remains **Beta** while the new EMHASS synchronization workflow and final flow-animation guard receive live installation validation.
+
 ## [0.28] - 2026-08-24
 
 ### Fixed
