@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timezone
 import importlib
 from pathlib import Path
@@ -138,10 +137,12 @@ def _load_v013_orchestrator():
 
     util = _module("homeassistant.util")
     util.__path__ = []
+    fixed_now = datetime(2026, 8, 23, 18, 31, tzinfo=timezone.utc)
     dt_module = _module(
         "homeassistant.util.dt",
         as_local=lambda value: value,
-        now=lambda: datetime.now(timezone.utc),
+        now=lambda: fixed_now,
+        utcnow=lambda: fixed_now,
     )
     util.dt = dt_module
     homeassistant.util = util
@@ -158,18 +159,37 @@ def _load_v013_orchestrator():
             self.base_setup_calls = 0
             self.base_optimize_calls = 0
             self.fail_optimize = False
+            self.last_soc_init = None
+            self.last_price_area = None
+            self.last_price_points = 0
+            self.last_load_points = 0
+            self.last_p_batt = None
+            self.optimize_http_status = None
+            self.publish_http_status = None
+            self.last_price_source = "not_checked"
 
         @property
         def attributes(self):
             return {"calculated_home_power": None}
+
+        def _coordinator_number(self, key):
+            return 1234.0 if key == "total_load_power" else None
 
         async def async_setup(self) -> None:
             self.base_setup_calls += 1
 
         async def async_optimize(self, reason: str = "manual") -> None:
             self.base_optimize_calls += 1
+            self.last_soc_init = 0.48
+            self.last_price_area = "NL"
+            self.last_price_points = 48
+            self.last_load_points = 25
+            self.optimize_http_status = 200
             if self.fail_optimize:
+                self.publish_http_status = None
                 raise RuntimeError("optimization failed")
+            self.publish_http_status = 200
+            self.last_p_batt = -4200.0
             self.last_success = datetime(
                 2026,
                 8,
@@ -204,8 +224,22 @@ def _load_v013_orchestrator():
         GWEnergyPilotRuntimeStore=FakeRuntimeStore,
     )
 
+    class FakeOptimizationLog:
+        records: list[dict] = []
+
+        def __init__(self, _hass, _entry_id) -> None:
+            pass
+
+        async def async_append(self, record):
+            type(self).records.append(dict(record))
+
+    _module(
+        f"{PACKAGE_NAME}.optimization_log",
+        GWEnergyPilotOptimizationLog=FakeOptimizationLog,
+    )
+
     orchestrator = importlib.import_module(f"{PACKAGE_NAME}.orchestrator_v013")
-    return orchestrator, FakeRuntimeStore
+    return orchestrator, FakeRuntimeStore, FakeOptimizationLog
 
 
 class FakeHass:
@@ -221,10 +255,11 @@ class FakeEntry:
 
 class OrchestratorPersistenceTests(unittest.IsolatedAsyncioTestCase):
     async def test_setup_restores_last_success_before_base_setup(self):
-        orchestrator_module, fake_store = _load_v013_orchestrator()
+        orchestrator_module, fake_store, fake_log = _load_v013_orchestrator()
         restored = datetime(2026, 8, 23, 17, 0, tzinfo=timezone.utc)
         fake_store.persisted = restored
         fake_store.save_calls = []
+        fake_log.records = []
         orchestrator = orchestrator_module.GWEnergyPilotOrchestrator(
             FakeHass(),
             FakeEntry(),
@@ -236,10 +271,11 @@ class OrchestratorPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(orchestrator.last_success, restored)
         self.assertEqual(orchestrator.base_setup_calls, 1)
 
-    async def test_successful_optimization_replaces_persisted_timestamp(self):
-        orchestrator_module, fake_store = _load_v013_orchestrator()
+    async def test_successful_optimization_replaces_persisted_timestamp_and_logs(self):
+        orchestrator_module, fake_store, fake_log = _load_v013_orchestrator()
         fake_store.persisted = datetime(2026, 8, 23, 17, 0, tzinfo=timezone.utc)
         fake_store.save_calls = []
+        fake_log.records = []
         orchestrator = orchestrator_module.GWEnergyPilotOrchestrator(
             FakeHass(),
             FakeEntry(),
@@ -254,12 +290,23 @@ class OrchestratorPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_store.persisted, expected)
         self.assertEqual(fake_store.save_calls, [expected])
         self.assertEqual(orchestrator.base_optimize_calls, 1)
+        self.assertEqual(len(fake_log.records), 1)
+        record = fake_log.records[0]
+        self.assertTrue(record["success"])
+        self.assertEqual(record["reason"], "manual_button")
+        self.assertEqual(record["soc_init"], 0.48)
+        self.assertEqual(record["current_load"], 1234.0)
+        self.assertEqual(record["price_points"], 48)
+        self.assertEqual(record["load_forecast_points"], 25)
+        self.assertEqual(record["p_batt"], -4200.0)
+        self.assertIsNone(record["error"])
 
-    async def test_failed_optimization_keeps_previous_persisted_success(self):
-        orchestrator_module, fake_store = _load_v013_orchestrator()
+    async def test_failed_optimization_keeps_success_and_logs_failure(self):
+        orchestrator_module, fake_store, fake_log = _load_v013_orchestrator()
         previous = datetime(2026, 8, 23, 17, 0, tzinfo=timezone.utc)
         fake_store.persisted = previous
         fake_store.save_calls = []
+        fake_log.records = []
         orchestrator = orchestrator_module.GWEnergyPilotOrchestrator(
             FakeHass(),
             FakeEntry(),
@@ -274,6 +321,12 @@ class OrchestratorPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(orchestrator.last_success, previous)
         self.assertEqual(fake_store.persisted, previous)
         self.assertEqual(fake_store.save_calls, [])
+        self.assertEqual(len(fake_log.records), 1)
+        record = fake_log.records[0]
+        self.assertFalse(record["success"])
+        self.assertEqual(record["reason"], "scheduled")
+        self.assertEqual(record["error"], "optimization failed")
+        self.assertIsNone(record["p_batt"])
 
 
 if __name__ == "__main__":
