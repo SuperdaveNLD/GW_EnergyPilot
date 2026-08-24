@@ -40,10 +40,9 @@ def select_meter_totals(
     """Select one coherent GoodWe lifetime-counter pair for accounting.
 
     The ETA/ET upstream implementation enables the 64-bit extended meter layout
-    for platform 745 and rated power >= 15 kW. Prefer that pair when available.
-    Once extended accounting is active, a transient missing optional block must
-    not make accounting flap back to the legacy pair; wait for the preferred
-    source to return instead.
+    for platform 745 and rated power >= 15 kW. Prefer a populated extended pair
+    when available. Once extended accounting is active, a transient missing
+    optional block must not make accounting flap back to the legacy pair.
     """
     extended_import = _nonnegative_number(values.get(EXTENDED_IMPORT_KEY))
     extended_export = _nonnegative_number(values.get(EXTENDED_EXPORT_KEY))
@@ -55,10 +54,16 @@ def select_meter_totals(
             return None
         return SOURCE_EXTENDED, extended_import, extended_export
 
-    if extended_import is not None and extended_export is not None:
+    extended_pair_available = extended_import is not None and extended_export is not None
+    legacy_pair_available = legacy_import is not None and legacy_export is not None
+    extended_pair_populated = extended_pair_available and (
+        extended_import > 0 or extended_export > 0
+    )
+
+    if extended_pair_populated or (extended_pair_available and not legacy_pair_available):
         return SOURCE_EXTENDED, extended_import, extended_export
 
-    if legacy_import is not None and legacy_export is not None:
+    if legacy_pair_available:
         return SOURCE_LEGACY, legacy_import, legacy_export
 
     return None
