@@ -8,8 +8,8 @@ GoodWe exposes two known lifetime smart-meter layouts on ETA/ET hardware. Both l
 
 | Priority | Direction | EnergyPilot key | GoodWe register | Format |
 |---|---|---|---:|---|
-| Preferred when the complete pair is available | Export | `meter_total_energy_export_extended` | `36104` | 64-bit energy total |
-| Preferred when the complete pair is available | Import | `meter_total_energy_import_extended` | `36120` | 64-bit energy total |
+| Preferred when the populated pair is available | Export | `meter_total_energy_export_extended` | `36104` | 64-bit energy total |
+| Preferred when the populated pair is available | Import | `meter_total_energy_import_extended` | `36120` | 64-bit energy total |
 | Fallback | Export | `meter_total_energy_export` | `36015` | legacy float total |
 | Fallback | Import | `meter_total_energy_import` | `36017` | legacy float total |
 
@@ -17,9 +17,10 @@ Current upstream GoodWe ET handling enables the extended meter layout for platfo
 
 The accounting source-selection contract is therefore:
 
-1. use `36104/36120` when both decoded values are available and valid;
-2. otherwise use `36015/36017`;
-3. once extended accounting is active, a transient missing optional extended read does not make accounting fall back to the legacy pair for one sample.
+1. prefer `36104/36120` when both decoded values are valid and the pair is populated;
+2. if an optional extended block is readable but reports `0/0` while a usable legacy pair exists, keep `36015/36017` for compatibility;
+3. otherwise use `36015/36017` when that pair is valid;
+4. once extended accounting is active, a transient missing optional extended read does not make accounting fall back to the legacy pair for one sample.
 
 A source change is always a **re-baseline**. EnergyPilot never subtracts the absolute total from one register layout from the absolute total of the other layout. This prevents a lifetime difference of hundreds or thousands of kWh from being recorded as current-day energy.
 
