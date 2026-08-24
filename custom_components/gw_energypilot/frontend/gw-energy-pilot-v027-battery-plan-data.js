@@ -347,11 +347,13 @@ export function energyComparison(data) {
 export function planEnergy(data) {
   if (!data) return { charged: null, discharged: null, available: false };
   const historical = data.historicalPlanRows || [];
-  const futurePoints = (data.futurePlanPoints || []).filter((p) => p.t >= data.nowMs);
+  const futurePoints = data.futurePlanPoints || [];
   if (!historical.length && !futurePoints.length) {
     return { charged: null, discharged: null, available: false };
   }
   const past = integrateStepPlan(historical, data.startMs, data.nowMs);
+  // Keep the schedule point that began before NOW when its interval is still
+  // active. integrateStepPlan clips elapsed intervals at rangeStartMs.
   const future = integrateStepPlan(futurePoints, data.nowMs, data.endMs);
   return {
     charged: past.charged + future.charged,
