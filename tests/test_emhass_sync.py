@@ -32,9 +32,9 @@ class EMHASSSyncTests(unittest.TestCase):
             "sensor_replace_zero": ["sensor.old_pv", "sensor.keep_zero"],
             "sensor_linear_interp": ["sensor.old_pv", "sensor.old_load", "sensor.keep_interp"],
             "var_model": "sensor.old_load",
-            "continual_publish": True,
+            "continual_publish": False,
             "method_ts_round": "nearest",
-            "set_use_pv": False,
+            "set_use_pv": True,
             "set_use_battery": False,
             "inverter_is_hybrid": False,
             "number_of_batteries": 1,
@@ -50,7 +50,7 @@ class EMHASSSyncTests(unittest.TestCase):
         self.assertEqual(synced["sensor_replace_zero"], [ENTITY_IDS["pv"], "sensor.keep_zero", "sensor.custom_pv_forecast"])
         self.assertEqual(synced["sensor_linear_interp"], [ENTITY_IDS["pv"], ENTITY_IDS["load"], "sensor.keep_interp"])
         self.assertEqual(synced["var_model"], ENTITY_IDS["load"])
-        self.assertFalse(synced["continual_publish"])
+        self.assertTrue(synced["continual_publish"])
         self.assertEqual(synced["method_ts_round"], "first")
         self.assertTrue(synced["set_use_pv"])
         self.assertTrue(synced["set_use_battery"])
@@ -58,15 +58,44 @@ class EMHASSSyncTests(unittest.TestCase):
         self.assertEqual(synced["custom_setting"], original["custom_setting"])
         self.assertEqual(original["sensor_power_photovoltaics"], "sensor.old_pv")
 
-    def test_missing_pv_forecast_uses_emhass_standard_output(self):
-        synced, warnings = emhass_sync.build_emhass_sync_config({}, ENTITY_IDS)
+    def test_battery_only_config_does_not_require_or_rewrite_pv(self):
+        config = {
+            "set_use_pv": False,
+            "sensor_power_photovoltaics": "sensor.customer_optional_pv",
+            "sensor_power_photovoltaics_forecast": "sensor.customer_optional_forecast",
+            "sensor_power_load_no_var_loads": "sensor.old_load",
+            "sensor_replace_zero": ["sensor.customer_optional_pv"],
+            "sensor_linear_interp": ["sensor.old_load"],
+        }
+        no_pv_entities = {
+            "load": ENTITY_IDS["load"],
+            "battery": ENTITY_IDS["battery"],
+            "soc": ENTITY_IDS["soc"],
+        }
+        synced, warnings = emhass_sync.build_emhass_sync_config(config, no_pv_entities)
+        self.assertEqual(warnings, [])
+        self.assertFalse(synced["set_use_pv"])
+        self.assertEqual(synced["sensor_power_photovoltaics"], "sensor.customer_optional_pv")
+        self.assertEqual(synced["sensor_power_photovoltaics_forecast"], "sensor.customer_optional_forecast")
+        self.assertEqual(synced["sensor_replace_zero"], ["sensor.customer_optional_pv"])
+        self.assertEqual(synced["sensor_linear_interp"], [ENTITY_IDS["load"]])
+        self.assertTrue(synced["continual_publish"])
+
+    def test_missing_pv_forecast_uses_emhass_standard_output_when_pv_enabled(self):
+        synced, warnings = emhass_sync.build_emhass_sync_config(
+            {"set_use_pv": True}, ENTITY_IDS
+        )
         self.assertEqual(warnings, [])
         self.assertEqual(synced["sensor_power_photovoltaics_forecast"], "sensor.p_pv_forecast")
         self.assertEqual(synced["sensor_replace_zero"], [ENTITY_IDS["pv"], "sensor.p_pv_forecast"])
 
     def test_custom_var_model_is_preserved_with_warning(self):
         synced, warnings = emhass_sync.build_emhass_sync_config(
-            {"sensor_power_load_no_var_loads": "sensor.old_load", "var_model": "sensor.custom_model_input"},
+            {
+                "set_use_pv": False,
+                "sensor_power_load_no_var_loads": "sensor.old_load",
+                "var_model": "sensor.custom_model_input",
+            },
             ENTITY_IDS,
         )
         self.assertEqual(synced["var_model"], "sensor.custom_model_input")
@@ -74,6 +103,7 @@ class EMHASSSyncTests(unittest.TestCase):
 
     def test_multiple_battery_sensor_lists_are_not_overwritten(self):
         config = {
+            "set_use_pv": False,
             "number_of_batteries": 2,
             "sensor_power_battery": ["sensor.battery_a", "sensor.battery_b"],
             "sensor_battery_state_of_charge": ["sensor.soc_a", "sensor.soc_b"],
@@ -85,16 +115,30 @@ class EMHASSSyncTests(unittest.TestCase):
         self.assertIn("multiple batteries", warnings[0])
 
     def test_diff_contains_only_changed_managed_keys_in_stable_order(self):
-        current = {"continual_publish": True, "set_use_pv": True, "custom": 1}
-        synced = {"continual_publish": False, "set_use_pv": True, "custom": 2}
+        current = {"continual_publish": False, "set_use_battery": True, "custom": 1}
+        synced = {"continual_publish": True, "set_use_battery": True, "custom": 2}
         self.assertEqual(
             emhass_sync.emhass_sync_changes(current, synced),
-            [{"key": "continual_publish", "current": True, "required": False}],
+            [{"key": "continual_publish", "current": False, "required": True}],
         )
 
-    def test_missing_required_entity_mapping_is_rejected(self):
+    def test_missing_required_battery_entity_mapping_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "battery"):
-            emhass_sync.build_emhass_sync_config({}, {"pv": "sensor.pv", "load": "sensor.load", "soc": "sensor.soc"})
+            emhass_sync.build_emhass_sync_config(
+                {"set_use_pv": False},
+                {"load": "sensor.load", "soc": "sensor.soc"},
+            )
+
+    def test_missing_pv_mapping_is_rejected_only_when_pv_enabled(self):
+        with self.assertRaisesRegex(ValueError, "pv"):
+            emhass_sync.build_emhass_sync_config(
+                {"set_use_pv": True},
+                {
+                    "load": "sensor.load",
+                    "battery": "sensor.battery",
+                    "soc": "sensor.soc",
+                },
+            )
 
 
 if __name__ == "__main__":
