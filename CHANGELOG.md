@@ -2,6 +2,31 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.31] - 2026-08-24
+
+### Added
+
+- Added an administrator-only **Debug session** to the existing dashboard LOG tab for high-detail problem analysis.
+- Added a bounded, memory-only 1200-event debug buffer that is disabled by default, starts each capture with a complete runtime baseline and retains a stopped session until clear/reload/restart.
+- Added observer hooks for full decoded GoodWe coordinator telemetry, poll health/errors, controller command/target/read-back, configured source state changes and EMHASS/orchestrator status transitions.
+- Added canonical register address/type/scale metadata to the support snapshot without introducing any new or guessed register definitions.
+- Added admin-only `gw_energypilot/debug_log/get`, `gw_energypilot/debug_log/set_enabled` and `gw_energypilot/debug_log/clear` WebSocket commands.
+- Added **Copy debug report**, combining the debug session/current runtime snapshot with the existing persistent optimization history.
+- Added Dutch/English debug-session UI text, `docs/DEBUG_LOG.md`, dedicated v0.31 release notes and bounded-session unit coverage.
+
+### Changed
+
+- The integration manifest and active frontend are now `0.31` / `gw-energy-pilot-v031.js`.
+- The existing persistent 50-run optimization history remains unchanged and is presented below the new temporary debug-session controls.
+
+### Safety / compatibility
+
+- Debug capture observes existing coordinator/controller/orchestrator signals; it does not add a second Modbus poller or control loop.
+- Debug data is not written to Home Assistant Store, Recorder or config-entry data and disappears on integration unload/reload or Home Assistant restart.
+- The configured GoodWe host/IP and EMHASS base URL are intentionally excluded from the report; configured entity IDs and diagnostic values are included for mapping/problem analysis.
+- No GoodWe register definitions, Modbus read blocks, EMS mappings/write order, EMHASS objective/configuration, entity IDs, unique IDs, device identity, accounting store or runtime store contracts change.
+- v0.31 remains **Beta** while the new support/debug workflow receives live-installation validation.
+
 ## [0.30] - 2026-08-24
 
 ### Added
