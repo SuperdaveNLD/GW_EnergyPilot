@@ -1,0 +1,190 @@
+import {
+  currentPrice, energyComparison, formatEnergy, formatPower, formatPrice, formatTime,
+  inferredPlanInterval, nicePowerPeak, planEnergy, t,
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.27-plan1";
+
+function priceRange(points) {
+  if (!points?.length) return null;
+  const values = points.map((p) => p.market);
+  let minimum = Math.min(...values);
+  let maximum = Math.max(...values);
+  if (minimum === maximum) {
+    minimum -= 0.05;
+    maximum += 0.05;
+  } else {
+    const padding = Math.max(0.01, (maximum - minimum) * 0.12);
+    minimum -= padding;
+    maximum += padding;
+  }
+  return { minimum, maximum };
+}
+
+function dimensions(size, modal) {
+  if (modal || size === "large") {
+    return { width: 1040, height: 470, left: 66, right: 82, top: 42, bottom: 52, xTicks: [0, 6, 12, 18, 24] };
+  }
+  if (size === "compact") {
+    return { width: 760, height: 215, left: 45, right: 55, top: 26, bottom: 38, xTicks: [0, 12, 24] };
+  }
+  return { width: 920, height: 340, left: 58, right: 72, top: 36, bottom: 46, xTicks: [0, 6, 12, 18, 24] };
+}
+
+function chartSvg(panel, data, size, modal) {
+  if (!data) return `<div class="ep-v027-empty">${panel._escape(t(panel, "waiting"))}</div>`;
+  const d = dimensions(size, modal);
+  const { width, height, left, right, top, bottom, xTicks } = d;
+  const plotW = width - left - right;
+  const plotH = height - top - bottom;
+  const zeroY = top + plotH / 2;
+  const peakKw = nicePowerPeak(data);
+  const range = priceRange(data.pricePoints);
+  const x = (timestamp) => left + ((timestamp - data.startMs) / Math.max(1, data.endMs - data.startMs)) * plotW;
+  const powerY = (watts) => zeroY - (watts / 1000 / peakKw) * (plotH / 2);
+  const priceY = (value) => range ? top + ((range.maximum - value) / (range.maximum - range.minimum)) * plotH : zeroY;
+
+  const grid = xTicks.map((hour) => {
+    const date = new Date(data.startMs);
+    date.setHours(hour === 24 ? 24 : hour, 0, 0, 0);
+    const xx = x(date.getTime());
+    const label = hour === 24 ? "24:00" : `${String(hour).padStart(2, "0")}:00`;
+    return `<line x1="${xx.toFixed(1)}" y1="${top}" x2="${xx.toFixed(1)}" y2="${height - bottom}" stroke="rgba(120,170,205,.075)"/><text x="${xx.toFixed(1)}" y="${height - 13}" text-anchor="middle" fill="#7895aa" font-size="${size === "compact" && !modal ? 10 : 11}">${label}</text>`;
+  }).join("");
+
+  const fractions = size === "compact" && !modal ? [-1, 0, 1] : [-1, -.5, 0, .5, 1];
+  const powerTicks = fractions.map((fraction) => {
+    const value = peakKw * fraction;
+    const yy = zeroY - fraction * (plotH / 2);
+    return `<line x1="${left}" y1="${yy.toFixed(1)}" x2="${width - right}" y2="${yy.toFixed(1)}" stroke="rgba(125,179,211,${fraction === 0 ? ".24" : ".07"})"/><text x="${left - 10}" y="${(yy + 4).toFixed(1)}" text-anchor="end" fill="#819caf" font-size="10">${Number(value.toFixed(1))}</text>`;
+  }).join("");
+
+  const actualSlot = plotW * (5 * 60 * 1000) / Math.max(1, data.endMs - data.startMs);
+  const actualWidth = Math.max(1.4, actualSlot * 0.56);
+  const actualBars = (data.actualRows || []).map((point) => {
+    const xx = x(point.t) - actualWidth / 2;
+    const yy = powerY(point.w);
+    const rectY = Math.min(yy, zeroY);
+    const rectH = Math.max(1, Math.abs(zeroY - yy));
+    const color = point.w < 0 ? "#27dfc2" : "#ffa52f";
+    const label = point.w < 0 ? t(panel, "actualCharge") : t(panel, "actualDischarge");
+    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${actualWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="1.5" fill="${color}" opacity=".92"><title>${panel._escape(`${formatTime(point.t)} · ${label} · ${formatPower(point.w)}`)}</title></rect>`;
+  }).join("");
+
+  const past = data.historicalPlanRows || [];
+  const historicalPlan = past.map((point, index) => {
+    const startT = Math.max(data.startMs, point.t);
+    const endT = Math.min(data.nowMs, past[index + 1]?.t ?? data.nowMs);
+    if (endT <= startT) return "";
+    const xx = x(startT);
+    const blockWidth = Math.max(2, x(endT) - xx);
+    const yy = powerY(point.w);
+    const rectY = Math.min(yy, zeroY);
+    const rectH = Math.max(1, Math.abs(zeroY - yy));
+    const color = point.w < 0 ? "#43e7ca" : "#ffb354";
+    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="2.5" fill="${color}" fill-opacity=".085" stroke="${color}" stroke-opacity=".32" stroke-width=".8"><title>${panel._escape(`${formatTime(startT)}–${formatTime(endT)} · ${t(panel, "plan")} · ${formatPower(point.w)}`)}</title></rect>`;
+  }).join("");
+
+  const future = data.futurePlanPoints || [];
+  const fallback = inferredPlanInterval(future);
+  const futurePlan = future.map((point, index) => {
+    if (point.t < data.nowMs) return "";
+    const nextT = future[index + 1]?.t ?? point.t + fallback;
+    const startT = Math.max(point.t, data.nowMs);
+    const endT = Math.min(nextT, data.endMs);
+    if (endT <= startT) return "";
+    const xx = x(startT);
+    const blockWidth = Math.max(2, x(endT) - xx - 1);
+    const yy = powerY(point.w);
+    const rectY = Math.min(yy, zeroY);
+    const rectH = Math.max(1, Math.abs(zeroY - yy));
+    const color = point.w < 0 ? "#43e7ca" : "#ffb354";
+    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="3" fill="${color}" fill-opacity=".075" stroke="${color}" stroke-opacity=".55" stroke-width="1" stroke-dasharray="5 4"><title>${panel._escape(`${formatTime(point.t)} · ${t(panel, "future")} · ${formatPower(point.w)}`)}</title></rect>`;
+  }).join("");
+
+  const pricePath = data.pricePoints?.length >= 2
+    ? data.pricePoints.map((p, index) => `${index ? "L" : "M"}${x(p.t).toFixed(1)},${priceY(p.market).toFixed(1)}`).join(" ")
+    : "";
+  const priceLine = pricePath ? `<path d="${pricePath}" fill="none" stroke="#55e8ff" stroke-width="${size === "compact" && !modal ? 2 : 2.5}" stroke-linejoin="round" stroke-linecap="round" filter="url(#epV027PriceGlow)"/>` : "";
+  const priceDots = (data.pricePoints || []).map((p) => `<circle cx="${x(p.t).toFixed(1)}" cy="${priceY(p.market).toFixed(1)}" r="5" fill="transparent"><title>${panel._escape(`${formatTime(p.t)} · ${formatPrice(panel, p.market, data.payload?.currency)}`)}</title></circle>`).join("");
+  const priceFractions = size === "compact" && !modal ? [0, .5, 1] : [0, .25, .5, .75, 1];
+  const priceTicks = range ? priceFractions.map((fraction) => {
+    const value = range.minimum + (range.maximum - range.minimum) * fraction;
+    const yy = priceY(value);
+    return `<text x="${width - right + 10}" y="${(yy + 4).toFixed(1)}" fill="#61dff2" font-size="10">${value.toFixed(2)}</text>`;
+  }).join("") : "";
+
+  const nowX = data.nowMs >= data.startMs && data.nowMs < data.endMs ? x(data.nowMs) : null;
+  const nowLine = nowX === null ? "" : `<line x1="${nowX.toFixed(1)}" y1="${top}" x2="${nowX.toFixed(1)}" y2="${height - bottom}" stroke="rgba(238,251,255,.28)" stroke-dasharray="4 5"/><text x="${nowX.toFixed(1)}" y="${top - 9}" text-anchor="middle" fill="#c4dae4" font-size="9">${panel._escape(t(panel, "now"))}</text>`;
+  const currency = panel._escape(data.payload?.currency || "EUR");
+  const titles = size === "compact" && !modal ? "" : `<text x="${left}" y="17" fill="#d9eaf2" font-size="11">${panel._escape(t(panel, "powerAxis"))}</text><text x="${width - right}" y="17" text-anchor="end" fill="#62e2f5" font-size="11">${panel._escape(t(panel, "priceAxis", { currency }))}</text>`;
+
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="${panel._escape(t(panel, "subtitle"))}"><defs><filter id="epV027PriceGlow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${titles}${grid}${powerTicks}${historicalPlan}${futurePlan}${actualBars}${priceLine}${priceDots}${priceTicks}${nowLine}</svg>`;
+}
+
+function sourceLine(panel, native, graphValue) {
+  return native
+    ? `${t(panel, "goodweCounter")} · ${t(panel, "graphEstimate", { value: formatEnergy(graphValue) })}`
+    : t(panel, "approximate");
+}
+
+function summaryHtml(panel, data, size, modal) {
+  const energy = energyComparison(data);
+  const planned = planEnergy(data);
+  const point = currentPrice(data?.pricePoints || [], data?.nowMs || Date.now());
+  const currency = data?.payload?.currency || "EUR";
+  const showPlan = modal || size === "large";
+  return `<div class="ep-v027-summary ${showPlan ? "with-plan" : ""}">
+    <div class="ep-v027-chip charge"><span class="ep-v027-icon">↓</span><div><small>${panel._escape(t(panel, "chargedToday"))}</small><strong>${panel._escape(formatEnergy(energy.charged))}</strong><em>${panel._escape(sourceLine(panel, energy.chargeNative, energy.graph.charged))}</em></div></div>
+    <div class="ep-v027-chip discharge"><span class="ep-v027-icon">↑</span><div><small>${panel._escape(t(panel, "dischargedToday"))}</small><strong>${panel._escape(formatEnergy(energy.discharged))}</strong><em>${panel._escape(sourceLine(panel, energy.dischargeNative, energy.graph.discharged))}</em></div></div>
+    <div class="ep-v027-chip price"><span class="ep-v027-icon">€</span><div><small>${panel._escape(t(panel, "currentPrice"))}</small><strong>${panel._escape(formatPrice(panel, point?.market, currency))}</strong><em>${panel._escape(data?.payload?.source || "—")}</em></div></div>
+    ${showPlan ? `<div class="ep-v027-chip plan-charge"><span class="ep-v027-icon">◇</span><div><small>${panel._escape(t(panel, "plannedCharge"))}</small><strong>${panel._escape(formatEnergy(planned.charged))}</strong><em>${panel._escape(t(panel, "plan"))}</em></div></div><div class="ep-v027-chip plan-discharge"><span class="ep-v027-icon">◇</span><div><small>${panel._escape(t(panel, "plannedDischarge"))}</small><strong>${panel._escape(formatEnergy(planned.discharged))}</strong><em>${panel._escape(t(panel, "plan"))}</em></div></div>` : ""}
+  </div>`;
+}
+
+function notesHtml(panel, data) {
+  const notes = [];
+  if (!data?.actualRows?.length) notes.push(t(panel, "noActual"));
+  if (!data?.historicalPlanRows?.length && !data?.futurePlanPoints?.length) notes.push(t(panel, "noPlan"));
+  if (!data?.pricePoints?.length) notes.push(data?.payload?.error || t(panel, "noPrice"));
+  if (data?.actualRows?.length) notes.push(t(panel, "energySource"));
+  if (data?.historicalPlanRows?.length || data?.futurePlanPoints?.length) notes.push(t(panel, "planHistory"));
+  const comparison = energyComparison(data);
+  if (comparison.chargeDifference > 0.25 || comparison.dischargeDifference > 0.25) notes.push(t(panel, "discrepancy"));
+  return notes.map((note) => `<span>${panel._escape(note)}</span>`).join(" · ");
+}
+
+function legendHtml(panel, size) {
+  if (size === "compact") {
+    return `<div class="ep-v027-legend compact"><span><i class="actual-combined"></i>${panel._escape(t(panel, "actual"))}</span><span><i class="plan"></i>${panel._escape(t(panel, "plan"))}</span><span><i class="price"></i>${panel._escape(t(panel, "marketPrice"))}</span></div>`;
+  }
+  return `<div class="ep-v027-legend"><span><i class="actual-charge"></i>${panel._escape(t(panel, "actualCharge"))}</span><span><i class="actual-discharge"></i>${panel._escape(t(panel, "actualDischarge"))}</span><span><i class="plan"></i>${panel._escape(t(panel, "plan"))}</span><span><i class="price"></i>${panel._escape(t(panel, "marketPrice"))}</span></div>`;
+}
+
+export function sizeControlHtml(panel, size) {
+  const definitions = [["compact", "S", t(panel, "compact")], ["normal", "M", t(panel, "normal")], ["large", "L", t(panel, "large")]];
+  return `<div class="ep-v027-size-control" role="group" aria-label="Chart size">${definitions.map(([value, label, title]) => `<button type="button" data-chart-size="${value}" class="${size === value ? "active" : ""}" title="${panel._escape(title)}" aria-pressed="${size === value ? "true" : "false"}">${label}</button>`).join("")}</div>`;
+}
+
+export function cardBody(panel, data, size, modal = false) {
+  return `<div class="ep-v027-chart size-${size} ${modal ? "modal" : ""}">${chartSvg(panel, data, size, modal)}</div>${legendHtml(panel, size)}${summaryHtml(panel, data, size, modal)}<div class="ep-v027-notes">${notesHtml(panel, data)}</div>`;
+}
+
+export function ensureStyles(root) {
+  if (root.querySelector("#ep-v027-battery-plan-style")) return;
+  const style = document.createElement("style");
+  style.id = "ep-v027-battery-plan-style";
+  style.textContent = `
+    .ep-v027-battery-plan-card{min-width:0;padding:17px 18px 14px;border:1px solid rgba(116,198,232,.20);border-radius:22px;background:linear-gradient(150deg,rgba(10,34,63,.93),rgba(5,18,38,.96));box-shadow:0 18px 50px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.035);position:relative;overflow:hidden;backdrop-filter:blur(24px);transition:grid-column .22s ease,padding .22s ease,border-radius .22s ease}
+    .ep-v027-battery-plan-card.size-compact{grid-column:span 2!important;padding:14px 14px 12px;border-radius:20px}.ep-v027-battery-plan-card.size-normal,.ep-v027-battery-plan-card.size-large{grid-column:1/-1!important}.ep-v027-battery-plan-card.size-large{padding:19px 20px 15px}
+    .ep-v027-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.ep-v027-head-actions{display:flex;align-items:center;gap:8px}.ep-v027-kicker{color:#65e6f9;font-size:10px;letter-spacing:.15em;font-weight:850}.ep-v027-subtitle{color:#819caf;font-size:10px;margin-top:4px}
+    .ep-v027-size-control{display:flex;align-items:center;padding:3px;border:1px solid rgba(255,255,255,.075);border-radius:999px;background:rgba(1,12,28,.42);box-shadow:inset 0 1px 8px rgba(0,0,0,.20)}.ep-v027-size-control button{width:29px;height:27px;border:0;border-radius:999px;background:transparent;color:#7793a7;font:700 9px -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease}.ep-v027-size-control button.active{background:rgba(255,255,255,.13);color:#f0fbff;box-shadow:0 1px 8px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.12)}
+    .ep-v027-expand{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;border:1px solid rgba(72,198,235,.22);background:rgba(9,47,74,.50);color:#c3eff8;cursor:pointer;font-size:17px;transition:background .16s ease,border-color .16s ease,transform .16s ease}.ep-v027-expand:hover{background:rgba(12,66,94,.68);border-color:rgba(73,225,248,.42);transform:translateY(-1px)}
+    .ep-v027-chart{margin-top:8px;border-radius:15px;background:rgba(1,12,28,.25);overflow:hidden}.ep-v027-chart.size-compact{min-height:160px}.ep-v027-chart.size-normal{min-height:260px}.ep-v027-chart.size-large{min-height:360px}.ep-v027-chart svg{display:block}.ep-v027-empty{min-height:190px;display:grid;place-items:center;color:#7895aa;font-size:10px}
+    .ep-v027-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px 19px;margin:5px 0 12px;color:#91a9ba;font-size:9px}.ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-legend i{display:inline-block}.ep-v027-legend i.actual-charge,.ep-v027-legend i.actual-discharge{width:9px;height:9px;border-radius:3px;background:#27dfc2}.ep-v027-legend i.actual-discharge{background:#ffa52f}.ep-v027-legend i.actual-combined{width:15px;height:9px;border-radius:3px;background:linear-gradient(90deg,#27dfc2 0 50%,#ffa52f 50% 100%)}.ep-v027-legend i.plan{width:16px;height:8px;border:1px dashed #88aebd;border-radius:3px;background:rgba(255,255,255,.025)}.ep-v027-legend i.price{width:18px;height:2px;border-radius:999px;background:#55e8ff;box-shadow:0 0 8px rgba(85,232,255,.42)}
+    .ep-v027-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ep-v027-summary.with-plan{grid-template-columns:repeat(5,minmax(0,1fr))}.ep-v027-chip{min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid rgba(255,255,255,.055);border-radius:13px;background:rgba(255,255,255,.022);box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}.ep-v027-icon{width:29px;height:29px;flex:0 0 29px;display:grid;place-items:center;border-radius:50%;border:1px solid rgba(39,224,193,.62);color:#42ebce;font-size:14px}.ep-v027-chip.discharge .ep-v027-icon{border-color:rgba(255,165,47,.66);color:#ffb34a}.ep-v027-chip.price .ep-v027-icon{border-color:rgba(85,232,255,.62);color:#64e9fb}.ep-v027-chip.plan-charge .ep-v027-icon,.ep-v027-chip.plan-discharge .ep-v027-icon{border-color:rgba(171,205,220,.38);color:#a8c5d1}.ep-v027-chip small{display:block;color:#849dae;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ep-v027-chip strong{display:block;margin-top:2px;color:#eff9fd;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ep-v027-chip em{display:block;margin-top:2px;color:#607c90;font-size:7px;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ep-v027-notes{margin-top:9px;color:#617f94;font-size:8px;line-height:1.5}.ep-v027-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px}.ep-v027-footer-actions{display:flex;align-items:center;gap:12px}.ep-v027-footer button{border:0;padding:0;background:transparent;color:#70d5eb;cursor:pointer;font:inherit;font-size:8px}.ep-v027-footer span{color:#607d92;font-size:8px}
+    .ep-v027-battery-plan-card.size-compact .ep-v027-subtitle{max-width:340px}.ep-v027-battery-plan-card.size-compact .ep-v027-notes{display:none}.ep-v027-battery-plan-card.size-compact .ep-v027-legend{gap:7px 12px;margin:3px 0 9px}.ep-v027-battery-plan-card.size-compact .ep-v027-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip{padding:8px;gap:7px}.ep-v027-battery-plan-card.size-compact .ep-v027-icon{width:25px;height:25px;flex-basis:25px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip strong{font-size:12px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip em{display:none}
+    @media(max-width:1000px){.ep-v027-battery-plan-card.size-compact{grid-column:1/-1!important}.ep-v027-summary.with-plan{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:720px){.ep-v027-battery-plan-card{padding:14px 13px 12px;border-radius:18px}.ep-v027-head{align-items:flex-start}.ep-v027-head-actions{gap:6px}.ep-v027-size-control button{width:27px}.ep-v027-summary,.ep-v027-summary.with-plan{grid-template-columns:1fr}.ep-v027-chip strong{font-size:13px}.ep-v027-chart.size-normal{min-height:220px}.ep-v027-chart.size-large{min-height:260px}}
+  `;
+  root.appendChild(style);
+}
