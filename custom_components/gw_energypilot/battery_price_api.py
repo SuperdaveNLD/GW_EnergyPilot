@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 
 from .battery_plan import (
+    emhass_schedule_attribute,
     finite_number,
     nonnegative_number,
     normalize_emhass_forecasts,
@@ -63,15 +64,18 @@ def _battery_plan_payload(
             "available": False,
             "current_w": None,
             "last_updated": None,
+            "schedule_attribute": None,
             "points": [],
         }
 
+    schedule_attribute = emhass_schedule_attribute(state.attributes)
     points = normalize_emhass_forecasts(entity_id, state.attributes)
     return {
         "entity_id": entity_id,
         "available": finite_number(state.state) is not None or bool(points),
         "current_w": finite_number(state.state),
         "last_updated": state.last_updated.isoformat(),
+        "schedule_attribute": schedule_attribute,
         "points": points,
     }
 
@@ -111,7 +115,7 @@ async def websocket_get_battery_price(
         msg["id"],
         {
             "entry_id": entry.entry_id,
-            "chart_schema_version": 2,
+            "chart_schema_version": 3,
             **price_payload,
             "battery_energy": _battery_energy_payload(runtime_data),
             "battery_plan": _battery_plan_payload(hass, entry),
