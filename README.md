@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.28 · Beta**
+**v0.30 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -27,15 +27,14 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.28 highlights
+## v0.30 highlights
 
-- Corrected **Hybrid control**: buying/import uses GoodWe mode `9` from EMHASS `P_grid`; selling/discharging uses mode `12` from EMHASS `P_batt`.
-- Neutral Hybrid battery plans remain mode `8` Battery Hold.
-- Hybrid charging without planned grid import falls back to GoodWe mode `1` self-use so local PV surplus can be absorbed without forcing a forecast-sized battery charge.
-- Repaired the **S / M / L Battery · Plan · Price** graph after v0.27 field validation: current EMHASS `battery_scheduled_power`, midnight plan continuity, active forecast interval clipping, visible dashed plan overlays and stepwise market prices.
-- Missing plan data is shown as unavailable instead of `0.00 kWh`, and near-zero actual samples are no longer presented as false discharge bars.
-- Native GoodWe battery-day counters remain the headline daily totals; Recorder power integration is explicitly a separate comparison measurement path.
-- Compact Support diagnostics, synchronized on-grid minimum SOC, Grid/Battery strategies and persistent runtime/accounting contracts remain unchanged.
+- Battery · Plan · Price now prefers the official EMHASS `GET /api/v1/plan` output for the complete future `P_batt` horizon, with existing Home Assistant schedule attributes retained as compatibility fallbacks.
+- Historical published `P_batt` targets remain Recorder-backed; future forecast blocks use the same dashed visual language to the right of NOW.
+- The visible S/M/L selector is replaced by EnergyPilot card chrome: coral `×` hides, cyan `−` cycles Compact/Normal/Large, and mint `↗` opens the detailed graph.
+- Every card already managed by the persistent dashboard layout receives a recoverable red close control using the existing Layout & visibility preference.
+- Battery daily headline totals remain the native GoodWe `35208/35211` counters; Recorder integration remains a separate visual comparison.
+- v0.29 EMHASS configuration synchronization, v0.28 Hybrid control, Max Charge SOC guard and all established Modbus/EMS safety boundaries remain unchanged.
 
 ## Tested hardware
 
@@ -199,11 +198,11 @@ The chart is read-only.
 - actual battery bars use Recorder 5-minute means from the existing GoodWe `battery_power` entity;
 - charging is below zero, discharging above zero, while near-zero samples are not drawn as false directional bars;
 - historical plan blocks use the configured EnergyPilot `P_batt` entity history, including the state already active at local midnight;
-- future plan blocks use current EMHASS `battery_scheduled_power`; legacy/custom `forecasts` remains a compatibility fallback;
-- the forecast interval active at NOW is clipped at NOW rather than discarded because it began a few minutes earlier;
-- dashed plan overlays render above solid actual bars;
+- future plan blocks prefer the latest official EMHASS `/api/v1/plan` `P_batt` horizon;
+- `battery_scheduled_power` and legacy/custom `forecasts` remain compatibility fallbacks when the official plan endpoint is unavailable;
+- dashed historical/future plan overlays render above solid actual bars and the current future interval is clipped at NOW;
 - the market-price series comes from the same EnergyPilot runtime price source used for EMHASS and is rendered as interval steps;
-- the card supports S/M/L layouts and an expanded detail view;
+- the cyan `−` control cycles Compact, Normal and Large chart layouts; mint `↗` opens the detailed graph;
 - native GoodWe day counters `35208` / `35211` are preferred for the headline charged/discharged totals;
 - Recorder-integrated battery power remains a separate visualization comparison and is not calibrated to force a match with the native inverter counter;
 - if no usable plan exists, planned-energy summaries display `—` rather than a fabricated zero.
