@@ -2,6 +2,52 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.31] - 2026-08-24
+
+### Added
+
+- Added **Battery Saver** to dashboard Settings → EMHASS with four EnergyPilot-owned modes: **Mad-Steve**, **Gold Rush**, **Balanced** and **Battery Saver**.
+- Added price-relative soft penalties for low SOC, high SOC and battery power stress while keeping the existing Minimum/Maximum SOC controls as hard limits.
+- Added admin-only `gw_energypilot/battery_saver/get` and `gw_energypilot/battery_saver/set` APIs, explicit legacy/custom detection and failed-apply rollback for Battery Saver-owned EMHASS fields.
+- Added `docs/BATTERY_SAVER.md` with the profile values, LFP design rationale, ownership model and runtime flow.
+- Added an administrator-only **Debug session** to the existing dashboard LOG tab for high-detail problem analysis.
+- Added a bounded, memory-only 1200-event debug buffer that is disabled by default, starts each capture with a complete runtime baseline and retains a stopped session until clear/reload/restart.
+- Added observer hooks for full decoded GoodWe coordinator telemetry, poll health/errors, controller command/target/read-back, configured source state changes and EMHASS/orchestrator status transitions.
+- Added canonical register address/type/scale metadata to the support snapshot without introducing any new or guessed register definitions.
+- Added admin-only `gw_energypilot/debug_log/get`, `gw_energypilot/debug_log/set_enabled` and `gw_energypilot/debug_log/clear` WebSocket commands.
+- Added **Copy debug report**, combining the debug session/current runtime snapshot with the existing persistent optimization history.
+- Added EnergyPilot-styled traffic-light controls to all normal dashboard cards: hide, collapse and full-width.
+- Added regression coverage for Battery Saver profile calculations, SOC clamping, EMHASS-version gating, zero-cost legacy detection, continual publication and battery-only EMHASS synchronization.
+
+### Fixed
+
+- Fixed stale 15-minute EMHASS targets by changing the required contract from `continual_publish = false` to **`continual_publish = true`**. EnergyPilot continues to own full optimization timing while EMHASS advances and republishes the saved plan at each optimization timestep.
+- Fixed startup Minimum SOC ownership: the existing synchronized slider now uses the verified GoodWe on-grid minimum SOC as its source of truth and mirrors that floor to EMHASS instead of initializing from an arbitrary EMHASS value.
+- Fixed runtime terminal SOC requests below/above hard limits by clamping EnergyPilot `soc_final` to the effective EMHASS minimum/maximum SOC before an owned solve.
+- Fixed required EMHASS synchronization for battery-only installations. `set_use_pv` is no longer forced; PV mappings are required/synchronized only when the customer's EMHASS configuration enables PV.
+- Fixed settings persistence so the separately managed Battery Saver mode survives normal Home Assistant options changes and generic EnergyPilot settings saves.
+
+### Changed
+
+- EnergyPilot-owned EMHASS optimizations now enforce the small runtime contract `continual_publish = true`, `method_ts_round = first`, `set_use_battery = true` and `inverter_is_hybrid = true` immediately before solving.
+- `set_use_pv` remains customer/install-specific and is not an EnergyPilot-required value.
+- Existing zero-penalty EMHASS installations are treated as Mad-Steve-like but remain unmanaged until a user explicitly selects a Battery Saver mode. Existing custom non-zero penalty settings are preserved on upgrade.
+- Non-zero Battery Saver power-stress modes require EMHASS 0.18.1 or newer when the EMHASS version is known.
+- The active v0.31 frontend is `gw-energy-pilot-v031-battery-saver.js`, layered over the debug and dashboard-window-control stack.
+- The existing persistent 50-run optimization history remains unchanged and is presented below the temporary debug-session controls.
+
+### Safety / compatibility
+
+- Battery Saver changes EMHASS optimization preferences; it never directly writes a GoodWe EMS mode. Published targets continue through the existing Automatic Control path.
+- No second EnergyPilot 15-minute publisher is added; EMHASS `continual_publish` owns current-row publication.
+- Battery Saver refuses multi-battery EMHASS ownership rather than guessing per-battery mappings.
+- Existing GoodWe EMS registers, write ordering, controller strategies, entity IDs, unique IDs and stable device identity are preserved.
+- No new or guessed GoodWe register definitions or Modbus read blocks are introduced.
+- Debug capture observes existing coordinator/controller/orchestrator signals; it does not add a second Modbus poller or control loop.
+- Debug data is not written to Home Assistant Store, Recorder or config-entry data and disappears on integration unload/reload or Home Assistant restart.
+- The configured GoodWe host/IP and EMHASS base URL are intentionally excluded from the debug report; configured entity IDs and diagnostic values are included for mapping/problem analysis.
+- v0.31 remains **Beta** while Battery Saver tuning and the expanded support/dashboard workflow receive broader field validation.
+
 ## [0.30] - 2026-08-24
 
 ### Added
@@ -206,7 +252,7 @@ All notable changes to GW EnergyPilot are documented here.
 ### Safety / compatibility
 
 - No GoodWe register definitions or Modbus read blocks change.
-- EMS registers remain `47511`/`47512`; write order remains `47512 -> wait -> 47511`.
+- EMS registers remain `47511/47512`; write order remains `47512 -> wait -> 47511`.
 - Explicit PCC-control installations retain their selected strategy.
 - Manual EMS modes, entity unique IDs, device identity, accounting stores and orchestrator runtime state are unchanged.
 - v0.24 remains **Beta** while the restored default is field-verified after upgrade from v0.23.

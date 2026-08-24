@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.31** | 2026-08-24 | **Beta** | Adds an opt-in, administrator-only debug session to LOG with bounded memory-only runtime tracing, full decoded GoodWe telemetry, controller/read-back and EMHASS status correlation, plus a copyable support report. |
 | **0.30** | 2026-08-24 | **Beta** | Standardizes numeric GitHub Releases for HACS/Home Assistant so updates show `0.30` instead of a shortened commit SHA, with validated release automation and a synchronized v0.30 frontend badge. |
 | **0.29** | 2026-08-24 | **Beta** | Adds safe EMHASS required-config synchronization and recommended defaults, resolves current EnergyPilot entity IDs from the Home Assistant registry, and adds a final live-flow double-reversal guard. |
 | **0.28** | 2026-08-24 | **Beta** | Corrects Hybrid control to mode-9 buying / mode-12 selling and repairs the Battery · Plan · Price chart: canonical EMHASS battery schedule, historical-plan continuity, visible plan overlays, active-interval clipping and stepwise market prices. |
@@ -45,6 +46,26 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.31 — Opt-in debug sessions for problem analysis
+
+v0.31 extends the existing dashboard **LOG** tab with a temporary high-detail debug session. The existing persistent 50-run optimization history remains unchanged and continues below the new debug controls.
+
+Debug capture is administrator-only and **off by default**. Starting it opens a fresh memory-only session with a complete baseline. While active, EnergyPilot observes its existing coordinator, controller and orchestrator signals and records:
+
+- all decoded GoodWe telemetry values plus canonical `registers.py` address/type/scale metadata;
+- coordinator poll success/failure, latest update exception and current Modbus connection state;
+- controller strategy, command, target and GoodWe EMS mode/setpoint read-back;
+- configured `P_batt`, `P_grid`, optimization-status and optional EV source changes;
+- EMHASS/orchestrator status transitions and the HTTP/error diagnostics already exposed by the orchestrator.
+
+The session is bounded to the newest 1200 events. Stopping capture preserves the session in memory for copying; clearing, integration reload/unload or Home Assistant restart discards it. Debug events are not written to Home Assistant Store, Recorder or config-entry data.
+
+**Copy debug report** combines the current debug session/runtime snapshot with the existing persistent optimization history. The configured GoodWe host/IP and EMHASS base URL are intentionally excluded; configured entity IDs and diagnostic values remain because they are needed to diagnose mapping and stale/unavailable-input problems.
+
+Debug capture is observer-only: it does not add a second Modbus poller, change a register/read block, write an EMS command, alter EMHASS configuration, trigger an optimization or introduce new entities/unique IDs.
+
+See `docs/DEBUG_LOG.md` and `docs/RELEASE_NOTES_V031.md`.
 
 # v0.30 — Versioned HACS/Home Assistant releases
 

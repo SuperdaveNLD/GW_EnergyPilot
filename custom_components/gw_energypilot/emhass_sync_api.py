@@ -53,6 +53,7 @@ ENTITY_KEYS: dict[str, str] = {
     "battery": "battery_power",
     "soc": "battery_soc",
 }
+REQUIRED_ENTITY_PURPOSES = {"load", "battery", "soc"}
 
 
 def _resolve_entry(hass: HomeAssistant, entry_id: str | None) -> ConfigEntry | None:
@@ -83,20 +84,32 @@ def _recommended_emhass_options() -> dict[str, Any]:
     }
 
 
-def _resolve_required_entities(hass: HomeAssistant, entry: ConfigEntry) -> tuple[dict[str, str], list[str]]:
+def _resolve_required_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> tuple[dict[str, str], list[str]]:
+    """Resolve canonical entities, treating PV as optional until EMHASS enables it."""
     registry = er.async_get(hass)
     entity_ids: dict[str, str] = {}
     missing: list[str] = []
     for purpose, key in ENTITY_KEYS.items():
-        entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{entry.entry_id}_{key}"
+        )
         if entity_id:
             entity_ids[purpose] = entity_id
-        else:
+        elif purpose in REQUIRED_ENTITY_PURPOSES:
             missing.append(key)
     return entity_ids, missing
 
 
-def _payload_from_config(entry: ConfigEntry, config: dict[str, Any], entity_ids: dict[str, str], *, error: str | None = None) -> dict[str, Any]:
+def _payload_from_config(
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    entity_ids: dict[str, str],
+    *,
+    error: str | None = None,
+) -> dict[str, Any]:
     synced, warnings = build_emhass_sync_config(config, entity_ids)
     changes = emhass_sync_changes(config, synced)
     managed_keys = (
@@ -110,7 +123,6 @@ def _payload_from_config(entry: ConfigEntry, config: dict[str, Any], entity_ids:
         "var_model",
         "continual_publish",
         "method_ts_round",
-        "set_use_pv",
         "set_use_battery",
         "inverter_is_hybrid",
     )
@@ -135,7 +147,10 @@ def _payload_from_config(entry: ConfigEntry, config: dict[str, Any], entity_ids:
     }
 
 
-async def _async_get_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
+async def _async_get_payload(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> dict[str, Any]:
     entity_ids, missing = _resolve_required_entities(hass, entry)
     base = {
         "entry_id": entry.entry_id,
@@ -149,38 +164,68 @@ async def _async_get_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[st
         "error": None,
     }
     if missing:
-        base["error"] = "Required EnergyPilot entities are not registered yet: " + ", ".join(missing)
+        base["error"] = (
+            "Required EnergyPilot entities are not registered yet: "
+            + ", ".join(missing)
+        )
         return base
     try:
         config = await async_get_emhass_config(hass, entry)
-    except HomeAssistantError as err:
+        return _payload_from_config(entry, config, entity_ids)
+    except (HomeAssistantError, ValueError) as err:
         base["error"] = str(err)
         return base
-    return _payload_from_config(entry, config, entity_ids)
 
 
 @websocket_api.require_admin
-@websocket_api.websocket_command({vol.Required("type"): "gw_energypilot/emhass_sync/get", vol.Optional("entry_id"): str})
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "gw_energypilot/emhass_sync/get",
+        vol.Optional("entry_id"): str,
+    }
+)
 @websocket_api.async_response
-async def websocket_get_emhass_sync(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+async def websocket_get_emhass_sync(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
     entry = _resolve_entry(hass, msg.get("entry_id"))
     if entry is None:
-        connection.send_error(msg["id"], "not_found", "GW EnergyPilot config entry not found")
+        connection.send_error(
+            msg["id"], "not_found", "GW EnergyPilot config entry not found"
+        )
         return
     connection.send_result(msg["id"], await _async_get_payload(hass, entry))
 
 
 @websocket_api.require_admin
-@websocket_api.websocket_command({vol.Required("type"): "gw_energypilot/emhass_sync/apply", vol.Required("entry_id"): str})
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "gw_energypilot/emhass_sync/apply",
+        vol.Required("entry_id"): str,
+    }
+)
 @websocket_api.async_response
-async def websocket_apply_emhass_sync(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+async def websocket_apply_emhass_sync(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
     entry = _resolve_entry(hass, msg["entry_id"])
     if entry is None:
-        connection.send_error(msg["id"], "not_found", "GW EnergyPilot config entry not found")
+        connection.send_error(
+            msg["id"], "not_found", "GW EnergyPilot config entry not found"
+        )
         return
     entity_ids, missing = _resolve_required_entities(hass, entry)
     if missing:
-        connection.send_error(msg["id"], "entities_not_ready", "Required EnergyPilot entities are not registered yet: " + ", ".join(missing))
+        connection.send_error(
+            msg["id"],
+            "entities_not_ready",
+            "Required EnergyPilot entities are not registered yet: "
+            + ", ".join(missing),
+        )
         return
     try:
         current = await async_get_emhass_config(hass, entry)
@@ -191,12 +236,18 @@ async def websocket_apply_emhass_sync(hass: HomeAssistant, connection: websocket
         verified = await async_get_emhass_config(hass, entry)
         payload = _payload_from_config(entry, verified, entity_ids)
         payload["applied_changes"] = requested_changes
-        payload["warnings"] = list(dict.fromkeys([*warnings, *payload["warnings"]]))
+        payload["warnings"] = list(
+            dict.fromkeys([*warnings, *payload["warnings"]])
+        )
     except (HomeAssistantError, ValueError) as err:
         connection.send_error(msg["id"], "sync_failed", str(err))
         return
     if not payload["synchronized"]:
-        connection.send_error(msg["id"], "verification_failed", "EMHASS accepted the configuration write but required values did not verify")
+        connection.send_error(
+            msg["id"],
+            "verification_failed",
+            "EMHASS accepted the configuration write but required values did not verify",
+        )
         return
     connection.send_result(msg["id"], payload)
 

@@ -39,6 +39,7 @@ CONF_NORDPOOL_AREA = "nordpool_area"
 CONF_NORDPOOL_CURRENCY = "nordpool_currency"
 CONF_BUY_PRICE_ADDER = "buy_price_adder"
 CONF_SELL_PRICE_DEDUCTION = "sell_price_deduction"
+CONF_BATTERY_SAVER_MODE = "battery_saver_mode"
 
 DEFAULT_PORT = 502
 DEFAULT_SLAVE = 247
@@ -74,6 +75,10 @@ DEFAULT_NORDPOOL_AREA = ""
 DEFAULT_NORDPOOL_CURRENCY = "EUR"
 DEFAULT_BUY_PRICE_ADDER = 0.0
 DEFAULT_SELL_PRICE_DEDUCTION = 0.0248
+# Mad-Steve is behavior-compatible with the historic zero-penalty EMHASS setup.
+# Existing entries only become Battery Saver-managed after this option is
+# explicitly persisted; see orchestrator policy preparation.
+DEFAULT_BATTERY_SAVER_MODE = "mad_steve"
 
 REGISTER_EMS_MODE = 47511
 REGISTER_EMS_POWER = 47512

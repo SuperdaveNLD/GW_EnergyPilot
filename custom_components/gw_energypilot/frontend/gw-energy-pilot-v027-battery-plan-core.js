@@ -34,6 +34,16 @@ function openModal(panel) {
 function installEnhancedCard(panel, root) {
   const layout = root.querySelector(".ep-dashboard-layout");
   if (!layout) return;
+
+  // A cache-busted frontend module can wrap _render more than once during a
+  // live upgrade. Keep the first enhanced card as the canonical instance and
+  // remove any already-created duplicates instead of appending another card.
+  const existingCards = [...root.querySelectorAll(".ep-v027-battery-plan-card")];
+  if (existingCards.length) {
+    for (const duplicate of existingCards.slice(1)) duplicate.remove();
+    return;
+  }
+
   const oldCard = root.querySelector(".ep-v026-battery-price-card");
   const size = chartSize();
   const data = panel.__epV027BatteryPlanData;

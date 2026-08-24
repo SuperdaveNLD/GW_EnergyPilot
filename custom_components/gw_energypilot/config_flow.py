@@ -14,6 +14,7 @@ from homeassistant.helpers import selector
 
 from .client import GWModbusClient, GWModbusError
 from .const import (
+    CONF_BATTERY_SAVER_MODE,
     CONF_BUY_PRICE_ADDER,
     CONF_DEADBAND,
     CONF_EMHASS_FALLBACK_LOAD,
@@ -398,7 +399,15 @@ class GWOptionsFlow(OptionsFlowWithReload):
     ) -> ConfigFlowResult:
         """Manage options."""
         if user_input is not None:
-            return self.async_create_entry(data=_options_from_form(user_input))
+            stored_options = _options_from_form(user_input)
+            # Battery Saver is intentionally managed from the EnergyPilot
+            # dashboard EMHASS tab. Preserve that option when the standard Home
+            # Assistant options flow updates unrelated controller settings.
+            if CONF_BATTERY_SAVER_MODE in self.config_entry.options:
+                stored_options[CONF_BATTERY_SAVER_MODE] = self.config_entry.options[
+                    CONF_BATTERY_SAVER_MODE
+                ]
+            return self.async_create_entry(data=stored_options)
 
         schema = self.add_suggested_values_to_schema(
             _controller_schema(

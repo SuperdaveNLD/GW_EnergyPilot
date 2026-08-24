@@ -21,6 +21,7 @@ from .config_flow import (
     _options_from_form,
 )
 from .const import (
+    CONF_BATTERY_SAVER_MODE,
     CONF_BUY_PRICE_ADDER,
     CONF_DEADBAND,
     CONF_EMHASS_FALLBACK_LOAD,
@@ -529,6 +530,10 @@ async def websocket_update_settings(
             return
 
         form_values = _options_for_form(dict(entry.options))
+        # Battery Saver is managed by its dedicated control, not by this generic
+        # form schema. Remove it before validation and restore it after converting
+        # the regular form values back to config-entry options.
+        form_values.pop(CONF_BATTERY_SAVER_MODE, None)
         form_values.update(values)
         for key in OPTIONAL_ENTITY_KEYS:
             if form_values.get(key) in (None, ""):
@@ -544,6 +549,10 @@ async def websocket_update_settings(
         except (vol.Invalid, TypeError, ValueError) as err:
             connection.send_error(msg["id"], "invalid_settings", str(err))
             return
+        if CONF_BATTERY_SAVER_MODE in entry.options:
+            stored_options[CONF_BATTERY_SAVER_MODE] = entry.options[
+                CONF_BATTERY_SAVER_MODE
+            ]
         hass.config_entries.async_update_entry(entry, options=stored_options)
 
     require_restart = await _async_reload_entry(hass, entry)

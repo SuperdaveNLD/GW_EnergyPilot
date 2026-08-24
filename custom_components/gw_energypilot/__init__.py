@@ -17,15 +17,18 @@ from homeassistant.helpers.typing import ConfigType
 
 from .accounting import GWEnergyPilotAccounting
 from .battery_price_api import async_register_battery_price_api
+from .battery_saver_api import async_register_battery_saver_api
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
+from .debug_log_api import async_register_debug_log_api
+from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
-from .orchestrator_v026 import GWEnergyPilotOrchestrator
+from .orchestrator_v031 import GWEnergyPilotOrchestrator
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
 
@@ -40,7 +43,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v030.js?v=0.30-release1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v031-battery-saver.js?v=0.31-battery-saver1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -53,6 +56,7 @@ class GWRuntimeData:
     controller: GWEnergyPilotController
     orchestrator: GWEnergyPilotOrchestrator
     accounting: GWEnergyPilotAccounting
+    debug_log: GWEnergyPilotDebugRuntime
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -65,7 +69,9 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     async_register_beta_soc_api(hass)
     async_register_smart_meter_api(hass)
     async_register_optimization_log_api(hass)
+    async_register_debug_log_api(hass)
     async_register_battery_price_api(hass)
+    async_register_battery_saver_api(hass)
     async_register_emhass_sync_api(hass)
     return True
 
@@ -127,14 +133,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
+    debug_log = GWEnergyPilotDebugRuntime(hass, entry.entry_id)
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
         controller=controller,
         orchestrator=orchestrator,
         accounting=accounting,
+        debug_log=debug_log,
     )
 
+    await debug_log.async_start(entry)
     await accounting.async_prepare()
     await controller.async_setup()
     await orchestrator.async_setup()
@@ -156,6 +165,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     if unload_ok:
         while entry.runtime_data.event_unsubs:
             entry.runtime_data.event_unsubs.pop()()
+        await entry.runtime_data.debug_log.async_unload()
         await entry.runtime_data.accounting.async_unload()
         await entry.runtime_data.orchestrator.async_unload()
         await entry.runtime_data.controller.async_unload()
