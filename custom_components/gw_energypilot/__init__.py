@@ -1,10 +1,9 @@
 """GW EnergyPilot integration."""
-
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Callable
 
 from homeassistant.components import panel_custom
 from homeassistant.components.frontend import async_panel_exists
@@ -13,18 +12,17 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.typing import ConfigType
 
 from .accounting import GWEnergyPilotAccounting
 from .battery_price_api import async_register_battery_price_api
-from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
-from .event_triggers import async_setup_event_triggers
+from .emhass_config_api import async_register_emhass_config_api
+from .events import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
-from .orchestrator_v026 import GWEnergyPilotOrchestrator
+from .orchestrator import GWEnergyPilotOrchestrator
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
 
@@ -39,7 +37,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v028.js?v=0.28-hybrid9-12-1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v028.js?v=0.28-chart1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -55,13 +53,13 @@ class GWRuntimeData:
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
-type GWConfigEntry = ConfigEntry[GWRuntimeData]
+GWConfigEntry = ConfigEntry[GWRuntimeData]
 
 
-async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
-    """Set up integration-wide dashboard APIs."""
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up GW EnergyPilot."""
+    async_register_emhass_config_api(hass)
     async_register_settings_api(hass)
-    async_register_beta_soc_api(hass)
     async_register_smart_meter_api(hass)
     async_register_optimization_log_api(hass)
     async_register_battery_price_api(hass)
@@ -69,10 +67,10 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
 
 
 def _migrate_device_identifier(hass: HomeAssistant, entry: GWConfigEntry) -> None:
-    """Move the legacy mutable host:slave device identifier to entry_id."""
+    """Move an existing host-based device identifier to the stable entry id."""
     registry = dr.async_get(hass)
     stable_identifier = (DOMAIN, entry.entry_id)
-    if registry.async_get_device_by_identifier(stable_identifier, entry.entry_id):
+    if registry.async_get_device_by_identifier(stable_identifier, entry.entry_id) is not None:
         return
 
     legacy_identifier = (
