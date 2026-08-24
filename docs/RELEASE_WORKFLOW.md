@@ -20,12 +20,16 @@ Do not prefix the Git tag with `v` while the manifest uses an unprefixed version
 
 ## Automated release publishing
 
-`.github/workflows/release.yml` runs when a version-like Git tag is pushed.
+`.github/workflows/release.yml` runs for pushes to `main`, numeric version tags and manual workflow dispatches.
 
-Before a GitHub Release is published it verifies:
+For a normal release, the manifest version is the release version. If no published GitHub Release exists for that version, the workflow validates the repository and creates the matching release/tag from the validated `main` commit. If the release already exists, publication work is skipped.
 
-1. the tag is a numeric release version;
-2. the tag exactly matches the integration manifest version;
+A manually pushed numeric tag remains supported. In that case the tag must exactly match the manifest version and the existing tag is verified before the GitHub Release is created.
+
+Before a new GitHub Release is published the workflow verifies:
+
+1. the manifest/release version is numeric;
+2. a manually pushed tag, when used, exactly matches the integration manifest version;
 3. Python sources compile;
 4. the unit test suite passes;
 5. `scripts/validate_repo.py` passes;
@@ -42,19 +46,20 @@ docs/RELEASE_NOTES_V030.md
 
 If no dedicated release-notes file exists, GitHub generated release notes are used instead.
 
-## Preparing v0.30
+## Preparing a release
 
-Before publishing v0.30:
+Before publishing a new release:
 
-1. Set `custom_components/gw_energypilot/manifest.json` to `0.30`.
-2. Set the active frontend release wrapper/version badge to `0.30`.
-3. Add the `0.30` entry to `CHANGELOG.md`.
-4. Add the `0.30` status row and release section to `docs/RELEASE_NOTES.md`.
-5. Add `docs/RELEASE_NOTES_V030.md` with the user-facing release notes.
-6. Merge the release changes to `main` and confirm normal CI is green.
-7. Create and push tag `0.30` on the intended `main` commit.
-8. Let the release workflow publish the GitHub Release.
-9. Verify HACS/Home Assistant reports `0.30` as the available version instead of a commit SHA.
+1. Set `custom_components/gw_energypilot/manifest.json` to the new numeric version.
+2. Set the active frontend release wrapper/version badge to the same version.
+3. Add the version entry to `CHANGELOG.md`.
+4. Add the version status row and release section to `docs/RELEASE_NOTES.md`.
+5. Add `docs/RELEASE_NOTES_V<version-without-dots>.md` with the user-facing release notes.
+6. Merge the release changes to `main` after normal pull-request checks pass.
+7. The release workflow validates the merged release commit and, when no matching release exists yet, creates the numeric Git tag and published GitHub Release.
+8. Verify HACS/Home Assistant reports the numeric release as the available version instead of a commit SHA.
+
+A manual numeric tag can still be used as a fallback, but it is no longer required for the normal release path.
 
 ## Ownership boundary
 
