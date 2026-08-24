@@ -2,21 +2,42 @@ import "./gw-energy-pilot-v029.js?v=0.30-base1";
 
 const VERSION = "0.30";
 const PANEL_NAME = "gw-energypilot-panel";
+const BATTERY_PLAN_CARD = ".ep-v027-battery-plan-card";
+
+function reconcileBatteryPlanCards(root) {
+  const cards = [...root.querySelectorAll(BATTERY_PLAN_CARD)];
+  if (cards.length <= 1) return;
+
+  // Prefer the instance already decorated by the v0.28 window-controls layer.
+  // This also repairs an already-open browser session that entered v0.30 with
+  // duplicate cards from a previously stacked render wrapper.
+  const canonical =
+    cards.find((card) => card.querySelector(".ep-v028-window-controls")) || cards[0];
+  for (const card of cards) {
+    if (card !== canonical) card.remove();
+  }
+}
 
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
-const previousRender = PanelClass.prototype._render;
 
-PanelClass.prototype._render = function energyPilotV030Render() {
-  previousRender.call(this);
-  const root = this.shadowRoot;
-  if (!root) return;
+if (!PanelClass.prototype.__epV030RenderInstalled) {
+  const previousRender = PanelClass.prototype._render;
+  PanelClass.prototype.__epV030RenderInstalled = true;
 
-  const versionBadge = root.querySelector(".version");
-  if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
+  PanelClass.prototype._render = function energyPilotV030Render() {
+    previousRender.call(this);
+    const root = this.shadowRoot;
+    if (!root) return;
 
-  const footerItems = root.querySelectorAll("footer span");
-  if (footerItems.length > 0) {
-    footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
-  }
-};
+    reconcileBatteryPlanCards(root);
+
+    const versionBadge = root.querySelector(".version");
+    if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
+
+    const footerItems = root.querySelectorAll("footer span");
+    if (footerItems.length > 0) {
+      footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
+    }
+  };
+}
