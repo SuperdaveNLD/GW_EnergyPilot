@@ -2,6 +2,40 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.27] - 2026-08-24
+
+### Added
+
+- Added **S / M / L** sizing for the Battery & Price dashboard card using an Apple-style segmented control stored in the existing browser-local dashboard preferences.
+- Added historical active-plan visualization from the configured EnergyPilot `P_batt` entity history, showing the target that was actually published at each point in the day.
+- Added future battery-plan visualization from the current EMHASS battery forecast `forecasts` attribute.
+- Added native GoodWe current-day battery energy values to the read-only chart payload using the already-decoded `35208` charge and `35211` discharge counters.
+- Added pure battery-plan normalization helpers, regression tests and `docs/BATTERY_PLAN_CHART.md` / `docs/BATTERY_PLAN_CHART_TEST.md`.
+- Added the compact Support presentation from the staged support-cleanup work: GoodWe telemetry, control ownership, optimizer health and minimum-SOC synchronization are visible at a glance while deep diagnostics remain in the copyable support report.
+
+### Fixed
+
+- Fixed Hybrid Automatic Control neutral battery plans. When `P_batt` is inside the deadband and there is no stronger grid-export request, EnergyPilot now uses GoodWe mode `8` Battery Hold instead of handing battery behavior back to mode `1` Auto.
+- The Hybrid export branch remains higher priority, so an explicit planned export still uses mode `10` while `P_batt` is neutral.
+- Battery graph energy integration now clips the still-active final Recorder 5-minute bucket at the current time instead of treating a partial bucket as a complete five minutes.
+
+### Changed
+
+- **Charged today** and **Discharged today** now prefer the inverter-native GoodWe day counters when available; the Recorder-integrated graph value remains visible as a comparison rather than being presented as authoritative accounting.
+- The Battery & Price chart now distinguishes solid actual GoodWe battery-power bars from translucent/dashed historical and future plan blocks while keeping the market-price line and NOW marker on the same local-day timeline.
+- The legacy direct minimum-SOC field-test panel is removed from the normal dashboard. The synchronized on-grid minimum-SOC NumberEntity remains the supported operator path; the existing low-level Beta SOC API is retained for diagnostics/backwards-compatible tooling.
+- The active frontend is `gw-energy-pilot-v027-battery-plan.js`, which layers the v0.26 support cleanup underneath the v0.27 plan-versus-actual chart.
+
+### Safety / compatibility
+
+- No new or guessed GoodWe register definition or Modbus read block is introduced.
+- EMS registers remain `47511` / `47512` with the existing write order.
+- Battery and Grid Automatic Control strategies are unchanged; only the diagnosed Hybrid neutral branch changes to the already-supported mode `8` hold behavior.
+- No existing entity ID, unique ID, stable device identity, persistent grid-accounting store or optimization-log contract changes.
+- No EMHASS optimization objective changes.
+- The chart remains read-only. Future financial accounting must consume backend accounting deltas and effective prices rather than reconstructing money from frontend graph samples.
+- v0.27 remains **Beta** while the resizable layout and plan-versus-actual overlays receive live field exposure.
+
 ## [0.26] - 2026-08-24
 
 ### Added

@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.27** | 2026-08-24 | **Beta** | Resizable Battery plan/actual/price chart, historical active `P_batt` targets plus current EMHASS future forecast, native GoodWe battery-day counters, compact support diagnostics and corrected Hybrid neutral hold behavior. |
 | **0.26** | 2026-08-24 | **Beta** | Consolidated release: Home Assistant language-aware Dutch/English UI, Battery & Price chart, canonical backend price-series API/cache, and synchronized EMHASS/GoodWe on-grid minimum SOC through register 45356 with verified write/read-back and rollback protection. |
 | **0.25** | 2026-08-24 | **Beta** | Three Automatic Control strategies including Hybrid, extended 15 kW+ daily grid-accounting source selection and persistent 50-run optimization history/LOG. |
 | **0.24** | 2026-08-23 | **Beta** | Restores the backwards-compatible direct `P_batt` automatic-control default while preserving explicit PCC control. |
@@ -41,6 +42,57 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.27 — Battery plan versus actual and dashboard refinement
+
+v0.27 turns the v0.26 Battery & Price visualization into a planning and verification view while preserving the existing GoodWe/EMHASS ownership boundaries.
+
+## Battery plan versus actual
+
+- The card can be switched between **S**, **M** and **L** layouts with an Apple-style segmented control; the browser remembers the selected size.
+- Solid bars remain actual GoodWe `battery_power` history from Home Assistant Recorder.
+- Historical plan blocks use the configured EnergyPilot `P_batt` entity history, so the graph shows the target that was actually active at each time rather than rewriting the past with the newest optimization.
+- Future plan blocks come from the current EMHASS battery forecast `forecasts` attribute.
+- EMHASS and GoodWe battery signs remain aligned: negative = charge, positive = discharge.
+- The market-price line and NOW marker stay on the same local-day timeline.
+
+The read-only `gw_energypilot/battery_price/get` response is extended with a versioned chart payload, native battery-day energy values and normalized battery-plan points. Dashboard reads never run an optimization or write a GoodWe register.
+
+## Battery energy totals
+
+The headline **charged today** and **discharged today** values now prefer the already-decoded GoodWe day counters `35208` and `35211`. The Recorder integration remains visible as a graph-derived comparison and clips the still-active final five-minute bucket at the current time.
+
+No new GoodWe register or Modbus block is introduced.
+
+## Hybrid neutral hold
+
+Hybrid Automatic Control now treats a neutral `P_batt` plan as an explicit battery hold when there is no stronger export request:
+
+```text
+P_batt < -deadband  -> mode 11 battery charge
+else P_grid < -deadband -> mode 10 grid export
+else P_batt inside deadband -> mode 8 Battery Hold
+otherwise -> mode 1 GoodWe Auto / self-use
+```
+
+The export branch remains higher priority so a planned export can still use mode 10 while `P_batt` is neutral. Battery and Grid strategies are unchanged.
+
+## Support and SOC presentation
+
+The legacy direct minimum-SOC field-test panel is removed from the normal dashboard. The synchronized on-grid minimum-SOC NumberEntity remains the supported operator path; the low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling.
+
+The Support card becomes a compact operational summary with GoodWe telemetry, control ownership, optimizer state and EMHASS/GoodWe minimum-SOC synchronization at a glance. Deep raw-register and lifetime diagnostics remain available through the support-report copy action.
+
+## Safety and compatibility
+
+- No guessed or new GoodWe register definitions.
+- No Modbus read-block changes.
+- EMS registers remain `47511` / `47512` with the existing write order.
+- No entity ID, unique ID, device identity or persistent accounting-store change.
+- No EMHASS optimization objective change.
+- The new chart is read-only; financial accounting must continue to use backend accounting deltas rather than reconstructing money from frontend graph samples.
+
+v0.27 remains **Beta** while the S/M/L layouts and plan-versus-actual overlays receive live installation exposure.
 
 # v0.26 — Language, Battery & Price and synchronized minimum SOC
 
