@@ -112,22 +112,44 @@ function ensureStyles(root) {
     }
     .ep-v031-card-windowlabel {
       min-width:0; margin-left:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-      color:#66879a; font-size:8px; font-weight:760; letter-spacing:.025em; opacity:.78;
+      color:#66879a; font-size:8px; font-weight:760; letter-spacing:.025em; opacity:.72;
     }
     .ep-v031-card-window-controls { display:flex; align-items:center; gap:6px; flex:0 0 auto; }
     .ep-v031-window-dot {
-      appearance:none; width:13px; height:13px; min-width:13px; padding:0; display:grid; place-items:center;
-      border:1px solid rgba(0,0,0,.20); border-radius:50%; cursor:pointer;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.30),0 1px 3px rgba(0,0,0,.18);
-      color:rgba(25,28,30,.82); font:900 9px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+      appearance:none; position:relative; width:14px; height:14px; min-width:14px; padding:0;
+      display:grid; place-items:center; overflow:hidden;
+      border:1px solid rgba(77,178,220,.22); border-radius:50%; cursor:pointer;
+      background:linear-gradient(145deg,rgba(14,48,76,.96),rgba(5,25,45,.98));
+      box-shadow:inset 0 1px 0 rgba(184,237,255,.10),0 2px 7px rgba(0,0,0,.24);
+      color:#061b2c; font:900 9px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+      transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease,background .12s ease;
     }
-    .ep-v031-window-dot.close { background:#ff5f57; }
-    .ep-v031-window-dot.minimize { background:#febc2e; }
-    .ep-v031-window-dot.maximize { background:#28c840; }
-    .ep-v031-window-dot span { opacity:0; pointer-events:none; transition:opacity .12s ease; }
+    .ep-v031-window-dot::before {
+      content:""; width:7px; height:7px; border-radius:50%;
+      box-shadow:0 0 8px currentColor; opacity:.90;
+    }
+    .ep-v031-window-dot.close { color:#d86f6b; }
+    .ep-v031-window-dot.minimize { color:#d1aa58; }
+    .ep-v031-window-dot.maximize { color:#2bc99b; }
+    .ep-v031-window-dot.close::before { background:#d86f6b; }
+    .ep-v031-window-dot.minimize::before { background:#d1aa58; }
+    .ep-v031-window-dot.maximize::before { background:#2bc99b; }
+    .ep-v031-window-dot:hover {
+      transform:translateY(-1px);
+      border-color:rgba(96,215,244,.42);
+      background:linear-gradient(145deg,rgba(18,58,91,.98),rgba(7,31,54,.99));
+      box-shadow:inset 0 1px 0 rgba(191,241,255,.14),0 0 10px rgba(25,217,255,.10),0 3px 8px rgba(0,0,0,.25);
+    }
+    .ep-v031-window-dot span {
+      position:absolute; inset:0; display:grid; place-items:center;
+      opacity:0; pointer-events:none; color:rgba(227,248,255,.90); text-shadow:0 1px 2px rgba(0,0,0,.55);
+      transition:opacity .12s ease;
+    }
+    .ep-v031-card-window-controls:hover .ep-v031-window-dot::before,
+    .ep-v031-window-dot:focus-visible::before { opacity:.35; }
     .ep-v031-card-window-controls:hover .ep-v031-window-dot span,
-    .ep-v031-window-dot:focus-visible span { opacity:.82; }
-    .ep-v031-window-dot:focus-visible { outline:2px solid rgba(91,224,249,.75); outline-offset:2px; }
+    .ep-v031-window-dot:focus-visible span { opacity:.90; }
+    .ep-v031-window-dot:focus-visible { outline:2px solid rgba(91,224,249,.70); outline-offset:2px; }
     .ep-dashboard-layout > .ep-v031-card-collapsed {
       min-height:0!important; height:auto!important; align-self:start!important; padding-bottom:11px!important;
     }
