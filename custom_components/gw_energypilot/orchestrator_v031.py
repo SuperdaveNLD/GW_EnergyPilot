@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.exceptions import HomeAssistantError
@@ -167,6 +168,33 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
         if endpoint == "/action/dayahead-optim":
             await self._async_prepare_emhass_policy(payload)
         return await super()._async_post_emhass(endpoint, payload, timeout_seconds)
+
+    async def _async_log_optimization(
+        self,
+        *,
+        started_at: datetime,
+        started_monotonic: float,
+        reason: str,
+        requested_soc_final: float,
+        current_load: float | None,
+        success: bool,
+        error: str | None,
+    ) -> None:
+        """Record the terminal SOC actually submitted after v0.31 clamping."""
+        effective_soc_final = (
+            self.last_effective_soc_final
+            if self.last_effective_soc_final is not None
+            else requested_soc_final
+        )
+        await super()._async_log_optimization(
+            started_at=started_at,
+            started_monotonic=started_monotonic,
+            reason=reason,
+            requested_soc_final=effective_soc_final,
+            current_load=current_load,
+            success=success,
+            error=error,
+        )
 
     async def async_optimize(self, reason: str = "manual") -> None:
         """Run the existing orchestration and retain the effective terminal SOC."""
