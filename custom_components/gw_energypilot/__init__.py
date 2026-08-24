@@ -40,7 +40,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v028-consolidated.js?v=0.28-release2"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v029.js?v=0.29-release1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -102,7 +102,10 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
     )
 
 
-async def _async_initial_refresh(coordinator: GWEnergyPilotCoordinator, accounting: GWEnergyPilotAccounting) -> None:
+async def _async_initial_refresh(
+    coordinator: GWEnergyPilotCoordinator,
+    accounting: GWEnergyPilotAccounting,
+) -> None:
     """Refresh telemetry, then seed accounting from existing Recorder history."""
     await coordinator.async_refresh()
     await accounting.async_bootstrap_if_needed()
@@ -111,12 +114,26 @@ async def _async_initial_refresh(coordinator: GWEnergyPilotCoordinator, accounti
 async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     """Set up GW EnergyPilot from a config entry."""
     _migrate_device_identifier(hass, entry)
-    client = GWModbusClient(host=entry.data[CONF_HOST], port=int(entry.data[CONF_PORT]), slave=int(entry.data[CONF_SLAVE]))
-    coordinator = GWEnergyPilotCoordinator(hass, client, scan_interval=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)))
+    client = GWModbusClient(
+        host=entry.data[CONF_HOST],
+        port=int(entry.data[CONF_PORT]),
+        slave=int(entry.data[CONF_SLAVE]),
+    )
+    coordinator = GWEnergyPilotCoordinator(
+        hass,
+        client,
+        scan_interval=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
+    )
     controller = GWEnergyPilotController(hass, entry, client, coordinator)
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
-    entry.runtime_data = GWRuntimeData(client=client, coordinator=coordinator, controller=controller, orchestrator=orchestrator, accounting=accounting)
+    entry.runtime_data = GWRuntimeData(
+        client=client,
+        coordinator=coordinator,
+        controller=controller,
+        orchestrator=orchestrator,
+        accounting=accounting,
+    )
 
     await accounting.async_prepare()
     await controller.async_setup()
