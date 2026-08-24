@@ -115,7 +115,6 @@ function chartSvg(panel, data, size, modal) {
   const future = data.futurePlanPoints || [];
   const fallback = inferredPlanInterval(future);
   const futurePlan = future.map((point, index) => {
-    if (point.t < data.nowMs) return "";
     const nextT = future[index + 1]?.t ?? point.t + fallback;
     const startT = Math.max(point.t, data.nowMs);
     const endT = Math.min(nextT, data.endMs);
@@ -126,7 +125,7 @@ function chartSvg(panel, data, size, modal) {
     const rectY = Math.min(yy, zeroY);
     const rectH = Math.max(1, Math.abs(zeroY - yy));
     const color = point.w < 0 ? "#43e7ca" : point.w > 0 ? "#ffb354" : "#a7c3cf";
-    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="3" fill="${color}" fill-opacity=".085" stroke="${color}" stroke-opacity=".90" stroke-width="1.2" stroke-dasharray="6 4"><title>${panel._escape(`${formatTime(point.t)} · ${t(panel, "future")} · ${formatPower(point.w)}`)}</title></rect>`;
+    return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="3" fill="${color}" fill-opacity=".085" stroke="${color}" stroke-opacity=".90" stroke-width="1.2" stroke-dasharray="6 4"><title>${panel._escape(`${formatTime(startT)}–${formatTime(endT)} · ${t(panel, "future")} · ${formatPower(point.w)}`)}</title></rect>`;
   }).join("");
 
   const pricePath = steppedPricePath(data.pricePoints || [], x, priceY, data.endMs);
