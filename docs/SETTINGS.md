@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.27 remains **Beta** while Hybrid neutral-hold behavior, the resizable Battery plan/actual/price visualization and the compact support presentation receive broader field exposure.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.28 remains **Beta** while the corrected Hybrid buy/sell mapping, the resizable Battery plan/actual/price visualization and the compact support presentation receive broader field exposure.
 
 ## Ownership
 
@@ -25,7 +25,7 @@ gw_energypilot/optimization_log/get
 gw_energypilot/battery_price/get
 ```
 
-The active v0.27 frontend is `gw-energy-pilot-v027-battery-plan.js`. It layers the compact v0.26 support presentation over the language-aware v0.26 dashboard, then adds the resizable plan-versus-actual Battery & Price view.
+The active v0.28 frontend is `gw-energy-pilot-v028.js`. It layers the complete v0.27 Battery plan/actual/price and compact Support presentation underneath a small Hybrid-strategy clarification layer.
 
 ## EP page
 
@@ -141,13 +141,15 @@ P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 **Hybrid control**
 
 ```text
-P_batt requests charge -> mode 11 direct battery charge
-else P_grid requests export -> mode 10 grid export target
+P_grid > +deadband -> mode 9 Grid import target (buy/import)
+else P_batt > +deadband -> mode 12 Battery discharge power (sell/discharge)
 else P_batt near 0 W -> mode 8 Battery Hold
 otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-The explicit export request is evaluated before neutral battery hold. With both `P_batt` and `P_grid` around zero, Hybrid therefore selects mode 8 instead of mode 1 so GoodWe Auto cannot independently charge or discharge against a neutral EMHASS battery plan.
+Hybrid deliberately combines two control domains. Buying/import is controlled at the PCC through mode 9, using the EMHASS `P_grid` import magnitude. Selling/discharging is controlled directly through mode 12, using the EMHASS `P_batt` discharge magnitude.
+
+The mode-9 branch is evaluated first because a positive planned `P_grid` is the authoritative Hybrid buying signal. A battery-charge request without planned grid import falls through to GoodWe mode 1/self-use so locally available PV can be absorbed without forcing the forecast-sized `P_batt` charging setpoint. A neutral battery plan remains mode 8.
 
 When no explicit `control_strategy` exists, backwards compatibility remains:
 
@@ -210,7 +212,7 @@ The visible detail is grouped into:
 
 Raw inverter mode registers, Beta candidates, lifetime energy counters and legacy/invalid EMHASS constraint values are deliberately not shown in the normal dashboard overview. They remain available through the single **Copy support report** action so issue reports retain deep diagnostic evidence without making the everyday UI unreadable.
 
-This is presentation-only cleanup. Existing diagnostic entity attributes, register reads, `beta_soc` API behavior, controller logic and EMHASS behavior are unchanged.
+This is presentation-only cleanup. Existing diagnostic entity attributes, register reads, `beta_soc` API behavior, controller logic and EMHASS behavior are unchanged apart from the explicitly documented v0.28 Hybrid strategy correction.
 
 ## Persistent state is not settings
 

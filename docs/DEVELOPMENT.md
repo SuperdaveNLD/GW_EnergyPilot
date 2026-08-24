@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.26 runtime structure
+## Current v0.28 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -29,7 +29,7 @@ orchestrator_v012.py    reliability/startup/price refinements
 orchestrator_v013.py    G20 load semantics + persistent last_success/optimization log
 orchestrator_v026.py    canonical dashboard price-series cache/read path
 price_series.py         pure timestamped price-series helpers
-battery_price_api.py    read-only Battery & Price WebSocket API
+battery_price_api.py    read-only battery/price/plan chart WebSocket API
 accounting.py           persistent daily grid-accounting runtime
 accounting_model.py     pure accounting source/delta/rollover model
 accounting_sensor.py    native Today import/export entities
@@ -62,22 +62,20 @@ All four layers are active runtime code. Check subclasses before changing a base
 Top level:
 
 ```text
-gw-energy-pilot-v026-complete.js
-    -> gw-energy-pilot-v026-battery-price.js
-        -> gw-energy-pilot-v026.js
-            -> gw-energy-pilot-v025.js
-                -> historical active layers
+gw-energy-pilot-v028.js
+    -> gw-energy-pilot-v027-battery-plan.js
+        -> v0.27/v0.26 support, chart and language layers
+            -> historical active layers
 ```
 
 Current ownership:
 
-- `v026-complete` — final v0.26 badge + synchronized minimum-SOC presentation;
-- `v026-battery-price` — Battery & Price graph, Recorder/price cache and visibility integration;
-- `v026` — Home Assistant language-aware Dutch/English localization;
-- `v025` — optimization LOG and prior dashboard behavior;
+- `v028` — corrected Hybrid 9/12 strategy explanation + final v0.28 badge;
+- `v027-battery-plan` — S/M/L Battery plan/actual/price view and plan overlays;
+- v0.26 layers — compact Support, synchronized minimum-SOC presentation, price chart and Dutch/English localization;
 - older assets remain active dependencies.
 
-**Do not add another release monkey-patch layer by default.** The layered frontend is technical debt and has caused small regressions. New presentation work should prefer functional components or deliberate consolidation under browser-level regression coverage.
+**Do not add another release monkey-patch layer by default.** The layered frontend is technical debt and has caused small regressions. v0.28 uses one bounded wrapper because the controller strategy wording changes while the complete v0.27 presentation must remain intact. New presentation work should prefer functional components or deliberate consolidation under browser-level regression coverage.
 
 ## Automatic-control contract
 
@@ -100,16 +98,17 @@ P_grid near 0 W    -> mode 1
 Hybrid strategy:
 
 ```text
-P_batt charge request -> mode 11
-else P_grid export request -> mode 10
-otherwise -> mode 1
+P_grid > +deadband -> mode 9  (buy/import; setpoint abs(P_grid))
+else P_batt > +deadband -> mode 12 (sell/discharge; setpoint abs(P_batt))
+else P_batt near 0 W -> mode 8
+otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-Legacy strategy fallback remains false/missing smart-meter flag -> Battery, true -> Grid.
+The Hybrid import branch intentionally uses `P_grid` because mode 9 owns the PCC import target. The Hybrid sell branch intentionally uses `P_batt` because mode 12 owns direct battery discharge. A charging plan without planned grid import falls through to mode 1 so GoodWe can absorb available local PV instead of forcing a forecast-sized battery charge.
 
-EV anti-discharge is a higher-priority directional override.
+The mode-9 import branch precedes mode 12. Legacy strategy fallback remains false/missing smart-meter flag -> Battery, true -> Grid.
 
-Manual commands never inherit or reinterpret the automatic strategy.
+EV anti-discharge is a higher-priority directional override. Manual commands never inherit or reinterpret the automatic strategy.
 
 ## EMS / Modbus safety
 
@@ -150,17 +149,23 @@ schedule existing debounced fresh optimization
 
 If `45356` is unavailable, do not change EMHASS. If the later EMHASS write fails, attempt to restore the previous `45356` value.
 
-No startup/background synchronization is allowed without a separate design decision.
+No startup/background synchronization is allowed without a separate design decision. The old direct minimum-SOC dashboard panel is not a normal settings path; the bounded low-level Beta SOC API remains available for controlled diagnostics/tooling. Maximum SOC remains EMHASS-only.
 
-Register `45358` remains an independent off-grid manual Beta field test. Maximum SOC remains EMHASS-only.
+## Battery plan / actual / price ownership
 
-## Battery & Price ownership
-
-Battery bars:
+Actual bars:
 
 ```text
 existing battery_power entity
 -> Home Assistant Recorder 5-minute mean statistics
+-> frontend visualization
+```
+
+Historical/future plan:
+
+```text
+configured P_batt history + current EMHASS forecasts attribute
+-> read-only chart payload
 -> frontend visualization
 ```
 
@@ -173,9 +178,7 @@ existing EnergyPilot runtime price-source path
 -> frontend visualization
 ```
 
-Do not discover Nord Pool independently in the browser.
-
-Approximate chart energy summaries are visualization only. Persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
+Do not discover Nord Pool independently in the browser. Chart energy summaries are visualization only; persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
 
 ## Persistent accounting
 
@@ -186,9 +189,7 @@ preferred populated extended: 36104 export / 36120 import
 fallback legacy:             36015 export / 36017 import
 ```
 
-Source changes re-baseline before accumulation. Never subtract absolute totals from different layouts.
-
-Recorder is not part of the live grid-accounting loop.
+Source changes re-baseline before accumulation. Never subtract absolute totals from different layouts. Recorder is not part of the live grid-accounting loop.
 
 ## Development workflow
 
@@ -226,7 +227,7 @@ GoodWe register/transport -> registers.py / client.py / coordinator.py
 Automatic EMS decision    -> controller.py
 SOC config synchronization-> number.py / emhass_config.py / verified client helper
 EMHASS optimization       -> orchestrator*.py / emhass_config.py / event_triggers.py
-Price chart backend       -> orchestrator_v026.py / price_series.py / battery_price_api.py
+Battery/price chart backend -> orchestrator_v026.py / price_series.py / battery_price_api.py
 Daily grid totals         -> accounting.py / accounting_model.py / accounting_sensor.py
 Runtime/log persistence   -> runtime_store.py / optimization_log.py
 Presentation              -> active frontend chain

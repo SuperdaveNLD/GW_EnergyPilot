@@ -19,7 +19,27 @@ spec.loader.exec_module(module)
 
 
 class BatteryPlanTests(unittest.TestCase):
-    def test_parses_standard_emhass_forecasts(self):
+    def test_parses_current_emhass_battery_schedule(self):
+        attributes = {
+            "battery_scheduled_power": [
+                {"date": "2026-08-24T13:00:00+02:00", "p_batt_forecast": "-4200"},
+                {"date": "2026-08-24T14:00:00+02:00", "p_batt_forecast": "3500"},
+            ]
+        }
+
+        self.assertEqual(
+            module.emhass_schedule_attribute(attributes),
+            "battery_scheduled_power",
+        )
+        self.assertEqual(
+            module.normalize_emhass_forecasts("sensor.p_batt_forecast", attributes),
+            [
+                {"start": "2026-08-24T13:00:00+02:00", "value_w": -4200.0},
+                {"start": "2026-08-24T14:00:00+02:00", "value_w": 3500.0},
+            ],
+        )
+
+    def test_legacy_forecasts_attribute_remains_supported(self):
         points = module.normalize_emhass_forecasts(
             "sensor.p_batt_forecast",
             {
@@ -30,19 +50,31 @@ class BatteryPlanTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(
-            points,
-            [
-                {"start": "2026-08-24T13:00:00+02:00", "value_w": -4200.0},
-                {"start": "2026-08-24T14:00:00+02:00", "value_w": 3500.0},
+        self.assertEqual(len(points), 2)
+        self.assertEqual(points[0]["value_w"], -4200.0)
+
+    def test_current_schedule_attribute_wins_over_legacy_fallback(self):
+        attributes = {
+            "battery_scheduled_power": [
+                {"date": "2026-08-24T13:00:00+02:00", "p_batt_forecast": 1000},
             ],
+            "forecasts": [
+                {"date": "2026-08-24T13:00:00+02:00", "p_batt_forecast": 9999},
+            ],
+        }
+
+        points = module.normalize_emhass_forecasts(
+            "sensor.p_batt_forecast",
+            attributes,
         )
+        self.assertEqual(module.emhass_schedule_attribute(attributes), "battery_scheduled_power")
+        self.assertEqual(points[0]["value_w"], 1000.0)
 
     def test_custom_entity_id_selects_custom_value_key(self):
         points = module.normalize_emhass_forecasts(
             "sensor.my_battery_plan",
             {
-                "forecasts": [
+                "battery_scheduled_power": [
                     {"date": "2026-08-24T13:00:00Z", "my_battery_plan": 1250},
                 ]
             },
@@ -55,7 +87,7 @@ class BatteryPlanTests(unittest.TestCase):
         points = module.normalize_emhass_forecasts(
             "sensor.custom_plan",
             {
-                "forecasts": [
+                "battery_scheduled_power": [
                     {"start": "2026-08-24T13:00:00+02:00", "value": "-2500.5"},
                 ]
             },
@@ -67,7 +99,7 @@ class BatteryPlanTests(unittest.TestCase):
         points = module.normalize_emhass_forecasts(
             "sensor.p_batt_forecast",
             {
-                "forecasts": [
+                "battery_scheduled_power": [
                     None,
                     {"date": "invalid", "p_batt_forecast": 10},
                     {"date": "2026-08-24T13:00:00+02:00", "p_batt_forecast": "nan"},
@@ -80,6 +112,16 @@ class BatteryPlanTests(unittest.TestCase):
         self.assertEqual(
             points,
             [{"start": "2026-08-24T14:00:00+02:00", "value_w": 2000.0}],
+        )
+
+    def test_missing_schedule_attribute_returns_empty(self):
+        self.assertIsNone(module.emhass_schedule_attribute({"friendly_name": "Battery"}))
+        self.assertEqual(
+            module.normalize_emhass_forecasts(
+                "sensor.p_batt_forecast",
+                {"friendly_name": "Battery"},
+            ),
+            [],
         )
 
     def test_nonnegative_number_rejects_invalid_or_negative_values(self):

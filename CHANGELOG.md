@@ -2,13 +2,43 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.28] - 2026-08-24
+
+### Fixed
+
+- Corrected **Hybrid control** to the intended asymmetric mapping: buying/import uses GoodWe mode `9` with the EMHASS `P_grid` import magnitude, while selling/discharging uses GoodWe mode `12` with the EMHASS `P_batt` discharge magnitude.
+- Hybrid no longer interprets buying as direct mode-11 battery charging or selling as mode-10 PCC export control.
+- A neutral Hybrid battery plan remains mode `8` Battery Hold.
+- A Hybrid battery-charge plan without planned grid import falls back to GoodWe mode `1` self-use so locally available PV can be absorbed without forcing the forecast-sized `P_batt` charge target.
+- Fixed the Battery · Plan · Price future-plan parser to use current EMHASS `battery_scheduled_power`; legacy/custom `forecasts` remains a compatibility fallback.
+- Fixed historical plan continuity at local midnight by retaining Home Assistant's `include_start_time_state` even when that state originated before 00:00.
+- Fixed the active EMHASS schedule interval at NOW so a block that began a few minutes earlier is clipped rather than discarded.
+- Fixed plan visibility by rendering dashed historical/future plan overlays above solid actual bars.
+- Fixed missing-plan summaries so they show `—` rather than a fabricated `0.00 kWh`.
+- Fixed zero/near-zero actual samples being shown as tiny discharge bars/tooltips.
+- Changed timestamped market-price rendering to an interval step series instead of diagonal interpolation between discrete prices.
+- Updated Hybrid and battery-plan regression coverage, chart schema/documentation and nested frontend cache-busting.
+
+### Changed
+
+- Native GoodWe `35208/35211` battery-day counters remain the headline charged/discharged values. Recorder 5-minute integration of instantaneous `35182` battery power is explicitly a separate comparison path and is not calibrated to force a match.
+- The read-only battery chart payload uses schema version `3` and reports the detected EMHASS schedule attribute.
+
+### Safety / compatibility
+
+- Battery control remains `P_batt -> 11/12/8`; Grid control remains `P_grid -> 9/10/1`.
+- EV anti-discharge remains a higher-priority directional override; manual EMS commands remain direct operator commands.
+- No GoodWe register definitions, Modbus read blocks or `client.py` write ordering change. EMS remains `47511/47512` with `47512 -> wait -> 47511`.
+- Chart/API changes are read-only; no EMHASS objective, entity ID/unique ID, stable device identity or accounting/runtime/log store changes.
+- v0.28 remains **Beta** while the corrected Hybrid mapping and repaired plan/actual chart receive real-installation field validation.
+
 ## [0.27] - 2026-08-24
 
 ### Added
 
 - Added **S / M / L** sizing for the Battery & Price dashboard card using an Apple-style segmented control stored in the existing browser-local dashboard preferences.
 - Added historical active-plan visualization from the configured EnergyPilot `P_batt` entity history, showing the target that was actually published at each point in the day.
-- Added future battery-plan visualization from the current EMHASS battery forecast `forecasts` attribute.
+- Added the first future battery-plan visualization; v0.28 later corrects the current EMHASS schedule attribute contract to `battery_scheduled_power`.
 - Added native GoodWe current-day battery energy values to the read-only chart payload using the already-decoded `35208` charge and `35211` discharge counters.
 - Added pure battery-plan normalization helpers, regression tests and `docs/BATTERY_PLAN_CHART.md` / `docs/BATTERY_PLAN_CHART_TEST.md`.
 - Added the compact Support presentation from the staged support-cleanup work: GoodWe telemetry, control ownership, optimizer health and minimum-SOC synchronization are visible at a glance while deep diagnostics remain in the copyable support report.
@@ -310,7 +340,7 @@ All notable changes to GW EnergyPilot are documented here.
 - GoodWe connection validation before host, Modbus TCP port or unit-ID changes are saved.
 - Multi-entry selection for installations with more than one GW EnergyPilot config entry.
 - Enabled-by-default Home Assistant Diagnostic sensors for the Beta SOC candidates `45356`, `45358` and `47500`.
-- A device-registry migration from the legacy mutable `host:slave` identifier to the stable config-entry ID.
+- A device-registry migration from the legacy mutable host:slave identifier to the stable config-entry ID.
 - A stateful **EMHASS optimization strategy** select that reads the active `costfun` from EMHASS `/get-config`.
 
 ### Changed

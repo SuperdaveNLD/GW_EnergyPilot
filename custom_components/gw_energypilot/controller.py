@@ -63,10 +63,15 @@ class GWEnergyPilotController:
       P_grid ~= 0 = mode 1 GoodWe Auto / self-use balancing
 
     Hybrid control:
-      P_batt < 0 = mode 11 direct battery charge target
-      P_grid < 0 = mode 10 export target at the PCC
+      P_grid > 0 = mode 9 import target at the PCC
+      P_batt > 0 = mode 12 direct battery discharge target
       P_batt ~= 0 = mode 8 Battery Hold
       otherwise = mode 1 GoodWe Auto / self-use balancing
+
+    Hybrid intentionally combines GoodWe's PCC import controller for buying
+    energy with direct battery-power discharge for selling energy. A charging
+    plan without planned grid import falls back to GoodWe self-use so locally
+    available PV can be absorbed without forcing a forecast-sized charge.
 
     Existing installations without an explicit strategy retain the legacy
     smart-meter boolean mapping for backwards compatibility.
@@ -82,6 +87,7 @@ class GWEnergyPilotController:
         self.expected_mode = MODE_AUTO
         self.last_command = "goodwe_auto"
         self.manual_power = min(DEFAULT_MAX_POWER, int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)))
+        self.manual_charge_limit_soc: float | None = None
         self._unsubs: list[Callable[[], None]] = []
         self._ev_was_active = False
         self._control_lock = asyncio.Lock()
@@ -134,6 +140,9 @@ class GWEnergyPilotController:
         entity_ids.discard("")
         if entity_ids:
             self._unsubs.append(async_track_state_change_event(self.hass, list(entity_ids), self._async_source_changed))
+        add_listener = getattr(self.coordinator, "async_add_listener", None)
+        if add_listener is not None:
+            self._unsubs.append(add_listener(self._async_coordinator_updated))
 
     async def async_unload(self) -> None:
         while self._unsubs:
@@ -159,6 +168,19 @@ class GWEnergyPilotController:
                 return
         self.hass.async_create_task(self.async_evaluate(), "gw-energypilot-evaluate")
 
+    @callback
+    def _async_coordinator_updated(self) -> None:
+        """Stop the Max charge quick action when its captured SOC limit is met."""
+        if self.last_command != "manual_max_charge" or self.manual_charge_limit_soc is None:
+            return
+        battery_soc = self._battery_soc()
+        if battery_soc is None or battery_soc < self.manual_charge_limit_soc:
+            return
+        self.hass.async_create_task(
+            self._async_stop_manual_max_charge_at_limit(),
+            "gw-energypilot-max-charge-soc-limit",
+        )
+
     def _state_float(self, entity_id: str | None) -> float | None:
         if not entity_id:
             return None
@@ -170,6 +192,19 @@ class GWEnergyPilotController:
         except (TypeError, ValueError):
             return None
         return value if isfinite(value) else None
+
+    def _battery_soc(self) -> float | None:
+        """Return the latest finite GoodWe battery SOC percentage."""
+        data = self.coordinator.data
+        values = getattr(data, "values", {}) if data is not None else {}
+        raw = values.get("battery_soc") if isinstance(values, dict) else None
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return None
+        if not isfinite(value) or not 0.0 <= value <= 100.0:
+            return None
+        return value
 
     def ev_is_active(self) -> bool:
         if not self.entry.options.get(CONF_ENABLE_EV_COORDINATION, False):
@@ -213,6 +248,7 @@ class GWEnergyPilotController:
         await self.coordinator.async_request_refresh()
 
     async def async_enable(self) -> None:
+        self.manual_charge_limit_soc = None
         self.enabled = True
         self._ev_was_active = self.ev_is_active()
         self._notify_state()
@@ -220,13 +256,60 @@ class GWEnergyPilotController:
 
     async def async_disable(self) -> None:
         async with self._control_lock:
+            self.manual_charge_limit_soc = None
             self.enabled = False
             await self._async_apply_command(MODE_AUTO, 0, "goodwe_auto")
 
     async def async_manual_command(self, mode: int, power: int, command: str) -> None:
         async with self._control_lock:
+            self.manual_charge_limit_soc = None
             self.enabled = False
             await self._async_apply_command(mode, power, command)
+
+    async def async_manual_max_charge(self, power: int, maximum_soc: float) -> None:
+        """Start Max charge with a telemetry-enforced EMHASS maximum-SOC ceiling."""
+        try:
+            limit_soc = float(maximum_soc)
+        except (TypeError, ValueError) as err:
+            raise ValueError("Maximum battery SOC is not numeric") from err
+        if not isfinite(limit_soc) or not 0.0 <= limit_soc <= 100.0:
+            raise ValueError("Maximum battery SOC must be between 0 and 100%")
+
+        async with self._control_lock:
+            battery_soc = self._battery_soc()
+            if battery_soc is None:
+                raise ValueError("Current GoodWe battery SOC is unavailable")
+
+            self.enabled = False
+            self.manual_charge_limit_soc = limit_soc
+            if battery_soc >= limit_soc:
+                await self._async_apply_command(
+                    MODE_BATTERY_HOLD,
+                    0,
+                    "manual_max_charge_soc_limit",
+                    skip_if_readback_matches=True,
+                )
+                return
+            await self._async_apply_command(
+                MODE_CHARGE_BATTERY,
+                power,
+                "manual_max_charge",
+            )
+
+    async def _async_stop_manual_max_charge_at_limit(self) -> None:
+        """Recheck the SOC ceiling under the control lock and hold the battery."""
+        async with self._control_lock:
+            if self.last_command != "manual_max_charge" or self.manual_charge_limit_soc is None:
+                return
+            battery_soc = self._battery_soc()
+            if battery_soc is None or battery_soc < self.manual_charge_limit_soc:
+                return
+            await self._async_apply_command(
+                MODE_BATTERY_HOLD,
+                0,
+                "manual_max_charge_soc_limit",
+                skip_if_readback_matches=True,
+            )
 
     async def _async_apply_direct_battery_plan(self, p_batt: float, deadband: float, max_power: int) -> None:
         power = min(int(abs(p_batt)), max_power)
@@ -257,19 +340,19 @@ class GWEnergyPilotController:
         await self._async_apply_command(MODE_AUTO, 0, "grid_zero_auto", skip_if_readback_matches=True)
 
     async def _async_apply_hybrid_plan(self, p_batt: float, p_grid: float, deadband: float, max_power: int) -> None:
-        """Charge on battery target, export on PCC target, hold a neutral battery plan."""
-        if p_batt < -deadband:
-            power = min(int(abs(p_batt)), max_power)
-            await self._async_apply_command(MODE_CHARGE_BATTERY, power, "hybrid_battery_charge", skip_if_readback_matches=True)
-            return
-        if p_grid < -deadband:
+        """Buy through PCC mode 9 and sell through direct battery mode 12."""
+        if p_grid > deadband:
             power = min(int(abs(p_grid)), max_power)
-            await self._async_apply_command(MODE_GRID_EXPORT_TARGET, power, "hybrid_grid_export", skip_if_readback_matches=True)
+            await self._async_apply_command(MODE_GRID_IMPORT_TARGET, power, "hybrid_grid_import", skip_if_readback_matches=True)
+            return
+        if p_batt > deadband:
+            power = min(int(abs(p_batt)), max_power)
+            await self._async_apply_command(MODE_DISCHARGE_BATTERY, power, "hybrid_battery_discharge", skip_if_readback_matches=True)
             return
         if abs(p_batt) <= deadband:
             await self._async_apply_command(MODE_BATTERY_HOLD, 0, "hybrid_battery_hold", skip_if_readback_matches=True)
             return
-        await self._async_apply_command(MODE_AUTO, 0, "hybrid_auto", skip_if_readback_matches=True)
+        await self._async_apply_command(MODE_AUTO, 0, "hybrid_pv_self_use", skip_if_readback_matches=True)
 
     async def _async_evaluate_locked(self) -> None:
         if not self.enabled:

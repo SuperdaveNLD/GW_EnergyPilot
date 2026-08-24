@@ -2,10 +2,10 @@ import "./gw-energy-pilot-v026-complete.js?v=0.26-complete1";
 import {
   CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartSize,
   formatTime, loadChartData, saveChartSize, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.27-plan1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.28-chart1";
 import {
   cardBody, ensureStyles, sizeControlHtml,
-} from "./gw-energy-pilot-v027-battery-plan-view.js?v=0.27-plan1";
+} from "./gw-energy-pilot-v027-battery-plan-view.js?v=0.28-chart1";
 
 function openModal(panel) {
   document.querySelector(".ep-v027-backdrop")?.remove();

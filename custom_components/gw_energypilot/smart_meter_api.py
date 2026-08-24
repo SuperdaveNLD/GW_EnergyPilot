@@ -81,7 +81,7 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
         },
         "battery_strategy": "P_batt -> GoodWe modes 11/12; mode 8 around zero",
         "grid_strategy": "P_grid -> GoodWe modes 9/10; mode 1 around zero",
-        "hybrid_strategy": "P_batt charge -> mode 11; P_grid export -> mode 10; P_batt near zero -> mode 8; mode 1 otherwise",
+        "hybrid_strategy": "P_grid import -> mode 9; P_batt discharge/sell -> mode 12; P_batt near zero -> mode 8; GoodWe self-use otherwise",
         "storage": "home_assistant_config_entry_data",
     }
 
@@ -146,7 +146,7 @@ async def websocket_set_smart_meter(
     new_data = dict(entry.data)
     new_data[CONF_CONTROL_STRATEGY] = strategy
     # Keep the old boolean synchronized for older frontend layers and support
-    # tooling. Hybrid needs meter telemetry for its export side.
+    # tooling. Hybrid still needs meter telemetry for its import side.
     new_data[CONF_USE_GOODWE_SMART_METER] = strategy != CONTROL_STRATEGY_BATTERY
     hass.config_entries.async_update_entry(entry, data=new_data)
 

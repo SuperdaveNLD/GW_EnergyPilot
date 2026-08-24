@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.27 · Beta**
+**v0.28 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -27,15 +27,15 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.27 highlights
+## v0.28 highlights
 
-- Resizable **S / M / L Battery plan / actual / price** graph with an Apple-style segmented control.
-- Historical active `P_batt` targets and the current future EMHASS battery forecast overlaid on actual GoodWe battery power.
-- Headline battery-day energy prefers the native GoodWe `35208` / `35211` counters; Recorder integration remains a comparison.
-- Hybrid neutral battery plans use mode `8` Battery Hold unless a stronger grid-export request selects mode `10`.
-- Compact operational Support diagnostics with deep details retained in the copyable support report.
-- The legacy direct **Battery minimum SOC limits** field-test panel is no longer shown; normal on-grid minimum SOC uses the synchronized control path.
-- Existing Battery/Grid control behavior, grid accounting, entity identities and persistent runtime contracts remain intact.
+- Corrected **Hybrid control**: buying/import uses GoodWe mode `9` from EMHASS `P_grid`; selling/discharging uses mode `12` from EMHASS `P_batt`.
+- Neutral Hybrid battery plans remain mode `8` Battery Hold.
+- Hybrid charging without planned grid import falls back to GoodWe mode `1` self-use so local PV surplus can be absorbed without forcing a forecast-sized battery charge.
+- Repaired the **S / M / L Battery · Plan · Price** graph after v0.27 field validation: current EMHASS `battery_scheduled_power`, midnight plan continuity, active forecast interval clipping, visible dashed plan overlays and stepwise market prices.
+- Missing plan data is shown as unavailable instead of `0.00 kWh`, and near-zero actual samples are no longer presented as false discharge bars.
+- Native GoodWe battery-day counters remain the headline daily totals; Recorder power integration is explicitly a separate comparison measurement path.
+- Compact Support diagnostics, synchronized on-grid minimum SOC, Grid/Battery strategies and persistent runtime/accounting contracts remain unchanged.
 
 ## Tested hardware
 
@@ -122,13 +122,15 @@ This requires a working/validated GoodWe smart meter.
 ### Hybrid control
 
 ```text
-P_batt requests charge -> mode 11 direct battery charge
-else P_grid requests export -> mode 10 grid export target
+P_grid > +deadband -> mode 9 Grid import target (buy/import)
+else P_batt > +deadband -> mode 12 Battery discharge power (sell/discharge)
 else P_batt near 0 W -> mode 8 Battery Hold
 otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-A neutral EMHASS battery plan therefore remains neutral instead of handing battery direction back to GoodWe Auto. An explicit grid-export request still takes priority over the neutral hold branch.
+Hybrid is deliberately asymmetric. Buying is controlled at the PCC through mode 9 and the EMHASS `P_grid` magnitude. Selling is controlled through direct battery discharge mode 12 and the EMHASS `P_batt` magnitude.
+
+A Hybrid charging plan with no planned grid import falls back to GoodWe self-use. That lets locally available PV flow to the battery according to the inverter's own fast control instead of forcing the battery to the forecast-sized EMHASS charging value. A neutral EMHASS battery plan remains neutral through mode 8.
 
 EV anti-discharge remains a higher-priority directional safety override.
 
@@ -195,13 +197,16 @@ The old direct **Battery minimum SOC limits** dashboard panel is not exposed as 
 The chart is read-only.
 
 - actual battery bars use Recorder 5-minute means from the existing GoodWe `battery_power` entity;
-- charging is below zero, discharging above zero;
-- historical plan blocks use the configured EnergyPilot `P_batt` entity history;
-- future plan blocks use the current EMHASS `forecasts` attribute;
-- the market-price line comes from the same EnergyPilot runtime price source used for EMHASS;
+- charging is below zero, discharging above zero, while near-zero samples are not drawn as false directional bars;
+- historical plan blocks use the configured EnergyPilot `P_batt` entity history, including the state already active at local midnight;
+- future plan blocks use current EMHASS `battery_scheduled_power`; legacy/custom `forecasts` remains a compatibility fallback;
+- the forecast interval active at NOW is clipped at NOW rather than discarded because it began a few minutes earlier;
+- dashed plan overlays render above solid actual bars;
+- the market-price series comes from the same EnergyPilot runtime price source used for EMHASS and is rendered as interval steps;
 - the card supports S/M/L layouts and an expanded detail view;
 - native GoodWe day counters `35208` / `35211` are preferred for the headline charged/discharged totals;
-- Recorder-integrated energy remains a visualization comparison rather than persistent accounting.
+- Recorder-integrated battery power remains a separate visualization comparison and is not calibrated to force a match with the native inverter counter;
+- if no usable plan exists, planned-energy summaries display `—` rather than a fabricated zero.
 
 Future persistent financial accounting must consume backend grid-accounting deltas and effective prices, not reconstruct totals from chart pixels/buckets.
 

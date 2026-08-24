@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.26 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.28 Beta**.
 
 ## High-level flow
 
@@ -109,13 +109,20 @@ P_grid near 0 W    -> mode 1
 ### Hybrid strategy
 
 ```text
-P_batt requests charge -> mode 11
-else P_grid requests export -> mode 10
+P_grid > +deadband -> mode 9  using abs(P_grid)
+else P_batt > +deadband -> mode 12 using abs(P_batt)
 else P_batt near 0 W -> mode 8
 otherwise -> mode 1
 ```
 
-The export branch intentionally precedes the neutral-battery branch. A neutral `P_batt` plan therefore holds the battery unless EMHASS explicitly requests grid export; it no longer hands battery direction back to GoodWe Auto.
+Hybrid intentionally combines two GoodWe control domains:
+
+- **buy/import** is a PCC target and therefore uses mode 9 with the EMHASS `P_grid` import magnitude;
+- **sell/discharge** is a battery-power target and therefore uses mode 12 with the EMHASS `P_batt` discharge magnitude;
+- a neutral battery plan is held with mode 8;
+- a battery-charge plan without planned grid import falls through to mode 1/self-use so locally available PV can be absorbed by GoodWe without forcing the EMHASS forecast-sized charge setpoint.
+
+The mode-9 branch is evaluated before mode 12 so an explicit planned grid import is the authoritative Hybrid buying signal.
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
@@ -140,22 +147,20 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes a read-only WebSocket payload for the dashboard. Dashboard reads do not launch an optimization. A stale cache can be refreshed through the same price-source method only when no optimization is already retrieving prices.
+`battery_price_api.py` exposes read-only chart data. Dashboard reads do not launch an optimization. The v0.27 chart layer also combines actual battery history, historical published `P_batt` targets, the current future EMHASS forecast and native GoodWe day-energy counters without creating another Modbus control path.
 
-`price_series.py` contains pure normalization/combination helpers and has hardware-independent regression tests.
-
-## Battery & Price frontend
+## Battery plan / actual / price frontend
 
 Active top-level module:
 
 ```text
-gw-energy-pilot-v026-complete.js
-    -> gw-energy-pilot-v026-battery-price.js
-        -> gw-energy-pilot-v026.js
+gw-energy-pilot-v028.js
+    -> gw-energy-pilot-v027-battery-plan.js
+        -> v0.27/v0.26 support, chart and language layers
             -> existing historical frontend chain
 ```
 
-The v0.26 completion layer owns the synchronized minimum-SOC presentation and final release badge. The Battery & Price layer owns the new graph and chart data cache. The language layer owns Dutch/English localization.
+The v0.28 layer owns only the corrected Hybrid 9/12 explanation and final release badge. The v0.27 layer owns Battery plan/actual/price presentation and S/M/L sizing. Earlier layers retain compact Support diagnostics, synchronized minimum-SOC presentation and Dutch/English localization.
 
 This layering remains technical debt: new releases should avoid adding another behavioral monkey-patch layer unless needed for a bounded compatibility fix. A future frontend consolidation should preserve behavior under browser-level regression tests before deleting historical assets.
 
@@ -179,7 +184,7 @@ The operation is GoodWe-first because the hardware floor is authoritative in rea
 
 There is no periodic/startup synchronization. Register `45356` changes only after an explicit minimum-SOC NumberEntity write.
 
-`45358` remains an independent off-grid manual Beta field test. Maximum SOC remains EMHASS-only.
+The old direct minimum-SOC dashboard panel is not a normal settings path. The low-level Beta SOC API remains available for controlled diagnostics/tooling. Maximum SOC remains EMHASS-only.
 
 ## Persistent grid accounting
 
@@ -201,7 +206,7 @@ Fallback:
 
 The selected pair is persisted. A source change re-baselines before further accumulation so absolute totals from different layouts are never subtracted.
 
-Recorder is not part of the live accounting loop. It remains an optional bootstrap/history source and supplies historical battery-power statistics for the Battery & Price graph.
+Recorder is not part of the live accounting loop. It remains an optional bootstrap/history source and supplies historical battery-power statistics for the battery graph.
 
 ## Optimization history
 
@@ -242,7 +247,7 @@ Entity unique IDs remain config-entry based. Host/unit-ID changes must not creat
 register/transport problem -> registers.py / client.py / coordinator.py
 controller decision        -> controller.py
 EMHASS optimization        -> orchestrator*.py / emhass_config.py
-price chart data           -> orchestrator_v026.py / price_series.py / battery_price_api.py
+battery/price chart data   -> orchestrator_v026.py / price_series.py / battery_price_api.py
 SOC synchronization        -> number.py + existing verified client 45356 helper
 daily grid totals          -> accounting.py / accounting_model.py
 runtime/log persistence    -> runtime_store.py / optimization_log.py
