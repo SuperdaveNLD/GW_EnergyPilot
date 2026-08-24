@@ -15,7 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
-| **0.28** | 2026-08-24 | **Beta** | Corrects Hybrid Automatic Control to the intended asymmetric strategy: buying/import uses GoodWe mode 9 from EMHASS `P_grid`, selling/discharging uses mode 12 from EMHASS `P_batt`, neutral battery plans use mode 8, and PV-only charging falls back to GoodWe self-use. |
+| **0.28** | 2026-08-24 | **Beta** | Corrects Hybrid control to mode-9 buying / mode-12 selling and repairs the Battery · Plan · Price chart: canonical EMHASS battery schedule, historical-plan continuity, visible plan overlays, active-interval clipping and stepwise market prices. |
 | **0.27** | 2026-08-24 | **Beta** | Resizable Battery plan/actual/price chart, historical active `P_batt` targets plus current EMHASS future forecast, native GoodWe battery-day counters, compact support diagnostics and corrected Hybrid neutral hold behavior. |
 | **0.26** | 2026-08-24 | **Beta** | Consolidated release: Home Assistant language-aware Dutch/English UI, Battery & Price chart, canonical backend price-series API/cache, and synchronized EMHASS/GoodWe on-grid minimum SOC through register 45356 with verified write/read-back and rollback protection. |
 | **0.25** | 2026-08-24 | **Beta** | Three Automatic Control strategies including Hybrid, extended 15 kW+ daily grid-accounting source selection and persistent 50-run optimization history/LOG. |
@@ -44,9 +44,13 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
 
-# v0.28 — Corrected Hybrid buy/sell control
+# v0.28 — Corrected Hybrid control and Battery chart repair
 
-v0.28 corrects the meaning of the **Hybrid** Automatic Control strategy. The previous Hybrid implementation combined direct battery charging through mode 11 with PCC export control through mode 10. The intended strategy is asymmetric in the other direction:
+v0.28 combines the corrected meaning of the **Hybrid** Automatic Control strategy with fixes found during live v0.27 Battery · Plan · Price validation.
+
+## Corrected Hybrid buy/sell control
+
+The previous Hybrid implementation combined direct battery charging through mode 11 with PCC export control through mode 10. The intended strategy is asymmetric in the other direction:
 
 ```text
 buy/import      -> GoodWe mode 9  -> target from EMHASS P_grid
@@ -68,7 +72,35 @@ Selling is deliberately direct battery control. A positive `P_batt` request uses
 
 A Hybrid battery-charge request with no planned grid import falls through to mode 1/self-use. This allows available local PV surplus to charge the battery according to GoodWe's own fast control rather than limiting charging to the forecast-sized `P_batt` value. A neutral battery plan remains mode 8 Battery Hold.
 
-### Safety and compatibility
+## Battery · Plan · Price fixes
+
+Live v0.27 validation showed that the chart's future-plan parser did not match current EMHASS output. Current EMHASS publishes the `P_batt` horizon through the **`battery_scheduled_power`** attribute. v0.28 uses that as the canonical schedule and keeps `forecasts` only as a conservative compatibility fallback for older/custom publishers.
+
+The chart also corrects several timeline and presentation details:
+
+- Home Assistant's start-time history state is retained at local 00:00 when the active `P_batt` state originated before midnight.
+- A current EMHASS schedule interval that started just before NOW remains visible and is clipped at NOW instead of being discarded.
+- Solid actual bars render below the dashed historical/future plan overlay so planned versus actual remains visible when values overlap.
+- Near-zero actual samples are not rendered as false charge/discharge bars or zero-power discharge tooltips.
+- Missing historical/future plan data displays `—` for planned energy instead of a fabricated `0.00 kWh`.
+- Timestamped market prices are rendered as a step series because they represent intervals, not continuously interpolated measurements.
+- The read-only chart payload is versioned as schema `3` and reports which schedule attribute was detected.
+- The complete nested ES-module import chain uses v0.28 cache keys so a browser cannot keep a stale v0.27 data/view module underneath a new panel wrapper.
+
+## Battery daily totals
+
+The headline charged/discharged values continue to prefer the native GoodWe day counters:
+
+```text
+35208 = battery_charge_energy_today
+35211 = battery_discharge_energy_today
+```
+
+The secondary graph figure remains a numerical integration of Recorder 5-minute mean samples from instantaneous battery power register `35182`.
+
+Those values can differ because they are separate measurement paths. v0.28 clarifies that distinction and does **not** scale or calibrate the Recorder integral to force a match with the inverter's own day counter. The GoodWe counter remains the headline value.
+
+## Safety and compatibility
 
 - Battery strategy remains `P_batt -> 11/12/8`.
 - Grid strategy remains `P_grid -> 9/10/1`.
@@ -76,9 +108,10 @@ A Hybrid battery-charge request with no planned grid import falls through to mod
 - Manual EMS commands remain direct operator commands.
 - No new or guessed GoodWe register definitions or Modbus read blocks.
 - EMS registers remain `47511` / `47512` with the existing `47512 -> wait -> 47511` write order.
-- No entity ID, unique ID, stable device identity, EMHASS optimization objective, persistent accounting/runtime/log store or v0.27 Battery plan/actual/price behavior changes.
+- Chart/API reads remain read-only and do not trigger optimization or write inverter state.
+- No entity ID, unique ID, stable device identity, EMHASS optimization objective or persistent accounting/runtime/log store changes.
 
-v0.28 remains **Beta** while the corrected Hybrid 9/12 mapping receives live installation validation.
+v0.28 remains **Beta** while the Hybrid 9/12 mapping and corrected real-world plan/actual chart receive live installation validation.
 
 # v0.27 — Battery plan versus actual and dashboard refinement
 
@@ -89,7 +122,7 @@ v0.27 turns the v0.26 Battery & Price visualization into a planning and verifica
 - The card can be switched between **S**, **M** and **L** layouts with an Apple-style segmented control; the browser remembers the selected size.
 - Solid bars remain actual GoodWe `battery_power` history from Home Assistant Recorder.
 - Historical plan blocks use the configured EnergyPilot `P_batt` entity history, so the graph shows the target that was actually active at each time rather than rewriting the past with the newest optimization.
-- Future plan blocks come from the current EMHASS battery forecast `forecasts` attribute.
+- Future plan blocks were introduced from the current EMHASS battery forecast payload; v0.28 later corrects the attribute contract to current `battery_scheduled_power`.
 - EMHASS and GoodWe battery signs remain aligned: negative = charge, positive = discharge.
 - The market-price line and NOW marker stay on the same local-day timeline.
 
