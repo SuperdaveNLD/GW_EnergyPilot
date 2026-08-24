@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.28 · Beta**
+**v0.30 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -27,15 +27,14 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.28 highlights
+## v0.30 highlights
 
-- Corrected **Hybrid control**: buying/import uses GoodWe mode `9` from EMHASS `P_grid`; selling/discharging uses mode `12` from EMHASS `P_batt`.
-- Neutral Hybrid battery plans remain mode `8` Battery Hold.
-- Hybrid charging without planned grid import falls back to GoodWe mode `1` self-use so local PV surplus can be absorbed without forcing a forecast-sized battery charge.
-- Repaired the **S / M / L Battery · Plan · Price** graph after v0.27 field validation: current EMHASS `battery_scheduled_power`, midnight plan continuity, active forecast interval clipping, visible dashed plan overlays and stepwise market prices.
-- Missing plan data is shown as unavailable instead of `0.00 kWh`, and near-zero actual samples are no longer presented as false discharge bars.
-- Native GoodWe battery-day counters remain the headline daily totals; Recorder power integration is explicitly a separate comparison measurement path.
-- Compact Support diagnostics, synchronized on-grid minimum SOC, Grid/Battery strategies and persistent runtime/accounting contracts remain unchanged.
+- Fixed issue #46 where **Battery · Plan · Price** could appear twice after hiding the card with the red window control and restoring it through Dashboard → Layout & visibility.
+- The v0.27 enhanced-card installer is now idempotent: a second render-layer invocation keeps one canonical card instead of appending another.
+- The v0.30 release layer also reconciles duplicate cards already present in an open browser session and prefers the instance that already has the Apple/macOS-style window controls.
+- Added the v0.30 frontend release wrapper plus light/dark dashboard wordmark SVG assets prepared for the v0.30 branding package.
+- v0.30 retains the v0.29 safe EMHASS required-config synchronization/recommended defaults and the v0.28 Hybrid 9/12 control and Battery · Plan · Price chart repairs.
+- No GoodWe register definitions, EMS mappings, entity IDs, unique IDs, persistent stores or EMHASS optimization objectives change in this dashboard fix.
 
 ## Tested hardware
 
