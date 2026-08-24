@@ -188,6 +188,49 @@ function renderOptimizationLog(panel, root) {
   });
 }
 
+function alignMinimumSocUi(root) {
+  const socNote = root.querySelector(".ep-v011-soc-note");
+  if (socNote) {
+    socNote.textContent =
+      "Minimum SOC writes both EMHASS battery_minimum_state_of_charge and the GoodWe on-grid minimum SOC floor (register 45356), with inverter read-back verification before a fresh optimization. Maximum SOC remains an EMHASS-only limit.";
+  }
+
+  const onGridInput = root.querySelector(
+    '[data-beta-soc-input="battery_discharge_depth_on_grid"]'
+  );
+  onGridInput?.closest(".ep-v018-beta-card")?.remove();
+
+  const betaSection = root.querySelector(".ep-v018-beta-soc");
+  if (betaSection) {
+    const heading = betaSection.querySelector("h4");
+    if (heading) heading.textContent = "Off-grid minimum SOC field test";
+    const copy = betaSection.querySelector(".ep-v018-beta-soc-copy");
+    if (copy) {
+      copy.textContent =
+        "On-grid minimum SOC (register 45356) is managed by the EMHASS minimum-SOC slider so the optimizer and inverter floor stay synchronized. The remaining control below is the independent off-grid register 45358 field test.";
+    }
+  }
+
+  const betaNote = root.querySelector(".ep-v016-beta-note");
+  if (betaNote) {
+    betaNote.textContent =
+      "BETA: on-grid minimum SOC 45356 is synchronized from the EMHASS minimum-SOC slider with verified read-back. 45358 remains a manual off-grid field-test setting. 47500, 36104 and 36120 remain read-only diagnostics.";
+  }
+
+  const onGridDiagnostic = root.querySelector('[data-v016-beta="soc-on-grid"] span');
+  if (onGridDiagnostic) {
+    onGridDiagnostic.textContent = "On-grid minimum SOC 45356 · synced";
+  }
+
+  const connectionNote = root.querySelector(".ep-v016-goodwe-note");
+  if (connectionNote?.innerHTML?.includes("G20 field test:")) {
+    connectionNote.innerHTML = connectionNote.innerHTML.replace(
+      / <strong>G20 field test:<\/strong> battery minimum-SOC register controls are shown below and are written independently from connection settings\./,
+      " <strong>G20 field test:</strong> off-grid minimum SOC 45358 remains available below; on-grid 45356 is synchronized from the EMHASS minimum-SOC slider."
+    );
+  }
+}
+
 PanelClass.prototype._render = function energyPilotV025Render() {
   previousRender.call(this);
   const root = this.shadowRoot;
@@ -195,6 +238,7 @@ PanelClass.prototype._render = function energyPilotV025Render() {
 
   ensureLogStyles(root);
   renderOptimizationLog(this, root);
+  alignMinimumSocUi(root);
 
   const versionBadge = root.querySelector(".version");
   if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
