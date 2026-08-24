@@ -19,7 +19,7 @@ from .coordinator import GWEnergyPilotCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-STORAGE_VERSION = 2
+STORAGE_VERSION = 1
 SAVE_DELAY_SECONDS = 30
 GRID_POWER_KEY = "meter_total_power_fast"
 IMPORT_DAILY_KEY = "grid_energy_imported_today"
