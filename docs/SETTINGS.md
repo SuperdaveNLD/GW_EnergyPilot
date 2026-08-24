@@ -107,7 +107,7 @@ Failure behavior:
 
 There is **no startup or periodic background synchronization**. Register `45356` is changed only after an explicit minimum-SOC NumberEntity write.
 
-The previous direct on-grid `45356` dashboard card is intentionally removed to avoid two competing operator controls for the same normal minimum SOC.
+The previous direct minimum-SOC field-test panel is intentionally not shown in the dashboard. This avoids a second operator path alongside the synchronized minimum-SOC control.
 
 ## GOODWE page
 
@@ -116,8 +116,7 @@ The GOODWE section owns:
 - inverter host/IP;
 - Modbus TCP port;
 - Modbus unit ID;
-- Automatic Control strategy;
-- independent off-grid minimum-SOC register `45358` Beta field test.
+- Automatic Control strategy.
 
 Connection changes are validated with a temporary `GWModbusClient` before the existing config entry is updated/reloaded.
 
@@ -156,23 +155,22 @@ legacy use_goodwe_smart_meter true          -> Grid
 
 Manual EMS selections are never remapped by the automatic strategy.
 
-## Off-grid minimum-SOC field test
+## Low-level Beta SOC API
 
-Register `45358` remains an independent manual Beta field-test control.
+The old **Battery minimum SOC limits** field-test panel is no longer exposed in the GOODWE dashboard.
 
-Safety rules:
+The existing `gw_energypilot/beta_soc/get` and `gw_energypilot/beta_soc/set` backend API remains available for backwards-compatible diagnostics and controlled field tooling. It is not a second normal operator settings path.
+
+Safety rules for that low-level API remain unchanged:
 
 - Home Assistant administrator access required;
 - canonical register-key whitelist only;
 - current register must already be readable;
 - whole `0..100%` values only;
-- frontend confirmation;
 - immediate same-register read-back;
 - success only when read-back matches.
 
-The existing `beta_soc` backend API remains available for backwards-compatible diagnostics/tooling. On-grid `45356` writes through that low-level API are not the normal dashboard control path; the synchronized minimum-SOC NumberEntity is the supported operator path.
-
-Register `47500` remains read-only because its firmware-dependent semantics are unresolved.
+Normal on-grid minimum SOC must use the synchronized NumberEntity path described above. Register `45358` remains a Beta register and is not exposed as a normal dashboard setting. Register `47500` remains read-only because its firmware-dependent semantics are unresolved.
 
 ## Battery & Price
 
