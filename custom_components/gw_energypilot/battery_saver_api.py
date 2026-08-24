@@ -131,9 +131,26 @@ async def _async_restore_battery_saver_config(
                 changed = True
         if changed:
             await async_write_emhass_config(hass, entry, current)
-    except HomeAssistantError as err:
+    except (HomeAssistantError, ValueError) as err:
         return str(err)
     return None
+
+
+def _successful_config_fallback(
+    previous: dict[str, Any],
+    orchestrator: Any,
+) -> dict[str, Any]:
+    """Build a truthful-enough UI payload if the post-success GET is unavailable."""
+    config = dict(previous)
+    profile = getattr(orchestrator, "last_battery_saver_profile", None)
+    if isinstance(profile, dict):
+        for key in BATTERY_SAVER_CONFIG_KEYS:
+            if key in profile:
+                config[key] = profile[key]
+    goodwe_minimum = _goodwe_minimum_soc(orchestrator.entry)
+    if goodwe_minimum is not None:
+        config["battery_minimum_state_of_charge"] = round(goodwe_minimum / 100.0, 4)
+    return config
 
 
 @websocket_api.require_admin
@@ -231,8 +248,7 @@ async def websocket_set_battery_saver(
 
     try:
         await orchestrator.async_optimize(reason="battery_saver_changed")
-        refreshed_config = await async_get_emhass_config(hass, entry)
-    except (HomeAssistantError, ValueError) as err:
+    except Exception as err:  # noqa: BLE001 - rollback must cover all failed runs
         # Do not leave a mode or its penalty values active if the first complete
         # profile+plan cycle failed. Restore only the Battery Saver-owned fields;
         # required config repairs remain valid independently of the chosen mode.
@@ -247,6 +263,13 @@ async def websocket_set_battery_saver(
             message += f"; Battery Saver EMHASS rollback also failed: {rollback_error}"
         connection.send_error(msg["id"], "apply_failed", message)
         return
+
+    # The optimize+initial publish is the transaction boundary. A transient
+    # diagnostics read failure after that success must not undo a valid plan.
+    try:
+        refreshed_config = await async_get_emhass_config(hass, entry)
+    except HomeAssistantError:
+        refreshed_config = _successful_config_fallback(config, orchestrator)
 
     connection.send_result(msg["id"], _payload(entry, refreshed_config))
 
