@@ -140,7 +140,9 @@ class GWEnergyPilotController:
         entity_ids.discard("")
         if entity_ids:
             self._unsubs.append(async_track_state_change_event(self.hass, list(entity_ids), self._async_source_changed))
-        self._unsubs.append(self.coordinator.async_add_listener(self._async_coordinator_updated))
+        add_listener = getattr(self.coordinator, "async_add_listener", None)
+        if add_listener is not None:
+            self._unsubs.append(add_listener(self._async_coordinator_updated))
 
     async def async_unload(self) -> None:
         while self._unsubs:
