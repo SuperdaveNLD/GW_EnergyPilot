@@ -96,14 +96,23 @@ function ensureStyles(root) {
     .ep-v027-size-control{display:none!important}
     .ep-v027-expand{display:none!important}
     .ep-v028-window-controls{display:none!important}
-    .ep-v027-modal .ep-v028-window-controls{display:flex!important}
-    .ep-v027-modal .ep-v028-window-dot.close{background:#ff6070!important}
-    .ep-v027-modal .ep-v028-window-dot.minimize{background:#37d7ff!important}
-    .ep-v027-modal .ep-v028-window-dot.zoom{background:#27e5b0!important}
-    .ep-v027-modal .ep-v028-window-dot span{opacity:.86!important}
     @media(max-width:720px){.ep-v030-card-chrome:not(.battery){top:6px;right:6px}.ep-v030-card-chrome.battery{margin-top:2px}}
   `;
   root.appendChild(style);
+}
+
+function decorateDetailedGraph() {
+  const backdrop = document.querySelector(".ep-v027-backdrop");
+  if (!backdrop || backdrop.querySelector("#ep-v030-modal-chrome-style")) return;
+  const style = document.createElement("style");
+  style.id = "ep-v030-modal-chrome-style";
+  style.textContent = `
+    .ep-v028-window-dot.close{background:#ff6070!important;border-color:rgba(255,124,137,.62)!important}
+    .ep-v028-window-dot.minimize{background:#37d7ff!important;border-color:rgba(111,226,255,.64)!important}
+    .ep-v028-window-dot.zoom{background:#27e5b0!important;border-color:rgba(103,244,205,.58)!important}
+    .ep-v028-window-dot span{opacity:.86!important;color:#061523!important}
+  `;
+  backdrop.appendChild(style);
 }
 
 function installGenericClose(panel, root) {
@@ -148,7 +157,12 @@ function installBatteryChrome(panel, root) {
   controls.querySelector('[data-v030-action="expand"]')?.addEventListener("click", (event) => {
     event.stopPropagation();
     card.querySelector(".ep-v027-expand")?.click();
+    queueMicrotask(decorateDetailedGraph);
   });
+
+  for (const trigger of card.querySelectorAll('[data-action="details"]')) {
+    trigger.addEventListener("click", () => queueMicrotask(decorateDetailedGraph));
+  }
 }
 
 await customElements.whenDefined(PANEL_NAME);
