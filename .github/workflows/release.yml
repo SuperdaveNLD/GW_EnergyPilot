@@ -76,7 +76,7 @@ jobs:
 
           tag="${GITHUB_REF_NAME}"
           notes_file="docs/RELEASE_NOTES_V${tag//./}.md"
-          title="GW EnergyPilot v${tag} Beta"
+          title="GW EnergyPilot v${tag}"
 
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "GitHub release $tag already exists; nothing to publish."
