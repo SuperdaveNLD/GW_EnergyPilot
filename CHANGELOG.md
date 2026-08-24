@@ -2,6 +2,30 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.30] - 2026-08-24
+
+### Added
+
+- Added the official read-only EMHASS `GET /api/v1/plan` as the primary source for the complete future `P_batt` optimization horizon shown in Battery · Plan · Price.
+- Added normalization and regression coverage for the versioned EMHASS plan records (`timestamp`, `P_batt`) while retaining Home Assistant entity-attribute fallbacks for older/custom EMHASS publishers.
+- Added EnergyPilot-native circular card chrome: red `×` hides a card, cyan `−` resizes Battery · Plan · Price, and mint `↗` opens its detailed graph.
+- Added a red close control to every dashboard card that already participates in the persistent dashboard layout through `data-ep-card`.
+
+### Changed
+
+- Battery forecast blocks to the right of NOW prefer the full `/api/v1/plan` horizon; `battery_scheduled_power` and legacy/custom `forecasts` remain compatibility fallbacks.
+- Battery chart payload schema advances to `4` and reports the forecast source plus EMHASS plan generation/schema metadata when available.
+- The visible S/M/L selector is replaced by the cyan dash control, which cycles Compact → Normal → Large → Compact while preserving the existing browser-local size preference.
+- Apple-inspired controls now use the EnergyPilot coral/cyan/mint palette instead of copying the macOS red/yellow/green traffic-light colors.
+- Closing a dashboard card writes the same existing `hidden` preference used by Dashboard layout & visibility, so cards remain recoverable rather than being removed from configuration.
+
+### Safety / compatibility
+
+- The new EMHASS plan read is visualization-only: it does not start an optimization, publish data or modify EMHASS configuration.
+- No GoodWe register definitions, Modbus read blocks, EMS modes, controller decisions or `47511/47512` write ordering change.
+- Existing entity IDs, unique IDs, stable device identity and persistent accounting/runtime/log store contracts remain unchanged.
+- v0.30 remains **Beta** while the official plan forecast overlay and generalized card controls receive live installation validation.
+
 ## [0.29] - 2026-08-24
 
 ### Added
@@ -332,7 +356,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Safety boundary
 
-- No EMHASS optimization objective, constraint or payload semantics are changed; v0.19 only exposes values that already exist in EnergyPilot or EMHASS.
+- No EMHASS optimizer objective, constraint or payload semantics are changed; v0.19 only exposes values that already exist in EnergyPilot or EMHASS.
 - No additional GoodWe registers are read or written.
 - The v0.18 manual Beta write path for `45356/45358`, Automatic Control ownership, EMS modes/registers and `P_batt` mapping are unchanged.
 
@@ -367,7 +391,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - A settings gear in the EnergyPilot dashboard header for Home Assistant administrators.
 - Dedicated **EP**, **EMHASS** and **GOODWE** configuration pages backed by the existing Home Assistant config entry.
-- Admin-only WebSocket settings commands for reading and updating the existing configuration.
+- Admin-only WebSocket settings commands for reading/updating the existing configuration.
 - GoodWe connection validation before host, Modbus TCP port or unit-ID changes are saved.
 - Multi-entry selection for installations with more than one GW EnergyPilot config entry.
 - Enabled-by-default Home Assistant Diagnostic sensors for the Beta SOC candidates `45356`, `45358` and `47500`.
