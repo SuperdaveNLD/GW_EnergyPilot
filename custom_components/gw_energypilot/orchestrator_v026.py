@@ -35,6 +35,16 @@ class GWEnergyPilotOrchestrator(_V013Orchestrator):
         self._dashboard_prod_price: dict[str, float] = {}
         self._dashboard_price_updated_at: datetime | None = None
         self._dashboard_price_lock = asyncio.Lock()
+        self._dashboard_price_read_task: asyncio.Task[Any] | None = None
+
+    def _set_status(self, status: str, error: str | None = None) -> None:
+        """Keep a read-only dashboard refresh from changing optimizer status."""
+        if (
+            status == "error_prices"
+            and self._dashboard_price_read_task is asyncio.current_task()
+        ):
+            return
+        super()._set_status(status, error)
 
     def _cache_dashboard_prices(
         self,
@@ -114,8 +124,9 @@ class GWEnergyPilotOrchestrator(_V013Orchestrator):
     ) -> dict[str, Any]:
         """Return a cached dashboard price series, refreshing it when needed.
 
-        Dashboard reads never launch an EMHASS optimization. They only reuse the
-        existing EnergyPilot price-source path and keep a short in-memory cache.
+        Dashboard reads never launch an EMHASS optimization or change its status.
+        They only reuse the existing EnergyPilot price-source path and keep a
+        short in-memory cache.
         """
         if not force and self._dashboard_price_cache_fresh():
             return self._dashboard_price_payload()
@@ -132,6 +143,9 @@ class GWEnergyPilotOrchestrator(_V013Orchestrator):
         async with self._dashboard_price_lock:
             if not force and self._dashboard_price_cache_fresh():
                 return self._dashboard_price_payload()
+
+            read_task = asyncio.current_task()
+            self._dashboard_price_read_task = read_task
             try:
                 await self._async_price_forecasts()
             except HomeAssistantError as err:
@@ -139,5 +153,8 @@ class GWEnergyPilotOrchestrator(_V013Orchestrator):
             except Exception as err:  # noqa: BLE001 - read-only UI must degrade safely
                 _LOGGER.exception("Unable to refresh EnergyPilot dashboard prices")
                 return self._dashboard_price_payload(str(err))
+            finally:
+                if self._dashboard_price_read_task is read_task:
+                    self._dashboard_price_read_task = None
 
         return self._dashboard_price_payload()
