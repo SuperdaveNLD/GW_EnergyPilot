@@ -1,0 +1,176 @@
+"""Pure helpers for synchronizing the required EMHASS configuration."""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from typing import Any, Mapping
+
+DEFAULT_PV_FORECAST_ENTITY = "sensor.p_pv_forecast"
+
+SYNCED_CONFIG_KEYS: tuple[str, ...] = (
+    "sensor_power_photovoltaics",
+    "sensor_power_load_no_var_loads",
+    "sensor_power_battery",
+    "sensor_battery_state_of_charge",
+    "sensor_power_photovoltaics_forecast",
+    "sensor_replace_zero",
+    "sensor_linear_interp",
+    "var_model",
+    "continual_publish",
+    "method_ts_round",
+    "set_use_pv",
+    "set_use_battery",
+    "inverter_is_hybrid",
+)
+
+
+def _required_entity(entity_ids: Mapping[str, str], key: str) -> str:
+    value = str(entity_ids.get(key, "")).strip()
+    if not value:
+        raise ValueError(f"Missing required EnergyPilot entity mapping: {key}")
+    return value
+
+
+def _string_value(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _string_items(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        normalized = _string_value(item)
+        if normalized and normalized not in result:
+            result.append(normalized)
+    return result
+
+
+def _replace_and_require(
+    value: Any,
+    replacements: Mapping[str, str],
+    required: tuple[str, ...],
+) -> list[str]:
+    result: list[str] = []
+    for item in _string_items(value):
+        replacement = replacements.get(item, item)
+        if replacement and replacement not in result:
+            result.append(replacement)
+    for item in required:
+        if item not in result:
+            result.append(item)
+    return result
+
+
+def _single_battery_entity_value(current: Any, entity_id: str) -> str | list[str]:
+    """Preserve the existing scalar/list shape for EMHASS compatibility."""
+    return [entity_id] if isinstance(current, list) else entity_id
+
+
+def _number_of_batteries(config: Mapping[str, Any]) -> int:
+    try:
+        value = int(config.get("number_of_batteries", 1))
+    except (TypeError, ValueError):
+        return 1
+    return max(1, value)
+
+
+def build_emhass_sync_config(
+    config: Mapping[str, Any],
+    entity_ids: Mapping[str, str],
+) -> tuple[dict[str, Any], list[str]]:
+    """Return a complete EMHASS config with only required mappings synchronized.
+
+    Unrelated settings are preserved. Existing custom list members are retained,
+    while references to the previous primary PV/load mappings are replaced with
+    the current EnergyPilot entity IDs.
+    """
+    pv_entity = _required_entity(entity_ids, "pv")
+    load_entity = _required_entity(entity_ids, "load")
+    battery_entity = _required_entity(entity_ids, "battery")
+    soc_entity = _required_entity(entity_ids, "soc")
+
+    synced = deepcopy(dict(config))
+    warnings: list[str] = []
+
+    old_pv = _string_value(config.get("sensor_power_photovoltaics"))
+    old_load = _string_value(config.get("sensor_power_load_no_var_loads"))
+    old_forecast = _string_value(
+        config.get("sensor_power_photovoltaics_forecast")
+    )
+    pv_forecast = old_forecast or DEFAULT_PV_FORECAST_ENTITY
+
+    synced["sensor_power_photovoltaics"] = pv_entity
+    synced["sensor_power_load_no_var_loads"] = load_entity
+    synced["sensor_power_photovoltaics_forecast"] = pv_forecast
+
+    if _number_of_batteries(config) == 1:
+        synced["sensor_power_battery"] = _single_battery_entity_value(
+            config.get("sensor_power_battery"), battery_entity
+        )
+        synced["sensor_battery_state_of_charge"] = _single_battery_entity_value(
+            config.get("sensor_battery_state_of_charge"), soc_entity
+        )
+    else:
+        warnings.append(
+            "EMHASS is configured with multiple batteries; EnergyPilot cannot "
+            "safely replace per-battery power/SOC sensor lists."
+        )
+
+    replacements = {
+        value: replacement
+        for value, replacement in (
+            (old_pv, pv_entity),
+            (old_load, load_entity),
+            (old_forecast, pv_forecast),
+        )
+        if value
+    }
+    synced["sensor_replace_zero"] = _replace_and_require(
+        config.get("sensor_replace_zero"),
+        replacements,
+        (pv_entity, pv_forecast),
+    )
+    synced["sensor_linear_interp"] = _replace_and_require(
+        config.get("sensor_linear_interp"),
+        replacements,
+        (pv_entity, load_entity),
+    )
+
+    current_var_model = _string_value(config.get("var_model"))
+    if current_var_model in {
+        None,
+        old_load,
+        "sensor.power_load_no_var_loads",
+    }:
+        synced["var_model"] = load_entity
+    else:
+        warnings.append(
+            "Custom EMHASS var_model was preserved instead of being replaced."
+        )
+
+    # EnergyPilot explicitly publishes only after a successful optimization.
+    synced["continual_publish"] = False
+    synced["method_ts_round"] = "first"
+    synced["set_use_pv"] = True
+    synced["set_use_battery"] = True
+    synced["inverter_is_hybrid"] = True
+
+    return synced, warnings
+
+
+def emhass_sync_changes(
+    current: Mapping[str, Any],
+    synced: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Return a stable, JSON-serializable change list for the managed keys."""
+    changes: list[dict[str, Any]] = []
+    for key in SYNCED_CONFIG_KEYS:
+        before = current.get(key)
+        after = synced.get(key)
+        if before != after:
+            changes.append({"key": key, "current": before, "required": after})
+    return changes
