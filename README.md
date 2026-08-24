@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.26 · Beta**
+**v0.27 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -24,17 +24,18 @@ Release documentation:
 - `docs/ACCOUNTING.md` — persistent grid accounting;
 - `docs/RUNTIME_STATE.md` — persistent runtime evidence;
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
+- `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.26 highlights
+## v0.27 highlights
 
-- Home Assistant language-aware dashboard with Dutch and English support.
-- Full-width **Battery & Price** graph comparing actual battery power with market price for the current local day.
-- Read-only backend price-series API using the same EnergyPilot price path as EMHASS.
-- Synchronized normal on-grid minimum SOC: one explicit minimum-SOC change updates and verifies GoodWe register `45356`, then writes the same value to EMHASS.
-- GoodWe rollback attempt if the subsequent EMHASS minimum-SOC write fails.
-- Separate on-grid `45356` dashboard field-test control removed; off-grid `45358` remains independent.
-- Existing Battery/Grid/Hybrid Automatic Control, accounting and optimization-log behavior retained.
+- Resizable **S / M / L Battery plan / actual / price** graph with an Apple-style segmented control.
+- Historical active `P_batt` targets and the current future EMHASS battery forecast overlaid on actual GoodWe battery power.
+- Headline battery-day energy prefers the native GoodWe `35208` / `35211` counters; Recorder integration remains a comparison.
+- Hybrid neutral battery plans use mode `8` Battery Hold unless a stronger grid-export request selects mode `10`.
+- Compact operational Support diagnostics with deep details retained in the copyable support report.
+- The legacy direct **Battery minimum SOC limits** field-test panel is no longer shown; normal on-grid minimum SOC uses the synchronized control path.
+- Existing Battery/Grid control behavior, grid accounting, entity identities and persistent runtime contracts remain intact.
 
 ## Tested hardware
 
@@ -57,10 +58,10 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - persistent optimization history and `last_success`;
 - persistent Today/Yesterday grid import/export accounting;
 - optional Nord Pool/runtime prices;
-- Battery & Price visualization;
+- Battery plan / actual / price visualization;
 - EV anti-discharge protection;
 - synchronized normal on-grid minimum SOC between EMHASS and GoodWe `45356`;
-- independent Beta off-grid minimum-SOC `45358` field test;
+- low-level Beta SOC API retained for diagnostics/backwards-compatible tooling;
 - built-in EnergyPilot dashboard and support diagnostics.
 
 ## Requirements
@@ -187,17 +188,20 @@ If `45356` is unavailable, neither system is changed. If EMHASS fails after a ve
 
 There is no startup/background SOC synchronization.
 
-`45358` remains an independent off-grid Beta field test. Maximum SOC remains EMHASS-only.
+The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains EMHASS-only.
 
-## Battery & Price chart
+## Battery plan / actual / price chart
 
 The chart is read-only.
 
-- battery bars use Recorder 5-minute means from the existing GoodWe `battery_power` entity;
+- actual battery bars use Recorder 5-minute means from the existing GoodWe `battery_power` entity;
 - charging is below zero, discharging above zero;
+- historical plan blocks use the configured EnergyPilot `P_batt` entity history;
+- future plan blocks use the current EMHASS `forecasts` attribute;
 - the market-price line comes from the same EnergyPilot runtime price source used for EMHASS;
-- chart data is cached for five minutes;
-- displayed charged/discharged energy is an approximate visualization integral, not persistent accounting.
+- the card supports S/M/L layouts and an expanded detail view;
+- native GoodWe day counters `35208` / `35211` are preferred for the headline charged/discharged totals;
+- Recorder-integrated energy remains a visualization comparison rather than persistent accounting.
 
 Future persistent financial accounting must consume backend grid-accounting deltas and effective prices, not reconstruct totals from chart pixels/buckets.
 
