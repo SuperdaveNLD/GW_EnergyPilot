@@ -2,6 +2,28 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.30] - 2026-08-24
+
+### Added
+
+- Added standardized GitHub Release publishing so HACS/Home Assistant can use the numeric GW EnergyPilot release version instead of falling back to a shortened commit SHA.
+- Added the v0.30 frontend release wrapper and synchronized dashboard/footer version badge.
+- Added dedicated `docs/RELEASE_NOTES_V030.md` and `docs/RELEASE_WORKFLOW.md` documentation for the release/update contract.
+
+### Changed
+
+- The integration manifest version is now `0.30`.
+- The release workflow validates that the release/tag version matches `manifest.json`, then runs compile, unit, repository, HACS and Hassfest checks before publication.
+- A new manifest version merged to `main` can publish its matching numeric GitHub Release automatically; manually pushed numeric release tags remain supported and are validated against the manifest.
+- HACS remains the owner of update discovery/installations; GW EnergyPilot does not add a duplicate Home Assistant `update` entity.
+
+### Safety / compatibility
+
+- No new or guessed GoodWe register definitions or Modbus read blocks.
+- EMS remains on `47511/47512` with the established `47512 -> wait -> 47511` write order.
+- No existing entity IDs, unique IDs, stable device identity, accounting/runtime/log store or EMHASS optimization contracts are changed.
+- v0.30 carries forward the complete v0.29 control and dashboard behavior and remains **Beta** while the standardized release/update presentation is validated through HACS/Home Assistant.
+
 ## [0.29] - 2026-08-24
 
 ### Added
@@ -58,7 +80,7 @@ All notable changes to GW EnergyPilot are documented here.
 ### Safety / compatibility
 
 - Battery control remains `P_batt -> 11/12/8`; Grid control remains `P_grid -> 9/10/1`.
-- EV anti-discharge remains a higher-priority directional override; manual EMS commands remain direct operator commands.
+- EV anti-discharge remains a higher-priority safety override; manual EMS commands remain direct operator commands.
 - No GoodWe register definitions, Modbus read blocks or `client.py` write ordering change. EMS remains `47511/47512` with `47512 -> wait -> 47511`.
 - Chart/API changes are read-only; no EMHASS objective, entity ID/unique ID, stable device identity or accounting/runtime/log store changes.
 - v0.28 remains **Beta** while the corrected Hybrid mapping and repaired plan/actual chart receive real-installation field validation.
