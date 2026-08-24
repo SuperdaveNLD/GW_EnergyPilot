@@ -2,6 +2,38 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.25] - 2026-08-24
+
+### Added
+
+- Added three explicit Automatic Control strategies in the GOODWE settings: **Battery control**, **Grid control** and **Hybrid control**.
+- Added **Hybrid control**: an EMHASS battery-charge request uses GoodWe mode `11`, a planned grid export uses mode `10`, and other situations return to GoodWe mode `1` self-use/Auto.
+- Added a per-config-entry persistent optimization history containing the newest 50 EnergyPilot-owned manual, scheduled and event-triggered optimization attempts.
+- Added the admin-only `gw_energypilot/optimization_log/get` WebSocket API and a read-only **LOG** page in EnergyPilot Settings.
+- Added persistent accounting-source selection so derived Today/Yesterday accounting can use the populated extended 64-bit GoodWe meter pair `36104/36120` on applicable 15 kW+ ETA/ET installations.
+- Added regression coverage for hybrid strategy selection/execution, optimization history persistence/failures, extended-meter selection and safe accounting source migration.
+
+### Changed
+
+- Existing installations without an explicit `control_strategy` keep the backwards-compatible legacy mapping: `use_goodwe_smart_meter=false` or missing selects Battery control; `true` selects Grid control.
+- Battery control remains `P_batt -> 11/12/8`; Grid control remains `P_grid -> 9/10/1`.
+- Hybrid control prioritizes an explicit battery-charge plan (`P_batt < -deadband`) through mode `11`; otherwise an export plan (`P_grid < -deadband`) uses mode `10`; otherwise mode `1` lets GoodWe perform self-use balancing.
+- EV anti-discharge protection remains a higher-priority directional safety override and is not replaced by the new strategy selector.
+- Daily grid accounting now prefers a coherent populated `36104/36120` pair, keeps legacy `36015/36017` when the extended block is empty or unavailable, and persists the selected source pair.
+- Any accounting source-pair change re-baselines before accumulation so absolute totals from different GoodWe layouts are never subtracted from one another. Existing Today/Yesterday values are preserved during a same-day migration.
+- Optimization history is stored separately from `gw_energypilot.runtime.<config_entry_id>`; failed runs are logged without overwriting the existing `last_success` contract.
+- The active frontend is `gw-energy-pilot-v025.js`, layered on the v0.24 hybrid-control frontend and adding the LOG view plus the v0.25 version wrapper.
+
+### Safety / compatibility
+
+- No new GoodWe register definitions or Modbus read blocks are introduced by v0.25; `36104/36120` were already existing optional Beta diagnostics.
+- EMS registers remain `47511`/`47512` and write ordering remains `47512 -> wait -> 47511`.
+- Manual EMS modes remain direct operator commands and are not remapped by the automatic strategy selector.
+- Existing entity unique IDs, device identity, physical lifetime grid-energy entities and daily accounting entity IDs remain unchanged.
+- When an existing installation first switches accounting to `36104/36120`, the first extended sample is a safe baseline; EnergyPilot does not fabricate energy for the part of the day before that baseline.
+- Diagnostic log persistence failures are non-fatal to optimization/control.
+- v0.25 remains **Beta** while the hybrid strategy, extended-meter accounting selection and optimization history receive broader field exposure.
+
 ## [0.24] - 2026-08-23
 
 ### Fixed
@@ -121,7 +153,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - When Automatic Control is ON, the new manual mode pad and slider are visually locked/greyed while the actual active mode remains highlighted.
 - When Automatic Control is OFF, clicking a mode uses the existing `manual_mode` select and existing controller manual-ownership path; no second Modbus control API is introduced.
-- Modes `1`, `6`, `7` and `8` continue to force a `0 W` setpoint. Mode `7` adds a dedicated confirmation before forced off-grid operation.
+- Modes `1`, `6`, `7` and `8` continue to force `0 W`. Mode `7` adds a dedicated confirmation before forced off-grid operation.
 - The active frontend is `gw-energy-pilot-v021.js`, layered on top of v0.20.
 
 ### Beta test focus
