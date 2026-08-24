@@ -3,76 +3,40 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 import math
 from typing import Any
 
-from homeassistant.components.recorder import get_instance, history
-from homeassistant.const import Platform
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .accounting_model import (
-    GridAccountingState,
-    apply_meter_totals,
-    roll_to_day,
-    seed_daily_totals,
-)
+from .accounting_model import GridAccountingState, roll_to_day
+from .accounting_power import integrate_signed_power
 from .const import DOMAIN
 from .coordinator import GWEnergyPilotCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-STORAGE_VERSION = 1
+STORAGE_VERSION = 2
 SAVE_DELAY_SECONDS = 30
-IMPORT_TOTAL_KEY = "meter_total_energy_import"
-EXPORT_TOTAL_KEY = "meter_total_energy_export"
+GRID_POWER_KEY = "meter_total_power_fast"
 IMPORT_DAILY_KEY = "grid_energy_imported_today"
 EXPORT_DAILY_KEY = "grid_energy_exported_today"
+MAX_SAMPLE_GAP_SECONDS = 120
 
 
-def _safe_number(value: Any) -> float | None:
+def _finite_number(value: Any) -> float | None:
     try:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return number if math.isfinite(number) and number >= 0 else None
-
-
-def _history_boundary_value(
-    hass: HomeAssistant,
-    entity_id: str,
-    boundary: datetime,
-) -> float | None:
-    """Return the cumulative state at a local-day boundary from Recorder."""
-    rows = history.get_significant_states(
-        hass,
-        boundary,
-        boundary + timedelta(seconds=1),
-        [entity_id],
-        None,
-        True,
-        False,
-        False,
-        True,
-        False,
-    ).get(entity_id, [])
-
-    for row in rows:
-        raw = getattr(row, "state", None)
-        if raw is None and isinstance(row, dict):
-            raw = row.get("state", row.get("s"))
-        value = _safe_number(raw)
-        if value is not None:
-            return value
-    return None
+    return number if math.isfinite(number) else None
 
 
 class GWEnergyPilotAccounting:
-    """Own EnergyPilot accounting derived from canonical GoodWe counters."""
+    """Own persistent EnergyPilot grid accounting from live PCC power."""
 
     def __init__(
         self,
@@ -93,6 +57,8 @@ class GWEnergyPilotAccounting:
         self._listeners: set[Callable[[], None]] = set()
         self._coordinator_unsub: CALLBACK_TYPE | None = None
         self._save_handle = None
+        self._previous_power_w: float | None = None
+        self._previous_sample_at: datetime | None = None
 
     async def async_prepare(self) -> None:
         """Restore persisted accounting before sensor entities are created."""
@@ -102,7 +68,7 @@ class GWEnergyPilotAccounting:
             await self._store.async_save(self.state.as_dict())
 
     async def async_start(self) -> None:
-        """Start consuming canonical GoodWe lifetime-counter updates."""
+        """Start consuming live signed GoodWe grid-power updates."""
         if self._coordinator_unsub is not None:
             return
         self._coordinator_unsub = self.coordinator.async_add_listener(
@@ -112,111 +78,8 @@ class GWEnergyPilotAccounting:
             self._handle_coordinator_update()
 
     async def async_bootstrap_if_needed(self) -> None:
-        """Seed first-release daily totals from existing Recorder boundaries."""
-        if self.state.bootstrap_complete:
-            return
-        if "recorder" not in self.hass.config.components:
-            return
-        if self.coordinator.data is None:
-            return
-
-        values = self.coordinator.data.values
-        current_import = _safe_number(values.get(IMPORT_TOTAL_KEY))
-        current_export = _safe_number(values.get(EXPORT_TOTAL_KEY))
-        if current_import is None or current_export is None:
-            return
-
-        registry = er.async_get(self.hass)
-        import_entity_id = registry.async_get_entity_id(
-            Platform.SENSOR,
-            DOMAIN,
-            f"{self.entry_id}_{IMPORT_TOTAL_KEY}",
-        )
-        export_entity_id = registry.async_get_entity_id(
-            Platform.SENSOR,
-            DOMAIN,
-            f"{self.entry_id}_{EXPORT_TOTAL_KEY}",
-        )
-        if import_entity_id is None or export_entity_id is None:
-            return
-
-        now_local = dt_util.now()
-        today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        yesterday_start_local = today_start_local - timedelta(days=1)
-        today_start = dt_util.as_utc(today_start_local)
-        yesterday_start = dt_util.as_utc(yesterday_start_local)
-
-        recorder = get_instance(self.hass)
-        try:
-            yesterday_import_start = await recorder.async_add_executor_job(
-                _history_boundary_value,
-                self.hass,
-                import_entity_id,
-                yesterday_start,
-            )
-            today_import_start = await recorder.async_add_executor_job(
-                _history_boundary_value,
-                self.hass,
-                import_entity_id,
-                today_start,
-            )
-            yesterday_export_start = await recorder.async_add_executor_job(
-                _history_boundary_value,
-                self.hass,
-                export_entity_id,
-                yesterday_start,
-            )
-            today_export_start = await recorder.async_add_executor_job(
-                _history_boundary_value,
-                self.hass,
-                export_entity_id,
-                today_start,
-            )
-        except Exception as err:  # Recorder bootstrap is optional, never fatal.
-            _LOGGER.debug("Unable to bootstrap EnergyPilot accounting: %s", err)
-            return
-
-        today_import = (
-            current_import - today_import_start
-            if today_import_start is not None and current_import >= today_import_start
-            else None
-        )
-        today_export = (
-            current_export - today_export_start
-            if today_export_start is not None and current_export >= today_export_start
-            else None
-        )
-        yesterday_import = (
-            today_import_start - yesterday_import_start
-            if yesterday_import_start is not None
-            and today_import_start is not None
-            and today_import_start >= yesterday_import_start
-            else None
-        )
-        yesterday_export = (
-            today_export_start - yesterday_export_start
-            if yesterday_export_start is not None
-            and today_export_start is not None
-            and today_export_start >= yesterday_export_start
-            else None
-        )
-
-        if not seed_daily_totals(
-            self.state,
-            now_local.date(),
-            today_import_kwh=today_import,
-            today_export_kwh=today_export,
-            yesterday_import_kwh=yesterday_import,
-            yesterday_export_kwh=yesterday_export,
-        ):
-            return
-
-        # Recorder supplied the period start; the fresh Modbus sample supplies
-        # the exact current lifetime baseline for all future delta accounting.
-        self.state.last_import_total_kwh = current_import
-        self.state.last_export_total_kwh = current_export
-        await self._store.async_save(self.state.as_dict())
-        self._notify_listeners()
+        """Retained as a compatibility no-op for the v0.23 setup call path."""
+        return
 
     async def async_unload(self) -> None:
         """Persist and stop accounting."""
@@ -244,15 +107,48 @@ class GWEnergyPilotAccounting:
     def _handle_coordinator_update(self) -> None:
         if self.coordinator.data is None:
             return
-        values = self.coordinator.data.values
-        before = self.state.as_dict()
-        apply_meter_totals(
-            self.state,
-            dt_util.now().date(),
-            import_total_kwh=values.get(IMPORT_TOTAL_KEY),
-            export_total_kwh=values.get(EXPORT_TOTAL_KEY),
-        )
-        if self.state.as_dict() == before:
+
+        power_w = _finite_number(self.coordinator.data.values.get(GRID_POWER_KEY))
+        if power_w is None:
+            self._previous_power_w = None
+            self._previous_sample_at = None
+            return
+
+        now = dt_util.now()
+        day_changed = roll_to_day(self.state, now.date())
+        changed = day_changed
+
+        if self._previous_power_w is not None and self._previous_sample_at is not None:
+            elapsed = (now - self._previous_sample_at).total_seconds()
+            same_day = self._previous_sample_at.date() == now.date()
+            if 0 < elapsed <= MAX_SAMPLE_GAP_SECONDS and same_day:
+                import_kwh, export_kwh = integrate_signed_power(
+                    self._previous_power_w,
+                    power_w,
+                    elapsed,
+                )
+                if import_kwh > 0:
+                    self.state.today_import_kwh = round(
+                        self.state.today_import_kwh + import_kwh,
+                        6,
+                    )
+                    changed = True
+                if export_kwh > 0:
+                    self.state.today_export_kwh = round(
+                        self.state.today_export_kwh + export_kwh,
+                        6,
+                    )
+                    changed = True
+            elif elapsed > MAX_SAMPLE_GAP_SECONDS:
+                _LOGGER.debug(
+                    "Skipping EnergyPilot grid accounting across %.1fs telemetry gap",
+                    elapsed,
+                )
+
+        self._previous_power_w = power_w
+        self._previous_sample_at = now
+
+        if not changed:
             return
         self._schedule_save()
         self._notify_listeners()
