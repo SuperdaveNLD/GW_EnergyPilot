@@ -2,7 +2,7 @@
 
 GW EnergyPilot exposes administrator-only configuration inside the built-in dashboard.
 
-v0.25 remains **Beta** while Hybrid control, extended-meter accounting selection and persistent optimization history receive wider field exposure.
+v0.25 remains **Beta** while Hybrid control, extended-meter accounting selection, persistent optimization history and synchronized G20 minimum-SOC handling receive wider field exposure.
 
 ## Configuration ownership
 
@@ -11,7 +11,8 @@ EnergyPilot does not create a parallel settings database.
 - `ConfigEntry.options` owns EP/EMHASS integration options.
 - `ConfigEntry.data` owns GoodWe connection data and the automatic-control strategy.
 - EMHASS `/get-config` and `/set-config` own live EMHASS configuration such as SOC bounds and `costfun`.
-- GoodWe registers such as `45356/45358` own inverter-stored settings.
+- The **EMHASS minimum SOC slider** is the single operator control for the normal on-grid minimum: an explicit change writes the same whole-percent value to EMHASS `battery_minimum_state_of_charge` and GoodWe register `45356`.
+- GoodWe register `45358` remains an independent off-grid inverter setting and manual Beta field test.
 - Home Assistant Stores own derived accounting/runtime history only; they are not editable user configuration.
 
 Backend dashboard APIs include:
@@ -26,7 +27,9 @@ gw_energypilot/beta_soc/set
 gw_energypilot/optimization_log/get
 ```
 
-The active v0.25 frontend layers the LOG view over the complete v0.24 Hybrid-control frontend.
+The `beta_soc` API remains available for backwards-compatible diagnostics/tooling. The active dashboard no longer exposes a separate direct on-grid `45356` control because that would create two competing operator controls for the same minimum SOC.
+
+The active v0.25 frontend layers the LOG view and current SOC-control alignment over the complete v0.24 Hybrid-control frontend.
 
 ## EP page
 
@@ -76,6 +79,28 @@ self-consumption
 
 Changing `costfun` does not silently change the GoodWe Automatic Control strategy.
 
+### Minimum and maximum SOC sliders
+
+The maximum-SOC slider remains an EMHASS-only optimizer constraint.
+
+The minimum-SOC slider has a stricter contract on the validated ETA-G20 path. Field testing established that lowering only EMHASS `battery_minimum_state_of_charge` is insufficient when the inverter-side on-grid floor in register `45356` is higher. The inverter stops discharge at its own floor even if EMHASS planned a lower SOC.
+
+Therefore one explicit minimum-SOC slider change now performs this transaction:
+
+```text
+validate minimum <= EMHASS maximum
+read current GoodWe 45356 from coordinator telemetry
+write requested whole-percent minimum to GoodWe 45356
+verify 45356 read-back
+write the same percentage to EMHASS battery_minimum_state_of_charge
+publish the verified GoodWe value into coordinator state
+schedule one fresh optimization after the existing debounce
+```
+
+If `45356` is unavailable, EnergyPilot does **not** change the EMHASS minimum. If the verified GoodWe write succeeds but the subsequent EMHASS `/set-config` call fails, EnergyPilot attempts to restore the previous `45356` value. A failed rollback is surfaced as an error rather than hidden.
+
+This synchronization occurs only after an explicit user/service change of the minimum-SOC number entity. It is configuration synchronization, not an Automatic Control EMS target and not a periodic background write.
+
 ## GOODWE page
 
 The GOODWE section manages:
@@ -84,9 +109,11 @@ The GOODWE section manages:
 - Modbus TCP port;
 - Modbus unit ID;
 - **Automatic control strategy**;
-- manual G20 minimum-SOC field tests.
+- the independent off-grid minimum-SOC `45358` field test.
 
 Connection changes are validated against a temporary `GWModbusClient` before the existing config entry is updated/reloaded.
+
+The former direct **On-grid minimum SOC / register 45356** card is intentionally removed from this page. On-grid minimum SOC is controlled from the EMHASS minimum-SOC slider so the optimizer and inverter floor cannot be changed independently through two dashboard controls.
 
 ## Automatic control strategy
 
@@ -159,22 +186,31 @@ This affects only the derived accounting source. Established physical lifetime H
 
 See `docs/ACCOUNTING.md`.
 
-## G20 Beta minimum-SOC field test
+## G20 minimum-SOC register ownership
 
-The GOODWE page retains manual field-test controls for:
+Current ETA-G20 handling is:
 
 ```text
-45356  On-grid minimum SOC
-45358  Off-grid minimum SOC
+45356  On-grid minimum SOC -> synchronized from EMHASS minimum-SOC slider
+45358  Off-grid minimum SOC -> independent manual Beta field test
 ```
 
-Rules:
+For `45356`:
+
+- whole `0..100%` values only;
+- the current register must already be readable before a minimum-SOC change is accepted;
+- canonical address lookup remains in `registers.py` through the existing client helper;
+- every actual write is followed by immediate same-register read-back;
+- EMHASS is changed only after the GoodWe write verifies;
+- a later EMHASS write failure triggers an attempted GoodWe rollback;
+- there is no second dashboard control under GOODWE.
+
+For `45358`, the existing manual field-test safety remains:
 
 - Home Assistant administrator required;
 - only the canonical register-key whitelist is accepted;
 - register must already be readable;
 - whole `0..100%` values only;
-- one register per action;
 - frontend confirmation;
 - immediate same-register read-back;
 - success only when read-back matches.
@@ -185,6 +221,8 @@ Rules:
 
 Device identity remains based on the stable config-entry ID rather than mutable host/unit-ID values. Existing entity unique IDs must not change as part of settings or connection updates.
 
+The existing `number.<...>_emhass_minimum_soc` entity and its unique ID remain unchanged. Only its write semantics are extended to synchronize the inverter-side floor.
+
 ## Security and reload behavior
 
 Dashboard write APIs require a Home Assistant administrator. Backend authorization is the security boundary; hiding controls in the frontend is not sufficient.
@@ -192,6 +230,7 @@ Dashboard write APIs require a Home Assistant administrator. Backend authorizati
 - EP/EMHASS changes normally reload the existing config entry.
 - GoodWe connection changes validate first, then reload.
 - Automatic strategy changes are stored in the selected config entry and may re-evaluate immediately without a full reload.
-- Manual `45356/45358` field-test writes do not reload the integration.
+- Minimum-SOC slider changes update EMHASS and verified GoodWe `45356` without reloading the integration, then debounce one fresh optimization.
+- Manual `45358` field-test writes do not reload the integration.
 - accounting/runtime/optimization-history Stores survive normal config-entry reloads and Home Assistant restarts.
 - all state and settings remain scoped per EnergyPilot config entry.
