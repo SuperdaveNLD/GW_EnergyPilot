@@ -135,6 +135,7 @@ async function setBatterySaverMode(panel, mode) {
 }
 
 function pct(value) {
+  if (value === null || value === undefined || value === "") return "—";
   return Number.isFinite(Number(value)) ? `${Number(value).toFixed(0)}%` : "—";
 }
 
