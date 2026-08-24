@@ -25,7 +25,7 @@ gw_energypilot/optimization_log/get
 gw_energypilot/battery_price/get
 ```
 
-The active v0.26 frontend is `gw-energy-pilot-v026-complete.js`. It layers the language-aware Battery & Price interface over the previous dashboard and applies the synchronized minimum-SOC presentation at the top level.
+The active v0.26 frontend is `gw-energy-pilot-v026-support.js`. It layers the compact support-diagnostics presentation over `gw-energy-pilot-v026-complete.js`, which owns the language-aware Battery & Price interface and synchronized minimum-SOC presentation.
 
 ## EP page
 
@@ -182,6 +182,29 @@ The Battery & Price card is read-only. It does not add user settings or a second
 - Approximate charged/discharged values are display summaries, not accounting entities.
 
 See `docs/BATTERY_PRICE_CHART.md`.
+
+## Support diagnostics
+
+The visible **Support** card is intentionally an operational summary instead of a full raw-register dump.
+
+It shows four immediate health indicators:
+
+```text
+GoodWe live telemetry
+Automatic/manual control ownership
+Optimizer status
+EMHASS / GoodWe minimum-SOC synchronization
+```
+
+The visible detail is grouped into:
+
+- **GOODWE / LIVE** — actual EMS mode/setpoint, signed grid and battery direction, house load and battery SOC/SOH;
+- **CONTROL / EMHASS** — current command/target, expected mode, both `P_batt` and `P_grid`, optimization/orchestrator state and last trigger/error;
+- **SOC / LIMITS** — current SOC, synchronized EMHASS/GoodWe minimum, maximum SOC and the latest optimization SOC path.
+
+Raw inverter mode registers, Beta candidates, lifetime energy counters and legacy/invalid EMHASS constraint values are deliberately not shown in the normal dashboard overview. They remain available through the single **Copy support report** action so issue reports retain deep diagnostic evidence without making the everyday UI unreadable.
+
+This is a presentation-only cleanup. Existing diagnostic entity attributes, register reads, `beta_soc` API behavior, controller logic and EMHASS behavior are unchanged.
 
 ## Persistent state is not settings
 
