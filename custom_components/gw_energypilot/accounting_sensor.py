@@ -9,6 +9,13 @@ from homeassistant.const import UnitOfEnergy
 
 from . import GWConfigEntry
 from .accounting import EXPORT_DAILY_KEY, IMPORT_DAILY_KEY
+from .accounting_model import (
+    EXTENDED_EXPORT_KEY,
+    EXTENDED_IMPORT_KEY,
+    LEGACY_EXPORT_KEY,
+    LEGACY_IMPORT_KEY,
+    SOURCE_EXTENDED,
+)
 from .entity import GWEnergyPilotEntity
 
 
@@ -40,16 +47,18 @@ class GWGridDailyEnergySensor(GWEnergyPilotEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         state = self.entry.runtime_data.accounting.state
+        extended = state.source_pair == SOURCE_EXTENDED
         if self._direction == "import":
             last_period = state.yesterday_import_kwh
-            source = "meter_total_energy_import"
+            source = EXTENDED_IMPORT_KEY if extended else LEGACY_IMPORT_KEY
         else:
             last_period = state.yesterday_export_kwh
-            source = "meter_total_energy_export"
+            source = EXTENDED_EXPORT_KEY if extended else LEGACY_EXPORT_KEY
         return {
             "last_period": last_period,
             "accounting_day": state.day,
             "source": source,
+            "source_pair": state.source_pair,
             "bootstrap_complete": state.bootstrap_complete,
         }
 
