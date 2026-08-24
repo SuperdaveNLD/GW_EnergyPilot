@@ -1,58 +1,47 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of GW EnergyPilot **v0.24 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.25 Beta**.
 
 ## High-level data flow
 
 ```text
-GoodWe ETA-G20 inverter
-        |
-        | Modbus TCP
-        v
+GoodWe ETA-G20
+    |
+    | Modbus TCP
+    v
 GWModbusClient
-        |
-        v
+    |
+    v
 GWEnergyPilotCoordinator
-        |
-        +--> Home Assistant telemetry/entities
-        +--> GWEnergyPilotController
-        +--> GWEnergyPilotAccounting
-        +--> EMHASS orchestrator
-        +--> diagnostics/dashboard
-
-EMHASS
-  |
-  +-- publish --> P_batt / P_grid / optimization status
-                      |
-                      v
-               Automatic Control
-                      |
-          +-----------+-----------+
-          |                       |
-Smart-meter strategy ON    OFF or not configured
-P_grid actuator plan       P_batt actuator plan
-modes 9 / 10 / 1          modes 11 / 12 / 8
-(explicit opt-in)          (v0.24 compatibility default)
-          |                       |
-          +-----------+-----------+
-                      |
-                      v
-              EMS 47511 / 47512
+    |---------------------> Home Assistant telemetry/entities
+    |---------------------> GWEnergyPilotAccounting
+    |---------------------> GWEnergyPilotController
+    `---------------------> EMHASS orchestrator
+                                  |
+                                  | publish
+                                  v
+                         P_batt / P_grid / status
+                                  |
+                                  v
+                         Automatic Control
 ```
 
-Persistent EnergyPilot-owned runtime state is split by purpose:
+Persistent EnergyPilot-owned data is deliberately separated by purpose:
 
 ```text
-ConfigEntry data/options       user/integration configuration
-GoodWe registers               inverter-stored settings + hardware state
-EMHASS config/output           optimizer configuration + current plan
-runtime Store                  small EnergyPilot runtime history
-accounting Store               derived persistent daily grid accounting
+ConfigEntry data/options                   user/integration configuration
+GoodWe registers                           hardware state + inverter settings
+EMHASS configuration/output                optimizer configuration + current plan
+gw_energypilot.runtime.<entry_id>          small runtime evidence / last_success
+gw_energypilot.accounting.<entry_id>       derived daily grid accounting
+gw_energypilot.optimization_log.<entry_id> newest 50 optimization attempts
 ```
+
+None of the Home Assistant Stores is a second configuration database.
 
 ## Runtime objects
 
-`custom_components/gw_energypilot/__init__.py` creates one runtime object per Home Assistant config entry:
+`custom_components/gw_energypilot/__init__.py` creates one runtime set per config entry:
 
 - `GWModbusClient`;
 - `GWEnergyPilotCoordinator`;
@@ -60,131 +49,74 @@ accounting Store               derived persistent daily grid accounting
 - `GWEnergyPilotOrchestrator`;
 - `GWEnergyPilotAccounting`.
 
-Platforms:
+Entity platforms are sensor, switch, number, select and button.
 
-- sensor;
-- switch;
-- number;
-- select;
-- button.
+The first Modbus refresh is a background config-entry task so an unavailable/sleeping inverter does not block Home Assistant startup. After that fresh poll, accounting may perform its optional one-time Recorder bootstrap.
 
-The initial Modbus refresh runs as a background config-entry task so an unavailable/sleeping inverter does not unnecessarily block Home Assistant startup. After that fresh refresh, accounting may perform its optional one-time Recorder bootstrap.
+## Device identity
 
-## Stable device identity
-
-Current Home Assistant device identity is:
+The Home Assistant device identifier is stable:
 
 ```text
 (DOMAIN, config_entry_id)
 ```
 
-v0.17 migrates the former mutable `(DOMAIN, host:slave)` identifier before entity setup when necessary. Entity unique IDs already use the config-entry ID.
+Connection changes must not create a second EnergyPilot device. Entity unique IDs remain config-entry based.
 
-Changing GoodWe connection data must not intentionally create a second EnergyPilot device.
-
-## Configuration and APIs
-
-EnergyPilot uses the existing Home Assistant `ConfigEntry`; there is no parallel settings database.
+## APIs
 
 Administrator dashboard APIs include:
 
 ```text
 gw_energypilot/settings/get
 gw_energypilot/settings/update
-
 gw_energypilot/smart_meter/get
 gw_energypilot/smart_meter/set
-
 gw_energypilot/beta_soc/get
 gw_energypilot/beta_soc/set
+gw_energypilot/optimization_log/get
 ```
 
-Ownership:
-
-- `ConfigEntry.options` — EP/EMHASS integration options;
-- `ConfigEntry.data` — GoodWe connection plus optional **GoodWe smart meter active** choice;
-- EMHASS `/get-config` and `/set-config` — live EMHASS configuration such as SOC bounds and `costfun`;
-- GoodWe registers `45356/45358` — inverter-stored manual Beta SOC-floor settings;
-- Home Assistant Store — persistent EnergyPilot runtime/accounting state, never user configuration.
-
-v0.24 compatibility rule: when `CONF_USE_GOODWE_SMART_METER` is absent from `ConfigEntry.data`, the controller must behave exactly like explicit `false` and use direct `P_batt` control. PCC control is explicit opt-in only.
-
-See `docs/SETTINGS.md` and `docs/RUNTIME_STATE.md`.
+The historical `smart_meter` API name is retained for compatibility, but v0.25 uses it to expose/store the three-value automatic `control_strategy`.
 
 ## Modbus layer
 
-`client.py` owns the asynchronous Modbus TCP connection.
+`client.py` owns connection/reconnection, serialized I/O, typed decoding and EMS writes. `registers.py` is canonical for register definitions and read blocks.
 
-Responsibilities:
-
-- connect/reconnect;
-- serialize I/O through an async lock;
-- read required and optional register blocks from `registers.py`;
-- decode typed/scaled telemetry;
-- write the GoodWe EMS command;
-- close/recover after transport/protocol errors.
-
-Canonical EMS write order remains:
+EMS contract:
 
 ```text
-write 47512 power/setpoint magnitude
-wait briefly
-write 47511 mode
+47511 = mode
+47512 = non-negative mode-specific setpoint magnitude
 ```
 
-Do not reorder these writes without hardware validation.
+Write ordering remains:
 
-`registers.py` is the canonical definition/read-block source. `client.py` must not duplicate telemetry block lists.
+```text
+write 47512
+wait briefly
+write 47511
+```
 
-## Telemetry coordinator
+Do not reorder or reinterpret this path without hardware evidence.
 
-`GWEnergyPilotCoordinator` is a Home Assistant `DataUpdateCoordinator` and publishes a `GWETAData` snapshot at the configured scan interval.
-
-Important signs on the tested ETA-G20:
+## Sign conventions
 
 ```text
 GoodWe meter 36008
   negative = import
   positive = export
 
-battery power
+Battery power
   negative = charging
   positive = discharging
+
+EMHASS P_grid
+  positive = planned import
+  negative = planned export
 ```
 
-EMHASS `P_grid` deliberately uses the opposite grid sign:
-
-```text
-P_grid > 0 = planned import
-P_grid < 0 = planned export
-```
-
-## Persistent grid accounting
-
-`GWEnergyPilotAccounting` is the single native daily grid-accounting runtime.
-
-Canonical physical sources remain:
-
-```text
-36017 = lifetime grid import
-36015 = lifetime grid export
-```
-
-The accounting runtime:
-
-- establishes a baseline from the physical lifetime counters;
-- accumulates only positive counter deltas;
-- re-baselines on a counter decrease instead of inventing negative energy/reset semantics;
-- rolls current-day totals at local midnight;
-- persists current/previous-day state through Home Assistant storage;
-- exposes native daily import/export entities through `accounting_sensor.py`;
-- may use Recorder once during upgrade bootstrap to recover previous/current local-midnight boundaries.
-
-Recorder is **not** part of the live accounting loop. The 24-hour Grid power graph remains Recorder-backed because it is historical visualization.
-
-The extended `36104/36120` candidates remain Beta diagnostics and are not canonical accounting inputs.
-
-See `docs/ACCOUNTING.md`.
+The GoodWe and EMHASS grid signs are intentionally opposite.
 
 ## Automatic controller ownership
 
@@ -197,254 +129,159 @@ mode 1 · GoodWe Auto / AI
 setpoint 0 W
 ```
 
-When ON, the selected GoodWe strategy determines which optimizer output is the actuator plan unless a documented safety override is active.
+When ON, one normal strategy owns the actuator unless a documented safety override such as EV anti-discharge protection is active.
 
-### Strategy A — GoodWe smart meter active = ON
-
-This strategy is **explicit opt-in** in v0.24:
-
-```text
-P_grid > +deadband
-    -> mode 9  Grid import target
-    -> 47512 = planned import magnitude
-
-P_grid < -deadband
-    -> mode 10 Grid export target
-    -> 47512 = planned export magnitude
-
-P_grid inside deadband
-    -> mode 1 GoodWe Auto / self-use
-    -> 47512 = 0 W
-```
-
-Both `P_batt` and `P_grid` must be finite and optimizer readiness must pass. `P_batt` remains a plan-validity/diagnostic output; `P_grid` is the actuator request.
-
-Modes 9/10 close the fast loop inside GoodWe against its own smart meter/PCC. EnergyPilot does **not** run the former 30-second mode-11 trim controller in parallel.
-
-### Strategy B — GoodWe smart meter active = OFF or missing
-
-This is the **v0.24 compatibility default**:
+### Battery control
 
 ```text
 P_batt < -deadband -> mode 11 Battery charge power
 P_batt > +deadband -> mode 12 Battery discharge power
-P_batt inside deadband -> mode 8 Battery Hold
+P_batt near 0 W    -> mode 8 Battery Hold
 ```
 
-This path requires finite `P_batt` but deliberately does **not** require `P_grid`.
+This is the backwards-compatible mapping when no explicit `control_strategy` exists and the old `use_goodwe_smart_meter` value is missing/false.
 
-The missing-value rule is intentional backwards compatibility for config entries created before the v0.22 strategy key existed. Do not change this back to implicit PCC control without an explicit migration/design decision.
-
-Field-regression contract:
+### Grid control
 
 ```text
-P_batt = +962 W
-P_grid = 0 W (inside deadband)
-strategy key absent
-=> mode 12 / 962 W
+P_grid > +deadband -> mode 9 Grid import target
+P_grid < -deadband -> mode 10 Grid export target
+P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 ```
 
-### EV anti-discharge override
+Modes 9/10 close the fast loop inside GoodWe against its own smart meter/PCC. No parallel EnergyPilot mode-11 trim loop should be reintroduced without an explicit redesign.
 
-EV anti-discharge protection is directional and is not an EV charging controller.
-
-During active EV charging:
+### Hybrid control
 
 ```text
-P_batt > +deadband -> mode 8  Battery Hold
-P_batt near 0 W    -> mode 8  Battery Hold
-P_batt < -deadband -> mode 11 Battery charge power
+if P_batt < -deadband:
+    mode 11 Battery charge target = abs(P_batt)
+elif P_grid < -deadband:
+    mode 10 Grid export target = abs(P_grid)
+else:
+    mode 1 GoodWe Auto / self-use
 ```
 
-The direct mode-11 charge override is intentional even when normal automatic operation uses PCC modes 9/10/1. A changing EV load must not cause the home battery to become the EV's source merely to maintain a site-level PCC target.
+Hybrid gives a direct battery-power target to planned charging and a PCC target to planned export. It intentionally does not translate normal discharge directly into mode 12; GoodWe mode 1 handles self-use when there is no explicit charge or export action.
 
-When native orchestration is enabled, EV stop waits for a fresh EMHASS optimization before normal automatic execution resumes.
+The legacy boolean remains synchronized for compatibility. Without an explicit new strategy: false/missing -> Battery, true -> Grid.
 
-The stored key `enable_ev_coordination` is retained for backwards compatibility; user-facing terminology is **EV anti-discharge protection**.
+## EV anti-discharge override
 
-See `docs/EV_ANTI_DISCHARGE.md`.
-
-### Common safety gates
-
-Automatic evaluation also respects:
-
-- optimizer required state;
-- configured maximum setpoint magnitude;
-- finite numeric plan values;
-- explicit Automatic Control ownership;
-- EV anti-discharge protection when configured.
-
-Beta diagnostic registers do not choose EMS modes or targets.
-
-## Manual ownership
-
-Manual mode selection and quick actions disable Automatic Control ownership before issuing a command.
-
-The Controller test pad is only a frontend over the existing entities:
+EV charging ownership remains external. EnergyPilot only constrains home-battery direction while an EV is active:
 
 ```text
-number.manual_power
-      |
-select.manual_mode
-      |
-controller.async_manual_command()
-      |
-GWModbusClient.async_set_mode()
+P_batt > +deadband -> mode 8 Battery Hold
+P_batt near 0 W    -> mode 8 Battery Hold
+P_batt < -deadband -> mode 11 Battery charge allowed
 ```
 
-The automatic Smart Meter setting never remaps a manual operator command.
+This override is evaluated before Battery/Grid/Hybrid execution. When native orchestration is enabled and EV charging stops, EnergyPilot waits for a fresh optimization before normal automatic control resumes.
 
-## EMHASS architecture
+## EMHASS orchestration
 
-EMHASS is an external prerequisite; EnergyPilot does not install it.
+The active orchestrator chain remains:
+
+```text
+orchestrator_v013.GWEnergyPilotOrchestrator
+    -> orchestrator_v012.GWEnergyPilotOrchestrator
+        -> orchestrator.GWEnergyPilotOrchestrator
+```
 
 Native orchestration performs:
 
 ```text
-live SOC + load forecast + optional runtime prices
-        |
-        v
-POST /action/dayahead-optim
-        |
-        v
-validate result
-        |
-        v
-POST /action/publish-data
-        |
-        v
-validate fresh numeric outputs/status
-        |
-        v
-controller executes selected actuator strategy
+current SOC + load forecast + optional runtime prices
+    -> /action/dayahead-optim
+    -> validate success
+    -> /action/publish-data
+    -> validate fresh outputs/status
+    -> controller executes selected strategy
 ```
 
-The active orchestrator remains layered:
+`emhass_config.py` preserves unrelated EMHASS configuration by reading the complete config before selected-field updates.
+
+## Persistent optimization history
+
+`optimization_log.py` stores the newest 50 EnergyPilot-owned optimization attempts per config entry. Successful and failed manual/scheduled/event-triggered runs share one history.
+
+Recorded context includes:
 
 ```text
-orchestrator_v013.GWEnergyPilotOrchestrator
-  -> orchestrator_v012.GWEnergyPilotOrchestrator
-       -> orchestrator.GWEnergyPilotOrchestrator
+start/end + duration
+reason + success
+soc_init / soc_final
+current load
+price source / area / points
+load forecast points
+P_batt on success
+optimize/publish HTTP statuses
+error text
 ```
 
-All three remain runtime dependencies until intentionally consolidated.
+A log write failure is diagnostic-only and must never make an otherwise successful optimize/publish cycle fail.
 
-`emhass_config.py` uses complete-config reads/writes so selected changes preserve unrelated EMHASS configuration.
+The admin-only `optimization_log/get` API feeds the read-only Settings LOG page. `last_success` remains a separate runtime contract: failed runs can appear in history without erasing the latest successful timestamp.
 
-### Persistent orchestrator runtime evidence
+## Persistent grid accounting
 
-The active v0.13 orchestrator uses `GWEnergyPilotRuntimeStore`.
+`GWEnergyPilotAccounting` owns derived daily grid accounting. It consumes one coherent lifetime-counter pair from the normal coordinator.
 
-The per-entry Store key is:
+Available source layouts are already defined in `registers.py`:
 
 ```text
-gw_energypilot.runtime.<config_entry_id>
+extended: 36104 export / 36120 import
+legacy:   36015 export / 36017 import
 ```
 
-`last_success` is restored before the inherited orchestrator setup begins and is persisted only after a complete EnergyPilot-owned optimize + publish cycle succeeds. A later failure preserves the previous successful timestamp. Invalid/timezone-less stored timestamps are ignored.
+Selection rules:
 
-This Store is runtime history only; configuration remains in `ConfigEntry.data/options` and EMHASS config.
+1. prefer the extended pair when both values are valid and the pair is populated;
+2. a readable but empty `0/0` extended pair does not override usable legacy values;
+3. use legacy when extended is unavailable;
+4. once extended is active, one transient missing optional read does not cause source flapping.
 
-See `docs/RUNTIME_STATE.md`.
+The selected source pair is persisted. Any source change establishes a new baseline before accumulating further deltas, so absolute totals from different layouts are never subtracted from one another. Same-day Today/Yesterday values are preserved through a source migration.
+
+For a first switch to extended counters, EnergyPilot deliberately does not fabricate the part of the current day that occurred before the new baseline.
+
+The established physical lifetime Home Assistant entities remain unchanged. Source selection affects the **derived daily accounting input**, not their unique IDs or state classes.
+
+Recorder is not part of the live accounting loop. It is only an optional legacy-boundary bootstrap/history source. The 24-hour power graph remains Recorder-backed visualization.
+
+See `docs/ACCOUNTING.md`.
 
 ## Load semantics
 
-On the reference GW15K-ETA-G20, register `35172` is the primary GoodWe load value and normally matches the phase-load sum.
+On the reference GW15K-ETA-G20, register `35172` is the primary GoodWe load value and normally matches the sum of the three phase-load values.
 
 ```text
 PV - grid + battery
 ```
 
-is a **system power balance diagnostic**, not a replacement load sensor.
-
-External AC-coupled PV can complicate inverter-local load/forecast semantics. PCC modes 9/10 remain useful when explicitly enabled because the GoodWe smart meter observes the external generation in the live net-site balance.
-
-## Event-driven optimization
-
-Optimization can be triggered by:
-
-- configured periodic interval;
-- Optimize now;
-- Resume AUTO;
-- EMHASS strategy change;
-- tomorrow prices becoming available;
-- EV charging stopping;
-- SOC limit changes after debounce.
-
-Home Assistant startup deliberately does not start a new optimization.
+remains a system power-balance diagnostic, not a replacement house-load entity.
 
 ## Frontend
 
-The sidebar entry module selected by `__init__.py` is:
+The active entrypoint is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v024.js
+gw-energy-pilot-v025.js
+  -> gw-energy-pilot-v024.js   three-strategy / Hybrid UI
+      -> earlier layered dashboard chain
 ```
 
-Current upper chain:
-
-```text
-gw-energy-pilot-v024.js
-  -> gw-energy-pilot-v023.js
-       -> gw-energy-pilot-v022-flow-direction.js
-            -> gw-energy-pilot-v022.js
-                 -> gw-energy-pilot-v021.js
-                      -> earlier layered dashboard/settings files
-```
-
-Responsibilities of the upper layers:
-
-- v0.24 — release/version wrapper for the control-default compatibility fix;
-- v0.23 — persistent Today/Yesterday accounting UI;
-- flow-direction overlay — removes the layered particle double reversal;
-- v0.22 — Smart Meter strategy UI and PCC/battery target relabelling;
-- v0.21 — manual 12-mode EMS test pad.
-
-Older versioned files remain active dependencies and must not be deleted based on filename alone.
-
-## Live-flow direction contract
-
-The current frontend must display energy movement as:
-
-```text
-PV production         -> hub
-Grid import           -> hub
-Grid export           hub -> grid
-Battery charging      hub -> battery
-Battery discharging   battery -> hub
-House consumption     hub -> house
-```
-
-The geometry-correct Forward/Reverse keyframe selected from live state is authoritative. The v0.23 overlay forces particle `animation-direction` to normal so an older layer cannot reverse that result a second time.
-
-## Primary confirmed control/telemetry registers
-
-```text
-35172  GoodWe load power
-35301  PV total power
-35182  battery power
-37007  battery SOC
-36008  fast grid power
-36015  canonical cumulative grid export
-36017  canonical cumulative grid import
-47511  EMS mode
-47512  EMS power/setpoint magnitude
-```
-
-See `docs/MODBUS.md` and `docs/EMS_MODES.md` for the full evidence/status contract.
+The versioned files are active dependencies, not automatically dead historical assets. Trace the import chain before deleting or consolidating them.
 
 ## Design principles
 
 1. Local operation first.
-2. Home Assistant startup tolerates unavailable external devices.
-3. Automatic/manual ownership is explicit.
-4. Optimizer outputs pass readiness/numeric checks before control.
+2. Startup tolerates unavailable inverter/EMHASS services.
+3. Automatic/manual/safety ownership is explicit.
+4. Optimizer readiness and finite outputs gate control.
 5. GoodWe register/mode semantics are evidence-based.
-6. Do not run competing feedback controllers over the same EMS actuator.
-7. Preserve entity unique IDs and stable device identity.
-8. Keep one Home Assistant config entry as the integration configuration source.
-9. Keep a reversible fallback for Beta automatic control strategies.
-10. External EV charging schedules remain external; EV anti-discharge may constrain battery direction but never owns the charger.
-11. Derived accounting must consume canonical physical counters rather than replace them.
-12. Persistent runtime history must remain separate from user configuration.
-13. PCC control must never become the default merely because a legacy config entry lacks the strategy key.
+6. Do not run competing feedback loops over the same EMS actuator.
+7. Preserve stable device identity and entity unique IDs.
+8. Keep user configuration separate from persistent runtime/accounting history.
+9. Re-baseline whenever accounting source semantics change.
+10. Diagnostic logging must never become a control failure source.
