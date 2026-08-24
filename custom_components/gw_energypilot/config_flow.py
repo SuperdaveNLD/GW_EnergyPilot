@@ -207,7 +207,7 @@ def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
                 selector.NumberSelectorConfig(
                     min=-1,
                     max=2,
-                    step=0.001,
+                    step=0.0001,
                     mode=selector.NumberSelectorMode.BOX,
                     unit_of_measurement="EUR/kWh",
                 )
@@ -219,7 +219,7 @@ def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
                 selector.NumberSelectorConfig(
                     min=-1,
                     max=2,
-                    step=0.001,
+                    step=0.0001,
                     mode=selector.NumberSelectorMode.BOX,
                     unit_of_measurement="EUR/kWh",
                 )
@@ -300,7 +300,7 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
 
 
 class GWEnergyPilotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for GW EnergyPilot."""
+    """Handle config flow for GW EnergyPilot."""
 
     VERSION = 1
 

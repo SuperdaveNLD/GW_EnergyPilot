@@ -2,6 +2,14 @@ import "./gw-energy-pilot-v028-consolidated.js?v=0.29-base1";
 
 const VERSION = "0.29";
 const PANEL_NAME = "gw-energypilot-panel";
+const PRICE_ADJUSTMENT_KEYS = ["buy_price_adder", "sell_price_deduction"];
+
+function alignPriceAdjustmentPrecision(root) {
+  for (const key of PRICE_ADJUSTMENT_KEYS) {
+    const input = root.querySelector(`input[data-setting-key="${key}"]`);
+    if (input) input.step = "0.0001";
+  }
+}
 
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
@@ -11,6 +19,8 @@ PanelClass.prototype._render = function energyPilotV029Render() {
   previousRender.call(this);
   const root = this.shadowRoot;
   if (!root) return;
+
+  alignPriceAdjustmentPrecision(root);
 
   const versionBadge = root.querySelector(".version");
   if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
