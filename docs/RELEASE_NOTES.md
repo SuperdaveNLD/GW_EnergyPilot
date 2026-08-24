@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.30** | 2026-08-24 | **Beta** | Uses the official EMHASS `/api/v1/plan` horizon for Battery forecast overlays, adds EnergyPilot coral/cyan/mint card chrome, replaces visible S/M/L sizing with the dash resize control, and adds a recoverable red close control to dashboard cards. |
 | **0.29** | 2026-08-24 | **Beta** | Adds safe EMHASS required-config synchronization and recommended defaults, resolves current EnergyPilot entity IDs from the Home Assistant registry, and adds a final live-flow double-reversal guard. |
 | **0.28** | 2026-08-24 | **Beta** | Corrects Hybrid control to mode-9 buying / mode-12 selling and repairs the Battery · Plan · Price chart: canonical EMHASS battery schedule, historical-plan continuity, visible plan overlays, active-interval clipping and stepwise market prices. |
 | **0.27** | 2026-08-24 | **Beta** | Resizable Battery plan/actual/price chart, historical active `P_batt` targets plus current EMHASS future forecast, native GoodWe battery-day counters, compact support diagnostics and corrected Hybrid neutral hold behavior. |
@@ -44,6 +45,58 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.30 — Official forecast horizon and EnergyPilot card chrome
+
+v0.30 completes the Battery · Plan · Price forecast path after live validation showed that Home Assistant's published `P_batt` entity did not reliably expose the complete future horizon on the reference installation.
+
+## Official EMHASS forecast source
+
+The chart now prefers the official versioned EMHASS endpoint:
+
+```text
+GET /api/v1/plan
+```
+
+EMHASS documents this response as the latest complete optimization plan. Each plan record carries a UTC `timestamp`; the documented `P_batt` column is in watts with positive = discharge and negative = charge.
+
+EnergyPilot reads this endpoint only when the Battery · Plan · Price data payload is refreshed. It normalizes the `P_batt` records into the same internal plan points already used by the chart. The dashed forecast overlay to the right of NOW therefore comes from the actual latest optimization horizon rather than depending on an optional Home Assistant entity attribute.
+
+For compatibility, EnergyPilot falls back to the configured `P_batt` entity's `battery_scheduled_power` and then legacy/custom `forecasts` attribute when `/api/v1/plan` is unavailable or does not provide a usable battery horizon.
+
+The existing Home Assistant Recorder history of the published `P_batt` target remains the historical plan source to the left of NOW. Past and future plan overlays keep the same dashed visual language.
+
+## EnergyPilot card controls
+
+The Apple-inspired controls are retained but moved to the EnergyPilot visual language:
+
+- coral/red `×` — hide the card;
+- cyan `−` — resize Battery · Plan · Price;
+- mint `↗` — open its detailed graph.
+
+The visible S/M/L segmented selector is removed. Clicking the dash cycles the same persistent sizes:
+
+```text
+Compact -> Normal -> Large -> Compact
+```
+
+Every card already managed by the dashboard layout receives a small red close control. Closing a card uses the existing browser-local `hidden` preference, so the card can be restored from Dashboard layout & visibility. No Home Assistant entity or configuration entry is deleted.
+
+## Read-only boundaries
+
+The Battery/price WebSocket payload advances to schema version `4` and exposes the selected forecast source plus EMHASS plan generation/schema metadata when available.
+
+The official plan read does not:
+
+- start an optimization;
+- call publish-data;
+- change EMHASS configuration;
+- write a GoodWe register;
+- change Automatic Control ownership.
+
+No GoodWe register definition, Modbus read block, entity ID/unique ID, persistent accounting store or EMS `47511/47512` write contract changes in v0.30.
+
+v0.30 remains **Beta** while the official forecast overlay and generalized card controls receive field validation.
 
 # v0.29 — EMHASS configuration sync and frontend stabilization
 
