@@ -1,20 +1,18 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator-only configuration inside the built-in dashboard.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.26 remains **Beta** while Hybrid control, extended-meter accounting, Battery & Price visualization and synchronized minimum-SOC handling receive broader field exposure.
 
-v0.25 remains **Beta** while Hybrid control, extended-meter accounting selection and persistent optimization history receive wider field exposure.
-
-## Configuration ownership
+## Ownership
 
 EnergyPilot does not create a parallel settings database.
 
-- `ConfigEntry.options` owns EP/EMHASS integration options.
-- `ConfigEntry.data` owns GoodWe connection data and the automatic-control strategy.
-- EMHASS `/get-config` and `/set-config` own live EMHASS configuration such as SOC bounds and `costfun`.
-- GoodWe registers such as `45356/45358` own inverter-stored settings.
-- Home Assistant Stores own derived accounting/runtime history only; they are not editable user configuration.
+- `ConfigEntry.options` owns EnergyPilot/EMHASS integration options.
+- `ConfigEntry.data` owns GoodWe connection data and the Automatic Control strategy.
+- EMHASS `/get-config` and `/set-config` own live EMHASS configuration such as SOC constraints and `costfun`.
+- GoodWe registers own inverter-side hardware settings/state.
+- Home Assistant Stores own derived runtime/accounting/log history, not user configuration.
 
-Backend dashboard APIs include:
+Administrator dashboard APIs include:
 
 ```text
 gw_energypilot/settings/get
@@ -24,49 +22,47 @@ gw_energypilot/smart_meter/set
 gw_energypilot/beta_soc/get
 gw_energypilot/beta_soc/set
 gw_energypilot/optimization_log/get
+gw_energypilot/battery_price/get
 ```
 
-The active v0.25 frontend layers the LOG view over the complete v0.24 Hybrid-control frontend.
+The active v0.26 frontend is `gw-energy-pilot-v026-complete.js`. It layers the language-aware Battery & Price interface over the previous dashboard and applies the synchronized minimum-SOC presentation at the top level.
 
 ## EP page
 
-The EP section manages:
+The EP section owns:
 
 - maximum controller/setpoint power;
 - control deadband;
-- GoodWe telemetry refresh interval;
+- GoodWe telemetry interval;
 - EV anti-discharge protection enable/disable;
-- EV mode entity;
-- EV power entity;
-- EV activity threshold.
+- EV mode/power observation entities and activity threshold.
 
-Maximum power caps the requested **mode-specific** setpoint. A mode-9/10 value is a PCC grid target; a mode-11/12 value is a direct battery target.
+EV inputs are observation-only. EnergyPilot does not start, stop or modulate the EV charger.
 
-### EV anti-discharge protection
-
-For backwards compatibility the stored option remains:
+During active EV charging:
 
 ```text
-enable_ev_coordination
+P_batt requests discharge -> Battery Hold
+P_batt is neutral         -> Battery Hold
+P_batt requests charge    -> mode 11 charge allowed
 ```
 
-The EV entities are observation inputs only. EnergyPilot does not start, stop or modulate the charger.
-
-While EV charging is active:
-
-```text
-P_batt > +deadband -> mode 8 Battery Hold
-P_batt near 0 W    -> mode 8 Battery Hold
-P_batt < -deadband -> mode 11 Battery charge allowed
-```
-
-This override is evaluated before the normal Battery/Grid/Hybrid strategy. After EV charging stops, native orchestration waits for a fresh optimization before normal automatic execution resumes.
+When native orchestration is enabled, EV stop waits for a fresh optimization before normal Automatic Control resumes.
 
 ## EMHASS page
 
-The EMHASS section manages EnergyPilot's integration with EMHASS, including URL, scheduler, runtime final SOC, fallback load, `P_batt`, `P_grid`, optimizer status and optional Nord Pool runtime-price settings.
+The EMHASS section owns EnergyPilot's EMHASS integration settings:
 
-The stateful EMHASS objective remains one `costfun` value:
+- native orchestrator enable/disable;
+- EMHASS URL;
+- optimization interval;
+- EnergyPilot runtime final SOC target;
+- fallback load;
+- `P_batt` and `P_grid` output entities;
+- optimization status entity/required state;
+- Nord Pool/runtime-price settings.
+
+The stateful EMHASS optimization strategy remains the active `costfun` value:
 
 ```text
 profit
@@ -74,25 +70,60 @@ cost
 self-consumption
 ```
 
-Changing `costfun` does not silently change the GoodWe Automatic Control strategy.
+Changing `costfun` does not change the GoodWe actuator strategy.
+
+## Minimum and maximum SOC
+
+### Maximum SOC
+
+Maximum SOC remains an **EMHASS-only** optimizer constraint.
+
+### Minimum SOC — one synchronized on-grid control
+
+The existing EMHASS minimum-SOC NumberEntity remains the single normal on-grid operator control and keeps its existing entity/unique ID.
+
+Field validation on the reference GW15K-ETA-G20 confirmed that GoodWe register `45356` is an independent on-grid minimum-SOC floor. A lower EMHASS minimum alone cannot override a higher inverter floor.
+
+Therefore an explicit minimum-SOC change is transactional:
+
+```text
+1. Read/validate current EMHASS config.
+2. Validate requested minimum <= EMHASS maximum.
+3. Require current readable GoodWe register 45356.
+4. Require a whole 0..100 percentage.
+5. Write requested value to GoodWe 45356.
+6. Verify immediate 45356 read-back.
+7. Write the same percentage to EMHASS battery_minimum_state_of_charge.
+8. Publish verified GoodWe read-back into coordinator state.
+9. Schedule one fresh optimization through the existing debounce.
+```
+
+Failure behavior:
+
+- if `45356` is unavailable, neither GoodWe nor EMHASS is changed;
+- if the GoodWe write/read-back fails, EMHASS is not changed;
+- if GoodWe verifies but EMHASS `/set-config` fails, EnergyPilot attempts to restore the previous `45356` value;
+- if rollback also fails, that second failure is surfaced explicitly.
+
+There is **no startup or periodic background synchronization**. Register `45356` is changed only after an explicit minimum-SOC NumberEntity write.
+
+The previous direct on-grid `45356` dashboard card is intentionally removed to avoid two competing operator controls for the same normal minimum SOC.
 
 ## GOODWE page
 
-The GOODWE section manages:
+The GOODWE section owns:
 
 - inverter host/IP;
 - Modbus TCP port;
 - Modbus unit ID;
-- **Automatic control strategy**;
-- manual G20 minimum-SOC field tests.
+- Automatic Control strategy;
+- independent off-grid minimum-SOC register `45358` Beta field test.
 
-Connection changes are validated against a temporary `GWModbusClient` before the existing config entry is updated/reloaded.
+Connection changes are validated with a temporary `GWModbusClient` before the existing config entry is updated/reloaded.
 
-## Automatic control strategy
+### Automatic Control strategies
 
-v0.25 exposes three explicit choices.
-
-### Battery control
+**Battery control**
 
 ```text
 P_batt < -deadband -> mode 11 Battery charge power
@@ -100,9 +131,7 @@ P_batt > +deadband -> mode 12 Battery discharge power
 P_batt near 0 W    -> mode 8 Battery Hold
 ```
 
-This is the backwards-compatible behavior when no explicit `control_strategy` exists and the legacy `use_goodwe_smart_meter` value is absent/false.
-
-### Grid control
+**Grid control**
 
 ```text
 P_grid > +deadband -> mode 9 Grid import target
@@ -110,88 +139,79 @@ P_grid < -deadband -> mode 10 Grid export target
 P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 ```
 
-Use this only with a valid/validated GoodWe smart meter. GoodWe performs the fast PCC control loop internally.
-
-### Hybrid control
+**Hybrid control**
 
 ```text
-P_batt < -deadband      -> mode 11 Battery charge target
-else P_grid < -deadband -> mode 10 Grid export target
-otherwise               -> mode 1 GoodWe Auto / self-use
+P_batt requests charge -> mode 11 direct battery charge
+else P_grid requests export -> mode 10 grid export target
+otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-Hybrid uses direct battery power for charging, PCC power for export and GoodWe self-use for other situations. It deliberately does not force a normal discharge request through mode 12.
-
-The old `use_goodwe_smart_meter` boolean remains synchronized for compatibility with older frontend/support layers. Existing installations without an explicit `control_strategy` retain the old mapping: false/missing = Battery, true = Grid.
-
-Changing the strategy while Automatic Control is ON requires frontend confirmation because the current plan is re-evaluated immediately.
-
-Manual mode 9/10/11/12 commands are never remapped by this setting.
-
-## LOG page
-
-v0.25 adds an administrator-only, read-only optimization history view.
-
-It loads the latest 50 EnergyPilot-owned optimization attempts from:
+When no explicit `control_strategy` exists, backwards compatibility remains:
 
 ```text
-gw_energypilot.optimization_log.<config_entry_id>
+legacy use_goodwe_smart_meter missing/false -> Battery
+legacy use_goodwe_smart_meter true          -> Grid
 ```
 
-The viewer shows newest first and supports manual refresh. It does not edit or replay runs.
+Manual EMS selections are never remapped by the automatic strategy.
 
-Typical stored diagnostics include run timestamps/duration, trigger reason, success/failure, SOC inputs, current load, price source/points, load-forecast point count, `P_batt`, EMHASS HTTP statuses and error text.
+## Off-grid minimum-SOC field test
 
-The log Store is separate from `gw_energypilot.runtime.<config_entry_id>` so a failed run can be retained as diagnostic evidence without changing `last_success`.
+Register `45358` remains an independent manual Beta field-test control.
 
-## Persistent accounting is not settings
+Safety rules:
 
-Derived Today/Yesterday grid accounting is stored per config entry. v0.25 may select:
-
-```text
-extended: 36104 export / 36120 import
-legacy:   36015 export / 36017 import
-```
-
-The populated extended pair is preferred when coherent; an empty `0/0` optional extended pair does not replace usable legacy totals. The selected source is persisted and any source change re-baselines before new deltas are accumulated.
-
-This affects only the derived accounting source. Established physical lifetime Home Assistant entities retain their existing unique IDs/state classes.
-
-See `docs/ACCOUNTING.md`.
-
-## G20 Beta minimum-SOC field test
-
-The GOODWE page retains manual field-test controls for:
-
-```text
-45356  On-grid minimum SOC
-45358  Off-grid minimum SOC
-```
-
-Rules:
-
-- Home Assistant administrator required;
-- only the canonical register-key whitelist is accepted;
-- register must already be readable;
+- Home Assistant administrator access required;
+- canonical register-key whitelist only;
+- current register must already be readable;
 - whole `0..100%` values only;
-- one register per action;
 - frontend confirmation;
 - immediate same-register read-back;
 - success only when read-back matches.
 
-`47500` remains read-only because its firmware-dependent semantics are unresolved.
+The existing `beta_soc` backend API remains available for backwards-compatible diagnostics/tooling. On-grid `45356` writes through that low-level API are not the normal dashboard control path; the synchronized minimum-SOC NumberEntity is the supported operator path.
 
-## Stable Home Assistant identity
+Register `47500` remains read-only because its firmware-dependent semantics are unresolved.
 
-Device identity remains based on the stable config-entry ID rather than mutable host/unit-ID values. Existing entity unique IDs must not change as part of settings or connection updates.
+## Battery & Price
+
+The Battery & Price card is read-only. It does not add user settings or a second pricing configuration source.
+
+- Battery bars consume Recorder statistics from the existing `battery_power` entity.
+- Price series come from the same EnergyPilot runtime price path used by EMHASS.
+- The browser caches chart data for five minutes to avoid request churn.
+- Approximate charged/discharged values are display summaries, not accounting entities.
+
+See `docs/BATTERY_PRICE_CHART.md`.
+
+## Persistent state is not settings
+
+EnergyPilot currently uses per-entry Home Assistant Stores for:
+
+```text
+gw_energypilot.runtime.<entry_id>          last_success runtime evidence
+gw_energypilot.accounting.<entry_id>       daily grid accounting state
+gw_energypilot.optimization_log.<entry_id> newest optimization attempts
+```
+
+These stores are not editable configuration.
+
+## Stable identity
+
+Home Assistant device identity remains based on:
+
+```text
+(DOMAIN, config_entry_id)
+```
+
+Connection changes must not create a second EnergyPilot device. Existing entity unique IDs remain stable.
 
 ## Security and reload behavior
 
-Dashboard write APIs require a Home Assistant administrator. Backend authorization is the security boundary; hiding controls in the frontend is not sufficient.
-
-- EP/EMHASS changes normally reload the existing config entry.
+- Dashboard configuration write APIs require a Home Assistant administrator.
+- EP/EMHASS setting changes normally reload the existing entry where the settings API requires it.
 - GoodWe connection changes validate first, then reload.
-- Automatic strategy changes are stored in the selected config entry and may re-evaluate immediately without a full reload.
-- Manual `45356/45358` field-test writes do not reload the integration.
-- accounting/runtime/optimization-history Stores survive normal config-entry reloads and Home Assistant restarts.
-- all state and settings remain scoped per EnergyPilot config entry.
+- Automatic strategy changes can be applied without a full reload and re-evaluate the active plan when Automatic Control is on.
+- Minimum-SOC synchronization is an explicit NumberEntity transaction and does not reload the integration.
+- Persistent runtime/accounting/log Stores survive config-entry reloads and Home Assistant restarts.

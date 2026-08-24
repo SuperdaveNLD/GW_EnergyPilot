@@ -10,40 +10,58 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.25 · Beta**
+**v0.26 · Beta**
 
-Primary development and validation hardware is the **GoodWe GW15K-ETA-G20**. Other ETA-G20 models and firmware combinations must be validated individually.
+Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
-Beta means functionality is available to the active tester group before broad multi-installation field exposure is complete.
+In this project, **Beta** means functionality is intentionally available before broad field testing across installations and firmware versions is complete.
 
-Key documentation:
+Release documentation:
 
-- `docs/RELEASE_NOTES.md` — user-facing release status;
+- `docs/RELEASE_NOTES.md` — current release index and Beta scope;
 - `CHANGELOG.md` — detailed technical history;
-- `docs/ARCHITECTURE.md` — runtime ownership and data flow;
 - `docs/EMS_MODES.md` — GoodWe EMS modes 1–12;
 - `docs/ACCOUNTING.md` — persistent grid accounting;
-- `docs/RUNTIME_STATE.md` — persistent runtime/optimization history;
-- `docs/EV_ANTI_DISCHARGE.md` — EV battery-protection behavior;
-- `docs/SETTINGS.md` — dashboard configuration ownership.
+- `docs/RUNTIME_STATE.md` — persistent runtime evidence;
+- `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
+- `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## What it provides
+## v0.26 highlights
+
+- Home Assistant language-aware dashboard with Dutch and English support.
+- Full-width **Battery & Price** graph comparing actual battery power with market price for the current local day.
+- Read-only backend price-series API using the same EnergyPilot price path as EMHASS.
+- Synchronized normal on-grid minimum SOC: one explicit minimum-SOC change updates and verifies GoodWe register `45356`, then writes the same value to EMHASS.
+- GoodWe rollback attempt if the subsequent EMHASS minimum-SOC write fails.
+- Separate on-grid `45356` dashboard field-test control removed; off-grid `45358` remains independent.
+- Existing Battery/Grid/Hybrid Automatic Control, accounting and optimization-log behavior retained.
+
+## Tested hardware
+
+| Model | Status | Notes |
+|---|---|---|
+| **GoodWe GW15K-ETA-G20** | Active reference hardware | Primary development and field validation inverter |
+
+Other ETA-G20 models/firmware must be validated individually.
+
+When reporting compatibility, include inverter model/firmware, battery model, GoodWe smart-meter presence and relevant EMS/register observations.
+
+## Main capabilities
 
 - direct local GoodWe Modbus TCP telemetry;
-- GoodWe EMS mode/setpoint control through the existing `47511/47512` path;
+- EMS mode/setpoint control;
 - manual access to all twelve EMS modes;
-- three selectable Automatic Control strategies: **Battery**, **Grid** and **Hybrid**;
-- native EMHASS optimization and publishing;
-- EMHASS `profit`, `cost` and `self-consumption` strategy control;
-- optional Nord Pool runtime pricing;
-- optional EV anti-discharge protection;
-- persistent orchestrator `last_success`;
-- persistent newest-50 optimization history with an admin-only Settings **LOG** page;
-- native PV, load, battery and grid telemetry;
+- three Automatic Control strategies: Battery, Grid and Hybrid;
+- native EMHASS optimization/publishing;
+- stateful EMHASS profit/cost/self-consumption strategy;
+- persistent optimization history and `last_success`;
 - persistent Today/Yesterday grid import/export accounting;
-- safe source selection between legacy and extended GoodWe lifetime meter layouts for derived accounting;
-- Beta G20 SOC-protection and meter diagnostics;
-- verified manual `45356/45358` minimum-SOC field-test controls.
+- optional Nord Pool/runtime prices;
+- Battery & Price visualization;
+- EV anti-discharge protection;
+- synchronized normal on-grid minimum SOC between EMHASS and GoodWe `45356`;
+- independent Beta off-grid minimum-SOC `45358` field test;
+- built-in EnergyPilot dashboard and support diagnostics.
 
 ## Requirements
 
@@ -51,161 +69,153 @@ Key documentation:
 - HACS;
 - GoodWe ETA-G20 reachable through Modbus TCP;
 - fixed inverter IP address or DHCP reservation;
-- EMHASS installed, started and configured;
-- optional Nord Pool source when runtime prices are used.
+- EMHASS installed/started/configured for native optimization features;
+- optional runtime price source when price-aware optimization/charting is used.
 
-Typical GoodWe connection:
+Typical GoodWe ETA-G20 connection:
 
 ```text
 Port:    502
 Unit ID: 247
 ```
 
-Use only one integration for continuous direct GoodWe polling/control where practical.
+Use only one continuously polling/controlling direct GoodWe integration where practical.
 
-## Installation
+## Installation / first validation
 
 1. Install and start EMHASS.
-2. Add this repository to HACS as an **Integration**.
-3. Install **GW EnergyPilot** and restart Home Assistant.
-4. Add GW EnergyPilot under **Settings -> Devices & services**.
-5. Enter inverter IP, port and Unit ID.
-6. Keep **Automatic Control OFF** during initial validation.
-7. Verify PV, grid, battery and GoodWe load values.
-8. Configure the EMHASS output entities (`P_batt`, `P_grid`, optimization status).
-9. Run **Optimize now** and confirm a successful fresh plan.
-10. Choose the intended Automatic Control strategy under dashboard gear -> **GOODWE**.
-11. Enable Automatic Control.
+2. Add this repository to HACS as an Integration.
+3. Install GW EnergyPilot.
+4. Restart Home Assistant.
+5. Add GW EnergyPilot under Settings → Devices & services.
+6. Enter inverter IP, port and Unit ID.
+7. Keep Automatic Control OFF during first validation.
+8. Verify PV, Home, Grid, Battery and EMS read-back values.
+9. Configure EMHASS output/status entities and runtime pricing if used.
+10. Press Optimize now and verify fresh numeric `P_batt`, `P_grid` and optimization status.
+11. Select the intended Automatic Control strategy under dashboard gear → GOODWE.
+12. Enable Automatic Control only after telemetry/control semantics are confirmed.
 
-# Automatic Control in v0.25
+## Automatic Control
 
-The GOODWE settings page exposes three explicit strategies.
-
-## Battery control
-
-This is the backwards-compatible default for installations without an explicit new strategy when the legacy smart-meter setting is absent/false.
+### Battery control
 
 ```text
 P_batt < -deadband -> mode 11 Battery charge power
 P_batt > +deadband -> mode 12 Battery discharge power
-P_batt near 0 W    -> mode 8  Battery Hold
+P_batt near 0 W    -> mode 8 Battery Hold
 ```
 
-This path does not require a valid `P_grid` output.
+This remains the backwards-compatible default when no explicit strategy exists and the legacy smart-meter flag is missing/false.
 
-## Grid control
-
-For installations with a working and validated GoodWe smart meter/PCC:
+### Grid control
 
 ```text
-P_grid > +deadband -> mode 9  Grid import target
+P_grid > +deadband -> mode 9 Grid import target
 P_grid < -deadband -> mode 10 Grid export target
-P_grid near 0 W    -> mode 1  GoodWe Auto / self-use
+P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 ```
 
-EMHASS and GoodWe grid signs are deliberately opposite:
+This requires a working/validated GoodWe smart meter.
+
+### Hybrid control
 
 ```text
-EMHASS P_grid > 0 = planned import
-EMHASS P_grid < 0 = planned export
-
-GoodWe 36008 < 0 = actual import
-GoodWe 36008 > 0 = actual export
+P_batt requests charge -> mode 11 direct battery charge
+else P_grid requests export -> mode 10 grid export target
+otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-Mode 9/10 setpoints are PCC/grid targets, not direct battery-power targets. On the reference ETA-G20 a 15 kW mode-9 target held roughly 15 kW grid import while locally connected DC PV was added behind the meter.
+EV anti-discharge remains a higher-priority directional safety override.
 
-## Hybrid control
+## EMS / sign conventions
 
-Hybrid combines the useful direct-charge and PCC-export primitives:
+Battery power:
 
 ```text
-P_batt < -deadband      -> mode 11 Battery charge target
-else P_grid < -deadband -> mode 10 Grid export target
-otherwise               -> mode 1  GoodWe Auto / self-use
+negative = charging
+positive = discharging
 ```
 
-Hybrid intentionally does not force mode 12 for normal discharge. When there is no explicit charge request and no planned export, GoodWe mode 1 owns self-use balancing.
-
-The legacy `use_goodwe_smart_meter` value remains synchronized/fallback-compatible so existing installations do not silently change strategy on upgrade.
-
-## EV anti-discharge protection
-
-EV protection is a safety override above the normal strategy. When an EV is actively charging:
+GoodWe smart meter register `36008`:
 
 ```text
-P_batt requests discharge -> mode 8 Battery Hold
-P_batt neutral            -> mode 8 Battery Hold
-P_batt requests charge    -> mode 11 Battery charge allowed
+negative = actual import
+positive = actual export
 ```
 
-EnergyPilot does not own or schedule the EV charger. After EV charging stops, native orchestration waits for a fresh EMHASS plan before normal automatic execution resumes.
-
-# Grid accounting
-
-Physical lifetime telemetry remains available using the existing entity contract. For **derived Today/Yesterday accounting**, v0.25 can select one coherent lifetime-counter pair:
+EMHASS `P_grid` uses the opposite grid sign:
 
 ```text
-extended: 36104 export / 36120 import
-legacy:   36015 export / 36017 import
+positive = planned import
+negative = planned export
 ```
 
-The populated extended pair is preferred when available on applicable ETA/ET hardware such as the reference 15 kW G20. An empty `0/0` optional extended block does not displace a usable legacy pair.
-
-The accounting source is persisted. Switching source pairs always re-baselines before accumulating new deltas; EnergyPilot never subtracts absolute lifetime totals from different layouts. Existing daily values survive a same-day source migration, but EnergyPilot does not fabricate energy from before the first new baseline.
-
-The existing lifetime energy entity unique IDs remain unchanged.
-
-# Optimization history
-
-v0.25 stores the newest 50 EnergyPilot-owned optimization attempts per config entry, including successful and failed manual, scheduled and event-triggered runs.
-
-Open dashboard **Settings -> LOG** as a Home Assistant administrator to view the read-only history. Typical fields include run reason/timing, SOC values, current load, price source/points, forecast points, `P_batt`, EMHASS HTTP statuses and errors.
-
-This history is separate from `last_success`: a failed run is useful diagnostic evidence but must not erase the latest successful optimize/publish timestamp.
-
-# Power/sign conventions
+EMS contract:
 
 ```text
-Battery power: negative = charging, positive = discharging
-GoodWe grid 36008: negative = import, positive = export
-EMHASS P_grid: positive = planned import, negative = planned export
-```
-
-# GoodWe load and SOC
-
-Register `35172` is the primary GoodWe load value on the reference GW15K-ETA-G20 and normally matches the sum of the three load phases. `PV - grid + battery` remains a system-balance diagnostic, not a replacement house-load sensor.
-
-EnergyPilot exposes EMHASS minimum/maximum SOC controls. A common normal grid-connected starting range is approximately 5–95%, but GoodWe/SEMS+ and the BMS have independent protection limits and the most restrictive layer wins.
-
-Manual Beta field-test controls currently include:
-
-```text
-45356  On-grid minimum SOC floor
-45358  Off-grid minimum SOC floor
-```
-
-These are admin-only, validated/read-back writes and are not automatically changed by EMHASS or Automatic Control.
-
-# EMS write contract
-
-```text
-47511 = EMS mode
-47512 = non-negative mode-specific power/setpoint magnitude
+47511 = mode
+47512 = non-negative mode-specific setpoint magnitude
 ```
 
 Write ordering remains:
 
 ```text
-write 47512
-wait briefly
-write 47511
+47512 -> brief wait -> 47511
 ```
 
-Do not change this ordering or GoodWe register semantics without hardware/vendor/upstream evidence.
+## Minimum SOC ownership
 
-# Safety
+The normal on-grid minimum is controlled through the existing EMHASS minimum-SOC NumberEntity.
 
-Before enabling Automatic Control verify inverter/firmware identity, grid and battery signs, configured maximum power, EMHASS output freshness/status, smart-meter validity when Grid/Hybrid is selected, battery/BMS/SOC limits and the installation's grid/contract limits.
+An explicit change:
 
-GW EnergyPilot can command significant battery/grid power. Real hardware validation remains required for control changes.
+```text
+validate request
+-> require current readable GoodWe 45356
+-> write 45356
+-> verify read-back
+-> write same percentage to EMHASS battery_minimum_state_of_charge
+-> refresh coordinator state
+-> debounce one fresh optimization
+```
+
+If `45356` is unavailable, neither system is changed. If EMHASS fails after a verified GoodWe write, EnergyPilot attempts to restore the previous GoodWe value.
+
+There is no startup/background SOC synchronization.
+
+`45358` remains an independent off-grid Beta field test. Maximum SOC remains EMHASS-only.
+
+## Battery & Price chart
+
+The chart is read-only.
+
+- battery bars use Recorder 5-minute means from the existing GoodWe `battery_power` entity;
+- charging is below zero, discharging above zero;
+- the market-price line comes from the same EnergyPilot runtime price source used for EMHASS;
+- chart data is cached for five minutes;
+- displayed charged/discharged energy is an approximate visualization integral, not persistent accounting.
+
+Future persistent financial accounting must consume backend grid-accounting deltas and effective prices, not reconstruct totals from chart pixels/buckets.
+
+## Persistent state
+
+Configuration remains in Home Assistant `ConfigEntry.data/options`, EMHASS config or GoodWe registers depending on ownership.
+
+EnergyPilot-owned persistent runtime stores are separate:
+
+```text
+gw_energypilot.runtime.<entry_id>
+gw_energypilot.accounting.<entry_id>
+gw_energypilot.optimization_log.<entry_id>
+```
+
+They are not a second settings database.
+
+## Safety boundary
+
+Do not guess GoodWe register addresses, sizes, scales or signs.
+
+`registers.py` is canonical for telemetry/register definitions. Changes to EMS mode semantics, registers `47511/47512`, sign conventions or write ordering require explicit hardware evidence.
+
+Beta register candidates remain bounded and reversible where practical.

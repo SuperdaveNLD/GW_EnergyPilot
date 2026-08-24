@@ -4,218 +4,116 @@ This document defines the practical development workflow for GW EnergyPilot.
 
 ## Repository is authoritative
 
-Inspect the current repository before changing code. Do not reconstruct current behavior from older chats or releases.
+Inspect the current repository before changing behavior. Do not reconstruct active behavior from older chats, old release wrappers or filenames alone.
 
-For AI-assisted work, read `AGENTS.md` first.
+For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current release structure
-
-The integration lives in:
+## Current v0.26 runtime structure
 
 ```text
 custom_components/gw_energypilot/
 ```
 
-Important modules:
+Core modules:
 
 ```text
-__init__.py          config-entry setup, device migration, APIs, accounting and panel
-client.py            asynchronous GoodWe Modbus TCP I/O
-registers.py         canonical register definitions and read blocks
-coordinator.py       periodic telemetry polling
-controller.py        automatic/manual EMS ownership and actuator strategy
-orchestrator.py      base EMHASS orchestration
-orchestrator_v012.py reliability/startup/price refinements
-orchestrator_v013.py current G20 orchestration + runtime-store persistence
-runtime_store.py     persistent EnergyPilot runtime evidence (last_success)
-accounting.py        persistent grid-accounting runtime + Recorder bootstrap
-accounting_model.py  pure daily-counter state/delta/rollover model
-accounting_sensor.py native Today import/export entities
-emhass_config.py     complete EMHASS config read/write helpers
-settings_api.py      EP/EMHASS/GoodWe connection settings
-smart_meter_api.py   GoodWe smart-meter actuator strategy
-beta_soc_api.py      verified manual 45356/45358 field-test writes
-event_triggers.py    event-driven optimization hooks
-sensor.py            telemetry/diagnostics + accounting sensor registration
-switch.py            Automatic Control ownership
-number.py            manual power + EMHASS SOC controls
-select.py            manual EMS mode + EMHASS strategy
-button.py            optimize/strategy/manual/resume actions
-frontend/            layered dashboard/settings assets
-tests/               hardware-independent regression tests
-```
-
-Repository tooling:
-
-```text
-scripts/validate_repo.py
-.github/workflows/quality.yml
-.github/workflows/hacs.yml
-.github/workflows/hassfest.yml
+__init__.py             config-entry setup, APIs, runtime wiring, panel entrypoint
+registers.py            canonical GoodWe register definitions/read blocks
+client.py               asynchronous Modbus TCP I/O + verified hardware writes
+coordinator.py          periodic telemetry snapshot
+controller.py           automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
+number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
+emhass_config.py        safe full EMHASS config read/write helpers
+orchestrator.py         base EMHASS orchestration
+orchestrator_v012.py    reliability/startup/price refinements
+orchestrator_v013.py    G20 load semantics + persistent last_success/optimization log
+orchestrator_v026.py    canonical dashboard price-series cache/read path
+price_series.py         pure timestamped price-series helpers
+battery_price_api.py    read-only Battery & Price WebSocket API
+accounting.py           persistent daily grid-accounting runtime
+accounting_model.py     pure accounting source/delta/rollover model
+accounting_sensor.py    native Today import/export entities
+runtime_store.py        persistent last_success evidence
+optimization_log.py     bounded optimization-attempt history
+optimization_log_api.py read-only optimization history API
+settings_api.py         EP/EMHASS/GoodWe connection settings
+smart_meter_api.py      automatic control-strategy API
+beta_soc_api.py         bounded verified 45356/45358 low-level field-test API
+event_triggers.py       event-driven optimization hooks
+frontend/               layered dashboard/settings assets
+tests/                  hardware-independent regressions
 ```
 
 ## Active orchestrator chain
 
 ```text
-orchestrator_v013.py
-    inherits orchestrator_v012.py
-        inherits orchestrator.py
+orchestrator_v026.py
+    -> orchestrator_v013.py
+        -> orchestrator_v012.py
+            -> orchestrator.py
 ```
 
-All three remain active runtime code. Check subclasses before modifying base behavior.
+All four layers are active runtime code. Check subclasses before changing a base method.
 
-v0.23 additionally gives the active v0.13 layer ownership of restoring/persisting `last_success` through `runtime_store.py`.
+`orchestrator_v026.py` adds read-only dashboard price-series caching; it must not silently change optimization objectives or turn dashboard reads into optimization triggers.
 
 ## Active frontend chain
 
-v0.23 top level:
+Top level:
 
 ```text
-gw-energy-pilot-v023.js
-  -> gw-energy-pilot-v022-flow-direction.js
-       -> gw-energy-pilot-v022.js
-            -> gw-energy-pilot-v021.js
-                 -> earlier layered dashboard/settings assets
+gw-energy-pilot-v026-complete.js
+    -> gw-energy-pilot-v026-battery-price.js
+        -> gw-energy-pilot-v026.js
+            -> gw-energy-pilot-v025.js
+                -> historical active layers
 ```
 
 Current ownership:
 
-- v0.23 — native Grid Today/Yesterday rendering and release badge;
-- flow overlay — final particle double-reversal correction;
-- v0.22 — Smart Meter strategy UI and PCC/battery target relabelling;
-- v0.21 — manual 12-mode EMS pad.
+- `v026-complete` — final v0.26 badge + synchronized minimum-SOC presentation;
+- `v026-battery-price` — Battery & Price graph, Recorder/price cache and visibility integration;
+- `v026` — Home Assistant language-aware Dutch/English localization;
+- `v025` — optimization LOG and prior dashboard behavior;
+- older assets remain active dependencies.
 
-Older filenames are active runtime dependencies. Trace imports before deleting/consolidating anything.
+**Do not add another release monkey-patch layer by default.** The layered frontend is technical debt and has caused small regressions. New presentation work should prefer functional components or deliberate consolidation under browser-level regression coverage.
 
 ## Automatic-control contract
 
-### GoodWe smart meter active = ON
-
-Default:
+Battery strategy:
 
 ```text
-EMHASS P_grid > +deadband -> mode 9  Grid import target
-EMHASS P_grid < -deadband -> mode 10 Grid export target
-EMHASS P_grid near 0 W    -> mode 1  GoodWe Auto / AI
+P_batt < -deadband -> mode 11
+P_batt > +deadband -> mode 12
+P_batt near 0 W    -> mode 8
 ```
 
-`P_grid` sign:
+Grid strategy:
 
 ```text
-positive = planned import
-negative = planned export
+P_grid > +deadband -> mode 9
+P_grid < -deadband -> mode 10
+P_grid near 0 W    -> mode 1
 ```
 
-GoodWe meter sign is opposite:
+Hybrid strategy:
 
 ```text
-36008 negative = actual import
-36008 positive = actual export
+P_batt charge request -> mode 11
+else P_grid export request -> mode 10
+otherwise -> mode 1
 ```
 
-Both `P_batt` and `P_grid` are validated as finite plan outputs. `P_grid` is the actuator request. GoodWe modes 9/10 close the fast loop at the PCC.
+Legacy strategy fallback remains false/missing smart-meter flag -> Battery, true -> Grid.
 
-Do not reintroduce the former mode-11 grid-neutral trim loop on top of PCC control without a new design and hardware evidence.
+EV anti-discharge is a higher-priority directional override.
 
-### GoodWe smart meter active = OFF
+Manual commands never inherit or reinterpret the automatic strategy.
 
-```text
-P_batt < -deadband -> mode 11 Battery charge power
-P_batt > +deadband -> mode 12 Battery discharge power
-P_batt near 0 W    -> mode 8  Battery Hold
-```
+## EMS / Modbus safety
 
-This fallback deliberately works without a valid `P_grid` entity.
-
-### EV anti-discharge protection
-
-During active EV charging:
-
-```text
-P_batt > +deadband -> mode 8  Battery Hold
-P_batt near 0 W    -> mode 8  Battery Hold
-P_batt < -deadband -> mode 11 Battery charge allowed
-```
-
-This is a battery-direction override, not EV charger control. The legacy option key `enable_ev_coordination` remains for compatibility.
-
-When native orchestration is enabled, EV stop waits for a fresh optimization before normal control resumes.
-
-### Manual ownership
-
-Manual commands never inherit or reinterpret the automatic strategy. Manual mode 9 is mode 9; manual mode 11 is mode 11.
-
-Automatic Control OFF returns the inverter to mode 1 / 0 W.
-
-## Hardware evidence behind PCC control
-
-Reference GW15K-ETA-G20 field tests established:
-
-```text
-mode 10 setpoint 400 W -> ~395 W grid export
-mode 9  setpoint 400 W -> ~331 W grid import
-mode 9  setpoint 15 kW -> ~15 kW grid import + local DC PV; battery ~16.9 kW charge
-mode 11 setpoint 15 kW -> battery ~15 kW charge; PV reduces required grid import
-mode 1                 -> observed self-use / near-zero-grid with PV surplus charging
-```
-
-Therefore:
-
-```text
-9 / 10  = PCC/grid targets
-11 / 12 = direct battery-power targets
-```
-
-Do not use a mode-9 setpoint as a battery-power limit.
-
-## Persistent grid accounting
-
-v0.23 introduces one `GWEnergyPilotAccounting` instance per config entry.
-
-Physical source:
-
-```text
-36017 lifetime import
-36015 lifetime export
-```
-
-Execution rules:
-
-- establish a baseline from physical lifetime counters;
-- accumulate only positive deltas;
-- re-baseline when a lifetime counter decreases;
-- roll current-day totals at local midnight;
-- persist current/previous-day state through Home Assistant storage;
-- expose native daily import/export sensors;
-- optionally use Recorder once to bootstrap existing midnight-boundary history.
-
-Recorder is not part of the live accounting loop. The 24-hour power graph remains Recorder-backed.
-
-Future financial accounting must consume the same per-refresh physical energy deltas rather than reconstructing energy in the frontend.
-
-See `docs/ACCOUNTING.md`.
-
-## Persistent runtime state
-
-`runtime_store.py` stores small EnergyPilot-owned runtime history separately from configuration.
-
-Current key:
-
-```text
-gw_energypilot.runtime.<config_entry_id>
-```
-
-The active orchestrator restores `last_success` before inherited setup and persists it only after a complete EnergyPilot-owned optimize + publish cycle succeeds.
-
-Failed optimizations preserve the previous timestamp. Invalid/timezone-less data is ignored.
-
-See `docs/RUNTIME_STATE.md`.
-
-## Modbus safety
-
-`registers.py` is canonical for register definitions/read blocks.
-
-Never guess GoodWe addresses, data widths, scales or signs.
+`registers.py` is canonical. Never guess addresses, widths, scaling or sign.
 
 EMS contract:
 
@@ -224,7 +122,7 @@ EMS contract:
 47512 = non-negative mode-specific setpoint magnitude
 ```
 
-Write order remains:
+Write order:
 
 ```text
 write 47512
@@ -232,42 +130,82 @@ brief wait
 write 47511
 ```
 
-Do not reorder this without hardware validation.
+Do not reorder without explicit hardware validation.
 
-## Dedicated settings architecture
+## Synchronized minimum SOC contract
 
-Dashboard write APIs are admin-only and use the existing ConfigEntry as the single configuration source.
+The existing EMHASS minimum-SOC NumberEntity is the supported normal on-grid operator control.
+
+An explicit write must follow this order:
 
 ```text
-settings_api.py      EP/EMHASS/GoodWe connection
-smart_meter_api.py   GoodWe smart-meter strategy
-beta_soc_api.py      verified 45356/45358 field-test writes
+validate EMHASS peer maximum
+require readable current GoodWe 45356
+write GoodWe 45356 through the canonical verified client helper
+verify read-back
+write the same percentage to EMHASS battery_minimum_state_of_charge
+update coordinator with verified hardware state
+schedule existing debounced fresh optimization
 ```
 
-Rules:
+If `45356` is unavailable, do not change EMHASS. If the later EMHASS write fails, attempt to restore the previous `45356` value.
 
-- GoodWe host/port/unit-ID changes must pass real Modbus validation before save;
-- smart-meter strategy is GoodWe/config-entry data, not EMHASS config;
-- device identity remains `(DOMAIN, config_entry_id)`;
-- entity unique IDs remain stable;
-- persistent runtime/accounting Store data is not user configuration.
+No startup/background synchronization is allowed without a separate design decision.
+
+Register `45358` remains an independent off-grid manual Beta field test. Maximum SOC remains EMHASS-only.
+
+## Battery & Price ownership
+
+Battery bars:
+
+```text
+existing battery_power entity
+-> Home Assistant Recorder 5-minute mean statistics
+-> frontend visualization
+```
+
+Price line:
+
+```text
+existing EnergyPilot runtime price-source path
+-> orchestrator_v026 cache
+-> battery_price/get WebSocket API
+-> frontend visualization
+```
+
+Do not discover Nord Pool independently in the browser.
+
+Approximate chart energy summaries are visualization only. Persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
+
+## Persistent accounting
+
+Daily grid accounting selects one coherent lifetime pair:
+
+```text
+preferred populated extended: 36104 export / 36120 import
+fallback legacy:             36015 export / 36017 import
+```
+
+Source changes re-baseline before accumulation. Never subtract absolute totals from different layouts.
+
+Recorder is not part of the live grid-accounting loop.
 
 ## Development workflow
 
-For each bug or feature:
+For each bug/feature:
 
-1. Inspect current implementation.
-2. Trace the runtime path and ownership boundary.
-3. Reproduce expected versus actual behavior from diagnostics/logs where possible.
-4. Apply the smallest robust change.
-5. Add/adjust hardware-independent regression coverage.
-6. Check startup, reload, unavailable-device and stale-data behavior.
+1. Inspect the current active runtime chain.
+2. Identify ownership: hardware, controller, optimizer, persistence or presentation.
+3. Reproduce expected versus actual behavior from diagnostics/logs/field evidence.
+4. Apply the smallest robust change inside the correct ownership boundary.
+5. Add hardware-independent regression coverage.
+6. Check startup/reload/unavailable/stale-data behavior.
 7. Check entity/device/storage compatibility.
-8. Update docs/changelog/release notes for externally visible behavior.
+8. Update user and maintainer documentation for externally visible behavior.
 9. Run repository checks.
-10. For release work, require Quality + HACS + hassfest on the exact final head.
+10. For releases require Quality + HACS + hassfest on the exact final head.
 
-## Lightweight repository checks
+## Repository checks
 
 ```text
 python -m compileall -q custom_components/gw_energypilot scripts tests
@@ -275,98 +213,48 @@ python -m unittest discover -s tests -v
 python scripts/validate_repo.py
 ```
 
-The `Quality` workflow runs these automatically.
+Quality runs these automatically.
 
-The validator checks, among other things:
+The validator covers register/read-block structure, JSON validity, frontend import existence, active frontend/manifest version agreement and changelog/release-note version coverage.
 
-- Modbus register/read-block coverage;
-- multi-word value coverage;
-- JSON validity;
-- frontend relative-import existence;
-- active frontend/manifest version agreement;
-- changelog/release-notes version coverage.
+Static CI does not prove GoodWe hardware semantics or browser rendering.
 
-Static CI does not prove GoodWe hardware semantics.
-
-## Domain split for debugging
+## Isolation rule for debugging
 
 ```text
-GoodWe telemetry/register issue
-  -> client.py / registers.py / coordinator.py
-
-Home Assistant entity/device issue
-  -> sensor.py / switch.py / number.py / select.py / button.py / entity.py / __init__.py
-
-Persistent daily grid totals
-  -> accounting.py / accounting_model.py / accounting_sensor.py
-
-Persistent Last success/runtime history
-  -> runtime_store.py / orchestrator_v013.py
-
-Dashboard settings
-  -> settings_api.py / smart_meter_api.py / config_flow.py / settings frontend layers
-
-Battery/PCC control
-  -> controller.py / client.py
-
-EMHASS optimization
-  -> orchestrator*.py / emhass_config.py / event_triggers.py
-
-Dashboard-only presentation
-  -> active frontend chain
+GoodWe register/transport -> registers.py / client.py / coordinator.py
+Automatic EMS decision    -> controller.py
+SOC config synchronization-> number.py / emhass_config.py / verified client helper
+EMHASS optimization       -> orchestrator*.py / emhass_config.py / event_triggers.py
+Price chart backend       -> orchestrator_v026.py / price_series.py / battery_price_api.py
+Daily grid totals         -> accounting.py / accounting_model.py / accounting_sensor.py
+Runtime/log persistence   -> runtime_store.py / optimization_log.py
+Presentation              -> active frontend chain
 ```
 
-Do not fix a presentation issue by changing Modbus semantics unless the data itself is wrong.
+Do not fix a presentation issue by changing Modbus semantics unless the data itself is proven wrong.
 
-## Known technical debt
+## Current technical debt priorities
 
-### Layered orchestrator
+1. **Frontend layering** — consolidate versioned monkey-patch layers into functional components under browser-level regression tests.
+2. **Orchestrator inheritance** — eventually replace release-version inheritance with composable forecast/price/runner services under existing tests.
+3. **Home Assistant lifecycle tests** — add config-entry/WebSocket/Recorder fixtures for integration-level coverage.
+4. **Control policy extraction** — separate pure Battery/Grid/Hybrid decision logic from Home Assistant state reading and Modbus execution when the next control refactor is scheduled.
 
-The v0.12/v0.13 classes subclass earlier code. Keep all active layers until behavior is deliberately consolidated under tests.
-
-### Layered frontend
-
-The v0.23 frontend imports older layers. The repository validator proves import existence, not behavioral equivalence after consolidation.
-
-### Runtime integration coverage
-
-Pure/unit coverage is materially better, including controller, EMHASS config, Modbus decoding, accounting model and runtime-store persistence. The repository still lacks a complete Home Assistant harness covering every config-entry/Recorder/WebSocket lifecycle path.
-
-## Testing priorities after v0.23
-
-Existing coverage includes:
-
-- PCC `P_grid -> 9/10/1` mapping;
-- direct `P_batt -> 11/12/8` fallback;
-- max-power clamping and invalid outputs;
-- manual ownership;
-- EV anti-discharge direction rules and EV-stop freshness;
-- EMHASS config preservation;
-- Modbus decoding/read coverage;
-- accounting baseline/delta/reset/rollover/bootstrap/persistence;
-- runtime `last_success` persistence and invalid-state handling.
-
-Next useful coverage:
-
-- Home Assistant config-entry lifecycle around accounting Store/Recorder bootstrap;
-- settings WebSocket authorization/reload behavior;
-- device-registry migration;
-- orchestrator HTTP success/failure integration;
-- Recorder statistics interactions on real HA test fixtures;
-- browser/client verification of the final flow-direction overlay.
+Do not perform these refactors opportunistically inside unrelated feature/bug releases.
 
 ## Release checklist
 
-Before a release verify:
+Before merge verify:
 
-- `manifest.json` version;
+- manifest version;
 - active frontend module/cache-buster and frontend `VERSION`;
-- `CHANGELOG.md` detailed changes;
-- `docs/RELEASE_NOTES.md` current version + status;
+- changelog version entry;
+- release-notes version/status row;
 - README current version/behavior;
 - architecture/development docs when runtime structure changes;
 - translations for user-facing changes;
-- Quality, HACS and hassfest on the exact final head;
+- Quality, HACS and hassfest on exact final head;
 - no accidental unique-ID/device-identifier/storage-key changes;
 - no undocumented register/control semantic changes;
-- Beta features are explicitly bounded and reversible where practical.
+- Beta features are bounded and reversible where practical.
