@@ -15,6 +15,7 @@ This page is the user-facing release index for every GW EnergyPilot version.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.25** | 2026-08-24 | **Beta** | Adds a persistent 50-run optimization history for manual, scheduled and event-triggered EMHASS runs, plus a read-only LOG page in the existing EnergyPilot Settings menu. |
 | **0.24** | 2026-08-23 | **Beta** | Fixes the v0.22/v0.23 automatic-control compatibility regression: when no explicit GoodWe smart-meter strategy is stored, Automatic Control again follows EMHASS `P_batt` through modes 11/12/8. PCC `P_grid` control through modes 9/10/1 remains available only when explicitly enabled. |
 | **0.23** | 2026-08-23 | **Beta** | Consolidated release: persistent native Today/Yesterday grid accounting from canonical GoodWe lifetime counters; directional EV anti-discharge protection that still allows an explicit home-battery charge plan; persistent orchestrator `last_success` across reload/restart; and the final live-flow particle double-reversal fix. Existing v0.22 PCC 9/10 control remains unchanged. |
 | **0.22** | 2026-08-23 | **Beta** | Promotes hardware-validated GoodWe smart-meter/PCC modes into an optional automatic strategy. Smart-meter ON maps EMHASS `P_grid` to modes 9/10/1; OFF restores direct `P_batt` control through modes 11/12/8. |
@@ -39,6 +40,69 @@ This page is the user-facing release index for every GW EnergyPilot version.
 | **0.03** | 2026-08-22 | **Historical** | Improves English setup/options UI, static-IP guidance and controller descriptions. |
 | **0.02** | 2026-08-22 | **Historical** | Adds native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS-compatible integration with EMS modes 1–12, manual control, EMHASS mapping and EV coordination groundwork. |
+
+# v0.25 — Persistent optimization history
+
+v0.25 adds a bounded diagnostic log around the existing EnergyPilot-owned EMHASS optimization path. It does not change how optimization inputs are calculated or how GoodWe EMS control is executed.
+
+## What is recorded
+
+The latest 50 optimization attempts are stored per EnergyPilot config entry. Manual button runs, scheduled runs and event-triggered runs all write to the same log.
+
+Each record captures the diagnostic context needed to compare runs after the fact:
+
+```text
+start/end timestamp and duration
+trigger reason and success/failure
+soc_init and soc_final
+current GoodWe house load
+price source, area and point count
+load forecast point count
+published P_batt on success
+optimize/publish HTTP status
+error message on failure
+```
+
+The oldest record is automatically removed when the 51st run is added.
+
+## Settings log viewer
+
+Home Assistant administrators can open the existing EnergyPilot Settings menu and select **LOG**. The page is read-only, shows the newest optimization first and provides a manual refresh button.
+
+The viewer uses the admin-only WebSocket command:
+
+```text
+gw_energypilot/optimization_log/get
+```
+
+No additional Home Assistant entities are created for the log.
+
+## Storage and failure boundary
+
+Optimization history uses its own per-entry Home Assistant Store:
+
+```text
+gw_energypilot.optimization_log.<config_entry_id>
+```
+
+This is intentionally separate from:
+
+```text
+gw_energypilot.runtime.<config_entry_id>
+```
+
+The existing runtime store continues to own `last_success`. A failed optimization is recorded in the history but does not overwrite the previous successful timestamp. Conversely, failure to persist a diagnostic history record is logged and must never turn an otherwise successful optimization into a control failure.
+
+## Compatibility and safety
+
+- no GoodWe register addresses or Modbus read blocks change;
+- no EMS write path or `47512 -> wait -> 47511` ordering changes;
+- no automatic-control strategy or P_batt/P_grid mapping changes;
+- no entity IDs, unique IDs or device identity changes;
+- no user configuration is moved into the log store;
+- the log viewer is read-only and admin-only.
+
+v0.25 remains **Beta** while the new persistent diagnostics receive field exposure.
 
 # v0.24 — Automatic-control compatibility fix
 
