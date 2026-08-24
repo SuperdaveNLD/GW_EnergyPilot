@@ -65,6 +65,7 @@ class GWEnergyPilotController:
     Hybrid control:
       P_batt < 0 = mode 11 direct battery charge target
       P_grid < 0 = mode 10 export target at the PCC
+      P_batt ~= 0 = mode 8 Battery Hold
       otherwise = mode 1 GoodWe Auto / self-use balancing
 
     Existing installations without an explicit strategy retain the legacy
@@ -256,7 +257,7 @@ class GWEnergyPilotController:
         await self._async_apply_command(MODE_AUTO, 0, "grid_zero_auto", skip_if_readback_matches=True)
 
     async def _async_apply_hybrid_plan(self, p_batt: float, p_grid: float, deadband: float, max_power: int) -> None:
-        """Charge on battery target, export on PCC target."""
+        """Charge on battery target, export on PCC target, hold a neutral battery plan."""
         if p_batt < -deadband:
             power = min(int(abs(p_batt)), max_power)
             await self._async_apply_command(MODE_CHARGE_BATTERY, power, "hybrid_battery_charge", skip_if_readback_matches=True)
@@ -264,6 +265,9 @@ class GWEnergyPilotController:
         if p_grid < -deadband:
             power = min(int(abs(p_grid)), max_power)
             await self._async_apply_command(MODE_GRID_EXPORT_TARGET, power, "hybrid_grid_export", skip_if_readback_matches=True)
+            return
+        if abs(p_batt) <= deadband:
+            await self._async_apply_command(MODE_BATTERY_HOLD, 0, "hybrid_battery_hold", skip_if_readback_matches=True)
             return
         await self._async_apply_command(MODE_AUTO, 0, "hybrid_auto", skip_if_readback_matches=True)
 
