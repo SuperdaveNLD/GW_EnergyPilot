@@ -16,10 +16,14 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .accounting_model import (
+    LEGACY_EXPORT_KEY,
+    LEGACY_IMPORT_KEY,
+    SOURCE_EXTENDED,
     GridAccountingState,
     apply_meter_totals,
     roll_to_day,
     seed_daily_totals,
+    select_meter_totals,
 )
 from .const import DOMAIN
 from .coordinator import GWEnergyPilotCoordinator
@@ -28,8 +32,8 @@ _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
 SAVE_DELAY_SECONDS = 30
-IMPORT_TOTAL_KEY = "meter_total_energy_import"
-EXPORT_TOTAL_KEY = "meter_total_energy_export"
+IMPORT_TOTAL_KEY = LEGACY_IMPORT_KEY
+EXPORT_TOTAL_KEY = LEGACY_EXPORT_KEY
 IMPORT_DAILY_KEY = "grid_energy_imported_today"
 EXPORT_DAILY_KEY = "grid_energy_exported_today"
 
@@ -72,7 +76,7 @@ def _history_boundary_value(
 
 
 class GWEnergyPilotAccounting:
-    """Own EnergyPilot accounting derived from canonical GoodWe counters."""
+    """Own EnergyPilot accounting derived from GoodWe lifetime counters."""
 
     def __init__(
         self,
@@ -102,7 +106,7 @@ class GWEnergyPilotAccounting:
             await self._store.async_save(self.state.as_dict())
 
     async def async_start(self) -> None:
-        """Start consuming canonical GoodWe lifetime-counter updates."""
+        """Start consuming GoodWe lifetime-counter updates."""
         if self._coordinator_unsub is not None:
             return
         self._coordinator_unsub = self.coordinator.async_add_listener(
@@ -115,15 +119,24 @@ class GWEnergyPilotAccounting:
         """Seed first-release daily totals from existing Recorder boundaries."""
         if self.state.bootstrap_complete:
             return
-        if "recorder" not in self.hass.config.components:
-            return
         if self.coordinator.data is None:
             return
 
         values = self.coordinator.data.values
-        current_import = _safe_number(values.get(IMPORT_TOTAL_KEY))
-        current_export = _safe_number(values.get(EXPORT_TOTAL_KEY))
-        if current_import is None or current_export is None:
+        selected = select_meter_totals(values, self.state.source_pair)
+        if selected is None:
+            return
+        source_pair, current_import, current_export = selected
+
+        # Extended 64-bit totals were not separate Recorder-facing entities.
+        # Their first selected live sample is therefore the safe baseline.
+        if source_pair == SOURCE_EXTENDED:
+            self.state.bootstrap_complete = True
+            await self._store.async_save(self.state.as_dict())
+            self._notify_listeners()
+            return
+
+        if "recorder" not in self.hass.config.components:
             return
 
         registry = er.async_get(self.hass)
@@ -211,8 +224,6 @@ class GWEnergyPilotAccounting:
         ):
             return
 
-        # Recorder supplied the period start; the fresh Modbus sample supplies
-        # the exact current lifetime baseline for all future delta accounting.
         self.state.last_import_total_kwh = current_import
         self.state.last_export_total_kwh = current_export
         await self._store.async_save(self.state.as_dict())
@@ -244,13 +255,21 @@ class GWEnergyPilotAccounting:
     def _handle_coordinator_update(self) -> None:
         if self.coordinator.data is None:
             return
-        values = self.coordinator.data.values
+        selected = select_meter_totals(
+            self.coordinator.data.values,
+            self.state.source_pair,
+        )
+        if selected is None:
+            return
+
+        source_pair, import_total, export_total = selected
         before = self.state.as_dict()
         apply_meter_totals(
             self.state,
             dt_util.now().date(),
-            import_total_kwh=values.get(IMPORT_TOTAL_KEY),
-            export_total_kwh=values.get(EXPORT_TOTAL_KEY),
+            import_total_kwh=import_total,
+            export_total_kwh=export_total,
+            source_pair=source_pair,
         )
         if self.state.as_dict() == before:
             return
