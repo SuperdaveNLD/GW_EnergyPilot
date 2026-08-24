@@ -1,0 +1,96 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          manifest = json.loads(
+              Path("custom_components/gw_energypilot/manifest.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          version = str(manifest.get("version", "")).strip()
+
+          if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", tag):
+              raise SystemExit(
+                  f"Release tag {tag!r} is invalid; use a numeric tag such as 0.30"
+              )
+          if tag != version:
+              raise SystemExit(
+                  f"Release tag {tag!r} must match manifest version {version!r}"
+              )
+
+          print(f"Release version validated: {version}")
+          PY
+
+      - name: Compile Python sources
+        run: python -m compileall -q custom_components/gw_energypilot scripts tests
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate repository invariants
+        run: python scripts/validate_repo.py
+
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          notes_file="docs/RELEASE_NOTES_V${tag//./}.md"
+          title="GW EnergyPilot v${tag}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "GitHub release $tag already exists; nothing to publish."
+            exit 0
+          fi
+
+          if [[ -f "$notes_file" ]]; then
+            gh release create "$tag" \
+              --verify-tag \
+              --title "$title" \
+              --notes-file "$notes_file"
+          else
+            gh release create "$tag" \
+              --verify-tag \
+              --title "$title" \
+              --generate-notes
+          fi
