@@ -90,6 +90,16 @@ v0.31 makes the EnergyPilot/macOS-style traffic-light controls visible on all no
 
 Collapse/full-width state is browser-local presentation state. The earlier Battery-only control node is removed before the v0.31 strip is attached, preventing duplicate controls.
 
+## Remaining backlog fixes included
+
+### Battery · Plan · Price duplicate card (#46)
+
+The Battery · Plan · Price installer is now idempotent. Repeated render wrappers no longer append a second graph after red-close → restore. The release layer also reconciles an already-duplicated browser session back to one canonical card on the next render.
+
+### Four-decimal price adjustments (#45)
+
+Import price adders and export price deductions now accept `0.0001` precision in the Home Assistant options schema and dashboard input path. Values such as the existing `0.0248` default are therefore valid without rounding to `0.024` or `0.025`.
+
 ## Safety and compatibility
 
 - No new or guessed GoodWe register definition is added.
@@ -106,4 +116,4 @@ See `docs/DEBUG_LOG.md`, `docs/BATTERY_SAVER.md` and `docs/EMHASS_CONFIG_SYNC.md
 
 ## Validation status
 
-**Beta.** The v0.31 changes have regression coverage and preserve the established controller/Modbus architecture, but the new Battery Saver tuning remains a Beta policy that should be validated across more real installations and tariff profiles before stronger lifetime or savings claims are made.
+**Beta.** The v0.31 changes have regression coverage and preserve the established controller/Modbus architecture. The new Battery Saver tuning remains a Beta policy that should be validated across more real installations and tariff profiles before stronger lifetime or savings claims are made.
