@@ -72,12 +72,13 @@ def normalize_emhass_forecasts(
     entity_id: str,
     attributes: Mapping[str, Any] | None,
 ) -> list[dict[str, Any]]:
-    """Return sorted ``P_batt`` forecast points from an EMHASS entity.
+    """Return sorted ``P_batt`` forecast points from an EMHASS HA entity.
 
-    Current EMHASS publishes battery-power horizons in the
+    Current EMHASS power publishing may expose a battery horizon through the
     ``battery_scheduled_power`` attribute. ``forecasts`` remains accepted as a
-    conservative compatibility fallback for older/custom publishers. Each row
-    uses ``date`` plus a value key derived from the configured entity id.
+    conservative compatibility fallback for older/custom publishers. The
+    official ``/api/v1/plan`` output is normalized separately and preferred by
+    the dashboard when available.
     """
     schedule_attribute = emhass_schedule_attribute(attributes)
     if schedule_attribute is None or attributes is None:
@@ -118,6 +119,41 @@ def normalize_emhass_forecasts(
         if value is None:
             continue
 
+        by_timestamp[sort_key] = {
+            "start": start,
+            "value_w": round(value, 3),
+        }
+
+    return [by_timestamp[key] for key in sorted(by_timestamp)]
+
+
+def normalize_emhass_api_plan(payload: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Normalize the official EMHASS ``GET /api/v1/plan`` battery horizon.
+
+    The official plan contract publishes one record per timestep with a UTC
+    ``timestamp`` and ``P_batt`` in watts. Positive ``P_batt`` means discharge;
+    negative means charge. Rows without a valid timestamp or battery value are
+    intentionally ignored so a partial plan cannot break the dashboard.
+    """
+    if not isinstance(payload, Mapping) or payload.get("status") != "ok":
+        return []
+    rows = payload.get("plan")
+    if not isinstance(rows, list):
+        return []
+
+    by_timestamp: dict[float, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        parsed_timestamp = _timestamp(row.get("timestamp"))
+        if parsed_timestamp is None:
+            continue
+        start, sort_key = parsed_timestamp
+        value = finite_number(row.get("P_batt"))
+        if value is None:
+            value = finite_number(row.get("p_batt"))
+        if value is None:
+            continue
         by_timestamp[sort_key] = {
             "start": start,
             "value_w": round(value, 3),
