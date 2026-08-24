@@ -29,7 +29,11 @@ from .const import (
     MODE_GRID_EXPORT_TARGET,
     MODE_NAMES,
 )
-from .emhass_config import async_set_emhass_cost_function
+from .emhass_config import (
+    async_get_emhass_config,
+    async_set_emhass_cost_function,
+    emhass_soc_diagnostics_from_config,
+)
 from .entity import GWEnergyPilotEntity
 
 
@@ -153,6 +157,7 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             "controller_deadband": float(
                 self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
             ),
+            "manual_charge_limit_soc": controller.manual_charge_limit_soc,
             "p_batt_entity": p_batt_entity,
             "p_batt_value": p_batt_state.state if p_batt_state else None,
             "p_grid_entity": p_grid_entity,
@@ -343,7 +348,7 @@ class GWBatteryPauseButton(_GWManualBatteryButton):
 
 
 class GWMaxChargeButton(_GWManualBatteryButton):
-    """Charge the battery at the configured maximum power."""
+    """Charge at maximum power while respecting the configured maximum SOC."""
 
     _attr_translation_key = "max_charge"
     _attr_icon = "mdi:battery-charging-high"
@@ -354,6 +359,26 @@ class GWMaxChargeButton(_GWManualBatteryButton):
     @property
     def entity_description_key(self) -> str:
         return "max_charge"
+
+    async def async_press(self) -> None:
+        """Start guarded Max charge using the current EMHASS maximum SOC."""
+        config = await async_get_emhass_config(self.hass, self.entry)
+        maximum_soc = emhass_soc_diagnostics_from_config(config).get(
+            "emhass_maximum_soc_pct"
+        )
+        if maximum_soc is None:
+            raise HomeAssistantError(
+                "EMHASS maximum battery SOC is unavailable or invalid; Max charge "
+                "was not started"
+            )
+        power = int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
+        try:
+            await self.entry.runtime_data.controller.async_manual_max_charge(
+                power,
+                maximum_soc,
+            )
+        except ValueError as err:
+            raise HomeAssistantError(f"Max charge was not started: {err}") from err
 
 
 class GWResumeAutoButton(GWEnergyPilotEntity, ButtonEntity):
