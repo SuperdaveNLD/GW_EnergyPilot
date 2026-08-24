@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.26 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.27 Beta**.
 
 ## High-level flow
 
@@ -109,13 +109,20 @@ P_grid near 0 W    -> mode 1
 ### Hybrid strategy
 
 ```text
-P_batt requests charge -> mode 11
-else P_grid requests export -> mode 10
+P_grid > +deadband -> mode 9  using abs(P_grid)
+else P_batt > +deadband -> mode 12 using abs(P_batt)
 else P_batt near 0 W -> mode 8
 otherwise -> mode 1
 ```
 
-The export branch intentionally precedes the neutral-battery branch. A neutral `P_batt` plan therefore holds the battery unless EMHASS explicitly requests grid export; it no longer hands battery direction back to GoodWe Auto.
+Hybrid intentionally combines two different GoodWe control domains:
+
+- **buy/import** is a PCC target and therefore uses mode 9 with the EMHASS `P_grid` import magnitude;
+- **sell/discharge** is a battery-power target and therefore uses mode 12 with the EMHASS `P_batt` discharge magnitude;
+- a neutral battery plan is held with mode 8;
+- a battery-charge plan without planned grid import falls through to mode 1/self-use so locally available PV can be absorbed by GoodWe without forcing the EMHASS forecast-sized charge setpoint.
+
+The mode-9 branch is evaluated before mode 12 so an explicit planned grid import is the authoritative Hybrid buying signal.
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
@@ -149,13 +156,14 @@ market - sell deduction = effective prod_price
 Active top-level module:
 
 ```text
-gw-energy-pilot-v026-complete.js
-    -> gw-energy-pilot-v026-battery-price.js
-        -> gw-energy-pilot-v026.js
-            -> existing historical frontend chain
+gw-energy-pilot-v027.js
+    -> gw-energy-pilot-v026-complete.js
+        -> gw-energy-pilot-v026-battery-price.js
+            -> gw-energy-pilot-v026.js
+                -> existing historical frontend chain
 ```
 
-The v0.26 completion layer owns the synchronized minimum-SOC presentation and final release badge. The Battery & Price layer owns the new graph and chart data cache. The language layer owns Dutch/English localization.
+The v0.27 layer owns only the corrected Hybrid 9/12 explanation and final release badge. The v0.26 completion layer owns synchronized minimum-SOC presentation; the Battery & Price layer owns the graph and chart data cache; the v0.26 language layer owns Dutch/English localization.
 
 This layering remains technical debt: new releases should avoid adding another behavioral monkey-patch layer unless needed for a bounded compatibility fix. A future frontend consolidation should preserve behavior under browser-level regression tests before deleting historical assets.
 
