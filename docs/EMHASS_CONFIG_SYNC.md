@@ -15,15 +15,50 @@ Canonical EnergyPilot outputs are:
 
 ## Synchronize required config
 
-**Synchronize required config** is an explicit administrator action. It reads the complete live EMHASS configuration, changes only the mappings required by EnergyPilot, writes the complete merged configuration, then reads it back for verification.
+**Synchronize required config** is an explicit administrator action. It reads the complete live EMHASS configuration, changes only mappings and runtime behavior required by EnergyPilot, writes the complete merged configuration, then reads it back for verification.
 
-The runtime resolves the actual Home Assistant entity IDs for EnergyPilot PV total power, GoodWe load power, battery power and battery SOC from the entity registry. Renamed entity IDs are therefore respected.
+The runtime resolves the actual Home Assistant entity IDs for EnergyPilot load power, battery power and battery SOC from the entity registry. When EMHASS has PV enabled, the EnergyPilot PV total-power entity is resolved as well. Renamed entity IDs are therefore respected.
 
-Managed EMHASS values are the required input sensor mappings, compatible interpolation/zero-replacement lists, compatible `var_model`, `continual_publish = false`, `method_ts_round = first`, and the PV/battery/hybrid enable flags.
+The required EMHASS runtime contract is:
 
-Unrelated EMHASS configuration is preserved. Existing custom PV forecast entities are preserved. Custom `var_model` values are preserved with a warning. Multi-battery power/SOC lists are not rewritten because EnergyPilot cannot safely infer per-battery ownership.
+- `continual_publish = true`
+- `method_ts_round = first`
+- `set_use_battery = true`
+- `inverter_is_hybrid = true`
 
-Synchronization does not write any GoodWe register and does not automatically launch an optimization. After a successful synchronization, run a fresh optimization before enabling Automatic Control.
+`continual_publish = true` is required because EnergyPilot performs full optimizations on its own schedule/events, while EMHASS must advance and republish the saved plan at each `optimization_time_step`. EnergyPilot deliberately does not add a second periodic publish loop.
+
+## PV is optional
+
+`set_use_pv` is **not** an EnergyPilot-required value and is never forced to `true`.
+
+- If the customer's EMHASS configuration has `set_use_pv = true`, EnergyPilot synchronizes the PV input and forecast mappings and requires a usable EnergyPilot PV entity.
+- If `set_use_pv = false`, the customer's PV configuration is preserved and no PV entity is required for synchronization.
+
+This keeps battery-only installations valid.
+
+## Preserved configuration
+
+Unrelated EMHASS configuration is preserved. Existing custom PV forecast entities are preserved when PV is enabled. Custom `var_model` values are preserved with a warning. Multi-battery power/SOC lists are not rewritten because EnergyPilot cannot safely infer per-battery ownership.
+
+Battery Saver penalty fields are intentionally outside the generic required-config sync. Existing custom battery penalties remain untouched until the user explicitly selects an EnergyPilot Battery Saver mode. See `BATTERY_SAVER.md`.
+
+## Minimum SOC ownership
+
+The generic config-sync action does not write a GoodWe register. Minimum SOC is handled by the dedicated synchronized Minimum SOC NumberEntity and the EnergyPilot-owned optimization policy:
+
+- GoodWe on-grid minimum SOC is the canonical operational floor;
+- the slider mirrors that verified GoodWe value into EMHASS `battery_minimum_state_of_charge`;
+- EnergyPilot-owned optimization runs reassert the available GoodWe floor in EMHASS;
+- runtime `soc_final` is clamped to the effective minimum/maximum SOC range.
+
+An explicit slider change retains the existing safety order: write and verify GoodWe first, then update EMHASS, and roll GoodWe back if the EMHASS write fails.
+
+## Applying synchronization
+
+The manual **Synchronize required config** action itself does not launch an optimization and does not write a GoodWe register. After changing required config manually, run a fresh EnergyPilot optimization before enabling Automatic Control.
+
+EnergyPilot-owned optimization runs also enforce the small core runtime contract immediately before solving, so `continual_publish`, battery use and timestamp rounding cannot silently drift away after a manual EMHASS edit.
 
 ## Flow animation regression guard
 
