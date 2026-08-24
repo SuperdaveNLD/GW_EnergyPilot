@@ -247,6 +247,28 @@ def number_of_batteries(config: Mapping[str, Any]) -> int:
     return max(1, value)
 
 
+def clamp_soc_final(
+    requested: Any,
+    minimum: Any,
+    maximum: Any,
+) -> float:
+    """Clamp a runtime terminal SOC target to valid hard EMHASS limits."""
+    requested_value = _finite_number(requested)
+    minimum_value = _finite_number(minimum)
+    maximum_value = _finite_number(maximum)
+    if requested_value is None:
+        requested_value = 0.0
+    if minimum_value is None or not 0.0 <= minimum_value <= 1.0:
+        minimum_value = 0.0
+    if maximum_value is None or not 0.0 <= maximum_value <= 1.0:
+        maximum_value = 1.0
+    if minimum_value > maximum_value:
+        raise ValueError(
+            f"Battery minimum SOC ({minimum_value:.3f}) exceeds maximum SOC ({maximum_value:.3f})"
+        )
+    return round(min(maximum_value, max(minimum_value, requested_value)), 4)
+
+
 def _version_tuple(version: str | None) -> tuple[int, int, int] | None:
     if not version:
         return None
