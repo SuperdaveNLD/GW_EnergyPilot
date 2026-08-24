@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.26 remains **Beta** while Hybrid control, extended-meter accounting, Battery & Price visualization and synchronized minimum-SOC handling receive broader field exposure.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.27 remains **Beta** while Hybrid neutral-hold behavior, the resizable Battery plan/actual/price visualization and the compact support presentation receive broader field exposure.
 
 ## Ownership
 
@@ -25,7 +25,7 @@ gw_energypilot/optimization_log/get
 gw_energypilot/battery_price/get
 ```
 
-The active v0.26 frontend is `gw-energy-pilot-v026-complete.js`. It layers the language-aware Battery & Price interface over the previous dashboard and applies the synchronized minimum-SOC presentation at the top level.
+The active v0.27 frontend is `gw-energy-pilot-v027-battery-plan.js`. It layers the compact v0.26 support presentation over the language-aware v0.26 dashboard, then adds the resizable plan-versus-actual Battery & Price view.
 
 ## EP page
 
@@ -107,7 +107,7 @@ Failure behavior:
 
 There is **no startup or periodic background synchronization**. Register `45356` is changed only after an explicit minimum-SOC NumberEntity write.
 
-The previous direct on-grid `45356` dashboard card is intentionally removed to avoid two competing operator controls for the same normal minimum SOC.
+The previous direct minimum-SOC field-test panel is intentionally not shown in the dashboard. This avoids a second operator path alongside the synchronized minimum-SOC control.
 
 ## GOODWE page
 
@@ -116,8 +116,7 @@ The GOODWE section owns:
 - inverter host/IP;
 - Modbus TCP port;
 - Modbus unit ID;
-- Automatic Control strategy;
-- independent off-grid minimum-SOC register `45358` Beta field test.
+- Automatic Control strategy.
 
 Connection changes are validated with a temporary `GWModbusClient` before the existing config entry is updated/reloaded.
 
@@ -159,34 +158,59 @@ legacy use_goodwe_smart_meter true          -> Grid
 
 Manual EMS selections are never remapped by the automatic strategy.
 
-## Off-grid minimum-SOC field test
+## Low-level Beta SOC API
 
-Register `45358` remains an independent manual Beta field-test control.
+The old **Battery minimum SOC limits** field-test panel is no longer exposed in the GOODWE dashboard.
 
-Safety rules:
+The existing `gw_energypilot/beta_soc/get` and `gw_energypilot/beta_soc/set` backend API remains available for backwards-compatible diagnostics and controlled field tooling. It is not a second normal operator settings path.
+
+Safety rules for that low-level API remain unchanged:
 
 - Home Assistant administrator access required;
 - canonical register-key whitelist only;
 - current register must already be readable;
 - whole `0..100%` values only;
-- frontend confirmation;
 - immediate same-register read-back;
 - success only when read-back matches.
 
-The existing `beta_soc` backend API remains available for backwards-compatible diagnostics/tooling. On-grid `45356` writes through that low-level API are not the normal dashboard control path; the synchronized minimum-SOC NumberEntity is the supported operator path.
+Normal on-grid minimum SOC must use the synchronized NumberEntity path described above. Register `45358` remains a Beta register and is not exposed as a normal dashboard setting. Register `47500` remains read-only because its firmware-dependent semantics are unresolved.
 
-Register `47500` remains read-only because its firmware-dependent semantics are unresolved.
+## Battery plan / actual / price
 
-## Battery & Price
+The Battery plan / actual / price card is read-only. It does not add user settings or a second pricing configuration source.
 
-The Battery & Price card is read-only. It does not add user settings or a second pricing configuration source.
-
-- Battery bars consume Recorder statistics from the existing `battery_power` entity.
+- Actual battery bars consume Recorder statistics from the existing `battery_power` entity.
+- Historical plan blocks consume Home Assistant history for the configured `P_batt` output entity.
+- Future plan blocks consume the current EMHASS `forecasts` attribute from that battery forecast entity.
 - Price series come from the same EnergyPilot runtime price path used by EMHASS.
 - The browser caches chart data for five minutes to avoid request churn.
-- Approximate charged/discharged values are display summaries, not accounting entities.
+- The S/M/L card size is a browser-local dashboard preference, not an integration setting.
+- Headline charged/discharged values prefer the existing GoodWe day counters `35208` / `35211`; graph integration remains a visualization comparison.
 
-See `docs/BATTERY_PRICE_CHART.md`.
+See `docs/BATTERY_PRICE_CHART.md` and `docs/BATTERY_PLAN_CHART.md`.
+
+## Support diagnostics
+
+The visible **Support** card is intentionally an operational summary instead of a full raw-register dump.
+
+It shows four immediate health indicators:
+
+```text
+GoodWe live telemetry
+Automatic/manual control ownership
+Optimizer status
+EMHASS / GoodWe minimum-SOC synchronization
+```
+
+The visible detail is grouped into:
+
+- **GOODWE / LIVE** — actual EMS mode/setpoint, signed grid and battery direction, house load and battery SOC/SOH;
+- **CONTROL / EMHASS** — current command/target, expected mode, both `P_batt` and `P_grid`, optimization/orchestrator state and last trigger/error;
+- **SOC / LIMITS** — current SOC, synchronized EMHASS/GoodWe minimum, maximum SOC and the latest optimization SOC path.
+
+Raw inverter mode registers, Beta candidates, lifetime energy counters and legacy/invalid EMHASS constraint values are deliberately not shown in the normal dashboard overview. They remain available through the single **Copy support report** action so issue reports retain deep diagnostic evidence without making the everyday UI unreadable.
+
+This is presentation-only cleanup. Existing diagnostic entity attributes, register reads, `beta_soc` API behavior, controller logic and EMHASS behavior are unchanged.
 
 ## Persistent state is not settings
 
