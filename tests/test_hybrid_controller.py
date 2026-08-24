@@ -174,7 +174,7 @@ def make_controller(*, strategy_data, p_batt, p_grid):
 
 
 class HybridControllerTests(unittest.IsolatedAsyncioTestCase):
-    async def test_hybrid_charge_uses_direct_mode11(self):
+    async def test_hybrid_buy_uses_mode9_grid_import_target(self):
         controller, client = make_controller(
             strategy_data={
                 const.CONF_CONTROL_STRATEGY: const.CONTROL_STRATEGY_HYBRID,
@@ -185,10 +185,10 @@ class HybridControllerTests(unittest.IsolatedAsyncioTestCase):
 
         await controller.async_evaluate()
 
-        self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 4200)])
-        self.assertEqual(controller.last_command, "hybrid_battery_charge")
+        self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 6500)])
+        self.assertEqual(controller.last_command, "hybrid_grid_import")
 
-    async def test_hybrid_export_uses_mode10_when_not_charging(self):
+    async def test_hybrid_sell_uses_mode12_battery_discharge(self):
         controller, client = make_controller(
             strategy_data={
                 const.CONF_CONTROL_STRATEGY: const.CONTROL_STRATEGY_HYBRID,
@@ -199,8 +199,8 @@ class HybridControllerTests(unittest.IsolatedAsyncioTestCase):
 
         await controller.async_evaluate()
 
-        self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 3600)])
-        self.assertEqual(controller.last_command, "hybrid_grid_export")
+        self.assertEqual(client.calls, [(const.MODE_DISCHARGE_BATTERY, 1800)])
+        self.assertEqual(controller.last_command, "hybrid_battery_discharge")
 
     async def test_hybrid_neutral_battery_plan_uses_mode8_hold(self):
         controller, client = make_controller(
@@ -216,7 +216,7 @@ class HybridControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
         self.assertEqual(controller.last_command, "hybrid_battery_hold")
 
-    async def test_hybrid_export_wins_over_neutral_battery_hold(self):
+    async def test_hybrid_neutral_battery_does_not_force_mode10_export(self):
         controller, client = make_controller(
             strategy_data={
                 const.CONF_CONTROL_STRATEGY: const.CONTROL_STRATEGY_HYBRID,
@@ -227,10 +227,24 @@ class HybridControllerTests(unittest.IsolatedAsyncioTestCase):
 
         await controller.async_evaluate()
 
-        self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 3600)])
-        self.assertEqual(controller.last_command, "hybrid_grid_export")
+        self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
+        self.assertEqual(controller.last_command, "hybrid_battery_hold")
 
-    async def test_hybrid_uses_auto_for_normal_self_use(self):
+    async def test_hybrid_pv_charge_without_grid_import_uses_goodwe_self_use(self):
+        controller, client = make_controller(
+            strategy_data={
+                const.CONF_CONTROL_STRATEGY: const.CONTROL_STRATEGY_HYBRID,
+            },
+            p_batt=-2500,
+            p_grid=0,
+        )
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_AUTO, 0)])
+        self.assertEqual(controller.last_command, "hybrid_pv_self_use")
+
+    async def test_hybrid_grid_import_wins_over_simultaneous_discharge_signal(self):
         controller, client = make_controller(
             strategy_data={
                 const.CONF_CONTROL_STRATEGY: const.CONTROL_STRATEGY_HYBRID,
@@ -241,8 +255,8 @@ class HybridControllerTests(unittest.IsolatedAsyncioTestCase):
 
         await controller.async_evaluate()
 
-        self.assertEqual(client.calls, [(const.MODE_AUTO, 0)])
-        self.assertEqual(controller.last_command, "hybrid_auto")
+        self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 1200)])
+        self.assertEqual(controller.last_command, "hybrid_grid_import")
 
     async def test_missing_strategy_keeps_legacy_battery_default(self):
         controller, client = make_controller(
