@@ -1,9 +1,10 @@
 """GW EnergyPilot integration."""
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections.abc import Callable
 
 from homeassistant.components import panel_custom
 from homeassistant.components.frontend import async_panel_exists
@@ -12,17 +13,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.typing import ConfigType
 
 from .accounting import GWEnergyPilotAccounting
 from .battery_price_api import async_register_battery_price_api
+from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
-from .emhass_config_api import async_register_emhass_config_api
-from .events import async_setup_event_triggers
+from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
-from .orchestrator import GWEnergyPilotOrchestrator
+from .orchestrator_v026 import GWEnergyPilotOrchestrator
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
 
@@ -53,13 +55,13 @@ class GWRuntimeData:
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
-GWConfigEntry = ConfigEntry[GWRuntimeData]
+type GWConfigEntry = ConfigEntry[GWRuntimeData]
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up GW EnergyPilot."""
-    async_register_emhass_config_api(hass)
+async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
+    """Set up integration-wide dashboard APIs."""
     async_register_settings_api(hass)
+    async_register_beta_soc_api(hass)
     async_register_smart_meter_api(hass)
     async_register_optimization_log_api(hass)
     async_register_battery_price_api(hass)
@@ -67,10 +69,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 def _migrate_device_identifier(hass: HomeAssistant, entry: GWConfigEntry) -> None:
-    """Move an existing host-based device identifier to the stable entry id."""
+    """Move the legacy mutable host:slave device identifier to entry_id."""
     registry = dr.async_get(hass)
     stable_identifier = (DOMAIN, entry.entry_id)
-    if registry.async_get_device_by_identifier(stable_identifier, entry.entry_id) is not None:
+    if registry.async_get_device_by_identifier(stable_identifier, entry.entry_id):
         return
 
     legacy_identifier = (
