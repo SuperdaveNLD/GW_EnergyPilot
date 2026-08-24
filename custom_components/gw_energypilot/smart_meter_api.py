@@ -81,7 +81,7 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
         },
         "battery_strategy": "P_batt -> GoodWe modes 11/12; mode 8 around zero",
         "grid_strategy": "P_grid -> GoodWe modes 9/10; mode 1 around zero",
-        "hybrid_strategy": "P_batt charge -> mode 11; P_grid export -> mode 10; mode 1 otherwise",
+        "hybrid_strategy": "P_batt charge -> mode 11; P_grid export -> mode 10; P_batt near zero -> mode 8; mode 1 otherwise",
         "storage": "home_assistant_config_entry_data",
     }
 

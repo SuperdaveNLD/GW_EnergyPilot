@@ -111,8 +111,11 @@ P_grid near 0 W    -> mode 1
 ```text
 P_batt requests charge -> mode 11
 else P_grid requests export -> mode 10
+else P_batt near 0 W -> mode 8
 otherwise -> mode 1
 ```
+
+The export branch intentionally precedes the neutral-battery branch. A neutral `P_batt` plan therefore holds the battery unless EMHASS explicitly requests grid export; it no longer hands battery direction back to GoodWe Auto.
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
