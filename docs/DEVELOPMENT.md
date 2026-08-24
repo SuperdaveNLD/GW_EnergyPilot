@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.26 runtime structure
+## Current v0.27 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -62,22 +62,24 @@ All four layers are active runtime code. Check subclasses before changing a base
 Top level:
 
 ```text
-gw-energy-pilot-v026-complete.js
-    -> gw-energy-pilot-v026-battery-price.js
-        -> gw-energy-pilot-v026.js
-            -> gw-energy-pilot-v025.js
-                -> historical active layers
+gw-energy-pilot-v027.js
+    -> gw-energy-pilot-v026-complete.js
+        -> gw-energy-pilot-v026-battery-price.js
+            -> gw-energy-pilot-v026.js
+                -> gw-energy-pilot-v025.js
+                    -> historical active layers
 ```
 
 Current ownership:
 
-- `v026-complete` — final v0.26 badge + synchronized minimum-SOC presentation;
+- `v027` — corrected Hybrid 9/12 strategy explanation + final v0.27 badge;
+- `v026-complete` — synchronized minimum-SOC presentation;
 - `v026-battery-price` — Battery & Price graph, Recorder/price cache and visibility integration;
 - `v026` — Home Assistant language-aware Dutch/English localization;
 - `v025` — optimization LOG and prior dashboard behavior;
 - older assets remain active dependencies.
 
-**Do not add another release monkey-patch layer by default.** The layered frontend is technical debt and has caused small regressions. New presentation work should prefer functional components or deliberate consolidation under browser-level regression coverage.
+**Do not add another release monkey-patch layer by default.** The layered frontend is technical debt and has caused small regressions. v0.27 uses one bounded wrapper because the controller behavior changes while the complete v0.26 presentation must remain intact. New presentation work should prefer functional components or deliberate consolidation under browser-level regression coverage.
 
 ## Automatic-control contract
 
@@ -100,10 +102,13 @@ P_grid near 0 W    -> mode 1
 Hybrid strategy:
 
 ```text
-P_batt charge request -> mode 11
-else P_grid export request -> mode 10
-otherwise -> mode 1
+P_grid > +deadband -> mode 9  (buy/import through the PCC target)
+else P_batt > +deadband -> mode 12 (sell/discharge by battery-power target)
+else P_batt near 0 W -> mode 8
+otherwise -> mode 1 GoodWe Auto / self-use
 ```
+
+The Hybrid import branch intentionally uses `P_grid` magnitude because mode 9 owns the PCC/grid-import target. The Hybrid sell branch intentionally uses `P_batt` magnitude because mode 12 owns direct battery discharge. A charging plan without planned grid import falls through to mode 1 so GoodWe can absorb available local PV instead of forcing a forecast-sized battery charge.
 
 Legacy strategy fallback remains false/missing smart-meter flag -> Battery, true -> Grid.
 
