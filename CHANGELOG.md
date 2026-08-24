@@ -2,6 +2,24 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.28] - 2026-08-24
+
+### Fixed
+
+- Corrected **Hybrid control** to the intended asymmetric mapping: buying/import uses GoodWe mode `9` with the EMHASS `P_grid` import magnitude, while selling/discharging uses GoodWe mode `12` with the EMHASS `P_batt` discharge magnitude.
+- Hybrid no longer interprets buying as direct mode-11 battery charging or selling as mode-10 PCC export control.
+- A neutral Hybrid battery plan remains mode `8` Battery Hold.
+- A Hybrid battery-charge plan without planned grid import falls back to GoodWe mode `1` self-use so locally available PV can be absorbed without forcing the forecast-sized `P_batt` charge target.
+- Updated Hybrid strategy API/UI descriptions and regression coverage for mode-9 buying, mode-12 selling, neutral hold, PV-only self-use and import precedence.
+
+### Safety / compatibility
+
+- Battery control remains `P_batt -> 11/12/8`; Grid control remains `P_grid -> 9/10/1`.
+- EV anti-discharge remains a higher-priority directional override; manual EMS commands remain direct operator commands.
+- No GoodWe register definitions, Modbus read blocks or `client.py` write ordering change. EMS remains `47511/47512` with `47512 -> wait -> 47511`.
+- Existing entity IDs/unique IDs, stable device identity, EMHASS optimizer objective, accounting/runtime/log stores and all v0.27 Battery plan/actual/price behavior are unchanged.
+- v0.28 remains **Beta** while the corrected Hybrid control mapping receives real-installation field validation.
+
 ## [0.27] - 2026-08-24
 
 ### Added
@@ -310,7 +328,7 @@ All notable changes to GW EnergyPilot are documented here.
 - GoodWe connection validation before host, Modbus TCP port or unit-ID changes are saved.
 - Multi-entry selection for installations with more than one GW EnergyPilot config entry.
 - Enabled-by-default Home Assistant Diagnostic sensors for the Beta SOC candidates `45356`, `45358` and `47500`.
-- A device-registry migration from the legacy mutable `host:slave` identifier to the stable config-entry ID.
+- A device-registry migration from the legacy mutable host:slave identifier to the stable config-entry ID.
 - A stateful **EMHASS optimization strategy** select that reads the active `costfun` from EMHASS `/get-config`.
 
 ### Changed
