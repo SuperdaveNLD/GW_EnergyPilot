@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.28 · Beta**
+**v0.31 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -20,6 +20,7 @@ Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
 - `CHANGELOG.md` — detailed technical history;
+- `docs/DEBUG_LOG.md` — opt-in LOG-tab debug-session/support-report contract;
 - `docs/EMS_MODES.md` — GoodWe EMS modes 1–12;
 - `docs/ACCOUNTING.md` — persistent grid accounting;
 - `docs/RUNTIME_STATE.md` — persistent runtime evidence;
@@ -27,15 +28,15 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.28 highlights
+## v0.31 highlights
 
-- Corrected **Hybrid control**: buying/import uses GoodWe mode `9` from EMHASS `P_grid`; selling/discharging uses mode `12` from EMHASS `P_batt`.
-- Neutral Hybrid battery plans remain mode `8` Battery Hold.
-- Hybrid charging without planned grid import falls back to GoodWe mode `1` self-use so local PV surplus can be absorbed without forcing a forecast-sized battery charge.
-- Repaired the **S / M / L Battery · Plan · Price** graph after v0.27 field validation: current EMHASS `battery_scheduled_power`, midnight plan continuity, active forecast interval clipping, visible dashed plan overlays and stepwise market prices.
-- Missing plan data is shown as unavailable instead of `0.00 kWh`, and near-zero actual samples are no longer presented as false discharge bars.
-- Native GoodWe battery-day counters remain the headline daily totals; Recorder power integration is explicitly a separate comparison measurement path.
-- Compact Support diagnostics, synchronized on-grid minimum SOC, Grid/Battery strategies and persistent runtime/accounting contracts remain unchanged.
+- The existing **LOG** tab now has an administrator-only **Debug session** that is disabled by default and captures high-detail runtime evidence only when explicitly started.
+- A debug session correlates complete decoded GoodWe telemetry and poll health with controller strategy/target/read-back, configured `P_batt`/`P_grid`/optimizer/EV source changes and EMHASS/orchestrator state transitions.
+- **Copy debug report** combines the temporary debug session/current runtime snapshot with the existing persistent 50-run optimization history.
+- Debug events are memory-only, bounded to the newest 1200 events and retained after Stop until clear, integration reload or Home Assistant restart.
+- The configured GoodWe host/IP and EMHASS URL are intentionally excluded from the report; no arbitrary Home Assistant entity attributes are collected.
+- Debug logging is observer-only: it does not add Modbus polling, change registers, alter controller ownership, change EMHASS configuration or trigger an optimization.
+- Existing v0.30 release/update behavior and the complete v0.29/v0.28 control/dashboard stack remain intact.
 
 ## Tested hardware
 
@@ -56,6 +57,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - native EMHASS optimization/publishing;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
+- opt-in bounded LOG-tab debug sessions and copyable support reports;
 - persistent Today/Yesterday grid import/export accounting;
 - optional Nord Pool/runtime prices;
 - Battery plan / actual / price visualization;
@@ -222,7 +224,13 @@ gw_energypilot.accounting.<entry_id>
 gw_energypilot.optimization_log.<entry_id>
 ```
 
-They are not a second settings database.
+They are not a second settings database. The v0.31 debug session is intentionally **not** persistent and is not added to this list.
+
+## Debug logging
+
+Open dashboard settings → **LOG** and select **Start debug logging** only when reproducing a problem. Stop capture after reproduction, then use **Copy debug report** for support.
+
+The debug buffer is bounded and memory-only. It observes the current EnergyPilot runtime rather than polling or controlling hardware independently. See `docs/DEBUG_LOG.md` for captured fields, privacy boundaries and lifecycle details.
 
 ## Safety boundary
 
