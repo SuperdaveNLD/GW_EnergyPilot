@@ -3,61 +3,8 @@ import "./gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1";
 
 const VERSION = "0.34";
 const PANEL_NAME = "gw-energypilot-panel";
-const FLOW_DEADBAND_W = 50;
 const FLOW_COMPACT_BREAKPOINT_PX = 430;
 const FLOW_TIGHT_BREAKPOINT_PX = 340;
-
-function finitePower(panel, key) {
-  const value = panel._numberByKey?.(key);
-  return Number.isFinite(value) ? value : null;
-}
-
-function setSemanticFlow(link, direction) {
-  if (!link) return;
-  link.classList.remove("ep-v034-to-hub", "ep-v034-from-hub");
-  if (!direction || link.classList.contains("idle")) return;
-  link.classList.add(
-    direction === "to" ? "ep-v034-to-hub" : "ep-v034-from-hub"
-  );
-}
-
-function synchronizeFlowDirections(panel, root) {
-  const pv = finitePower(panel, "pv_total_power");
-  const grid = finitePower(panel, "meter_total_power_fast");
-  const battery = finitePower(panel, "battery_power");
-
-  const pvLink = root.querySelector(".ep-link-pv");
-  const gridLink = root.querySelector(".ep-link-grid");
-  const houseLink = root.querySelector(".ep-link-house");
-  const batteryLink = root.querySelector(".ep-link-battery");
-
-  // Physical flow semantics are authoritative. Geometry is handled by the
-  // animation-name selectors below; animation-direction always stays normal.
-  setSemanticFlow(
-    pvLink,
-    pv !== null && pv > FLOW_DEADBAND_W ? "to" : null
-  );
-  setSemanticFlow(
-    gridLink,
-    grid === null || Math.abs(grid) < FLOW_DEADBAND_W
-      ? null
-      : grid > 0
-        ? "from"
-        : "to"
-  );
-  setSemanticFlow(
-    houseLink,
-    houseLink?.classList.contains("idle") ? null : "from"
-  );
-  setSemanticFlow(
-    batteryLink,
-    battery === null || Math.abs(battery) < FLOW_DEADBAND_W
-      ? null
-      : battery > 0
-        ? "to"
-        : "from"
-  );
-}
 
 function ensureFlowStyles(root) {
   if (root.querySelector("#ep-v034-flow-style")) return;
@@ -65,42 +12,12 @@ function ensureFlowStyles(root) {
   const style = document.createElement("style");
   style.id = "ep-v034-flow-style";
   style.textContent = `
-    /* One direction mechanism only: semantic to/from-hub classes select a
-       geometry-correct keyframe. Reversing the animation again is forbidden. */
-    .ep-flow-link .ep-v011-particles span {
+    /* v0.22 still contains two-class !important reversal rules. Match that
+       specificity at the active layer so the geometry-specific v0.13
+       animation names remain the only direction mechanism. */
+    .ep-flow-link.ep-v022-to-hub .ep-v011-particles span,
+    .ep-flow-link.ep-v022-from-hub .ep-v011-particles span {
       animation-direction: normal !important;
-    }
-    .ep-link-pv.ep-v034-to-hub .ep-v011-particles span,
-    .ep-link-grid.ep-v034-from-hub .ep-v011-particles span {
-      animation-name: epV034FlowHForward !important;
-    }
-    .ep-link-pv.ep-v034-from-hub .ep-v011-particles span,
-    .ep-link-grid.ep-v034-to-hub .ep-v011-particles span {
-      animation-name: epV034FlowHReverse !important;
-    }
-    .ep-link-house.ep-v034-to-hub .ep-v011-particles span,
-    .ep-link-battery.ep-v034-from-hub .ep-v011-particles span {
-      animation-name: epV034FlowVForward !important;
-    }
-    .ep-link-house.ep-v034-from-hub .ep-v011-particles span,
-    .ep-link-battery.ep-v034-to-hub .ep-v011-particles span {
-      animation-name: epV034FlowVReverse !important;
-    }
-    @keyframes epV034FlowHForward {
-      from { translate: -9px 0; }
-      to { translate: var(--ep-track-distance, 80px) 0; }
-    }
-    @keyframes epV034FlowHReverse {
-      from { translate: var(--ep-track-distance, 80px) 0; }
-      to { translate: -9px 0; }
-    }
-    @keyframes epV034FlowVForward {
-      from { translate: 0 -9px; }
-      to { translate: 0 var(--ep-track-distance, 80px); }
-    }
-    @keyframes epV034FlowVReverse {
-      from { translate: 0 var(--ep-track-distance, 80px); }
-      to { translate: 0 -9px; }
     }
 
     /* Compact flow geometry is enabled only for an actual narrow HA panel.
@@ -260,14 +177,17 @@ function updateResponsiveFlowLayout(panel, flow) {
   }
 
   const stage = flow.querySelector(".ep-flow-stage");
-  const stageWidth = stage?.getBoundingClientRect().width || Math.max(1, width - 24);
+  const stageWidth =
+    stage?.getBoundingClientRect().width || Math.max(1, width - 24);
   const nodeWidth = clamp(stageWidth * 0.235, 70, 82);
   const hubSize = clamp(stageWidth * 0.16, 50, 56);
   const nodeHeight = tight
     ? clamp(stageWidth * 0.19, 58, 64)
     : clamp(stageWidth * 0.20, 64, 68);
-  const gap = clamp(stageWidth * 0.025, 6, 9);
-  const stageHeight = Math.ceil(2 * (nodeHeight + gap + hubSize / 2));
+  const verticalGap = clamp(stageWidth * 0.045, 14, 18);
+  const stageHeight = Math.ceil(
+    2 * (nodeHeight + verticalGap + hubSize / 2)
+  );
   const layout = [nodeWidth, nodeHeight, hubSize, stageHeight]
     .map((value) => value.toFixed(1))
     .join(":");
@@ -295,7 +215,10 @@ function installFlowResizeObserver(panel, root) {
     return;
   }
 
-  if (!panel.__epV034FlowResizeObserver && typeof globalThis.ResizeObserver === "function") {
+  if (
+    !panel.__epV034FlowResizeObserver &&
+    typeof globalThis.ResizeObserver === "function"
+  ) {
     panel.__epV034FlowResizeObserver = new globalThis.ResizeObserver((entries) => {
       const currentFlow = panel.__epV034ObservedFlow;
       if (!currentFlow) return;
@@ -329,7 +252,6 @@ if (!PanelClass.prototype.__epV034RenderInstalled) {
     if (!root) return;
 
     ensureFlowStyles(root);
-    synchronizeFlowDirections(this, root);
     installFlowResizeObserver(this, root);
 
     const versionBadge = root.querySelector(".version");
