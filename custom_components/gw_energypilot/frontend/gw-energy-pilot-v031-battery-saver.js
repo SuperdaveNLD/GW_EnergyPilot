@@ -7,7 +7,7 @@ const TEXT = {
     title: "Battery Saver",
     description: "Choose how strongly EnergyPilot values battery preservation inside EMHASS optimization. These are soft economic preferences; the Minimum SOC and Maximum SOC sliders remain the hard operating limits.",
     unmanaged: "Existing EMHASS behavior is not managed by EnergyPilot yet.",
-    legacyMadSteve: "The current zero-penalty EMHASS behavior matches Mad-Steve. Select a mode to let EnergyPilot own these settings.",
+    legacyMadSteve: "Legacy zero-cost EMHASS behavior is more aggressive than current Mad-Steve. Select a mode to add the shared anti-churn trading cost.",
     custom: "Custom EMHASS battery penalties are active. They are preserved until you explicitly select an EnergyPilot mode.",
     applying: "Applying mode and rebuilding the plan…",
     applied: "Battery Saver mode applied and a new EMHASS plan was published.",
@@ -24,7 +24,7 @@ const TEXT = {
     title: "Battery Saver",
     description: "Kies hoe zwaar EnergyPilot batterijbehoud meeweegt in de EMHASS-optimalisatie. Dit zijn zachte economische voorkeuren; de sliders Minimum SOC en Maximum SOC blijven de harde bedrijfsgrenzen.",
     unmanaged: "Het bestaande EMHASS-gedrag wordt nog niet door EnergyPilot beheerd.",
-    legacyMadSteve: "Het huidige EMHASS-gedrag met nul penalties komt overeen met Mad-Steve. Kies een modus om EnergyPilot deze instellingen te laten beheren.",
+    legacyMadSteve: "Het oude EMHASS-gedrag zonder kosten is agressiever dan de huidige Mad-Steve. Kies een modus om de gedeelde anti-churn handelskosten toe te passen.",
     custom: "Er zijn custom EMHASS-batterijpenalties actief. Die blijven behouden totdat je expliciet een EnergyPilot-modus kiest.",
     applying: "Modus toepassen en nieuw plan maken…",
     applied: "Battery Saver-modus toegepast en een nieuw EMHASS-plan gepubliceerd.",
@@ -139,6 +139,11 @@ function pct(value) {
   return Number.isFinite(Number(value)) ? `${Number(value).toFixed(0)}%` : "—";
 }
 
+function firstWeight(value) {
+  if (Array.isArray(value)) return value.length ? value[0] : null;
+  return value ?? null;
+}
+
 function renderBatterySaver(panel, root) {
   if (!panel.__epV016SettingsOpen || panel.__epV016SettingsTab !== "emhass") return;
   const content = root.querySelector(".ep-v016-settings-content");
@@ -178,7 +183,7 @@ function renderBatterySaver(panel, root) {
 
   const profile = data?.effective_profile;
   const profileText = profile
-    ? `${t.effective}: deficit ${profile.battery_soc_deficit_cost} · surplus ${profile.battery_soc_surplus_cost} · stress ${profile.battery_stress_cost} · ${t.priceRef} ${profile.price_reference}`
+    ? `${t.effective}: cycle charge ${firstWeight(profile.weight_battery_charge)} · cycle discharge ${firstWeight(profile.weight_battery_discharge)} · deficit ${profile.battery_soc_deficit_cost} · surplus ${profile.battery_soc_surplus_cost} · stress ${profile.battery_stress_cost} · ${t.priceRef} ${profile.price_reference}`
     : "";
 
   wrap.innerHTML = `
