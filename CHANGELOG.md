@@ -2,6 +2,39 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.36] - 2026-08-25
+
+### Added
+
+- Added a customer-facing **Battery strategy** selector to the Controller card with **Mad-Steve**, **Gold Rush**, **Balanced**, **Battery Saver** and **Custom** choices.
+- Added an explicit **Custom** transition that releases EnergyPilot Battery Saver preset ownership while preserving the currently effective EMHASS battery values.
+- Custom mode reuses the existing Home Assistant minimum/maximum SOC NumberEntities and shows the active low-SOC, high-SOC, power-stress and charge/discharge EMHASS battery costs read-only for transparency.
+- Added regression coverage for strategy/Custom API ownership, immediate optimization, rollback, consolidated release wiring, live-flow responsiveness and render-storm protection.
+
+### Fixed
+
+- Fixed installation-dependent dashboard render storms by keeping every Home Assistant snapshot available while rebuilding the dashboard only for relevant EnergyPilot/EMHASS or locale/user/theme changes. Relevant bursts are batched for 80 ms.
+- Fixed controls losing clicks during a concurrent relevant state update by deferring destructive Shadow DOM replacement only while an actual pointer/keyboard press is active.
+- Fixed remaining live-flow double reversal by matching the specificity of the legacy two-class `animation-direction: reverse !important` selectors and leaving the established geometry-specific keyframes as the single direction mechanism.
+- Fixed live-flow sizing on narrow Home Assistant panels by deriving node, hub, connector, stage and particle travel geometry from the measured card width. Compact/tight layouts track resize and phone rotation through `ResizeObserver` while wide desktop geometry remains unchanged.
+
+### Changed
+
+- The low-level controller command such as `hybrid_battery_discharge` is removed from the normal customer Controller presentation and remains available through Diagnostics/support output.
+- Selecting any managed Battery Saver profile or Custom runs the existing complete EnergyPilot optimization/publish transaction. The existing `plan_revision` contract then invalidates the Battery · Plan · Price cache so the graph follows the fresh plan after every successful optimization.
+- The active frontend release is `gw-energy-pilot-v036-customer-controller.js`, layered over the consolidated render guard and mobile live-flow fixes.
+- The integration manifest version is `0.36` and the v0.36 frontend import chain uses release-specific cache keys.
+
+### Safety / compatibility
+
+- No new or guessed GoodWe register definitions or Modbus read blocks.
+- EMS remains on `47511/47512` with the established `47512 -> wait -> 47511` write order.
+- No Automatic Control EMS-mode mapping changes are introduced by the customer strategy UI or dashboard reliability work.
+- No entity ID, unique ID or stable Home Assistant device identity changes.
+- Existing SOC NumberEntities are reused; no duplicate sensors, settings or control paths are introduced.
+- EMHASS remains the canonical optimizer and plan owner; Custom preserves current EMHASS values rather than silently resetting them.
+- v0.36 remains **Beta** while the consolidated customer strategy UI and high-update/mobile frontend behavior receive broader field validation.
+
 ## [0.35] - 2026-08-25
 
 ### Fixed
@@ -74,7 +107,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Changed
 
-- Battery Saver ownership expands from six to eight EMHASS fields by adding `weight_battery_charge` and `weight_battery_discharge`. Existing unmanaged/custom EMHASS values remain untouched until a user explicitly selects an EnergyPilot profile, and failed first-apply transactions roll back all eight owned fields.
+- Battery Saver ownership expands from six to eight EMHASS fields by adding `weight_battery_charge` and `weight_battery_discharge`. Existing unmanaged/custom EMHASS values remain untouched until a user explicitly selects a profile, and failed first-apply transactions roll back all eight owned fields.
 - Legacy all-zero EMHASS battery costs/weights are now identified as unrestricted legacy behavior rather than being described as behaviorally identical to current Mad-Steve.
 - The battery chart payload uses schema `4` and prefers the validated persistent EMHASS plan horizon, with the existing Home Assistant schedule attributes retained as compatibility fallback.
 - The active runtime uses `controller_v033.py` and `orchestrator_v033.py` on top of the existing controller/orchestrator contracts, and the active frontend wrapper is `gw-energy-pilot-v033.js`.
