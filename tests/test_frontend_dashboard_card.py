@@ -38,7 +38,83 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
 
-    def test_v036_loads_customer_controller_release(self) -> None:
+    def test_v034_flow_direction_neutralizes_legacy_reversal_specificity(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            ".ep-flow-link.ep-v022-to-hub .ep-v011-particles span,",
+            source,
+        )
+        self.assertIn(
+            ".ep-flow-link.ep-v022-from-hub .ep-v011-particles span",
+            source,
+        )
+        self.assertIn("animation-direction: normal !important", source)
+        self.assertIn("geometry-specific v0.13", source)
+        self.assertNotIn("function synchronizeFlowDirections", source)
+        self.assertNotIn("@keyframes epV034Flow", source)
+
+    def test_v034_flow_layout_tracks_narrow_card_resize(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("const FLOW_COMPACT_BREAKPOINT_PX = 430", source)
+        self.assertIn("const FLOW_TIGHT_BREAKPOINT_PX = 340", source)
+        self.assertIn("function updateResponsiveFlowLayout", source)
+        self.assertIn("typeof globalThis.ResizeObserver", source)
+        self.assertIn('flow.classList.toggle("ep-v034-flow-compact", compact)', source)
+        self.assertIn("--ep-v034-node-width", source)
+        self.assertIn("--ep-v034-stage-height", source)
+        self.assertIn("height: auto !important", source)
+        self.assertIn("updateParticleGeometry(flow)", source)
+
+    def test_v035_filters_unrelated_hass_updates_before_rendering(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
+
+        self.assertIn("function installHassRenderGuard", source)
+        self.assertIn("function relevantHassStateChanged", source)
+        self.assertIn("function relevantEntityIds", source)
+        self.assertIn("Object.values(panel._entityMap || {})", source)
+        self.assertIn('"p_batt_entity", "p_grid_entity", "optim_status_entity"', source)
+        self.assertIn("previousState !== nextState", source)
+        self.assertIn("this._hass = value", source)
+        self.assertIn("scheduleHassRender(this)", source)
+        self.assertIn("const HASS_RENDER_BATCH_MS = 80", source)
+
+        setter_start = source.index("function installHassRenderGuard")
+        render_start = source.index("if (!PanelClass.prototype.__epV035RenderInstalled)")
+        setter = source[setter_start:render_start]
+        self.assertNotIn("descriptor.set.call(this, value);\n      }", setter)
+        self.assertLess(
+            setter.index("this._hass = value"),
+            setter.index("relevantHassStateChanged(this, previousHass, value)"),
+        )
+
+    def test_v035_defers_destructive_render_only_during_active_press(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
+
+        self.assertIn("function installInteractionGuard", source)
+        self.assertIn('root.addEventListener(\n    "pointerdown"', source)
+        self.assertIn('root.addEventListener(\n    "pointerup"', source)
+        self.assertIn("window.setTimeout(() => finishPointerInteraction(panel), 0)", source)
+        self.assertNotIn('"pointerover"', source)
+        self.assertNotIn("__epV035HoverActive", source)
+        self.assertIn("function interactionActive", source)
+        self.assertIn("this.__epV035RenderDeferred = true", source)
+        self.assertIn("flushDeferredRender(panel)", source)
+        self.assertLess(
+            source.index("if (interactionActive(this))"),
+            source.index("previousRender.call(this)"),
+        )
+        self.assertLess(
+            source.index("previousRender.call(this)"),
+            source.index("installInteractionGuard(this, root)"),
+        )
+
+    def test_v036_loads_consolidated_customer_controller_release(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
         )
@@ -49,6 +125,7 @@ class FrontendDashboardCardTests(unittest.TestCase):
             FRONTEND / "gw-energy-pilot-v036-customer-controller.js"
         ).read_text(encoding="utf-8")
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        manifest = (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
 
         self.assertIn(
             'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
@@ -58,11 +135,12 @@ class FrontendDashboardCardTests(unittest.TestCase):
             'gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1',
             release_v034,
         )
-        self.assertIn('gw-energy-pilot-v034.js?v=0.35-release1', release_v035)
-        self.assertIn('gw-energy-pilot-v035.js?v=0.36-controller2', release_v036)
+        self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)
+        self.assertIn('gw-energy-pilot-v035.js?v=0.36-renderguard1', release_v036)
         self.assertIn('const VERSION = "0.36"', release_v036)
+        self.assertIn('"version": "0.36"', manifest)
         self.assertIn(
-            'gw-energy-pilot-v036-customer-controller.js?v=0.36-controller2',
+            'gw-energy-pilot-v036-customer-controller.js?v=0.36-release1',
             integration,
         )
 
@@ -79,6 +157,23 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn('callService("number", "set_value"', source)
         self.assertIn('if (label === "command" || label === "commando")', source)
         self.assertIn("current_emhass_values", source)
+
+    def test_customer_strategy_exposes_profiles_and_diagnostic_boundary(self) -> None:
+        source = (
+            FRONTEND / "gw-energy-pilot-v036-customer-controller.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("const CUSTOM_MODE = \"custom\"", source)
+        self.assertIn("data?.modes || []", source)
+        self.assertIn("data-v036-mode", source)
+        self.assertIn("current_emhass_values", source)
+        self.assertIn("battery_soc_deficit_cost", source)
+        self.assertIn("battery_soc_surplus_cost", source)
+        self.assertIn("battery_stress_cost", source)
+        self.assertIn("weight_battery_charge", source)
+        self.assertIn("weight_battery_discharge", source)
+        self.assertIn("Low-level controller command is available in Diagnostics.", source)
+        self.assertIn("Het technische controllercommando staat in Diagnostiek.", source)
 
     def test_release_layer_reconciles_existing_duplicate_cards(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v030.js").read_text(encoding="utf-8")
