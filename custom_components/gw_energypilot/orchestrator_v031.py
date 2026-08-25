@@ -25,6 +25,7 @@ from .const import (
     DEFAULT_P_BATT_ENTITY,
 )
 from .emhass_config import async_get_emhass_config, async_write_emhass_config
+from .emhass_sync import apply_emhass_runtime_contract
 from .orchestrator import OUTPUT_TIMEOUT
 from .orchestrator_v026 import GWEnergyPilotOrchestrator as _V026Orchestrator
 
@@ -122,14 +123,10 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
         restart.
         """
         current = await async_get_emhass_config(self.hass, self.entry)
-        updated = dict(current)
-
-        # Core EnergyPilot/EMHASS contract. PV and inverter topology deliberately
-        # remain user-owned EMHASS capabilities; battery-only installations and
-        # non-hybrid inverter models are valid.
-        updated["continual_publish"] = True
-        updated["method_ts_round"] = "first"
-        updated["set_use_battery"] = True
+        # Use the same canonical runtime contract as the explicit config-sync
+        # action. Installation/model topology (including inverter_is_hybrid and
+        # set_use_pv) is copied unchanged from EMHASS.
+        updated = apply_emhass_runtime_contract(current)
 
         battery_count = number_of_batteries(current)
         configured_mode = self.entry.options.get(CONF_BATTERY_SAVER_MODE)
