@@ -4,6 +4,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "custom_components" / "gw_energypilot" / "frontend"
+INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 
 
 class FrontendDashboardCardTests(unittest.TestCase):
@@ -29,10 +30,26 @@ class FrontendDashboardCardTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("function activePlanChanged", source)
+        self.assertIn("function currentOptimizationPlanRevision", source)
+        self.assertIn('_entityId?.("optimize_now")', source)
+        self.assertIn("attributes?.plan_revision", source)
+        self.assertIn("data?.payload?.plan_revision", source)
         self.assertIn("state.last_updated !== plan.last_updated", source)
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
+
+    def test_v033_directly_cache_busts_chart_core(self) -> None:
+        release = (FRONTEND / "gw-energy-pilot-v033.js").read_text(encoding="utf-8")
+        integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'gw-energy-pilot-v027-battery-plan-core.js?v=0.33-planrefresh1',
+            release,
+        )
+        self.assertIn(
+            'gw-energy-pilot-v033.js?v=0.33-planrefresh1',
+            integration,
+        )
 
     def test_release_layer_reconciles_existing_duplicate_cards(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v030.js").read_text(encoding="utf-8")
