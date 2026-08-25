@@ -38,16 +38,21 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
 
-    def test_v033_directly_cache_busts_chart_core(self) -> None:
-        release = (FRONTEND / "gw-energy-pilot-v033.js").read_text(encoding="utf-8")
+    def test_v034_cache_busts_modified_frontend_modules(self) -> None:
+        release = (FRONTEND / "gw-energy-pilot-v034.js").read_text(encoding="utf-8")
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
         self.assertIn(
-            'gw-energy-pilot-v027-battery-plan-core.js?v=0.33-planrefresh1',
+            'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
             release,
         )
         self.assertIn(
-            'gw-energy-pilot-v033.js?v=0.33-planrefresh1',
+            'gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1',
+            release,
+        )
+        self.assertIn('const VERSION = "0.34"', release)
+        self.assertIn(
+            'gw-energy-pilot-v034.js?v=0.34-release1',
             integration,
         )
 
