@@ -38,17 +38,18 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
 
-    def test_v035_wraps_v034_cache_busted_frontend_modules(self) -> None:
+    def test_v036_loads_customer_controller_release(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
         )
         release_v035 = (FRONTEND / "gw-energy-pilot-v035.js").read_text(
             encoding="utf-8"
         )
+        release_v036 = (
+            FRONTEND / "gw-energy-pilot-v036-customer-controller.js"
+        ).read_text(encoding="utf-8")
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
-        # v0.34 still owns the behavioral cache-busting for the two modified
-        # nested modules. v0.35 deliberately remains a version-only wrapper.
         self.assertIn(
             'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
             release_v034,
@@ -57,17 +58,27 @@ class FrontendDashboardCardTests(unittest.TestCase):
             'gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1',
             release_v034,
         )
-        self.assertIn('const VERSION = "0.34"', release_v034)
-
+        self.assertIn('gw-energy-pilot-v034.js?v=0.35-release1', release_v035)
+        self.assertIn('gw-energy-pilot-v035.js?v=0.36-controller2', release_v036)
+        self.assertIn('const VERSION = "0.36"', release_v036)
         self.assertIn(
-            'gw-energy-pilot-v034.js?v=0.35-release1',
-            release_v035,
-        )
-        self.assertIn('const VERSION = "0.35"', release_v035)
-        self.assertIn(
-            'gw-energy-pilot-v035.js?v=0.35-release1',
+            'gw-energy-pilot-v036-customer-controller.js?v=0.36-controller2',
             integration,
         )
+
+    def test_customer_controller_reuses_existing_policy_and_soc_paths(self) -> None:
+        source = (
+            FRONTEND / "gw-energy-pilot-v036-customer-controller.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('type: "gw_energypilot/battery_saver/get"', source)
+        self.assertIn('type: "gw_energypilot/battery_saver/set"', source)
+        self.assertIn('const CUSTOM_MODE = "custom"', source)
+        self.assertIn('numberModel(panel, "emhass_minimum_soc"', source)
+        self.assertIn('numberModel(panel, "emhass_maximum_soc"', source)
+        self.assertIn('callService("number", "set_value"', source)
+        self.assertIn('if (label === "command" || label === "commando")', source)
+        self.assertIn("current_emhass_values", source)
 
     def test_release_layer_reconciles_existing_duplicate_cards(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v030.js").read_text(encoding="utf-8")
