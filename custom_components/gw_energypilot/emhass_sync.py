@@ -7,6 +7,15 @@ from typing import Any, Mapping
 
 DEFAULT_PV_FORECAST_ENTITY = "sensor.p_pv_forecast"
 
+# Keep the runtime contract in one canonical definition. These values are
+# required for EnergyPilot orchestration, unlike installation/model topology
+# settings such as set_use_pv and inverter_is_hybrid which remain EMHASS-owned.
+REQUIRED_RUNTIME_CONFIG: dict[str, Any] = {
+    "continual_publish": True,
+    "method_ts_round": "first",
+    "set_use_battery": True,
+}
+
 SYNCED_CONFIG_KEYS: tuple[str, ...] = (
     "sensor_power_photovoltaics",
     "sensor_power_load_no_var_loads",
@@ -16,10 +25,15 @@ SYNCED_CONFIG_KEYS: tuple[str, ...] = (
     "sensor_replace_zero",
     "sensor_linear_interp",
     "var_model",
-    "continual_publish",
-    "method_ts_round",
-    "set_use_battery",
+    *REQUIRED_RUNTIME_CONFIG,
 )
+
+
+def apply_emhass_runtime_contract(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a copied config with only the EnergyPilot runtime contract applied."""
+    updated = deepcopy(dict(config))
+    updated.update(REQUIRED_RUNTIME_CONFIG)
+    return updated
 
 
 def _required_entity(entity_ids: Mapping[str, str], key: str) -> str:
@@ -92,7 +106,7 @@ def build_emhass_sync_config(
     use_pv = bool(config.get("set_use_pv", False))
     pv_entity = _required_entity(entity_ids, "pv") if use_pv else None
 
-    synced = deepcopy(dict(config))
+    synced = apply_emhass_runtime_contract(config)
     warnings: list[str] = []
     old_pv = _string_value(config.get("sensor_power_photovoltaics"))
     old_load = _string_value(config.get("sensor_power_load_no_var_loads"))
@@ -162,12 +176,6 @@ def build_emhass_sync_config(
             "Custom EMHASS var_model was preserved instead of being replaced."
         )
 
-    # Required EnergyPilot runtime contract. EMHASS owns publication of the
-    # active row at each optimization timestep; EnergyPilot owns full re-solves.
-    # Hardware/model topology settings remain user-owned in EMHASS.
-    synced["continual_publish"] = True
-    synced["method_ts_round"] = "first"
-    synced["set_use_battery"] = True
     return synced, warnings
 
 
