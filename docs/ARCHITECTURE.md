@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.34 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.35 Beta**.
 
 ## High-level flow
 
@@ -216,7 +216,7 @@ A refresh failure never deletes a still-valid cached plan. Once `valid_until` is
 
 See `docs/EMHASS_PLAN_RUNTIME.md` for the detailed lifecycle and validation contract.
 
-## EMHASS orchestration and output freshness
+## EMHASS orchestration, runtime contract and output freshness
 
 The active orchestrator chain is:
 
@@ -233,12 +233,33 @@ Responsibilities are layered deliberately:
 
 - base/v012/v013: existing optimization, publication and runtime-evidence behavior;
 - v026: canonical timestamped price-series support for dashboard/optimizer use;
-- v031: Battery Saver policy ownership, GoodWe minimum-SOC synchronization before owned solves and runtime final-SOC clamping;
+- v031: Battery Saver policy ownership, canonical EMHASS runtime-contract application, GoodWe minimum-SOC synchronization before owned solves and runtime final-SOC clamping;
 - v033: refresh the persistent canonical plan after a successful optimize/publish cycle and increment `plan_revision` in a `finally` block after the refresh attempt.
+
+The EnergyPilot-required runtime contract is defined once in `emhass_sync.py` and reused by both explicit **Synchronize required config** and automatic pre-solve preparation:
+
+```text
+continual_publish = true
+method_ts_round = first
+set_use_battery = true
+```
+
+This contract deliberately does **not** contain installation/model topology. The following remain EMHASS/operator-owned and are preserved exactly:
+
+```text
+set_use_pv
+inverter_is_hybrid
+```
+
+`inverter_is_hybrid` must not be inferred from the physical GoodWe hardware type. EMHASS uses it to choose optimizer topology/constraints, and the operator can intentionally model an installation differently, including external or AC-coupled generation. v0.35 therefore preserves explicit `false`, explicit `true` and an absent key through both configuration-write paths.
+
+The Settings → EMHASS synchronization API derives its managed-value list from the same `SYNCED_CONFIG_KEYS` definition, so UI ownership cannot drift away from the backend contract.
 
 `plan_revision` is deterministic freshness evidence for UI consumers. It does not replace EMHASS plan content or become a second optimizer version.
 
 Fresh-output validation in v031 uses Home Assistant `State.last_reported` as proof of a new `P_batt` report. `last_updated` remains a compatibility fallback for older State-like test doubles. A repeated numeric `P_batt` is therefore valid when EMHASS actually reported it again. The existing finite-number and optimizer-ready gates remain mandatory.
+
+See `docs/EMHASS_CONFIG_SYNC.md` for the synchronization ownership contract.
 
 ## Battery Saver policy
 
@@ -298,7 +319,7 @@ See `docs/BATTERY_SAVER.md`.
 
 `P_batt < 15 kW` does not automatically mean available power was ignored.
 
-Current EMHASS hybrid modeling puts PV and battery on the same DC/AC path. Therefore:
+When the **EMHASS configuration itself** has `inverter_is_hybrid = true`, current EMHASS hybrid modeling puts PV and battery on the same DC/AC path. Therefore:
 
 ```text
 PV + battery discharge -> shared hybrid inverter AC output limit
@@ -306,7 +327,9 @@ PV + battery discharge -> shared hybrid inverter AC output limit
 
 During evening discharge, the inverter can already be at 15 kW AC while battery discharge is only about 14–14.8 kW because PV supplies the remaining DC power. When neither physical limit binds, EMHASS may also reserve energy for later higher-price timesteps or reduce instantaneous power because of `battery_stress_cost`.
 
-Diagnostics and plan reviews must compare `P_batt`, `P_PV`, `P_hybrid_inverter`, SOC and neighboring prices before concluding that a power limit is wrong.
+This interpretation applies only when the operator has selected the hybrid EMHASS topology. EnergyPilot no longer forces that topology in v0.35.
+
+Diagnostics and plan reviews must compare the active EMHASS topology, `P_batt`, `P_PV`, `P_hybrid_inverter`, SOC and neighboring prices before concluding that a power limit is wrong.
 
 ## Prices and Battery · Plan · Price chart
 
@@ -334,16 +357,17 @@ The frontend keeps one canonical Battery · Plan · Price card. A mismatch betwe
 Active top-level module:
 
 ```text
-gw-energy-pilot-v034.js
-    -> gw-energy-pilot-v031-battery-saver.js
-        -> gw-energy-pilot-v031-window-controls.js
-            -> gw-energy-pilot-v031.js
-                -> gw-energy-pilot-v030.js
-                    -> existing v0.29/v0.28/v0.27/... chain
-    -> gw-energy-pilot-v027-battery-plan-core.js (fresh v0.34 cache key)
+gw-energy-pilot-v035.js
+    -> gw-energy-pilot-v034.js
+        -> gw-energy-pilot-v031-battery-saver.js
+            -> gw-energy-pilot-v031-window-controls.js
+                -> gw-energy-pilot-v031.js
+                    -> gw-energy-pilot-v030.js
+                        -> existing v0.29/v0.28/v0.27/... chain
+        -> gw-energy-pilot-v027-battery-plan-core.js (v0.34 behavior retained)
 ```
 
-The v0.34 top wrapper owns release version presentation and cache-busts both modified nested modules. Battery Saver behavior remains in the v031 Battery Saver layer with v0.34 profile metadata supplied by the backend. Revision-aware chart refresh remains in the Battery Plan core.
+The v0.35 wrapper is release/version presentation only. It carries forward the v0.34 Battery Saver and revision-aware Battery Plan frontend behavior without adding another behavioral monkey patch.
 
 This layering remains technical debt: future releases should avoid adding behavioral monkey-patch layers where a bounded backend/module change is sufficient. A frontend consolidation must preserve behavior under browser/regression tests before historical assets are removed.
 
@@ -437,7 +461,8 @@ Entity unique IDs remain config-entry based. Host/unit-ID changes must not creat
 ```text
 register/transport problem -> registers.py / client.py / coordinator.py
 controller decision        -> controller.py + bounded controller_v033 availability/EV layer
-EMHASS optimization        -> orchestrator*.py / emhass_config.py
+EMHASS config ownership    -> emhass_sync.py / emhass_sync_api.py / emhass_config.py
+EMHASS optimization        -> orchestrator*.py
 persistent plan resilience -> plan_runtime.py / battery_plan.py
 Battery Saver policy       -> battery_saver.py / battery_saver_api.py / orchestrator_v031.py
 battery/price chart data   -> orchestrator_v026.py / price_series.py / battery_price_api.py
@@ -447,4 +472,4 @@ runtime/log persistence    -> runtime_store.py / optimization_log.py
 presentation               -> active frontend chain
 ```
 
-Do not fix a presentation problem by changing Modbus semantics unless the underlying data is proven wrong. Do not fix a temporary Home Assistant publication gap by creating duplicate optimizer or hardware-control ownership.
+Do not fix a presentation problem by changing Modbus semantics unless the underlying data is proven wrong. Do not fix a temporary Home Assistant publication gap by creating duplicate optimizer or hardware-control ownership. Do not infer EMHASS inverter topology from the physical GoodWe model; preserve the operator's EMHASS topology unless a future explicit configuration control is introduced.
