@@ -208,7 +208,10 @@ def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
                 selector.NumberSelectorConfig(
                     min=-1,
                     max=2,
-                    step=0.0001,
+                    # Home Assistant validates NumberSelector step >= 0.001.
+                    # BOX input itself is not rounded to the step, so values such
+                    # as 0.0248 remain valid and are preserved exactly.
+                    step=0.001,
                     mode=selector.NumberSelectorMode.BOX,
                     unit_of_measurement="EUR/kWh",
                 )
@@ -220,7 +223,7 @@ def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
                 selector.NumberSelectorConfig(
                     min=-1,
                     max=2,
-                    step=0.0001,
+                    step=0.001,
                     mode=selector.NumberSelectorMode.BOX,
                     unit_of_measurement="EUR/kWh",
                 )
