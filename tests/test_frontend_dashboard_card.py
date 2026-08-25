@@ -48,7 +48,7 @@ class FrontendDashboardCardTests(unittest.TestCase):
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
         # v0.34 still owns the behavioral cache-busting for the two modified
-        # nested modules. v0.35 deliberately remains a version-only wrapper.
+        # nested modules. v0.35 adds the interaction-safe outer render layer.
         self.assertIn(
             'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
             release_v034,
@@ -65,8 +65,28 @@ class FrontendDashboardCardTests(unittest.TestCase):
         )
         self.assertIn('const VERSION = "0.35"', release_v035)
         self.assertIn(
-            'gw-energy-pilot-v035.js?v=0.35-release1',
+            'gw-energy-pilot-v035.js?v=0.35-interaction1',
             integration,
+        )
+
+    def test_v035_defers_destructive_render_during_control_interaction(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
+
+        self.assertIn("function installInteractionGuard", source)
+        self.assertIn('root.addEventListener(\n    "pointerover"', source)
+        self.assertIn('root.addEventListener(\n    "pointerdown"', source)
+        self.assertIn('root.addEventListener("pointerup", finishPointer, true)', source)
+        self.assertIn("function interactionActive", source)
+        self.assertIn("this.__epV035RenderDeferred = true", source)
+        self.assertIn("flushDeferredRender(panel)", source)
+        self.assertIn("panel._queueRender()", source)
+        self.assertLess(
+            source.index("if (interactionActive(this))"),
+            source.index("previousRender.call(this)"),
+        )
+        self.assertLess(
+            source.index("previousRender.call(this)"),
+            source.index("installInteractionGuard(this, root)"),
         )
 
     def test_release_layer_reconciles_existing_duplicate_cards(self) -> None:
