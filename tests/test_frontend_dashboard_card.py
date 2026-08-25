@@ -47,8 +47,8 @@ class FrontendDashboardCardTests(unittest.TestCase):
         )
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
-        # v0.34 still owns the behavioral cache-busting for the two modified
-        # nested modules. v0.35 adds the interaction-safe outer render layer.
+        # v0.34 still owns behavioral cache-busting for its modified nested
+        # modules. v0.35 adds the outer render-storm and interaction guard.
         self.assertIn(
             'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
             release_v034,
@@ -65,21 +65,44 @@ class FrontendDashboardCardTests(unittest.TestCase):
         )
         self.assertIn('const VERSION = "0.35"', release_v035)
         self.assertIn(
-            'gw-energy-pilot-v035.js?v=0.35-interaction1',
+            'gw-energy-pilot-v035.js?v=0.35-renderstorm1',
             integration,
         )
 
-    def test_v035_defers_destructive_render_during_control_interaction(self) -> None:
+    def test_v035_filters_unrelated_hass_updates_before_rendering(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
+
+        self.assertIn("function installHassRenderGuard", source)
+        self.assertIn("function relevantHassStateChanged", source)
+        self.assertIn("function relevantEntityIds", source)
+        self.assertIn("Object.values(panel._entityMap || {})", source)
+        self.assertIn('"p_batt_entity", "p_grid_entity", "optim_status_entity"', source)
+        self.assertIn("previousState !== nextState", source)
+        self.assertIn("this._hass = value", source)
+        self.assertIn("scheduleHassRender(this)", source)
+        self.assertIn("const HASS_RENDER_BATCH_MS = 80", source)
+
+        setter_start = source.index("function installHassRenderGuard")
+        render_start = source.index("if (!PanelClass.prototype.__epV035RenderInstalled)")
+        setter = source[setter_start:render_start]
+        self.assertNotIn("descriptor.set.call(this, value);\n      }", setter)
+        self.assertLess(
+            setter.index("this._hass = value"),
+            setter.index("relevantHassStateChanged(this, previousHass, value)"),
+        )
+
+    def test_v035_defers_destructive_render_only_during_active_press(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
 
         self.assertIn("function installInteractionGuard", source)
-        self.assertIn('root.addEventListener(\n    "pointerover"', source)
         self.assertIn('root.addEventListener(\n    "pointerdown"', source)
-        self.assertIn('root.addEventListener("pointerup", finishPointer, true)', source)
+        self.assertIn('root.addEventListener(\n    "pointerup"', source)
+        self.assertIn("window.setTimeout(() => finishPointerInteraction(panel), 0)", source)
+        self.assertNotIn('"pointerover"', source)
+        self.assertNotIn("__epV035HoverActive", source)
         self.assertIn("function interactionActive", source)
         self.assertIn("this.__epV035RenderDeferred = true", source)
         self.assertIn("flushDeferredRender(panel)", source)
-        self.assertIn("panel._queueRender()", source)
         self.assertLess(
             source.index("if (interactionActive(this))"),
             source.index("previousRender.call(this)"),
