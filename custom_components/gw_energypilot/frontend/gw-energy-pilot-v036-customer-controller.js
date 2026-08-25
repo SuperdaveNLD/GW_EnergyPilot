@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v035.js?v=0.36-controller2";
+import "./gw-energy-pilot-v035.js?v=0.36-renderguard1";
 
 const VERSION = "0.36";
 const PANEL_NAME = "gw-energypilot-panel";
