@@ -19,7 +19,6 @@ SYNCED_CONFIG_KEYS: tuple[str, ...] = (
     "continual_publish",
     "method_ts_round",
     "set_use_battery",
-    "inverter_is_hybrid",
 )
 
 
@@ -84,6 +83,8 @@ def build_emhass_sync_config(
 
     PV is intentionally conditional. A battery-only EMHASS installation is valid,
     so EnergyPilot preserves ``set_use_pv`` and PV mappings when PV is disabled.
+    Inverter topology remains entirely EMHASS-owned; EnergyPilot never changes
+    ``inverter_is_hybrid``.
     """
     load_entity = _required_entity(entity_ids, "load")
     battery_entity = _required_entity(entity_ids, "battery")
@@ -163,10 +164,10 @@ def build_emhass_sync_config(
 
     # Required EnergyPilot runtime contract. EMHASS owns publication of the
     # active row at each optimization timestep; EnergyPilot owns full re-solves.
+    # Hardware/model topology settings remain user-owned in EMHASS.
     synced["continual_publish"] = True
     synced["method_ts_round"] = "first"
     synced["set_use_battery"] = True
-    synced["inverter_is_hybrid"] = True
     return synced, warnings
 
 
