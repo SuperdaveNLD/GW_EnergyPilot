@@ -24,6 +24,8 @@ class BatterySaverTests(unittest.TestCase):
             ["mad_steve", "gold_rush", "balanced", "battery_saver"],
         )
         self.assertEqual(payloads[0]["label"], "Mad-Steve")
+        self.assertEqual(payloads[1]["surplus_threshold_pct"], 96)
+        self.assertEqual(payloads[0]["anti_churn_cost_factor_pct"], 1.5)
         self.assertTrue(payloads[2]["recommended"])
 
     def test_profiles_scale_virtual_costs_with_price_reference(self):
@@ -32,12 +34,16 @@ class BatterySaverTests(unittest.TestCase):
         balanced = battery_saver.build_battery_saver_profile("balanced", 0.20)
         saver = battery_saver.build_battery_saver_profile("battery_saver", 0.20)
 
+        for profile in (mad, gold, balanced, saver):
+            self.assertEqual(profile["weight_battery_charge"], [0.003])
+            self.assertEqual(profile["weight_battery_discharge"], [0.003])
+
         self.assertEqual(mad["battery_soc_deficit_cost"], 0.0)
         self.assertEqual(mad["battery_soc_surplus_cost"], 0.0)
         self.assertEqual(mad["battery_stress_cost"], 0.0)
 
         self.assertEqual(gold["battery_soc_deficit_threshold"], 0.05)
-        self.assertEqual(gold["battery_soc_surplus_threshold"], 0.98)
+        self.assertEqual(gold["battery_soc_surplus_threshold"], 0.96)
         self.assertEqual(gold["battery_soc_surplus_cost"], 0.01)
         self.assertEqual(gold["battery_stress_cost"], 0.006)
 
@@ -53,6 +59,11 @@ class BatterySaverTests(unittest.TestCase):
         self.assertEqual(saver["battery_soc_surplus_cost"], 0.05)
         self.assertEqual(saver["battery_stress_cost"], 0.04)
         self.assertEqual(saver["battery_stress_segments"], 10)
+
+    def test_anti_churn_factor_matches_field_validated_scale(self):
+        profile = battery_saver.build_battery_saver_profile("gold_rush", 0.3105)
+        self.assertEqual(profile["weight_battery_charge"], [0.004658])
+        self.assertEqual(profile["weight_battery_discharge"], [0.004658])
 
     def test_price_reference_prefers_positive_runtime_import_prices(self):
         reference = battery_saver.battery_saver_price_reference(
@@ -80,6 +91,8 @@ class BatterySaverTests(unittest.TestCase):
         original = {
             "custom_setting": {"keep": True},
             "battery_soc_deficit_cost": 99,
+            "weight_battery_charge": [0],
+            "weight_battery_discharge": [0],
         }
         updated, profile = battery_saver.apply_battery_saver_profile(
             original,
@@ -88,6 +101,8 @@ class BatterySaverTests(unittest.TestCase):
         )
         self.assertEqual(updated["custom_setting"], original["custom_setting"])
         self.assertEqual(updated["battery_soc_deficit_cost"], 0.01)
+        self.assertEqual(updated["weight_battery_charge"], [0.003])
+        self.assertEqual(updated["weight_battery_discharge"], [0.003])
         self.assertEqual(profile["mode"], "balanced")
         self.assertEqual(original["battery_soc_deficit_cost"], 99)
 
@@ -104,13 +119,15 @@ class BatterySaverTests(unittest.TestCase):
         self.assertTrue(battery_saver.emhass_supports_battery_stress("0.19.0-beta"))
         self.assertTrue(battery_saver.emhass_supports_battery_stress(None))
 
-    def test_zero_cost_detection_is_behavioral(self):
+    def test_zero_cost_detection_is_legacy_unrestricted_behavior(self):
         self.assertTrue(
             battery_saver.battery_saver_costs_are_zero(
                 {
                     "battery_soc_deficit_cost": 0,
                     "battery_soc_surplus_cost": 0.0,
                     "battery_stress_cost": 0,
+                    "weight_battery_charge": [0],
+                    "weight_battery_discharge": [0],
                 }
             )
         )
@@ -118,8 +135,10 @@ class BatterySaverTests(unittest.TestCase):
             battery_saver.battery_saver_costs_are_zero(
                 {
                     "battery_soc_deficit_cost": 0,
-                    "battery_soc_surplus_cost": 0.01,
+                    "battery_soc_surplus_cost": 0,
                     "battery_stress_cost": 0,
+                    "weight_battery_charge": [0.001],
+                    "weight_battery_discharge": [0],
                 }
             )
         )

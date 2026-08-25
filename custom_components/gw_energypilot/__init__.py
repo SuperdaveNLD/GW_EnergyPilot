@@ -21,14 +21,15 @@ from .battery_saver_api import async_register_battery_saver_api
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
-from .controller import GWEnergyPilotController
+from .controller_v033 import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .debug_log_api import async_register_debug_log_api
 from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
-from .orchestrator_v031 import GWEnergyPilotOrchestrator
+from .orchestrator_v033 import GWEnergyPilotOrchestrator
+from .plan_runtime import GWEnergyPilotPlanRuntime
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
 
@@ -43,7 +44,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v032.js?v=0.32-hotfix1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v033.js?v=0.33-release1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -57,6 +58,7 @@ class GWRuntimeData:
     orchestrator: GWEnergyPilotOrchestrator
     accounting: GWEnergyPilotAccounting
     debug_log: GWEnergyPilotDebugRuntime
+    plan_runtime: GWEnergyPilotPlanRuntime
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -134,6 +136,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
     debug_log = GWEnergyPilotDebugRuntime(hass, entry.entry_id)
+    plan_runtime = GWEnergyPilotPlanRuntime(hass, entry)
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -141,8 +144,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         orchestrator=orchestrator,
         accounting=accounting,
         debug_log=debug_log,
+        plan_runtime=plan_runtime,
     )
 
+    await plan_runtime.async_restore()
+    entry.async_create_background_task(
+        hass,
+        plan_runtime.async_startup_refresh(),
+        f"GW EnergyPilot EMHASS plan refresh ({entry.entry_id})",
+    )
     await debug_log.async_start(entry)
     await accounting.async_prepare()
     await controller.async_setup()

@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.33** | 2026-08-25 | **Beta** | Persists the canonical EMHASS plan across Home Assistant restart/publication gaps, fixes fresh-output and chart refresh handling, and adds shared anti-churn Battery Saver weights with Gold Rush 5–96%. |
 | **0.32** | 2026-08-25 | **Beta** | Hotfixes EMHASS settings saving on current Home Assistant while preserving four-decimal tariff values such as `0.0248`. |
 | **0.31** | 2026-08-24 | **Beta** | Adds an opt-in, administrator-only debug session to LOG with bounded memory-only runtime tracing, full decoded GoodWe telemetry, controller/read-back and EMHASS status correlation, plus a copyable support report. |
 | **0.30** | 2026-08-24 | **Beta** | Standardizes numeric GitHub Releases for HACS/Home Assistant so updates show `0.30` instead of a shortened commit SHA, with validated release automation and a synchronized v0.30 frontend badge. |
@@ -47,6 +48,87 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.33 — Persistent EMHASS plan and calmer Battery Saver optimization
+
+v0.33 consolidates the reliability fixes and Battery Saver field findings made after v0.32 into one release candidate.
+
+## Persistent canonical EMHASS plan
+
+EMHASS remains the canonical plan owner. Current EMHASS persists its latest optimization and exposes the versioned read-only `GET /api/v1/plan` endpoint. EnergyPilot now validates that plan and stores a per-config-entry resilience mirror in Home Assistant Store:
+
+```text
+gw_energypilot.plan.<config_entry_id>
+```
+
+The mirror contains timestamped `P_batt` and `P_grid` horizon points, generation time, schema version, inferred timestep and an explicit `valid_until` boundary.
+
+Control source order is:
+
+```text
+1. live configured Home Assistant P_batt / P_grid
+2. current point from a still-valid persistent EnergyPilot plan mirror
+3. existing unavailable/waiting behavior
+```
+
+A valid mirror may bridge a temporary missing Home Assistant publication after restart/reload. An explicit live non-ready optimization status remains authoritative and is never overridden. EnergyPilot also never extrapolates the last command beyond the final inferred plan interval.
+
+The Battery · Plan · Price future horizon now prefers the same persistent validated plan. Existing Home Assistant schedule attributes remain compatibility fallback rather than a second plan owner.
+
+See `docs/EMHASS_PLAN_RUNTIME.md`.
+
+## Fresh EMHASS output detection
+
+A valid EMHASS publish can repeat exactly the same numeric `P_batt` value and attributes. Home Assistant does not necessarily advance `last_updated` for such a report. v0.33 therefore uses `State.last_reported` as the primary proof of a fresh publication, retaining `last_updated` only as compatibility fallback for older State-like test doubles.
+
+The existing safety gates stay intact: `P_batt` must still be finite and the optimizer status must still be ready.
+
+## Battery · Plan · Price refresh
+
+The chart's duplicate-card protection remains, but it no longer prevents the existing canonical card from being rebuilt after fresh chart data arrives. When the configured active-plan entity has a newer timestamp than the cached payload, v0.33 forces a read-only chart refresh immediately instead of waiting up to the normal five-minute frontend cache interval.
+
+## Battery Saver anti-churn tuning
+
+Field comparison showed that a small linear cost on battery throughput removes low-value quarter-hour reversals much more directly than simply increasing the quadratic power-stress cost. v0.33 therefore adds the same small transaction cost to all four managed profiles:
+
+```text
+weight_battery_charge    = 1.5% × dynamic price reference
+weight_battery_discharge = 1.5% × dynamic price reference
+```
+
+On the primary field test, approximately `0.005` currency/kWh per direction removed several small charge/discharge reversals while preserving high-value evening discharge up to the physical inverter/battery limits. The price-relative 1.5% factor yields approximately `0.004658` per direction at the observed price reference of `0.3105` and scales with other price/currency magnitudes.
+
+The four public profiles remain:
+
+- **Mad-Steve** — maximum economic freedom, zero additional SOC/power-stress costs, but now with the shared anti-churn floor so tiny price noise does not automatically justify a reversal.
+- **Gold Rush** — profit first, shared anti-churn floor, light power stress and a high-SOC soft threshold changed from 98% to **96%**.
+- **Balanced** — the recommended general-purpose profile with the shared anti-churn floor and the existing moderate SOC/power-stress costs.
+- **Battery Saver** — the shared anti-churn floor plus the strongest existing SOC/power-stress costs.
+
+The normal hard Minimum/Maximum SOC settings remain separate. Gold Rush 96% is a **soft threshold**, not a hard maximum.
+
+Battery Saver ownership expands from six to eight EMHASS fields so failed first-apply transactions also restore the two charge/discharge weights. Existing unmanaged/custom EMHASS configuration remains untouched until the user explicitly selects a profile.
+
+See `docs/BATTERY_SAVER.md`.
+
+## Why `P_batt` may be below 15 kW
+
+The optimizer table can show battery power below the configured 15 kW maximum for multiple valid reasons. In the hybrid inverter model, PV and battery share the same AC converter path, so the inverter can already be at 15 kW AC while `P_batt` is only 14–14.8 kW. When no physical limit binds, EMHASS can also reserve energy for a later higher-price interval or reduce instantaneous power because `battery_stress_cost` is a quadratic/PWL power penalty.
+
+This release documents that distinction; it does not add another power limiter or rewrite EMHASS's optimizer.
+
+## Safety and compatibility
+
+- No new or guessed GoodWe register definitions or Modbus read blocks.
+- EMS remains `47511` / `47512` with the established `47512 -> wait -> 47511` write order.
+- Battery/Grid/Hybrid control mappings are unchanged.
+- Live configured EMHASS states remain first priority over the persistent plan mirror.
+- Explicit live non-ready optimization status is not bypassed.
+- Expired plan data is not repeated indefinitely.
+- Existing entity IDs, unique IDs and stable device identity are preserved.
+- EMHASS remains an external prerequisite and EnergyPilot does not install or replace it.
+
+v0.33 remains **Beta** while plan recovery across live restart/reload scenarios and the revised Battery Saver tuning receive broader installation validation.
 
 # v0.32 — Home Assistant price-selector hotfix
 

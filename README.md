@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.31 · Beta**
+**v0.33 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -20,6 +20,8 @@ Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
 - `CHANGELOG.md` — detailed technical history;
+- `docs/EMHASS_PLAN_RUNTIME.md` — persistent canonical EMHASS plan/recovery contract;
+- `docs/BATTERY_SAVER.md` — Battery Saver profiles, anti-churn tuning and ownership;
 - `docs/DEBUG_LOG.md` — opt-in LOG-tab debug-session/support-report contract;
 - `docs/EMS_MODES.md` — GoodWe EMS modes 1–12;
 - `docs/ACCOUNTING.md` — persistent grid accounting;
@@ -28,15 +30,14 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.31 highlights
+## v0.33 highlights
 
-- The existing **LOG** tab now has an administrator-only **Debug session** that is disabled by default and captures high-detail runtime evidence only when explicitly started.
-- A debug session correlates complete decoded GoodWe telemetry and poll health with controller strategy/target/read-back, configured `P_batt`/`P_grid`/optimizer/EV source changes and EMHASS/orchestrator state transitions.
-- **Copy debug report** combines the temporary debug session/current runtime snapshot with the existing persistent 50-run optimization history.
-- Debug events are memory-only, bounded to the newest 1200 events and retained after Stop until clear, integration reload or Home Assistant restart.
-- The configured GoodWe host/IP and EMHASS URL are intentionally excluded from the report; no arbitrary Home Assistant entity attributes are collected.
-- Debug logging is observer-only: it does not add Modbus polling, change registers, alter controller ownership, change EMHASS configuration or trigger an optimization.
-- Existing v0.30 release/update behavior and the complete v0.29/v0.28 control/dashboard stack remain intact.
+- EnergyPilot now keeps a validated persistent mirror of the canonical EMHASS `P_batt` / `P_grid` horizon from official `GET /api/v1/plan`, so a temporary Home Assistant entity publication gap after restart/reload does not immediately erase the usable plan.
+- Live configured Home Assistant plan entities remain first priority. The persistent mirror is used only while it is still inside its inferred validity window; an explicit non-ready optimizer status remains authoritative.
+- Fresh EMHASS output detection now uses Home Assistant `last_reported`, so a valid newly published `P_batt` value is accepted even when its numeric value did not change.
+- The Battery · Plan · Price card now rebuilds when the active plan changes and bypasses its normal five-minute cache for a newly published plan without reintroducing duplicate cards.
+- All four managed Battery Saver profiles gain the same small price-relative anti-churn charge/discharge weight to suppress low-value quarter-hour reversals. **Gold Rush** now uses a 5–96% soft SOC zone.
+- No GoodWe register, Modbus block, EMS mapping, write ordering, entity ID or unique ID changes are introduced by these v0.33 improvements.
 
 ## Tested hardware
 
@@ -55,6 +56,8 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - manual access to all twelve EMS modes;
 - three Automatic Control strategies: Battery, Grid and Hybrid;
 - native EMHASS optimization/publishing;
+- persistent validated EMHASS plan continuity across temporary publication gaps;
+- four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences and anti-churn battery-throughput costs;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
 - opt-in bounded LOG-tab debug sessions and copyable support reports;
@@ -194,6 +197,14 @@ There is no startup/background SOC synchronization.
 
 The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains EMHASS-only.
 
+## Battery Saver
+
+Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes a GoodWe mode directly. The public profiles are **Mad-Steve**, **Gold Rush**, **Balanced** and **Battery Saver**.
+
+All four managed modes use the same small price-relative charge/discharge anti-churn cost. This gives low-value battery throughput a real virtual cost even in Mad-Steve; the modes then differ through their soft SOC thresholds and quadratic battery power-stress costs. Gold Rush uses a 5–96% soft SOC zone in v0.33. Minimum/Maximum SOC remain the hard optimizer limits.
+
+See `docs/BATTERY_SAVER.md` for exact profile factors and ownership.
+
 ## Battery plan / actual / price chart
 
 The chart is read-only.
@@ -201,9 +212,10 @@ The chart is read-only.
 - actual battery bars use Recorder 5-minute means from the existing GoodWe `battery_power` entity;
 - charging is below zero, discharging above zero, while near-zero samples are not drawn as false directional bars;
 - historical plan blocks use the configured EnergyPilot `P_batt` entity history, including the state already active at local midnight;
-- future plan blocks use current EMHASS `battery_scheduled_power`; legacy/custom `forecasts` remains a compatibility fallback;
+- future plan blocks prefer the validated persistent official EMHASS plan mirror; current Home Assistant `battery_scheduled_power` and legacy/custom `forecasts` remain compatibility fallbacks;
 - the forecast interval active at NOW is clipped at NOW rather than discarded because it began a few minutes earlier;
 - dashed plan overlays render above solid actual bars;
+- a newly published plan forces a chart refresh without waiting for the normal five-minute cache;
 - the market-price series comes from the same EnergyPilot runtime price source used for EMHASS and is rendered as interval steps;
 - the card supports S/M/L layouts and an expanded detail view;
 - native GoodWe day counters `35208` / `35211` are preferred for the headline charged/discharged totals;
@@ -222,9 +234,10 @@ EnergyPilot-owned persistent runtime stores are separate:
 gw_energypilot.runtime.<entry_id>
 gw_energypilot.accounting.<entry_id>
 gw_energypilot.optimization_log.<entry_id>
+gw_energypilot.plan.<entry_id>
 ```
 
-They are not a second settings database. The v0.31 debug session is intentionally **not** persistent and is not added to this list.
+The plan Store is a bounded resilience mirror of EMHASS's canonical plan, not a second optimizer or settings database. It is valid only through its inferred final plan interval. The debug session is intentionally **not** persistent and is not added to this list.
 
 ## Debug logging
 

@@ -7,7 +7,7 @@ FRONTEND = ROOT / "custom_components" / "gw_energypilot" / "frontend"
 
 
 class FrontendDashboardCardTests(unittest.TestCase):
-    def test_battery_plan_installer_is_idempotent(self) -> None:
+    def test_battery_plan_installer_is_idempotent_and_refreshable(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v027-battery-plan-core.js").read_text(
             encoding="utf-8"
         )
@@ -20,7 +20,19 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn(duplicate_guard, installer)
         self.assertIn("existingCards.slice(1)", installer)
         self.assertIn("duplicate.remove()", installer)
+        self.assertIn("dataset.epRenderKey", installer)
+        self.assertIn("existingCard.replaceWith(card)", installer)
         self.assertLess(installer.index(duplicate_guard), installer.index(card_creation))
+
+    def test_battery_plan_change_bypasses_chart_cache(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v027-battery-plan-core.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("function activePlanChanged", source)
+        self.assertIn("state.last_updated !== plan.last_updated", source)
+        self.assertIn("activePlanChanged(panel, data)", source)
+        self.assertIn("loadChartData(panel, true)", source)
 
     def test_release_layer_reconciles_existing_duplicate_cards(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v030.js").read_text(encoding="utf-8")

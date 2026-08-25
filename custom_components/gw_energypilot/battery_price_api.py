@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import voluptuous as vol
@@ -52,30 +53,57 @@ def _battery_plan_payload(
     hass: HomeAssistant,
     entry: ConfigEntry,
 ) -> dict[str, Any]:
-    """Return the configured EMHASS battery entity and its current horizon."""
+    """Return live P_batt plus the canonical persisted EMHASS horizon."""
     entity_id = str(
         entry.options.get(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
         or DEFAULT_P_BATT_ENTITY
     )
     state = hass.states.get(entity_id)
-    if state is None:
-        return {
-            "entity_id": entity_id,
-            "available": False,
-            "current_w": None,
-            "last_updated": None,
-            "schedule_attribute": None,
-            "points": [],
-        }
+    schedule_attribute = (
+        emhass_schedule_attribute(state.attributes) if state is not None else None
+    )
+    live_points = (
+        normalize_emhass_forecasts(entity_id, state.attributes)
+        if state is not None
+        else []
+    )
 
-    schedule_attribute = emhass_schedule_attribute(state.attributes)
-    points = normalize_emhass_forecasts(entity_id, state.attributes)
+    runtime_data = getattr(entry, "runtime_data", None)
+    plan_runtime = getattr(runtime_data, "plan_runtime", None)
+    cached_points = plan_runtime.points("p_batt") if plan_runtime is not None else []
+    points = cached_points or live_points
+
+    live_current = finite_number(state.state) if state is not None else None
+    cached_current = (
+        plan_runtime.current_p_batt() if plan_runtime is not None else None
+    )
+    diagnostics = dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
+    current_w = live_current if live_current is not None else cached_current
+    forecast_source = (
+        diagnostics.get("source")
+        if cached_points
+        else f"home_assistant_{schedule_attribute}"
+        if live_points and schedule_attribute
+        else None
+    )
+
     return {
         "entity_id": entity_id,
-        "available": finite_number(state.state) is not None or bool(points),
-        "current_w": finite_number(state.state),
-        "last_updated": state.last_updated.isoformat(),
+        "available": current_w is not None or bool(points),
+        "current_w": current_w,
+        "current_source": (
+            "home_assistant"
+            if live_current is not None
+            else "persistent_plan"
+            if cached_current is not None
+            else None
+        ),
+        "last_updated": state.last_updated.isoformat() if state is not None else None,
         "schedule_attribute": schedule_attribute,
+        "forecast_source": forecast_source,
+        "generated_at": diagnostics.get("generated_at"),
+        "valid_until": diagnostics.get("valid_until"),
+        "restored_from_store": diagnostics.get("restored_from_store", False),
         "points": points,
     }
 
@@ -103,6 +131,7 @@ async def websocket_get_battery_price(
 
     runtime_data = getattr(entry, "runtime_data", None)
     orchestrator = getattr(runtime_data, "orchestrator", None)
+    plan_runtime = getattr(runtime_data, "plan_runtime", None)
     price_reader = getattr(orchestrator, "async_dashboard_price_payload", None)
     if not callable(price_reader):
         connection.send_error(
@@ -110,12 +139,23 @@ async def websocket_get_battery_price(
         )
         return
 
-    price_payload = await price_reader(force=bool(msg.get("force", False)))
+    force = bool(msg.get("force", False))
+    refresh_plan = bool(
+        plan_runtime is not None and (force or not plan_runtime.has_current_plan())
+    )
+    if refresh_plan:
+        price_payload, _plan_refreshed = await asyncio.gather(
+            price_reader(force=force),
+            plan_runtime.async_refresh(reason="dashboard"),
+        )
+    else:
+        price_payload = await price_reader(force=force)
+
     connection.send_result(
         msg["id"],
         {
             "entry_id": entry.entry_id,
-            "chart_schema_version": 3,
+            "chart_schema_version": 4,
             **price_payload,
             "battery_energy": _battery_energy_payload(runtime_data),
             "battery_plan": _battery_plan_payload(hass, entry),

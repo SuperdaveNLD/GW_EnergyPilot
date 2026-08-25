@@ -1,9 +1,10 @@
-"""Pure helpers for GW EnergyPilot battery-plan chart data."""
+"""Pure helpers for GW EnergyPilot battery-plan data."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 import math
+from statistics import median
 from typing import Any, Mapping
 
 
@@ -38,7 +39,7 @@ def nonnegative_number(value: Any) -> float | None:
     return number if number is not None and number >= 0 else None
 
 
-def _timestamp(value: Any) -> tuple[str, float] | None:
+def normalized_timestamp(value: Any) -> tuple[str, float] | None:
     """Normalize an ISO timestamp while retaining its explicit offset."""
     if isinstance(value, datetime):
         parsed = value
@@ -72,12 +73,12 @@ def normalize_emhass_forecasts(
     entity_id: str,
     attributes: Mapping[str, Any] | None,
 ) -> list[dict[str, Any]]:
-    """Return sorted ``P_batt`` forecast points from an EMHASS entity.
+    """Return sorted forecast points from an EMHASS-published HA entity.
 
     Current EMHASS publishes battery-power horizons in the
     ``battery_scheduled_power`` attribute. ``forecasts`` remains accepted as a
-    conservative compatibility fallback for older/custom publishers. Each row
-    uses ``date`` plus a value key derived from the configured entity id.
+    conservative compatibility fallback for older/custom publishers. The same
+    helper also supports ``P_grid`` entities because those use ``forecasts``.
     """
     schedule_attribute = emhass_schedule_attribute(attributes)
     if schedule_attribute is None or attributes is None:
@@ -97,7 +98,7 @@ def normalize_emhass_forecasts(
             (row.get(key) for key in _TIMESTAMP_KEYS if row.get(key) is not None),
             None,
         )
-        parsed_timestamp = _timestamp(raw_timestamp)
+        parsed_timestamp = normalized_timestamp(raw_timestamp)
         if parsed_timestamp is None:
             continue
         start, sort_key = parsed_timestamp
@@ -124,3 +125,99 @@ def normalize_emhass_forecasts(
         }
 
     return [by_timestamp[key] for key in sorted(by_timestamp)]
+
+
+def normalize_emhass_api_plan(
+    payload: Mapping[str, Any] | None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Normalize the official ``GET /api/v1/plan`` P_batt/P_grid horizon.
+
+    EMHASS schema 1.x defines ``timestamp``, ``P_batt`` and ``P_grid`` as the
+    canonical plan columns. Unknown/missing rows are ignored rather than
+    guessed from unrelated numeric columns.
+    """
+    if not isinstance(payload, Mapping) or payload.get("status") != "ok":
+        return {"p_batt": [], "p_grid": []}
+    rows = payload.get("plan")
+    if not isinstance(rows, list):
+        return {"p_batt": [], "p_grid": []}
+
+    result: dict[str, list[dict[str, Any]]] = {"p_batt": [], "p_grid": []}
+    for result_key, column in (("p_batt", "P_batt"), ("p_grid", "P_grid")):
+        by_timestamp: dict[float, dict[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            parsed_timestamp = normalized_timestamp(row.get("timestamp"))
+            value = finite_number(row.get(column))
+            if parsed_timestamp is None or value is None:
+                continue
+            start, sort_key = parsed_timestamp
+            by_timestamp[sort_key] = {
+                "start": start,
+                "value_w": round(value, 3),
+            }
+        result[result_key] = [by_timestamp[key] for key in sorted(by_timestamp)]
+    return result
+
+
+def infer_plan_step_seconds(*point_sets: list[dict[str, Any]]) -> int | None:
+    """Infer the plan timestep from adjacent timestamps without hardcoding it."""
+    deltas: list[float] = []
+    for points in point_sets:
+        timestamps: list[float] = []
+        for point in points:
+            parsed = normalized_timestamp(point.get("start"))
+            if parsed is not None:
+                timestamps.append(parsed[1])
+        timestamps.sort()
+        for previous, current in zip(timestamps, timestamps[1:], strict=False):
+            delta = current - previous
+            if delta > 0:
+                deltas.append(delta)
+    if not deltas:
+        return None
+    return max(1, int(round(median(deltas))))
+
+
+def plan_valid_until(
+    points: list[dict[str, Any]],
+    step_seconds: int | None,
+) -> datetime | None:
+    """Return the exclusive validity boundary of a stepwise plan."""
+    if not points or step_seconds is None or step_seconds <= 0:
+        return None
+    parsed = [normalized_timestamp(point.get("start")) for point in points]
+    timestamps = [item[1] for item in parsed if item is not None]
+    if not timestamps:
+        return None
+    return datetime.fromtimestamp(max(timestamps) + step_seconds, tz=timezone.utc)
+
+
+def plan_value_at(
+    points: list[dict[str, Any]],
+    when: datetime,
+    step_seconds: int | None,
+) -> float | None:
+    """Return the plan value active at ``when`` without extrapolating stale data."""
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    target = when.timestamp()
+    parsed_points: list[tuple[float, float]] = []
+    for point in points:
+        parsed = normalized_timestamp(point.get("start"))
+        value = finite_number(point.get("value_w"))
+        if parsed is not None and value is not None:
+            parsed_points.append((parsed[1], value))
+    parsed_points.sort(key=lambda item: item[0])
+    for index, (start, value) in enumerate(parsed_points):
+        next_start = (
+            parsed_points[index + 1][0]
+            if index + 1 < len(parsed_points)
+            else start + step_seconds
+            if step_seconds is not None and step_seconds > 0
+            else None
+        )
+        if next_start is not None and start <= target < next_start:
+            return value
+    return None

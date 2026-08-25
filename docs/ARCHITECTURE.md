@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.28 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.33 Beta**.
 
 ## High-level flow
 
@@ -15,31 +15,40 @@ GWModbusClient
 GWEnergyPilotCoordinator
     |----------------------> Home Assistant telemetry/entities
     |----------------------> GWEnergyPilotAccounting
-    |----------------------> GWEnergyPilotController
-    `----------------------> GWEnergyPilotOrchestrator (v026)
+    |----------------------> GWEnergyPilotController (controller_v033)
+    `----------------------> GWEnergyPilotOrchestrator (orchestrator_v033)
                                   |
+                                  +--> EnergyPilot Battery Saver policy
                                   +--> EMHASS optimize/publish
                                   +--> canonical timestamped price cache
+                                  +--> refresh official EMHASS /api/v1/plan
                                   |
                                   v
-                            P_batt / P_grid
+                          GWEnergyPilotPlanRuntime
+                                  |
+                         Home Assistant Store mirror
+                                  |
+                    live-first P_batt / P_grid fallback
                                   |
                                   v
                            Automatic Control
 ```
 
-Persistent EnergyPilot-owned data remains split by purpose:
+EMHASS remains an external prerequisite and remains the canonical owner of the optimization plan. The EnergyPilot plan Store is only a resilience mirror.
+
+Persistent EnergyPilot-owned data is split by purpose:
 
 ```text
 ConfigEntry data/options                   user/integration configuration
 GoodWe registers                           hardware state + inverter settings
-EMHASS configuration/output                optimizer configuration + current plan
+EMHASS configuration/output                optimizer configuration + canonical plan
 gw_energypilot.runtime.<entry_id>          last_success runtime evidence
 gw_energypilot.accounting.<entry_id>       derived daily grid accounting
 gw_energypilot.optimization_log.<entry_id> newest optimization attempts
+gw_energypilot.plan.<entry_id>             bounded mirror of latest valid EMHASS plan
 ```
 
-No Home Assistant Store is a second configuration database.
+No Home Assistant Store is a second configuration database or optimizer.
 
 ## Runtime objects
 
@@ -47,13 +56,15 @@ No Home Assistant Store is a second configuration database.
 
 - `GWModbusClient`;
 - `GWEnergyPilotCoordinator`;
-- `GWEnergyPilotController`;
-- `GWEnergyPilotOrchestrator` from `orchestrator_v026.py`;
-- `GWEnergyPilotAccounting`.
+- `GWEnergyPilotController` from `controller_v033.py`;
+- `GWEnergyPilotOrchestrator` from `orchestrator_v033.py`;
+- `GWEnergyPilotPlanRuntime`;
+- `GWEnergyPilotAccounting`;
+- `GWEnergyPilotDebugRuntime`.
 
 Entity platforms remain sensor, switch, number, select and button.
 
-The initial Modbus refresh runs as a background config-entry task. Accounting may perform optional Recorder bootstrap only after fresh telemetry is available.
+During setup, the last valid plan mirror is restored before the normal control/orchestration lifecycle starts. A bounded background task then retries the official EMHASS plan endpoint while startup dependencies settle. The initial Modbus refresh also remains a background config-entry task.
 
 ## Modbus boundary
 
@@ -117,29 +128,159 @@ otherwise -> mode 1
 
 Hybrid intentionally combines two GoodWe control domains:
 
-- **buy/import** is a PCC target and therefore uses mode 9 with the EMHASS `P_grid` import magnitude;
-- **sell/discharge** is a battery-power target and therefore uses mode 12 with the EMHASS `P_batt` discharge magnitude;
+- **buy/import** is a PCC target and uses mode 9 with the EMHASS `P_grid` import magnitude;
+- **sell/discharge** is a battery-power target and uses mode 12 with the EMHASS `P_batt` discharge magnitude;
 - a neutral battery plan is held with mode 8;
 - a battery-charge plan without planned grid import falls through to mode 1/self-use so locally available PV can be absorbed by GoodWe without forcing the EMHASS forecast-sized charge setpoint.
 
-The mode-9 branch is evaluated before mode 12 so an explicit planned grid import is the authoritative Hybrid buying signal.
-
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
-EV anti-discharge is evaluated before normal strategy execution and can hold the battery or allow explicit mode-11 charging.
+EV anti-discharge remains a higher-priority directional safety override.
 
-## EMHASS orchestration and prices
+## Plan-resilient control in v0.33
+
+`controller_v033.py` deliberately changes **source availability**, not GoodWe mode selection.
+
+For configured `P_batt` / `P_grid` values the source order is:
+
+```text
+1. finite live Home Assistant entity state
+2. current value from GWEnergyPilotPlanRuntime when the live state is unavailable
+3. no value / existing waiting-unavailable behavior
+```
+
+Optimizer readiness remains conservative:
+
+- a present live optimizer state that is explicitly non-ready remains authoritative;
+- only a missing/unknown/unavailable optimizer publication may be bridged by a still-valid mirrored plan;
+- an expired or out-of-range plan never overrides readiness.
+
+This prevents a Home Assistant publication lifecycle gap from discarding a valid EMHASS plan while also preventing stale control from continuing indefinitely.
+
+## Canonical EMHASS plan mirror
+
+`plan_runtime.py` owns the v0.33 resilience mirror.
+
+Canonical refresh source:
+
+```text
+GET <EMHASS base URL>/api/v1/plan
+```
+
+EnergyPilot accepts the supported versioned EMHASS schema, normalizes timestamped `P_batt` and `P_grid` points, infers the plan timestep and calculates:
+
+```text
+valid_until = final P_batt timestamp + inferred timestep
+```
+
+The mirror stores:
+
+```text
+source
+generated_at
+emhass_schema_version
+step_seconds
+valid_until
+configured P_batt/P_grid entity IDs
+P_batt horizon
+P_grid horizon
+```
+
+The Store key is:
+
+```text
+gw_energypilot.plan.<config_entry_id>
+```
+
+If the official endpoint is temporarily unavailable, the existing Home Assistant schedule attributes may be accepted as a compatibility fallback. An official plan can replace the mirror. An ever-shrinking continual-publish Home Assistant remainder does not replace a longer valid canonical snapshot merely because it was republished later.
+
+A refresh failure never deletes a still-valid cached plan. Once `valid_until` is passed, current plan values become unavailable; EnergyPilot does not repeat the last command.
+
+See `docs/EMHASS_PLAN_RUNTIME.md` for the detailed lifecycle and validation contract.
+
+## EMHASS orchestration and output freshness
 
 The active orchestrator chain is:
 
 ```text
-orchestrator_v026.GWEnergyPilotOrchestrator
-    -> orchestrator_v013.GWEnergyPilotOrchestrator
-        -> orchestrator_v012.GWEnergyPilotOrchestrator
-            -> orchestrator.GWEnergyPilotOrchestrator
+orchestrator_v033.GWEnergyPilotOrchestrator
+    -> orchestrator_v031.GWEnergyPilotOrchestrator
+        -> orchestrator_v026.GWEnergyPilotOrchestrator
+            -> orchestrator_v013.GWEnergyPilotOrchestrator
+                -> orchestrator_v012.GWEnergyPilotOrchestrator
+                    -> orchestrator.GWEnergyPilotOrchestrator
 ```
 
-`orchestrator_v026.py` adds dashboard price-series support without changing the optimizer objective. It caches the exact timestamped price maps produced by the existing EnergyPilot price path:
+Responsibilities are layered deliberately:
+
+- base/v012/v013: existing optimization, publication and runtime-evidence behavior;
+- v026: canonical timestamped price-series support for dashboard/optimizer use;
+- v031: Battery Saver policy ownership, GoodWe minimum-SOC synchronization before owned solves and runtime final-SOC clamping;
+- v033: refresh the persistent canonical plan after a successful optimize/publish cycle.
+
+Fresh-output validation in v031 uses Home Assistant `State.last_reported` as proof of a new `P_batt` report. `last_updated` remains a compatibility fallback for older State-like test doubles. A repeated numeric `P_batt` is therefore valid when EMHASS actually reported it again. The existing finite-number and optimizer-ready gates remain mandatory.
+
+## Battery Saver policy
+
+`battery_saver.py` owns the four public modes:
+
+```text
+Mad-Steve
+Gold Rush
+Balanced
+Battery Saver
+```
+
+Hard Minimum/Maximum SOC remains separate from Battery Saver soft preferences.
+
+v0.33 distinguishes two economic mechanisms:
+
+1. **battery throughput / anti-churn cost** — linear EMHASS `weight_battery_charge` and `weight_battery_discharge` costs;
+2. **battery power stress** — EMHASS `battery_stress_cost`, which current EMHASS models as a quadratic/PWL cost versus instantaneous battery power.
+
+All four EnergyPilot profiles apply the same small anti-churn floor:
+
+```text
+weight_battery_charge    = 1.5% × dynamic price reference
+weight_battery_discharge = 1.5% × dynamic price reference
+```
+
+This makes small charge/discharge reversals economically non-free even in Mad-Steve. The profiles then differ through their existing SOC and power-stress penalties. Gold Rush uses a 5–96% soft SOC zone in v0.33.
+
+Battery Saver owns exactly eight EMHASS fields after the user explicitly selects a managed mode:
+
+```text
+battery_soc_deficit_threshold
+battery_soc_deficit_cost
+battery_soc_surplus_threshold
+battery_soc_surplus_cost
+battery_stress_cost
+battery_stress_segments
+weight_battery_charge
+weight_battery_discharge
+```
+
+Existing unmanaged/custom values are preserved. Multi-battery Battery Saver ownership is rejected instead of broadcasting scalar policy values across heterogeneous batteries. Failed first-apply optimization transactions restore the previous option and all owned EMHASS fields.
+
+See `docs/BATTERY_SAVER.md`.
+
+## Hybrid inverter power interpretation
+
+`P_batt < 15 kW` does not automatically mean available power was ignored.
+
+Current EMHASS hybrid modeling puts PV and battery on the same DC/AC path. Therefore:
+
+```text
+PV + battery discharge -> shared hybrid inverter AC output limit
+```
+
+During evening discharge, the inverter can already be at 15 kW AC while battery discharge is only about 14–14.8 kW because PV supplies the remaining DC power. When neither physical limit binds, EMHASS may also reserve energy for later higher-price timesteps or reduce instantaneous power because of `battery_stress_cost`.
+
+Diagnostics and plan reviews must compare `P_batt`, `P_PV`, `P_hybrid_inverter`, SOC and neighboring prices before concluding that a power limit is wrong.
+
+## Prices and Battery · Plan · Price chart
+
+`orchestrator_v026.py` caches the exact timestamped price maps produced by the EnergyPilot price path:
 
 ```text
 market price
@@ -147,22 +288,33 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes read-only chart data. Dashboard reads do not launch an optimization. The v0.27 chart layer also combines actual battery history, historical published `P_batt` targets, the current future EMHASS forecast and native GoodWe day-energy counters without creating another Modbus control path.
+`battery_price_api.py` exposes read-only chart data. In v0.33 the payload is schema `4` and future-plan source order is:
 
-## Battery plan / actual / price frontend
+```text
+1. persistent validated official EMHASS plan mirror
+2. existing Home Assistant battery_scheduled_power / forecasts compatibility path
+```
+
+Actual bars remain Recorder history from the existing GoodWe battery-power entity. Native GoodWe day counters remain the headline charged/discharged energy values.
+
+The frontend keeps one canonical Battery · Plan · Price card. A newer configured plan-entity timestamp forces a chart refresh and bypasses the normal five-minute chart cache; the card is replaced rather than duplicated.
+
+## Frontend
 
 Active top-level module:
 
 ```text
-gw-energy-pilot-v028.js
-    -> gw-energy-pilot-v027-battery-plan.js
-        -> v0.27/v0.26 support, chart and language layers
-            -> existing historical frontend chain
+gw-energy-pilot-v033.js
+    -> gw-energy-pilot-v031-battery-saver.js
+        -> gw-energy-pilot-v031-window-controls.js
+            -> gw-energy-pilot-v031.js
+                -> gw-energy-pilot-v030.js
+                    -> existing v0.29/v0.28/v0.27/... chain
 ```
 
-The v0.28 layer owns only the corrected Hybrid 9/12 explanation and final release badge. The v0.27 layer owns Battery plan/actual/price presentation and S/M/L sizing. Earlier layers retain compact Support diagnostics, synchronized minimum-SOC presentation and Dutch/English localization.
+The v0.33 top wrapper owns only the release version presentation. Battery Saver behavior remains in the v031 Battery Saver layer, with v0.33 profile data supplied by the backend. The existing chart core now includes the live-plan refresh repair.
 
-This layering remains technical debt: new releases should avoid adding another behavioral monkey-patch layer unless needed for a bounded compatibility fix. A future frontend consolidation should preserve behavior under browser-level regression tests before deleting historical assets.
+This layering remains technical debt: future releases should avoid adding behavioral monkey-patch layers where a bounded backend/module change is sufficient. A frontend consolidation must preserve behavior under browser/regression tests before historical assets are removed.
 
 ## Synchronized minimum SOC
 
@@ -182,9 +334,9 @@ schedule debounced fresh optimization
 
 The operation is GoodWe-first because the hardware floor is authoritative in real inverter behavior. If EMHASS fails after a successful GoodWe write, EnergyPilot attempts to roll `45356` back to the previous value.
 
-There is no periodic/startup synchronization. Register `45356` changes only after an explicit minimum-SOC NumberEntity write.
+The orchestrator also reasserts the currently verified GoodWe minimum into EnergyPilot-owned EMHASS optimizations and clamps runtime `soc_final` to the effective hard EMHASS range.
 
-The old direct minimum-SOC dashboard panel is not a normal settings path. The low-level Beta SOC API remains available for controlled diagnostics/tooling. Maximum SOC remains EMHASS-only.
+The low-level Beta SOC API remains available for controlled diagnostics/tooling. Maximum SOC remains EMHASS-only.
 
 ## Persistent grid accounting
 
@@ -208,11 +360,13 @@ The selected pair is persisted. A source change re-baselines before further accu
 
 Recorder is not part of the live accounting loop. It remains an optional bootstrap/history source and supplies historical battery-power statistics for the battery graph.
 
-## Optimization history
+## Optimization history and debug runtime
 
 `optimization_log.py` stores the newest 50 EnergyPilot-owned optimization attempts per config entry. Failed and successful runs share the log. A log persistence failure must never convert a successful optimize/publish cycle into a control failure.
 
 `last_success` remains a separate contract in `runtime_store.py`.
+
+`GWEnergyPilotDebugRuntime` is deliberately different: it is bounded, memory-only, disabled by default and observes the existing runtime. It does not add Modbus polling, EMHASS optimization or hardware writes.
 
 ## APIs
 
@@ -226,7 +380,13 @@ gw_energypilot/smart_meter/set
 gw_energypilot/beta_soc/get
 gw_energypilot/beta_soc/set
 gw_energypilot/optimization_log/get
+gw_energypilot/debug_log/get
+gw_energypilot/debug_log/set_enabled
+gw_energypilot/debug_log/clear
 gw_energypilot/battery_price/get
+gw_energypilot/battery_saver/get
+gw_energypilot/battery_saver/set
+gw_energypilot/emhass_sync/...
 ```
 
 Configuration-changing APIs are administrator-protected. Read-only presentation APIs do not gain hardware-write authority.
@@ -245,8 +405,10 @@ Entity unique IDs remain config-entry based. Host/unit-ID changes must not creat
 
 ```text
 register/transport problem -> registers.py / client.py / coordinator.py
-controller decision        -> controller.py
+controller decision        -> controller.py + bounded controller_v033 availability layer
 EMHASS optimization        -> orchestrator*.py / emhass_config.py
+persistent plan resilience -> plan_runtime.py / battery_plan.py
+Battery Saver policy       -> battery_saver.py / battery_saver_api.py / orchestrator_v031.py
 battery/price chart data   -> orchestrator_v026.py / price_series.py / battery_price_api.py
 SOC synchronization        -> number.py + existing verified client 45356 helper
 daily grid totals          -> accounting.py / accounting_model.py
@@ -254,4 +416,4 @@ runtime/log persistence    -> runtime_store.py / optimization_log.py
 presentation               -> active frontend chain
 ```
 
-Do not fix a presentation problem by changing Modbus semantics unless the underlying data is proven wrong.
+Do not fix a presentation problem by changing Modbus semantics unless the underlying data is proven wrong. Do not fix a temporary Home Assistant publication gap by creating duplicate optimizer or hardware-control ownership.
