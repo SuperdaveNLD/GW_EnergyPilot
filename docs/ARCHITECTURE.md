@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.33 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.34 Beta**.
 
 ## High-level flow
 
@@ -22,6 +22,7 @@ GWEnergyPilotCoordinator
                                   +--> EMHASS optimize/publish
                                   +--> canonical timestamped price cache
                                   +--> refresh official EMHASS /api/v1/plan
+                                  +--> advance plan_revision
                                   |
                                   v
                           GWEnergyPilotPlanRuntime
@@ -131,17 +132,34 @@ Hybrid intentionally combines two GoodWe control domains:
 - **buy/import** is a PCC target and uses mode 9 with the EMHASS `P_grid` import magnitude;
 - **sell/discharge** is a battery-power target and uses mode 12 with the EMHASS `P_batt` discharge magnitude;
 - a neutral battery plan is held with mode 8;
-- a battery-charge plan without planned grid import falls through to mode 1/self-use so locally available PV can be absorbed by GoodWe without forcing the EMHASS forecast-sized charge setpoint.
+- a battery-charge plan without planned grid import normally falls through to mode 1/self-use so locally available PV can be absorbed by GoodWe without forcing the EMHASS forecast-sized charge setpoint.
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
-EV anti-discharge remains a higher-priority directional safety override.
+### EV anti-discharge override
 
-## Plan-resilient control in v0.33
+The EV feature is a higher-priority directional safety guard, not an EV charger controller.
 
-`controller_v033.py` deliberately changes **source availability**, not GoodWe mode selection.
+During an active EV charging session:
 
-For configured `P_batt` / `P_grid` values the source order is:
+```text
+P_batt >= -deadband -> mode 8 Battery Hold
+P_batt < -deadband  -> explicit home-battery charge remains allowed
+```
+
+Charge execution follows the selected strategy as far as safely possible:
+
+```text
+Battery -> mode 11 using abs(P_batt)
+Grid    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+```
+
+The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. EV-stop stale-plan protection remains unchanged.
+
+## Plan-resilient controller layer
+
+`controller_v033.py` also provides source availability resilience for configured `P_batt` / `P_grid` values:
 
 ```text
 1. finite live Home Assistant entity state
@@ -159,7 +177,7 @@ This prevents a Home Assistant publication lifecycle gap from discarding a valid
 
 ## Canonical EMHASS plan mirror
 
-`plan_runtime.py` owns the v0.33 resilience mirror.
+`plan_runtime.py` owns the resilience mirror introduced in v0.33.
 
 Canonical refresh source:
 
@@ -216,7 +234,9 @@ Responsibilities are layered deliberately:
 - base/v012/v013: existing optimization, publication and runtime-evidence behavior;
 - v026: canonical timestamped price-series support for dashboard/optimizer use;
 - v031: Battery Saver policy ownership, GoodWe minimum-SOC synchronization before owned solves and runtime final-SOC clamping;
-- v033: refresh the persistent canonical plan after a successful optimize/publish cycle.
+- v033: refresh the persistent canonical plan after a successful optimize/publish cycle and increment `plan_revision` in a `finally` block after the refresh attempt.
+
+`plan_revision` is deterministic freshness evidence for UI consumers. It does not replace EMHASS plan content or become a second optimizer version.
 
 Fresh-output validation in v031 uses Home Assistant `State.last_reported` as proof of a new `P_batt` report. `last_updated` remains a compatibility fallback for older State-like test doubles. A repeated numeric `P_batt` is therefore valid when EMHASS actually reported it again. The existing finite-number and optimizer-ready gates remain mandatory.
 
@@ -231,25 +251,35 @@ Balanced
 Battery Saver
 ```
 
-Hard Minimum/Maximum SOC remains separate from Battery Saver soft preferences.
+When a profile is explicitly managed, its EMHASS hard maximum SOC is part of the profile transaction:
 
-v0.33 distinguishes two economic mechanisms:
+```text
+Mad-Steve     100%
+Gold Rush      96%
+Balanced       95%
+Battery Saver  90%
+```
+
+The verified GoodWe-synchronized minimum SOC remains a separate hard lower boundary.
+
+v0.34 distinguishes two economic mechanisms:
 
 1. **battery throughput / anti-churn cost** — linear EMHASS `weight_battery_charge` and `weight_battery_discharge` costs;
 2. **battery power stress** — EMHASS `battery_stress_cost`, which current EMHASS models as a quadratic/PWL cost versus instantaneous battery power.
 
-All four EnergyPilot profiles apply the same small anti-churn floor:
+All four EnergyPilot profiles apply the same anti-churn floor:
 
 ```text
-weight_battery_charge    = 1.5% × dynamic price reference
-weight_battery_discharge = 1.5% × dynamic price reference
+weight_battery_charge    = 2.25% × dynamic price reference
+weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-This makes small charge/discharge reversals economically non-free even in Mad-Steve. The profiles then differ through their existing SOC and power-stress penalties. Gold Rush uses a 5–96% soft SOC zone in v0.33.
+At the field-test price reference around `0.31`, this is approximately `0.007` currency/kWh per direction. Profile differentiation remains through hard maximum SOC and the profile-specific deficit/surplus/power-stress policy.
 
-Battery Saver owns exactly eight EMHASS fields after the user explicitly selects a managed mode:
+Battery Saver owns exactly nine EMHASS fields after the user explicitly selects a managed mode:
 
 ```text
+battery_maximum_state_of_charge
 battery_soc_deficit_threshold
 battery_soc_deficit_cost
 battery_soc_surplus_threshold
@@ -288,7 +318,7 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes read-only chart data. In v0.33 the payload is schema `4` and future-plan source order is:
+`battery_price_api.py` exposes read-only chart data. The payload remains schema `4`, includes `plan_revision`, and uses future-plan source order:
 
 ```text
 1. persistent validated official EMHASS plan mirror
@@ -297,22 +327,23 @@ market - sell deduction = effective prod_price
 
 Actual bars remain Recorder history from the existing GoodWe battery-power entity. Native GoodWe day counters remain the headline charged/discharged energy values.
 
-The frontend keeps one canonical Battery · Plan · Price card. A newer configured plan-entity timestamp forces a chart refresh and bypasses the normal five-minute chart cache; the card is replaced rather than duplicated.
+The frontend keeps one canonical Battery · Plan · Price card. A mismatch between the live orchestrator `plan_revision` and the cached API payload forces an immediate refresh; `P_batt.last_updated` remains a compatibility fallback for plan changes outside EnergyPilot. The card is replaced/rebuilt rather than duplicated.
 
 ## Frontend
 
 Active top-level module:
 
 ```text
-gw-energy-pilot-v033.js
+gw-energy-pilot-v034.js
     -> gw-energy-pilot-v031-battery-saver.js
         -> gw-energy-pilot-v031-window-controls.js
             -> gw-energy-pilot-v031.js
                 -> gw-energy-pilot-v030.js
                     -> existing v0.29/v0.28/v0.27/... chain
+    -> gw-energy-pilot-v027-battery-plan-core.js (fresh v0.34 cache key)
 ```
 
-The v0.33 top wrapper owns only the release version presentation. Battery Saver behavior remains in the v031 Battery Saver layer, with v0.33 profile data supplied by the backend. The existing chart core now includes the live-plan refresh repair.
+The v0.34 top wrapper owns release version presentation and cache-busts both modified nested modules. Battery Saver behavior remains in the v031 Battery Saver layer with v0.34 profile metadata supplied by the backend. Revision-aware chart refresh remains in the Battery Plan core.
 
 This layering remains technical debt: future releases should avoid adding behavioral monkey-patch layers where a bounded backend/module change is sufficient. A frontend consolidation must preserve behavior under browser/regression tests before historical assets are removed.
 
@@ -336,7 +367,7 @@ The operation is GoodWe-first because the hardware floor is authoritative in rea
 
 The orchestrator also reasserts the currently verified GoodWe minimum into EnergyPilot-owned EMHASS optimizations and clamps runtime `soc_final` to the effective hard EMHASS range.
 
-The low-level Beta SOC API remains available for controlled diagnostics/tooling. Maximum SOC remains EMHASS-only.
+The low-level Beta SOC API remains available for controlled diagnostics/tooling. When Battery Saver manages a profile, maximum SOC remains EMHASS-owned but is included in the EnergyPilot profile transaction.
 
 ## Persistent grid accounting
 
@@ -405,7 +436,7 @@ Entity unique IDs remain config-entry based. Host/unit-ID changes must not creat
 
 ```text
 register/transport problem -> registers.py / client.py / coordinator.py
-controller decision        -> controller.py + bounded controller_v033 availability layer
+controller decision        -> controller.py + bounded controller_v033 availability/EV layer
 EMHASS optimization        -> orchestrator*.py / emhass_config.py
 persistent plan resilience -> plan_runtime.py / battery_plan.py
 Battery Saver policy       -> battery_saver.py / battery_saver_api.py / orchestrator_v031.py
