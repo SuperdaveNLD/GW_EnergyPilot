@@ -29,6 +29,7 @@ from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
 from .orchestrator_v031 import GWEnergyPilotOrchestrator
+from .plan_runtime import GWEnergyPilotPlanRuntime
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
 
@@ -57,6 +58,7 @@ class GWRuntimeData:
     orchestrator: GWEnergyPilotOrchestrator
     accounting: GWEnergyPilotAccounting
     debug_log: GWEnergyPilotDebugRuntime
+    plan_runtime: GWEnergyPilotPlanRuntime
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -134,6 +136,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
     debug_log = GWEnergyPilotDebugRuntime(hass, entry.entry_id)
+    plan_runtime = GWEnergyPilotPlanRuntime(hass, entry)
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -141,8 +144,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         orchestrator=orchestrator,
         accounting=accounting,
         debug_log=debug_log,
+        plan_runtime=plan_runtime,
     )
 
+    await plan_runtime.async_restore()
+    entry.async_create_background_task(
+        hass,
+        plan_runtime.async_startup_refresh(),
+        f"GW EnergyPilot EMHASS plan refresh ({entry.entry_id})",
+    )
     await debug_log.async_start(entry)
     await accounting.async_prepare()
     await controller.async_setup()
