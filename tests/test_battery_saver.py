@@ -37,7 +37,7 @@ class BatterySaverTests(unittest.TestCase):
         self.assertEqual(mad["battery_stress_cost"], 0.0)
 
         self.assertEqual(gold["battery_soc_deficit_threshold"], 0.05)
-        self.assertEqual(gold["battery_soc_surplus_threshold"], 0.98)
+        self.assertEqual(gold["battery_soc_surplus_threshold"], 0.96)
         self.assertEqual(gold["battery_soc_surplus_cost"], 0.01)
         self.assertEqual(gold["battery_stress_cost"], 0.006)
 
