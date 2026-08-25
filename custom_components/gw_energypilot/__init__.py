@@ -21,7 +21,7 @@ from .battery_saver_api import async_register_battery_saver_api
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
-from .controller import GWEnergyPilotController
+from .controller_v033 import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .debug_log_api import async_register_debug_log_api
 from .debug_log_runtime import GWEnergyPilotDebugRuntime
