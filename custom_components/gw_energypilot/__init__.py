@@ -45,7 +45,7 @@ PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
 PANEL_MODULE = (
-    f"{PANEL_STATIC_URL}/gw-energy-pilot-v036-customer-controller.js?v=0.36-controller2"
+    f"{PANEL_STATIC_URL}/gw-energy-pilot-v036-customer-controller.js?v=0.36-release1"
 )
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
