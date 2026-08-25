@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.32** | 2026-08-25 | **Beta** | Hotfixes EMHASS settings saving on current Home Assistant while preserving four-decimal tariff values such as `0.0248`. |
 | **0.31** | 2026-08-24 | **Beta** | Adds an opt-in, administrator-only debug session to LOG with bounded memory-only runtime tracing, full decoded GoodWe telemetry, controller/read-back and EMHASS status correlation, plus a copyable support report. |
 | **0.30** | 2026-08-24 | **Beta** | Standardizes numeric GitHub Releases for HACS/Home Assistant so updates show `0.30` instead of a shortened commit SHA, with validated release automation and a synchronized v0.30 frontend badge. |
 | **0.29** | 2026-08-24 | **Beta** | Adds safe EMHASS required-config synchronization and recommended defaults, resolves current EnergyPilot entity IDs from the Home Assistant registry, and adds a final live-flow double-reversal guard. |
@@ -46,6 +47,24 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.32 — Home Assistant price-selector hotfix
+
+v0.32 is a focused compatibility hotfix for the EMHASS settings form introduced immediately after v0.31.
+
+Home Assistant currently validates `NumberSelector` configuration with a minimum numeric `step` of `0.001`. v0.31 configured the import/export price selectors with `step=0.0001`, which caused settings validation to fail before the values could be saved:
+
+```text
+not a valid value for dictionary value @ data['step']
+```
+
+v0.32 restores the Home Assistant selector configuration to `step=0.001`. This does **not** reduce the stored precision: in BOX mode Home Assistant does not round typed input to the configured step. Values such as `0.0248` therefore remain valid and are stored unchanged.
+
+The EnergyPilot dashboard still exposes a browser input increment of `0.0001`, retaining convenient fine-grained tariff entry while respecting the Home Assistant backend selector contract.
+
+No GoodWe register, Modbus block, controller mapping, EMHASS optimization model, Battery Saver tuning, entity ID or unique ID changes in this hotfix.
+
+See `docs/RELEASE_NOTES_V032.md`.
 
 # v0.31 — Opt-in debug sessions for problem analysis
 
