@@ -31,7 +31,30 @@ function openModal(panel) {
   document.body.appendChild(backdrop);
 }
 
+function currentOptimizationPlanRevision(panel) {
+  const entityId = panel._entityId?.("optimize_now");
+  const state = entityId ? panel._hass?.states?.[entityId] : null;
+  const raw = state?.attributes?.plan_revision;
+  if (raw === null || raw === undefined || raw === "") return null;
+  const revision = Number(raw);
+  return Number.isFinite(revision) ? revision : null;
+}
+
 function activePlanChanged(panel, data) {
+  const currentRevision = currentOptimizationPlanRevision(panel);
+  const cachedRaw = data?.payload?.plan_revision;
+  const cachedRevision = cachedRaw === null || cachedRaw === undefined || cachedRaw === ""
+    ? null
+    : Number(cachedRaw);
+  if (
+    currentRevision !== null &&
+    (!Number.isFinite(cachedRevision) || currentRevision !== cachedRevision)
+  ) {
+    return true;
+  }
+
+  // Preserve the external-EMHASS fallback: a plan published outside an
+  // EnergyPilot optimization still invalidates the chart when P_batt changes.
   const plan = data?.payload?.battery_plan;
   const entityId = plan?.entity_id;
   if (!entityId) return false;

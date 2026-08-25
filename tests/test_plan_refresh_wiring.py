@@ -1,0 +1,25 @@
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
+
+
+class PlanRefreshWiringTests(unittest.TestCase):
+    def test_successful_optimization_publishes_plan_revision(self) -> None:
+        source = (INTEGRATION / "orchestrator_v033.py").read_text(encoding="utf-8")
+
+        self.assertIn("self.plan_revision = 0", source)
+        self.assertIn("self.plan_revision += 1", source)
+        self.assertIn("await plan_runtime.async_refresh", source)
+        self.assertIn("async_dispatcher_send(self.hass, self.signal)", source)
+
+    def test_chart_payload_contains_plan_revision(self) -> None:
+        source = (INTEGRATION / "battery_price_api.py").read_text(encoding="utf-8")
+
+        self.assertIn('"plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0)', source)
+
+
+if __name__ == "__main__":
+    unittest.main()

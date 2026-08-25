@@ -156,6 +156,7 @@ async def websocket_get_battery_price(
         {
             "entry_id": entry.entry_id,
             "chart_schema_version": 4,
+            "plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0),
             **price_payload,
             "battery_energy": _battery_energy_payload(runtime_data),
             "battery_plan": _battery_plan_payload(hass, entry),
