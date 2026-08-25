@@ -1,5 +1,6 @@
-import "./gw-energy-pilot-v035.js?v=0.36-controller1";
+import "./gw-energy-pilot-v035.js?v=0.36-controller2";
 
+const VERSION = "0.36";
 const PANEL_NAME = "gw-energypilot-panel";
 const CUSTOM_MODE = "custom";
 
@@ -9,14 +10,19 @@ const TEXT = {
     title: "Battery strategy",
     description: "Choose how EnergyPilot should value battery use. A profile change updates EMHASS and immediately builds a fresh plan.",
     custom: "Custom",
-    customDescription: "Keep the current EMHASS battery values and tune them manually.",
+    customDescription: "Keep the current EMHASS battery values and tune the main limits manually.",
     active: "ACTIVE",
     applying: "Applying profile and optimizing…",
     applied: "Profile applied · fresh plan published.",
-    customTitle: "Custom battery limits",
-    customNote: "SOC sliders use the existing Home Assistant entities. Minimum SOC remains synchronized with the GoodWe on-grid battery floor; each completed change triggers a fresh optimization.",
+    customTitle: "Custom battery settings",
+    customNote: "SOC sliders use the existing Home Assistant entities. Minimum SOC remains synchronized with the GoodWe on-grid battery floor; each completed change triggers a fresh optimization. Advanced EMHASS battery penalties are shown below for transparency and remain managed in EMHASS.",
     minimum: "Minimum SOC",
     maximum: "Maximum SOC",
+    deficit: "Low-SOC cost",
+    surplus: "High-SOC cost",
+    stress: "Power stress",
+    chargeWeight: "Charge cost",
+    dischargeWeight: "Discharge cost",
     diagnostics: "Low-level controller command is available in Diagnostics.",
   },
   nl: {
@@ -24,14 +30,19 @@ const TEXT = {
     title: "Batterijstrategie",
     description: "Kies hoe EnergyPilot batterijgebruik moet waarderen. Een profielwijziging past EMHASS aan en bouwt direct een nieuw plan.",
     custom: "Custom",
-    customDescription: "Behoud de huidige EMHASS-batterijwaarden en stel ze handmatig af.",
+    customDescription: "Behoud de huidige EMHASS-batterijwaarden en stel de belangrijkste limieten handmatig af.",
     active: "ACTIEF",
     applying: "Profiel toepassen en optimaliseren…",
     applied: "Profiel toegepast · nieuw plan gepubliceerd.",
-    customTitle: "Custom batterijlimieten",
-    customNote: "De SOC-sliders gebruiken de bestaande Home Assistant-entiteiten. Minimum SOC blijft gekoppeld aan de GoodWe on-grid ondergrens; iedere afgeronde wijziging start een nieuwe optimalisatie.",
+    customTitle: "Custom batterijinstellingen",
+    customNote: "De SOC-sliders gebruiken de bestaande Home Assistant-entiteiten. Minimum SOC blijft gekoppeld aan de GoodWe on-grid ondergrens; iedere afgeronde wijziging start een nieuwe optimalisatie. De overige EMHASS-batterijkosten staan hieronder ter controle en blijven in EMHASS beheerd.",
     minimum: "Minimum SOC",
     maximum: "Maximum SOC",
+    deficit: "Kosten lage SOC",
+    surplus: "Kosten hoge SOC",
+    stress: "Vermogensstress",
+    chargeWeight: "Laadkosten",
+    dischargeWeight: "Ontlaadkosten",
     diagnostics: "Het technische controllercommando staat in Diagnostiek.",
   },
 };
@@ -71,10 +82,14 @@ function ensureStyles(root) {
     .ep-v036-soc-label { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; color:#8fa9ba; font-size:8px; }
     .ep-v036-soc-label strong { color:#e5f4fa; font-size:10px; }
     .ep-v036-soc input { width:100%; accent-color:#25ddb6; }
+    .ep-v036-custom-values { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; margin-top:9px; }
+    .ep-v036-custom-value { padding:8px; border:1px solid rgba(76,157,202,.08); border-radius:8px; background:rgba(7,29,50,.32); min-width:0; }
+    .ep-v036-custom-value span { display:block; color:#66879a; font-size:7px; }
+    .ep-v036-custom-value strong { display:block; margin-top:3px; color:#bfd6e1; font-size:8px; overflow-wrap:anywhere; }
     .ep-v036-custom-note { margin-top:8px; color:#5f7e91; font-size:7px; line-height:1.45; }
     .ep-v036-diagnostic-note { margin-top:10px; color:#58788d; font-size:8px; }
-    @media (max-width:1000px) { .ep-v036-profile-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-    @media (max-width:650px) { .ep-v036-profile-grid { grid-template-columns:1fr 1fr; } .ep-v036-custom-grid { grid-template-columns:1fr; } }
+    @media (max-width:1000px) { .ep-v036-profile-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .ep-v036-custom-values { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media (max-width:650px) { .ep-v036-profile-grid { grid-template-columns:1fr 1fr; } .ep-v036-custom-grid, .ep-v036-custom-values { grid-template-columns:1fr; } }
     @media (max-width:430px) { .ep-v036-profile-grid { grid-template-columns:1fr; } }
   `;
   root.appendChild(style);
@@ -104,9 +119,7 @@ async function loadBatterySaver(panel, force = false) {
 async function selectProfile(panel, mode) {
   const cache = batterySaverCache(panel);
   if (!panel._hass?.callWS || cache.busy) return;
-  if (!cache.data?.entry_id) {
-    await loadBatterySaver(panel, true);
-  }
+  if (!cache.data?.entry_id) await loadBatterySaver(panel, true);
   const entryId = cache.data?.entry_id;
   if (!entryId) return;
   const t = copy(panel);
@@ -135,15 +148,26 @@ function numberModel(panel, key, fallback) {
   const entityId = panel._entityId?.(key);
   const state = entityId ? panel._state?.(entityId) : null;
   const value = Number(state?.state);
-  return {
-    entityId,
-    value: Number.isFinite(value) ? value : fallback,
-  };
+  return { entityId, value: Number.isFinite(value) ? value : fallback };
 }
 
-function customSocHtml(panel, t) {
+function displayConfigValue(value) {
+  if (Array.isArray(value)) return value.map((item) => displayConfigValue(item)).join(", ");
+  const number = Number(value);
+  return Number.isFinite(number) ? String(Math.round(number * 1000000) / 1000000) : "—";
+}
+
+function customSocHtml(panel, t, data) {
   const min = numberModel(panel, "emhass_minimum_soc", 0);
   const max = numberModel(panel, "emhass_maximum_soc", 100);
+  const values = data?.current_emhass_values || {};
+  const fields = [
+    [t.deficit, values.battery_soc_deficit_cost],
+    [t.surplus, values.battery_soc_surplus_cost],
+    [t.stress, values.battery_stress_cost],
+    [t.chargeWeight, values.weight_battery_charge],
+    [t.dischargeWeight, values.weight_battery_discharge],
+  ];
   return `
     <div class="ep-v036-custom">
       <div class="ep-v036-custom-head">${panel._escape(t.customTitle)}</div>
@@ -156,6 +180,9 @@ function customSocHtml(panel, t) {
           <div class="ep-v036-soc-label"><span>${panel._escape(t.maximum)}</span><strong data-v036-soc-value="max">${Math.round(max.value)}%</strong></div>
           <input data-v036-soc="max" type="range" min="0" max="100" step="1" value="${max.value}" ${max.entityId ? "" : "disabled"}>
         </div>
+      </div>
+      <div class="ep-v036-custom-values">
+        ${fields.map(([label, value]) => `<div class="ep-v036-custom-value"><span>${panel._escape(label)}</span><strong>${panel._escape(displayConfigValue(value))}</strong></div>`).join("")}
       </div>
       <div class="ep-v036-custom-note">${panel._escape(t.customNote)}</div>
     </div>`;
@@ -210,12 +237,7 @@ function installCustomerStrategy(panel, root) {
   const activeMode = data?.managed ? data.mode : CUSTOM_MODE;
   const modes = [
     ...(data?.modes || []),
-    {
-      key: CUSTOM_MODE,
-      label: t.custom,
-      description: t.customDescription,
-      recommended: false,
-    },
+    { key: CUSTOM_MODE, label: t.custom, description: t.customDescription, recommended: false },
   ];
 
   const wrap = document.createElement("section");
@@ -236,7 +258,7 @@ function installCustomerStrategy(panel, root) {
           <small>${panel._escape(mode.description || "")}</small>
         </button>`).join("")}
     </div>
-    ${activeMode === CUSTOM_MODE ? customSocHtml(panel, t) : ""}
+    ${activeMode === CUSTOM_MODE ? customSocHtml(panel, t, data) : ""}
     <div class="ep-v036-message ${cache.tone || ""}">${panel._escape(cache.error || cache.message || "")}</div>
     <div class="ep-v036-diagnostic-note">${panel._escape(t.diagnostics)}</div>`;
 
@@ -250,6 +272,13 @@ function installCustomerStrategy(panel, root) {
   if (activeMode === CUSTOM_MODE) bindCustomSoc(panel, wrap);
 }
 
+function updateVersion(root) {
+  const versionBadge = root.querySelector(".version");
+  if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
+  const footerItems = root.querySelectorAll("footer span");
+  if (footerItems.length > 0) footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
+}
+
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 
@@ -260,6 +289,7 @@ if (!PanelClass.prototype.__epV036CustomerControllerInstalled) {
     const root = this.shadowRoot;
     if (!root) return;
     installCustomerStrategy(this, root);
+    updateVersion(root);
   };
   PanelClass.prototype.__epV036CustomerControllerInstalled = true;
 }
