@@ -144,10 +144,9 @@ For every EnergyPilot-owned optimization EnergyPilot continues to enforce:
 continual_publish = true
 method_ts_round = first
 set_use_battery = true
-inverter_is_hybrid = true
 ```
 
-`set_use_pv` remains installation-specific.
+`set_use_pv` and `inverter_is_hybrid` remain installation-specific EMHASS settings and are preserved by EnergyPilot.
 
 The runtime flow is:
 
