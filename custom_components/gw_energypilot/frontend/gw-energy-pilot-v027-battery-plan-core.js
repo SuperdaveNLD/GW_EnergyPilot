@@ -31,31 +31,52 @@ function openModal(panel) {
   document.body.appendChild(backdrop);
 }
 
+function activePlanChanged(panel, data) {
+  const plan = data?.payload?.battery_plan;
+  const entityId = plan?.entity_id;
+  if (!entityId) return false;
+  const state = panel._hass?.states?.[entityId];
+  if (!state?.last_updated || !plan?.last_updated) return false;
+  return state.last_updated !== plan.last_updated;
+}
+
 function installEnhancedCard(panel, root) {
   const layout = root.querySelector(".ep-dashboard-layout");
   if (!layout) return;
 
+  const size = chartSize();
+  const data = panel.__epV027BatteryPlanData;
+  const hidden = chartHidden();
+
   // A cache-busted frontend module can wrap _render more than once during a
-  // live upgrade. Keep the first enhanced card as the canonical instance and
-  // remove any already-created duplicates instead of appending another card.
+  // live upgrade. Keep one canonical card, but do not let the duplicate guard
+  // prevent that card from being replaced when fresh chart data arrives.
   const existingCards = [...root.querySelectorAll(".ep-v027-battery-plan-card")];
-  if (existingCards.length) {
-    for (const duplicate of existingCards.slice(1)) duplicate.remove();
+  const existingCard = existingCards[0] || null;
+  for (const duplicate of existingCards.slice(1)) duplicate.remove();
+
+  const renderKey = `${data?.at || 0}:${size}:${hidden ? 1 : 0}`;
+  if (existingCard?.dataset.epRenderKey === renderKey) {
+    if (data && activePlanChanged(panel, data) && !panel.__epV027BatteryPlanPromise) {
+      void loadChartData(panel, true);
+    } else if (data && Date.now() - data.at >= DATA_CACHE_MS && !panel.__epV027BatteryPlanPromise) {
+      void loadChartData(panel);
+    }
     return;
   }
 
   const oldCard = root.querySelector(".ep-v026-battery-price-card");
-  const size = chartSize();
-  const data = panel.__epV027BatteryPlanData;
   const card = document.createElement("article");
   card.className = `panel-card ep-v027-battery-plan-card size-${size}`;
   card.dataset.epCard = CARD_ID;
   card.dataset.epSpan = size === "compact" ? "2" : "4";
-  card.hidden = chartHidden();
+  card.dataset.epRenderKey = renderKey;
+  card.hidden = hidden;
   const updated = data?.at ? t(panel, "updated", { time: formatTime(data.at) }) : t(panel, "waiting");
   card.innerHTML = `<div class="ep-v027-head"><div><div class="ep-v027-kicker">${panel._escape(t(panel, "title"))}</div><div class="ep-v027-subtitle">${panel._escape(t(panel, "subtitle"))}</div></div><div class="ep-v027-head-actions">${sizeControlHtml(panel, size)}<button type="button" class="ep-v027-expand" title="${panel._escape(t(panel, "expand"))}" aria-label="${panel._escape(t(panel, "expand"))}">↗</button></div></div>${cardBody(panel, data, size, false)}<div class="ep-v027-footer"><div class="ep-v027-footer-actions"><button type="button" data-action="details">${panel._escape(t(panel, "details"))}</button><button type="button" data-action="refresh" title="${panel._escape(t(panel, "refresh"))}">↻</button></div><span>${panel._escape(updated)}</span></div>`;
 
-  if (oldCard) oldCard.replaceWith(card);
+  if (existingCard) existingCard.replaceWith(card);
+  else if (oldCard) oldCard.replaceWith(card);
   else {
     const batteryCard = layout.querySelector('[data-ep-card="battery"]') || layout.querySelector(".energy-card.battery");
     if (batteryCard) batteryCard.insertAdjacentElement("afterend", card);
@@ -73,6 +94,7 @@ function installEnhancedCard(panel, root) {
   card.querySelector('[data-action="refresh"]')?.addEventListener("click", () => void loadChartData(panel, true));
 
   if (!data && !panel.__epV027BatteryPlanPromise) void loadChartData(panel);
+  else if (data && activePlanChanged(panel, data) && !panel.__epV027BatteryPlanPromise) void loadChartData(panel, true);
   else if (data && Date.now() - data.at >= DATA_CACHE_MS && !panel.__epV027BatteryPlanPromise) void loadChartData(panel);
 }
 
