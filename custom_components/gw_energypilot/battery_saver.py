@@ -27,10 +27,18 @@ BATTERY_SAVER_CONFIG_KEYS: tuple[str, ...] = (
     "battery_soc_surplus_cost",
     "battery_stress_cost",
     "battery_stress_segments",
+    "weight_battery_charge",
+    "weight_battery_discharge",
 )
 
 MINIMUM_STRESS_SAFE_EMHASS_VERSION = (0, 18, 1)
 DEFAULT_PRICE_REFERENCE = 0.20
+# Field validation on the primary installation showed that ~0.005 currency/kWh
+# on both charge and discharge removed low-value quarter-hour reversals while
+# preserving the high-value 12-15 kW evening dispatch. The observed Battery
+# Saver price reference was ~0.31, so 1.5% reproduces that friction without
+# hard-coding EUR and keeps the policy proportional in other currencies.
+ANTI_CHURN_COST_FACTOR = 0.015
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +61,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_MAD_STEVE,
         label="Mad-Steve",
         short_description=(
-            "Maximum economic freedom. No additional low-SOC, high-SOC or power-stress cost."
+            "Maximum economic freedom with a small anti-churn trading cost; no extra SOC or power-stress penalty."
         ),
         deficit_threshold=0.05,
         deficit_cost_factor=0.0,
@@ -65,11 +73,11 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_GOLD_RUSH,
         label="Gold Rush",
         short_description=(
-            "Profit first, while filtering low-value high-SOC dwell and unnecessary high-power cycling."
+            "Profit first with anti-churn protection, a light high-SOC cost above 96% and light power stress."
         ),
         deficit_threshold=0.05,
         deficit_cost_factor=0.0,
-        surplus_threshold=0.98,
+        surplus_threshold=0.96,
         surplus_cost_factor=0.05,
         stress_cost_factor=0.03,
     ),
@@ -77,7 +85,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_BALANCED,
         label="Balanced",
         short_description=(
-            "Balances trading value with moderate high-SOC, low-SOC and high-power penalties."
+            "Balances trading value with the shared anti-churn cost and moderate SOC and high-power penalties."
         ),
         deficit_threshold=0.10,
         deficit_cost_factor=0.05,
@@ -89,7 +97,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_BATTERY_SAVER,
         label="Battery Saver",
         short_description=(
-            "Makes marginal cycling, extended high SOC and high power materially less attractive."
+            "Keeps the anti-churn floor and makes extended extreme SOC and high power materially less attractive."
         ),
         deficit_threshold=0.15,
         deficit_cost_factor=0.10,
@@ -118,6 +126,7 @@ def battery_saver_mode_payloads() -> list[dict[str, Any]]:
             "description": preset.short_description,
             "deficit_threshold_pct": round(preset.deficit_threshold * 100),
             "surplus_threshold_pct": round(preset.surplus_threshold * 100),
+            "anti_churn_cost_factor_pct": round(ANTI_CHURN_COST_FACTOR * 100, 1),
             "recommended": preset.key == MODE_BALANCED,
         }
         for preset in PRESETS.values()
@@ -199,6 +208,7 @@ def build_battery_saver_profile(
     normalized = normalize_battery_saver_mode(mode)
     preset = PRESETS[normalized]
     reference = battery_saver_price_reference([price_reference], {})
+    anti_churn_weight = round(reference * ANTI_CHURN_COST_FACTOR, 6)
     return {
         "mode": preset.key,
         "label": preset.label,
@@ -209,6 +219,10 @@ def build_battery_saver_profile(
         "battery_soc_surplus_cost": round(reference * preset.surplus_cost_factor, 6),
         "battery_stress_cost": round(reference * preset.stress_cost_factor, 6),
         "battery_stress_segments": preset.stress_segments,
+        # Battery Saver supports exactly one EMHASS battery model. Keep the
+        # explicit one-element list shape used by current EMHASS configs.
+        "weight_battery_charge": [anti_churn_weight],
+        "weight_battery_discharge": [anti_churn_weight],
     }
 
 
@@ -225,17 +239,31 @@ def apply_battery_saver_profile(
     return updated, profile
 
 
+def _zero_cost_value(value: Any) -> bool:
+    """Return whether a scalar/list EMHASS cost is absent or numerically zero."""
+    if value is None:
+        return True
+    if isinstance(value, list | tuple):
+        if not value:
+            return True
+        numbers = [_finite_number(item) for item in value]
+        return all(number is not None and abs(number) <= 1e-12 for number in numbers)
+    number = _finite_number(value)
+    return number is not None and abs(number) <= 1e-12
+
+
 def battery_saver_costs_are_zero(config: Mapping[str, Any]) -> bool:
-    """Return whether the active EMHASS config is behaviorally Mad-Steve."""
-    for key in (
-        "battery_soc_deficit_cost",
-        "battery_soc_surplus_cost",
-        "battery_stress_cost",
-    ):
-        value = _finite_number(config.get(key))
-        if value is None or abs(value) > 1e-12:
-            return False
-    return True
+    """Return whether EMHASS still uses legacy unrestricted zero-cost behavior."""
+    return all(
+        _zero_cost_value(config.get(key))
+        for key in (
+            "battery_soc_deficit_cost",
+            "battery_soc_surplus_cost",
+            "battery_stress_cost",
+            "weight_battery_charge",
+            "weight_battery_discharge",
+        )
+    )
 
 
 def number_of_batteries(config: Mapping[str, Any]) -> int:
