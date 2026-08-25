@@ -132,20 +132,6 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
         updated["inverter_is_hybrid"] = True
 
         battery_count = number_of_batteries(current)
-        goodwe_minimum = self._goodwe_minimum_soc()
-        if battery_count == 1 and goodwe_minimum is not None:
-            maximum = current.get("battery_maximum_state_of_charge", 1.0)
-            try:
-                maximum_value = float(maximum)
-            except (TypeError, ValueError):
-                maximum_value = 1.0
-            if 0.0 <= maximum_value <= 1.0 and goodwe_minimum > maximum_value:
-                raise HomeAssistantError(
-                    "GoodWe minimum SOC exceeds the configured EMHASS maximum SOC; "
-                    "adjust the maximum SOC before optimizing"
-                )
-            updated["battery_minimum_state_of_charge"] = goodwe_minimum
-
         configured_mode = self.entry.options.get(CONF_BATTERY_SAVER_MODE)
         profile: dict[str, Any] | None = None
         if configured_mode is not None:
@@ -177,6 +163,25 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
                 mode,
                 price_reference,
             )
+
+        # The managed profile maximum must be applied before validating the
+        # canonical GoodWe minimum. This prevents a stale/custom previous EMHASS
+        # maximum from rejecting a mode that intentionally raises the hard cap
+        # (for example Mad-Steve 100%). Unmanaged installations keep their
+        # existing EMHASS maximum exactly as before.
+        goodwe_minimum = self._goodwe_minimum_soc()
+        if battery_count == 1 and goodwe_minimum is not None:
+            maximum = updated.get("battery_maximum_state_of_charge", 1.0)
+            try:
+                maximum_value = float(maximum)
+            except (TypeError, ValueError):
+                maximum_value = 1.0
+            if 0.0 <= maximum_value <= 1.0 and goodwe_minimum > maximum_value:
+                raise HomeAssistantError(
+                    "GoodWe minimum SOC exceeds the effective EMHASS maximum SOC; "
+                    "select a profile or maximum SOC compatible with the GoodWe minimum"
+                )
+            updated["battery_minimum_state_of_charge"] = goodwe_minimum
 
         try:
             effective_soc_final = clamp_soc_final(

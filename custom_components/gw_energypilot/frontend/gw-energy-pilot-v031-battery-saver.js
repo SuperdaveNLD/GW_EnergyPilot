@@ -5,7 +5,7 @@ const PANEL_NAME = "gw-energypilot-panel";
 const TEXT = {
   en: {
     title: "Battery Saver",
-    description: "Choose how strongly EnergyPilot values battery preservation inside EMHASS optimization. These are soft economic preferences; the Minimum SOC and Maximum SOC sliders remain the hard operating limits.",
+    description: "Choose how strongly EnergyPilot values battery preservation inside EMHASS optimization. A managed profile sets the EMHASS Maximum SOC; the GoodWe-synchronized Minimum SOC remains the hard lower operating limit.",
     unmanaged: "Existing EMHASS behavior is not managed by EnergyPilot yet.",
     legacyMadSteve: "Legacy zero-cost EMHASS behavior is more aggressive than current Mad-Steve. Select a mode to add the shared anti-churn trading cost.",
     custom: "Custom EMHASS battery penalties are active. They are preserved until you explicitly select an EnergyPilot mode.",
@@ -14,6 +14,7 @@ const TEXT = {
     hardRange: "Hard SOC range",
     low: "Low-SOC soft threshold",
     high: "High-SOC soft threshold",
+    maximum: "Hard maximum",
     effective: "Effective profile",
     priceRef: "price reference",
     recommended: "RECOMMENDED",
@@ -22,7 +23,7 @@ const TEXT = {
   },
   nl: {
     title: "Battery Saver",
-    description: "Kies hoe zwaar EnergyPilot batterijbehoud meeweegt in de EMHASS-optimalisatie. Dit zijn zachte economische voorkeuren; de sliders Minimum SOC en Maximum SOC blijven de harde bedrijfsgrenzen.",
+    description: "Kies hoe zwaar EnergyPilot batterijbehoud meeweegt in de EMHASS-optimalisatie. Een beheerd profiel stelt de EMHASS Maximum SOC in; de met GoodWe gesynchroniseerde Minimum SOC blijft de harde ondergrens.",
     unmanaged: "Het bestaande EMHASS-gedrag wordt nog niet door EnergyPilot beheerd.",
     legacyMadSteve: "Het oude EMHASS-gedrag zonder kosten is agressiever dan de huidige Mad-Steve. Kies een modus om de gedeelde anti-churn handelskosten toe te passen.",
     custom: "Er zijn custom EMHASS-batterijpenalties actief. Die blijven behouden totdat je expliciet een EnergyPilot-modus kiest.",
@@ -31,6 +32,7 @@ const TEXT = {
     hardRange: "Harde SOC-range",
     low: "Zachte low-SOC-drempel",
     high: "Zachte high-SOC-drempel",
+    maximum: "Harde maximum-SOC",
     effective: "Effectief profiel",
     priceRef: "prijsreferentie",
     recommended: "AANBEVOLEN",
@@ -178,12 +180,16 @@ function renderBatterySaver(panel, root) {
       ${mode.recommended ? `<span class="ep-v031-bs-rec">${panel._escape(t.recommended)}</span>` : ""}
       <strong>${panel._escape(mode.label)}</strong>
       <p>${panel._escape(mode.description)}</p>
-      <div class="ep-v031-bs-thresholds">${panel._escape(t.low)} ${mode.deficit_threshold_pct}% · ${panel._escape(t.high)} ${mode.surplus_threshold_pct}%</div>
+      <div class="ep-v031-bs-thresholds">${panel._escape(t.low)} ${mode.deficit_threshold_pct}% · ${panel._escape(t.high)} ${mode.surplus_threshold_pct}% · ${panel._escape(t.maximum)} ${mode.maximum_soc_pct}%</div>
     </button>`).join("");
 
   const profile = data?.effective_profile;
+  const profileMax = profile?.battery_maximum_state_of_charge;
+  const profileMaxText = Number.isFinite(Number(profileMax))
+    ? `${Math.round(Number(profileMax) * 100)}%`
+    : "—";
   const profileText = profile
-    ? `${t.effective}: cycle charge ${firstWeight(profile.weight_battery_charge)} · cycle discharge ${firstWeight(profile.weight_battery_discharge)} · deficit ${profile.battery_soc_deficit_cost} · surplus ${profile.battery_soc_surplus_cost} · stress ${profile.battery_stress_cost} · ${t.priceRef} ${profile.price_reference}`
+    ? `${t.effective}: max SOC ${profileMaxText} · cycle charge ${firstWeight(profile.weight_battery_charge)} · cycle discharge ${firstWeight(profile.weight_battery_discharge)} · deficit ${profile.battery_soc_deficit_cost} · surplus ${profile.battery_soc_surplus_cost} · stress ${profile.battery_stress_cost} · ${t.priceRef} ${profile.price_reference}`
     : "";
 
   wrap.innerHTML = `
