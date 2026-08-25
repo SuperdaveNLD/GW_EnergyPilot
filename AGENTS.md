@@ -5,13 +5,13 @@ This file defines working rules for AI coding assistants and contributors. The r
 ## Source of truth
 
 - Always inspect the current repository before proposing or applying a change.
-- Never reconstruct current code from an older chat, pasted fragment, or previous release.
+- Never reconstruct current code from an older chat, pasted fragment or previous release.
 - Repository code and current documentation take precedence over conversation history.
 - If documentation and code disagree, treat code as current behavior and fix the documentation mismatch.
 
 ## Current scope
 
-GW EnergyPilot is an unofficial Home Assistant custom integration for local GoodWe ETA-G20 telemetry, EMS control, EMHASS orchestration, optional Nord Pool pricing, optional EV anti-discharge protection, persistent grid accounting and a built-in dashboard.
+GW EnergyPilot is an unofficial Home Assistant custom integration for local GoodWe ETA-G20 telemetry, EMS control, EMHASS orchestration, optional runtime pricing, EV anti-discharge protection, persistent grid accounting, persistent EMHASS plan resilience and a built-in dashboard.
 
 Primary tested inverter:
 
@@ -22,20 +22,20 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.24 Beta
+v0.33 Beta
 ```
 
-EMHASS is an external prerequisite. EnergyPilot may integrate with EMHASS but must not install or silently replace it.
+EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
 ## Before changing code
 
 1. Read the live files involved in the requested behavior.
-2. Trace callers, listeners, config/options, entities and frontend dependencies.
+2. Trace callers, listeners, config/options, entities, persistence and frontend dependencies.
 3. Identify the root cause before rewriting code.
 4. Prefer the smallest robust change.
 5. Preserve working behavior outside the requested scope.
 6. Check backwards compatibility for entity unique IDs, device identifiers, config entries, storage keys and Recorder/statistics history.
-7. Update documentation when architecture, register semantics, public entities, persistent state or operator workflow changes.
+7. Update documentation when architecture, register semantics, optimizer policy, public entities, persistent state or operator workflow changes.
 
 ## Home Assistant rules
 
@@ -47,7 +47,7 @@ EMHASS is an external prerequisite. EnergyPilot may integrate with EMHASS but mu
 - Current device identity is `(DOMAIN, config_entry_id)`; do not revert to mutable `host:slave` identity.
 - Prefer config/options over hard-coded Home Assistant entity IDs.
 - Do not create duplicate entities or parallel implementations for the same concept without a migration plan.
-- Persistent runtime history belongs in Home Assistant `Store`, not in user configuration.
+- Persistent runtime/history belongs in Home Assistant `Store`, not in user configuration.
 
 ## Modbus rules
 
@@ -84,8 +84,6 @@ write 47511
 
 ## Beta register policy
 
-Beta means **not yet extensively field-tested**.
-
 For unconfirmed hardware semantics:
 
 - keep candidate registers optional;
@@ -106,58 +104,128 @@ Automatic and manual control must remain explicit.
 - Manual mode numbers always mean exactly the selected GoodWe mode; automatic strategy settings must never remap manual commands.
 - Do not introduce competing automatic feedback loops over the same EMS actuator.
 
-### Automatic actuator strategy
+### Automatic strategies
 
-v0.24 restores backwards-compatible strategy selection. A missing `use_goodwe_smart_meter` value must behave the same as explicit OFF. Never silently opt an existing installation into PCC control.
-
-With **GoodWe smart meter active = ON** (explicit opt-in):
-
-```text
-P_grid > +deadband  -> mode 9  Grid import target
-P_grid < -deadband  -> mode 10 Grid export target
-P_grid near 0 W     -> mode 1  Auto / self-use
-```
-
-GoodWe closes the fast loop against its own smart meter/PCC. `P_batt` remains a required plan-validity/diagnostic output.
-
-With **GoodWe smart meter active = OFF or missing** (compatibility default):
+Battery:
 
 ```text
 P_batt < -deadband -> mode 11 Battery charge power
 P_batt > +deadband -> mode 12 Battery discharge power
-P_batt near 0 W    -> mode 8  Battery Hold
+P_batt near 0 W    -> mode 8 Battery Hold
 ```
 
-This direct path must remain usable when `P_grid` is missing/unavailable.
-
-Regression contract from v0.24 field report:
+Grid:
 
 ```text
-P_batt = +962 W
-P_grid = approximately 0 W
-smart-meter strategy missing
-=> mode 12, setpoint 962 W
+P_grid > +deadband -> mode 9 Grid import target
+P_grid < -deadband -> mode 10 Grid export target
+P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 ```
 
-An explicit stored `true` must continue to use the PCC strategy.
-
-### EV anti-discharge protection
-
-The EV feature protects battery direction; it does not control the EV charger.
-
-During EV charging:
+Hybrid:
 
 ```text
-P_batt > +deadband -> mode 8  Battery Hold
-P_batt near 0 W    -> mode 8  Battery Hold
-P_batt < -deadband -> mode 11 Battery charge allowed
+P_grid > +deadband -> mode 9 using abs(P_grid)
+else P_batt > +deadband -> mode 12 using abs(P_batt)
+else P_batt near 0 W -> mode 8
+otherwise -> mode 1 GoodWe Auto / self-use
 ```
 
-The stored option name `enable_ev_coordination` remains for backwards compatibility. User-facing terminology is **EV anti-discharge protection**.
+Hybrid is deliberately asymmetric: buy/import is PCC mode 9; sell/discharge is direct battery mode 12. A battery-charge plan without planned grid import falls through to mode 1 so GoodWe can absorb local PV.
 
-If native orchestration is enabled, EV stop waits for a fresh optimization before normal automatic execution resumes.
+Legacy compatibility remains: missing/false old smart-meter flag -> Battery; explicit true -> Grid.
 
-See `docs/EV_ANTI_DISCHARGE.md`.
+EV anti-discharge is a higher-priority directional override. See `docs/EV_ANTI_DISCHARGE.md`.
+
+## v0.33 plan-resilience rules
+
+EMHASS remains the canonical plan owner. EnergyPilot mirrors the official `GET /api/v1/plan` result in:
+
+```text
+gw_energypilot.plan.<config_entry_id>
+```
+
+This is a resilience mirror only.
+
+Current control source order:
+
+```text
+finite live configured HA P_batt/P_grid
+-> current still-valid persistent-plan point
+-> unavailable/wait
+```
+
+Rules:
+
+- explicit live non-ready optimizer status remains authoritative;
+- only missing/unknown/unavailable optimizer publication may be bridged by a valid mirrored plan;
+- the plan must have an inferred timestep and explicit `valid_until`;
+- never extrapolate the last plan row after expiry;
+- a failed refresh must not delete a still-valid mirror;
+- do not create duplicate P_batt/P_grid entities or a second optimization engine.
+
+See `docs/EMHASS_PLAN_RUNTIME.md`.
+
+## EMHASS output freshness
+
+Do not use `State.last_updated` alone as proof of a fresh publish. Repeated state/attributes can be reported without advancing it.
+
+Current contract:
+
+```text
+State.last_reported primary
+State.last_updated compatibility fallback
++ finite numeric output
++ optimizer ready
+```
+
+## Battery Saver policy
+
+Public modes are exactly:
+
+```text
+Mad-Steve
+Gold Rush
+Balanced
+Battery Saver
+```
+
+Hard Minimum/Maximum SOC is separate from soft Battery Saver preferences.
+
+v0.33 uses two distinct mechanisms:
+
+- `weight_battery_charge` / `weight_battery_discharge`: linear anti-churn cost per battery-throughput kWh;
+- `battery_stress_cost`: current EMHASS quadratic/PWL penalty for high instantaneous battery power.
+
+All four managed profiles use:
+
+```text
+weight_battery_charge    = 1.5% × dynamic price reference
+weight_battery_discharge = 1.5% × dynamic price reference
+```
+
+This prevents unrestricted micro-arbitrage even in current Mad-Steve. Gold Rush uses a **5–96% soft SOC zone**. Do not silently turn 96% into a hard maximum.
+
+Battery Saver owns eight EMHASS fields after explicit profile selection:
+
+```text
+battery_soc_deficit_threshold
+battery_soc_deficit_cost
+battery_soc_surplus_threshold
+battery_soc_surplus_cost
+battery_stress_cost
+battery_stress_segments
+weight_battery_charge
+weight_battery_discharge
+```
+
+Existing unmanaged/custom values remain untouched until selection. Multi-battery profile ownership is rejected rather than guessed. See `docs/BATTERY_SAVER.md`.
+
+## Hybrid inverter power interpretation
+
+Before changing limits because `P_batt` is below 15 kW, check the shared hybrid inverter constraint. PV and battery share the inverter path in the current EMHASS hybrid model. `P_hybrid_inverter` can already be 15 kW while `P_batt` is lower because PV supplies the remainder.
+
+Also inspect SOC, neighboring prices and `battery_stress_cost` before concluding that the optimizer left usable power idle.
 
 ## EMHASS rules
 
@@ -165,127 +233,69 @@ See `docs/EV_ANTI_DISCHARGE.md`.
 - Use the configured EMHASS base URL; do not assume `localhost` works from Home Assistant Core.
 - Preserve unrelated EMHASS configuration when changing selected settings.
 - `/set-config` must receive the complete intended configuration.
-- Do not execute stale `P_batt`/`P_grid` after a condition that requires re-optimization.
 - Treat optimizer readiness and finite numeric outputs as safety gates.
-- Cost-function changes alter the optimizer objective only; never silently change the GoodWe actuator strategy with them.
+- Cost-function changes alter the optimizer objective only; never silently change GoodWe actuator strategy with them.
+- Battery Saver policy changes must preserve unrelated config and roll back all EnergyPilot-owned fields on failed first application.
 
-## Persistent runtime state
+## Persistent state
 
 Configuration and runtime history are deliberately separate.
 
-`runtime_store.py` owns small EnergyPilot runtime evidence that must survive reload/restart.
-
-Current key:
+Current EnergyPilot stores include:
 
 ```text
 gw_energypilot.runtime.<config_entry_id>
+gw_energypilot.accounting.<config_entry_id>
+gw_energypilot.optimization_log.<config_entry_id>
+gw_energypilot.plan.<config_entry_id>
 ```
 
-`last_success` is restored before active orchestrator setup and persisted only after a complete EnergyPilot-owned optimize + publish cycle succeeds.
-
-Rules:
-
-- do not put user configuration in this Store;
-- failed later optimizations must not erase a previous successful timestamp;
-- stored datetimes must be timezone-aware;
-- invalid persisted data must fail safe.
-
-See `docs/RUNTIME_STATE.md`.
+The debug session is deliberately memory-only and is not persisted.
 
 ## Persistent grid accounting
 
-`GWEnergyPilotAccounting` and `accounting_model.py` own the native daily grid-accounting runtime.
-
-Canonical physical inputs remain:
+Daily grid accounting may select one coherent source pair:
 
 ```text
-36017 = lifetime grid import
-36015 = lifetime grid export
+preferred when populated/valid: 36104 export / 36120 import
+fallback:                       36015 export / 36017 import
 ```
 
-Rules:
-
-- derive only positive lifetime-counter deltas;
-- re-baseline on counter decreases;
-- local-midnight rollover moves current totals to previous-day totals;
-- persist derived daily state through Home Assistant storage;
-- Recorder is optional bootstrap/history infrastructure, not the live accounting source;
-- Beta `36104/36120` counters must not replace the canonical inputs without explicit promotion evidence;
-- future cost/revenue accounting must consume the same physical energy deltas rather than reconstructing energy independently in the frontend.
+A source change must re-baseline before accumulation. Never subtract absolute counters from different layouts. Recorder is optional bootstrap/history infrastructure, not the live accounting source.
 
 See `docs/ACCOUNTING.md`.
-
-## Settings APIs
-
-Dashboard configuration uses:
-
-```text
-settings_api.py
-smart_meter_api.py
-beta_soc_api.py
-```
-
-Rules:
-
-- dashboard write APIs remain admin-only;
-- the existing Home Assistant `ConfigEntry` is the single configuration source;
-- do not add a parallel settings database;
-- GoodWe connection changes must be validated before storage;
-- smart-meter actuator selection is GoodWe/config-entry data, not EMHASS config;
-- a missing smart-meter actuator selection must remain direct `P_batt` control in v0.24+;
-- preserve stable device identity and entity unique IDs.
-
-See `docs/SETTINGS.md`.
 
 ## Active orchestrator chain
 
 Do not assume `orchestrator.py` alone is active:
 
 ```text
-orchestrator_v013.GWEnergyPilotOrchestrator
-  -> orchestrator_v012.GWEnergyPilotOrchestrator
-       -> orchestrator.GWEnergyPilotOrchestrator
+orchestrator_v033
+  -> orchestrator_v031
+       -> orchestrator_v026
+            -> orchestrator_v013
+                 -> orchestrator_v012
+                      -> orchestrator
 ```
 
-`orchestrator_v013.py` also owns runtime-store restore/save timing.
-
-Until intentionally consolidated, inspect all three layers for orchestration changes.
+Inspect all active subclasses before changing orchestration behavior.
 
 ## Active frontend chain
 
-The active top-level module is selected in `__init__.py`.
-
-v0.24 upper chain:
+The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v024.js
-  -> gw-energy-pilot-v023.js
-       -> gw-energy-pilot-v022-flow-direction.js
-            -> gw-energy-pilot-v022.js
-                 -> gw-energy-pilot-v021.js
-                      -> earlier layered frontend files
+gw-energy-pilot-v033.js
+  -> gw-energy-pilot-v031-battery-saver.js
+       -> gw-energy-pilot-v031-window-controls.js
+            -> gw-energy-pilot-v031.js
+                 -> gw-energy-pilot-v030.js
+                      -> earlier active layers
 ```
 
-Responsibilities:
+Do not delete versioned frontend files based on filename alone. Trace imports first. Avoid new behavioral monkey-patch layers unless a bounded compatibility fix requires one.
 
-- v0.24: release/version wrapper for the control-default regression fix;
-- v0.23: persistent Grid Today/Yesterday UI;
-- flow-direction overlay: remove double reversal;
-- v0.22: Smart Meter strategy UI + PCC/battery target labeling;
-- v0.21: manual 12-mode EMS test pad.
-
-Do not delete versioned frontend files based on filename alone. Trace the import chain first.
-
-Current visual flow contract:
-
-```text
-PV production         -> hub
-Grid import           -> hub
-Grid export           hub -> grid
-Battery charging      hub -> battery
-Battery discharging   battery -> hub
-House consumption     hub -> house
-```
+The Battery · Plan · Price card must keep one canonical instance. A fresh plan should rebuild/replace it, not create a duplicate or remain stale behind the frontend cache.
 
 ## Repository checks
 
@@ -299,34 +309,25 @@ python scripts/validate_repo.py
 
 Release PRs also require green HACS validation and hassfest on the exact final head.
 
-The repository validator checks register coverage, JSON validity, frontend imports, active frontend/manifest version agreement and release-note/changelog version coverage.
-
-Static CI proves repository consistency, not GoodWe hardware meaning.
+Static CI proves repository consistency, not GoodWe hardware meaning or browser rendering.
 
 ## Documentation map
 
 - `README.md` — user-facing overview/current behavior.
 - `docs/ARCHITECTURE.md` — runtime architecture/ownership.
+- `docs/DEVELOPMENT.md` — maintainer workflow/current active chain.
 - `docs/MODBUS.md` — register/control semantics and evidence policy.
 - `docs/EMS_MODES.md` — exact modes 1–12.
+- `docs/EMHASS_PLAN_RUNTIME.md` — persistent plan resilience.
+- `docs/BATTERY_SAVER.md` — optimizer profile ownership/tuning.
 - `docs/EV_ANTI_DISCHARGE.md` — EV battery-direction protection.
 - `docs/ACCOUNTING.md` — persistent grid accounting.
 - `docs/RUNTIME_STATE.md` — persistent EnergyPilot runtime history.
 - `docs/EMHASS_SETUP.md` — EMHASS setup/operator guidance.
 - `docs/SETTINGS.md` — settings ownership/security.
 - `docs/ENTITIES.md` — Home Assistant entity/device contract.
-- `docs/KNOWN_ISSUES.md` — field issues outside/adjacent to EnergyPilot.
 - `docs/RELEASE_NOTES.md` — per-version status/user-facing notes.
 - `CHANGELOG.md` — detailed technical history.
-
-## Release documentation rule
-
-Every version bump must update both:
-
-1. `CHANGELOG.md`;
-2. `docs/RELEASE_NOTES.md` with explicit Beta/Validated status.
-
-Also update README/current architecture when runtime behavior or active frontend changes.
 
 ## Definition of done
 
@@ -337,9 +338,9 @@ For a substantial change verify at least:
 - config/options/storage compatibility;
 - entity unique IDs and device identity;
 - persistent-state migration/rollback behavior;
-- translations for user-visible changes;
+- translations/copy for user-visible changes;
 - dashboard impact;
 - relevant unit tests;
 - Quality + HACS + hassfest for releases;
-- README/architecture/changelog/release notes;
+- README/architecture/development/changelog/release notes;
 - no undocumented register/control semantic changes.
