@@ -42,6 +42,16 @@ Tests cover all three inverter-topology states:
 
 Additional wiring tests verify that the automatic optimization path uses the canonical runtime helper and that the synchronization API does not re-add topology ownership.
 
+## Dashboard hotfix
+
+The v0.35 frontend cache key now also loads a bounded live-flow compatibility fix from the retained v0.34 behavior layer.
+
+- Moving energy particles use the existing semantic **to hub / from hub** classes without a second reversal. The active rule matches the specificity of the legacy `!important` direction selectors, so import, export, charging, discharging and house consumption follow the physical flow direction.
+- On a narrow Home Assistant panel, the flow card derives node, hub, connector and stage dimensions from the measured card width. It updates after panel resizing or phone rotation and drops the desktop grid's forced card height.
+- Wide dashboard cards retain the existing desktop geometry.
+
+Regression tests cover the CSS-specificity guard, compact/tight breakpoints, resize tracking and frontend cache-busting.
+
 ## Compatibility and safety
 
 - No GoodWe register definitions or Modbus read blocks change.
