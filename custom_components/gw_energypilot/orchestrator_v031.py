@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
+import math
 from typing import Any
 
 from homeassistant.exceptions import HomeAssistantError
@@ -17,8 +19,13 @@ from .battery_saver import (
     normalize_battery_saver_mode,
     number_of_batteries,
 )
-from .const import CONF_BATTERY_SAVER_MODE
+from .const import (
+    CONF_BATTERY_SAVER_MODE,
+    CONF_P_BATT_ENTITY,
+    DEFAULT_P_BATT_ENTITY,
+)
 from .emhass_config import async_get_emhass_config, async_write_emhass_config
+from .orchestrator import OUTPUT_TIMEOUT
 from .orchestrator_v026 import GWEnergyPilotOrchestrator as _V026Orchestrator
 
 GOODWE_ON_GRID_MINIMUM_SOC_KEY = "battery_discharge_depth_on_grid"
@@ -31,6 +38,7 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
         super().__init__(hass, entry, coordinator)
         self.last_battery_saver_profile: dict[str, Any] | None = None
         self.last_effective_soc_final: float | None = None
+        self._p_batt_reported_before: datetime | None = None
 
     @property
     def attributes(self) -> dict[str, Any]:
@@ -60,6 +68,48 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
         if not 0 <= value <= 100:
             return None
         return round(value / 100.0, 4)
+
+    def _p_batt_report_timestamp(self) -> datetime | None:
+        """Return the timestamp proving that the configured P_batt was reported."""
+        entity_id = str(
+            self.entry.options.get(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
+            or DEFAULT_P_BATT_ENTITY
+        )
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return None
+        # Home Assistant updates last_reported for every state report, including
+        # reports where state and attributes are unchanged. Older HA State-like
+        # test doubles may not expose it, so retain last_updated as a fallback.
+        return getattr(state, "last_reported", state.last_updated)
+
+    async def _async_wait_for_fresh_output(
+        self,
+        before: datetime | None,
+    ) -> float | None:
+        """Wait for a newly reported finite P_batt while optimization is ready."""
+        entity_id = str(
+            self.entry.options.get(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
+            or DEFAULT_P_BATT_ENTITY
+        )
+        baseline = self._p_batt_reported_before
+        if baseline is None:
+            baseline = before
+
+        deadline = self.hass.loop.time() + OUTPUT_TIMEOUT
+        while self.hass.loop.time() < deadline:
+            state = self.hass.states.get(entity_id)
+            if state is not None and self._optimization_ready():
+                try:
+                    value = float(state.state)
+                except (TypeError, ValueError):
+                    value = math.nan
+                reported = getattr(state, "last_reported", state.last_updated)
+                is_fresh = baseline is None or reported > baseline
+                if math.isfinite(value) and is_fresh:
+                    return value
+            await asyncio.sleep(0.5)
+        return None
 
     async def _async_prepare_emhass_policy(self, payload: dict[str, Any]) -> None:
         """Synchronize required config and clamp the runtime terminal SOC.
@@ -199,7 +249,11 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
     async def async_optimize(self, reason: str = "manual") -> None:
         """Run the existing orchestration and retain the effective terminal SOC."""
         self.last_effective_soc_final = None
-        await super().async_optimize(reason=reason)
+        self._p_batt_reported_before = self._p_batt_report_timestamp()
+        try:
+            await super().async_optimize(reason=reason)
+        finally:
+            self._p_batt_reported_before = None
         if self.last_effective_soc_final is not None:
             # v0.13 stores the requested target. Replace the runtime diagnostic
             # with the value actually submitted after hard-limit clamping.
