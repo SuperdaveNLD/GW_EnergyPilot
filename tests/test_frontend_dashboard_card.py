@@ -38,35 +38,23 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
 
-    def test_v034_flow_direction_is_semantic_and_geometry_specific(self) -> None:
+    def test_v034_flow_direction_neutralizes_legacy_reversal_specificity(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("function synchronizeFlowDirections", source)
-        self.assertIn('grid > 0\n        ? "from"\n        : "to"', source)
-        self.assertIn('battery > 0\n        ? "to"\n        : "from"', source)
         self.assertIn(
-            ".ep-link-pv.ep-v034-to-hub .ep-v011-particles span,",
+            ".ep-flow-link.ep-v022-to-hub .ep-v011-particles span,",
             source,
         )
         self.assertIn(
-            ".ep-link-grid.ep-v034-from-hub .ep-v011-particles span",
-            source,
-        )
-        self.assertIn(
-            ".ep-link-house.ep-v034-from-hub .ep-v011-particles span,",
-            source,
-        )
-        self.assertIn(
-            ".ep-link-battery.ep-v034-to-hub .ep-v011-particles span",
+            ".ep-flow-link.ep-v022-from-hub .ep-v011-particles span",
             source,
         )
         self.assertIn("animation-direction: normal !important", source)
-        self.assertIn("@keyframes epV034FlowHForward", source)
-        self.assertIn("@keyframes epV034FlowHReverse", source)
-        self.assertIn("@keyframes epV034FlowVForward", source)
-        self.assertIn("@keyframes epV034FlowVReverse", source)
+        self.assertIn("geometry-specific v0.13", source)
+        self.assertNotIn("function synchronizeFlowDirections", source)
+        self.assertNotIn("@keyframes epV034Flow", source)
 
     def test_v034_flow_layout_tracks_narrow_card_resize(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
@@ -103,7 +91,7 @@ class FrontendDashboardCardTests(unittest.TestCase):
             release_v034,
         )
         self.assertIn('const VERSION = "0.34"', release_v034)
-        self.assertIn("synchronizeFlowDirections", release_v034)
+        self.assertIn("ep-v022-to-hub", release_v034)
 
         self.assertIn(
             'gw-energy-pilot-v034.js?v=0.35-release2',
