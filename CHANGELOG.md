@@ -2,6 +2,23 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.32] - 2026-08-25
+
+### Fixed
+
+- Fixed the v0.31 EMHASS settings save regression caused by configuring Home Assistant `NumberSelector` with `step=0.0001`. Current Home Assistant requires a numeric selector step of at least `0.001`.
+- Restored the supported `0.001` selector step without rounding typed BOX values, so tariff adjustments such as `0.0248` remain valid and are preserved.
+
+### Changed
+
+- The dashboard keeps a browser input increment of `0.0001` for convenient four-decimal tariff entry while the Home Assistant backend selector uses its supported `0.001` configuration step.
+- Added a v0.32 frontend release wrapper and regression coverage for the split frontend/backend precision contract.
+
+### Safety / compatibility
+
+- No GoodWe register, Modbus block, EMS mapping, controller behavior, EMHASS optimization model, Battery Saver tuning, entity ID or unique ID changes.
+- v0.32 is a focused compatibility hotfix on top of v0.31.
+
 ## [0.31] - 2026-08-24
 
 ### Added
@@ -472,7 +489,7 @@ All notable changes to GW EnergyPilot are documented here.
 ### Changed
 
 - Candidate registers are now shipped to the small active tester group instead of remaining isolated in draft branches.
-- Every candidate remains optional and read-only; unsupported firmware cannot make normal required telemetry unavailable.
+- Every candidate remains optional and read-only; unsupported firmware cannot make the main inverter telemetry unavailable.
 - Legacy `36015/36017` remain the canonical grid-energy source until the extended counters are validated against physical SEMS lifetime totals.
 
 ### Safety boundary
