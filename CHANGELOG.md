@@ -2,6 +2,36 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.34] - 2026-08-25
+
+### Added
+
+- Added an explicit optimization `plan_revision` to the existing orchestrator/dashboard contract so every successful EnergyPilot optimization can deterministically invalidate the Battery · Plan · Price cache after the persistent EMHASS plan refresh attempt.
+- Added a v0.34 frontend release wrapper that cache-busts both the updated Battery Saver module and the Battery Plan core for already-open Home Assistant browser sessions.
+- Added profile-owned EMHASS hard maximum SOC values for explicitly managed Battery Saver modes: Mad-Steve 100%, Gold Rush 96%, Balanced 95% and Battery Saver/Eco 90%.
+
+### Fixed
+
+- Fixed Battery · Plan · Price not updating deterministically when the canonical persistent plan changed after an optimization without a sufficiently distinct `P_batt.last_updated` signal. The explicit plan revision now forces a read-only refresh while retaining the existing timestamp fallback for externally changed plans.
+- Fixed EV anti-discharge behavior so an active EV session still pauses battery discharge/neutral operation through mode `8`, but no longer pauses a legitimate home-battery charge request.
+- Fixed strategy bypass during EV charging: Battery control charges through mode `11`; Grid/Hybrid use mode `9` when a positive planned `P_grid` import target is available, with mode `11` as the explicit-charge fallback when required.
+
+### Changed
+
+- Increased the common Battery Saver charge/discharge anti-churn floor from `1.5%` to `2.25% × dynamic price reference` per direction based on field comparison, reducing low-value quarter-hour reversals while preserving high-value battery operation.
+- Battery Saver maximum SOC is now part of the existing profile apply/rollback transaction. The verified GoodWe on-grid minimum SOC remains a separate lower-limit ownership layer.
+- The active frontend release module is `gw-energy-pilot-v034.js` and reports v0.34 while loading fresh v0.34 cache keys for the modified nested frontend modules.
+
+### Safety / compatibility
+
+- No new or guessed GoodWe register definitions or Modbus read blocks.
+- EMS remains on `47511/47512` with the established `47512 -> wait -> 47511` write order.
+- No entity ID, unique ID or stable Home Assistant device identity changes.
+- EMHASS remains the canonical optimizer and plan owner; the persistent EnergyPilot plan remains a resilience mirror only.
+- The v0.33 optimizer-readiness, persistent-plan expiry and EV-stop fresh-optimization protections remain intact.
+- EV coordination remains an anti-discharge guard only and does not control the EV charger or add a second fast power-control loop.
+- v0.34 remains **Beta** while the combined chart-refresh, Battery Saver and EV-control changes receive broader live installation validation.
+
 ## [0.33] - 2026-08-25
 
 ### Added
