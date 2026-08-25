@@ -20,7 +20,7 @@ For example, if the hard minimum SOC is 23%, the Battery Saver low-SOC soft thre
 | Mode | Low-SOC threshold | Low-SOC cost | High-SOC threshold | High-SOC cost | Power-stress cost |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | **Mad-Steve** | 5% | 0% × price reference | 98% | 0% × price reference | 0% × price reference |
-| **Gold Rush** | 5% | 0% × price reference | 98% | 5% × price reference | 3% × price reference |
+| **Gold Rush** | 5% | 0% × price reference | 96% | 5% × price reference | 3% × price reference |
 | **Balanced** | 10% | 5% × price reference | 95% | 10% × price reference | 8% × price reference |
 | **Battery Saver** | 15% | 10% × price reference | 90% | 25% × price reference | 20% × price reference |
 
@@ -34,7 +34,7 @@ This is behaviorally equivalent to an existing EMHASS configuration where `batte
 
 ### Gold Rush
 
-Profit remains the priority, while very small-value cycling is discouraged. There is no extra low-SOC cost, a light high-SOC cost above 98%, and a light quadratic power-stress cost. Large price spreads can still justify full battery power.
+Profit remains the priority, while very small-value cycling is discouraged. There is no extra low-SOC cost, a light high-SOC cost above 96%, and a light quadratic power-stress cost. Large price spreads can still justify full battery power.
 
 ### Balanced
 
