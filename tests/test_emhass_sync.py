@@ -54,9 +54,19 @@ class EMHASSSyncTests(unittest.TestCase):
         self.assertEqual(synced["method_ts_round"], "first")
         self.assertTrue(synced["set_use_pv"])
         self.assertTrue(synced["set_use_battery"])
-        self.assertTrue(synced["inverter_is_hybrid"])
+        self.assertFalse(synced["inverter_is_hybrid"])
         self.assertEqual(synced["custom_setting"], original["custom_setting"])
         self.assertEqual(original["sensor_power_photovoltaics"], "sensor.old_pv")
+
+    def test_hybrid_inverter_setting_is_preserved_when_enabled(self):
+        original = {
+            "set_use_pv": False,
+            "inverter_is_hybrid": True,
+        }
+        synced, warnings = emhass_sync.build_emhass_sync_config(original, ENTITY_IDS)
+        self.assertEqual(warnings, [])
+        self.assertTrue(synced["inverter_is_hybrid"])
+        self.assertNotIn("inverter_is_hybrid", emhass_sync.SYNCED_CONFIG_KEYS)
 
     def test_battery_only_config_does_not_require_or_rewrite_pv(self):
         config = {
@@ -115,8 +125,18 @@ class EMHASSSyncTests(unittest.TestCase):
         self.assertIn("multiple batteries", warnings[0])
 
     def test_diff_contains_only_changed_managed_keys_in_stable_order(self):
-        current = {"continual_publish": False, "set_use_battery": True, "custom": 1}
-        synced = {"continual_publish": True, "set_use_battery": True, "custom": 2}
+        current = {
+            "continual_publish": False,
+            "set_use_battery": True,
+            "inverter_is_hybrid": False,
+            "custom": 1,
+        }
+        synced = {
+            "continual_publish": True,
+            "set_use_battery": True,
+            "inverter_is_hybrid": True,
+            "custom": 2,
+        }
         self.assertEqual(
             emhass_sync.emhass_sync_changes(current, synced),
             [{"key": "continual_publish", "current": False, "required": True}],
