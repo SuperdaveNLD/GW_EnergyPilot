@@ -124,12 +124,12 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
         current = await async_get_emhass_config(self.hass, self.entry)
         updated = dict(current)
 
-        # Core EnergyPilot/EMHASS contract. PV deliberately remains a user-owned
-        # capability because battery-only installations are valid.
+        # Core EnergyPilot/EMHASS contract. PV and inverter topology deliberately
+        # remain user-owned EMHASS capabilities; battery-only installations and
+        # non-hybrid inverter models are valid.
         updated["continual_publish"] = True
         updated["method_ts_round"] = "first"
         updated["set_use_battery"] = True
-        updated["inverter_is_hybrid"] = True
 
         battery_count = number_of_batteries(current)
         configured_mode = self.entry.options.get(CONF_BATTERY_SAVER_MODE)
