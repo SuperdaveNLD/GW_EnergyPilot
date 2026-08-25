@@ -39,6 +39,15 @@ Release documentation:
 - All four managed Battery Saver profiles gain the same small price-relative anti-churn charge/discharge weight to suppress low-value quarter-hour reversals. **Gold Rush** now uses a 5–96% soft SOC zone.
 - No GoodWe register, Modbus block, EMS mapping, write ordering, entity ID or unique ID changes are introduced by these v0.33 improvements.
 
+## Next-release Battery Saver tuning
+
+The current feature branch prepares the next Battery Saver optimization update:
+
+- managed profiles own the EMHASS hard Maximum SOC as part of the same apply/rollback transaction as their economic penalties;
+- hard maxima are **Mad-Steve 100%**, **Gold Rush 96%**, **Balanced 95%** and **Battery Saver/Eco 90%**;
+- the common price-relative anti-churn factor moves from `1.5%` to **`2.25%`** per charge/discharge direction, which is approximately `0.007` currency/kWh at the field-test price reference around `0.31`;
+- the GoodWe-synchronized minimum SOC remains a separate hard lower boundary and is checked against the effective profile maximum before solving.
+
 ## Tested hardware
 
 | Model | Status | Notes |
@@ -57,7 +66,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - three Automatic Control strategies: Battery, Grid and Hybrid;
 - native EMHASS optimization/publishing;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
-- four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences and anti-churn battery-throughput costs;
+- four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences, profile-owned maximum SOC and anti-churn battery-throughput costs;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
 - opt-in bounded LOG-tab debug sessions and copyable support reports;
@@ -195,13 +204,15 @@ If `45356` is unavailable, neither system is changed. If EMHASS fails after a ve
 
 There is no startup/background SOC synchronization.
 
-The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains EMHASS-only.
+The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains an EMHASS hard limit; when a Battery Saver profile is managed, EnergyPilot owns that EMHASS maximum as part of the selected profile.
 
 ## Battery Saver
 
 Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes a GoodWe mode directly. The public profiles are **Mad-Steve**, **Gold Rush**, **Balanced** and **Battery Saver**.
 
-All four managed modes use the same small price-relative charge/discharge anti-churn cost. This gives low-value battery throughput a real virtual cost even in Mad-Steve; the modes then differ through their soft SOC thresholds and quadratic battery power-stress costs. Gold Rush uses a 5–96% soft SOC zone in v0.33. Minimum/Maximum SOC remain the hard optimizer limits.
+Managed profiles use a common price-relative charge/discharge anti-churn cost and profile-specific hard maximum SOC/power-stress behavior. The staged next-release maxima are **100% / 96% / 95% / 90%** for Mad-Steve / Gold Rush / Balanced / Battery Saver respectively. Minimum SOC remains the GoodWe-synchronized hard floor.
+
+The common anti-churn factor is staged at **2.25% × price reference per direction**. At the field-test price reference around `0.31`, that is approximately `0.007` per charged or discharged kWh.
 
 See `docs/BATTERY_SAVER.md` for exact profile factors and ownership.
 
