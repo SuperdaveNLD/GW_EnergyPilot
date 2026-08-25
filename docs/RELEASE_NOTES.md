@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.36** | 2026-08-25 | **Beta** | Adds customer-facing Mad-Steve/Gold Rush/Balanced/Battery Saver/Custom strategy controls, preserves Custom EMHASS values, fixes dashboard render storms and lost clicks, and corrects live-flow direction/mobile sizing. |
 | **0.35** | 2026-08-25 | **Beta** | Preserves the user-owned EMHASS inverter topology instead of forcing `inverter_is_hybrid=true`, and centralizes the small EnergyPilot runtime contract used by config sync and pre-solve preparation. |
 | **0.34** | 2026-08-25 | **Beta** | Consolidates deterministic Battery Plan refresh, Battery Saver hard maximum-SOC/anti-churn tuning, and EV anti-discharge behavior that pauses discharge while allowing strategy-aware charging through mode 9 or 11. |
 | **0.33** | 2026-08-25 | **Beta** | Persists the canonical EMHASS plan across Home Assistant restart/publication gaps, fixes fresh-output and chart refresh handling, and adds shared anti-churn Battery Saver weights with Gold Rush 5–96%. |
@@ -50,6 +51,22 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.36 — Customer strategy controls and dashboard reliability
+
+v0.36 makes the Controller card customer-facing while consolidating two frontend reliability fixes developed after v0.35.
+
+The Controller card now shows the active **Battery strategy** with direct choices for **Mad-Steve**, **Gold Rush**, **Balanced**, **Battery Saver** and **Custom**. The first four reuse the existing canonical Battery Saver profiles. **Custom** releases EnergyPilot preset ownership without resetting the currently effective EMHASS battery values, and exposes the established minimum/maximum SOC NumberEntities plus read-only advanced EMHASS battery costs for transparency.
+
+Every managed-profile or Custom transition runs the existing complete EnergyPilot optimization/publish transaction. After the persistent EMHASS plan refresh, the existing `plan_revision` contract invalidates the Battery · Plan · Price cache so the graph follows the new plan immediately. The low-level controller command such as `hybrid_battery_discharge` is removed from the normal customer Controller presentation but remains available through Diagnostics/support output.
+
+The dashboard also fixes installation-dependent render storms. Once entity discovery is complete, unrelated Home Assistant state changes no longer rebuild the complete Shadow DOM. Relevant EnergyPilot/EMHASS changes are batched for 80 ms, and a narrow pointer/keyboard guard prevents an actual button press from being destroyed by a concurrent relevant render. Locale, user and theme changes remain render triggers.
+
+Live-flow particles now neutralize the legacy double-reversal rule at matching CSS specificity while retaining the established geometry-specific animation keyframes. On narrow panels, node/hub/connector geometry is calculated from the measured card width and follows phone rotation/resizing through `ResizeObserver`; wide desktop geometry is unchanged.
+
+No GoodWe register definitions, Modbus read blocks, EMS mappings, entity IDs, unique IDs or stable device identity are changed. EMS remains on `47511/47512` with the established `47512 -> wait -> 47511` write order. EMHASS remains the canonical optimizer and plan owner.
+
+See `docs/RELEASE_NOTES_V036.md` and `docs/BATTERY_SAVER.md`.
 
 # v0.35 — Preserve EMHASS inverter topology
 

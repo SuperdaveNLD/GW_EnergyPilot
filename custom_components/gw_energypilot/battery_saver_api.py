@@ -25,6 +25,8 @@ from .const import CONF_BATTERY_SAVER_MODE, DOMAIN
 from .emhass_config import async_get_emhass_config, async_write_emhass_config
 
 GOODWE_ON_GRID_MINIMUM_SOC_KEY = "battery_discharge_depth_on_grid"
+CUSTOM_MODE = "custom"
+SELECTABLE_MODES: tuple[str, ...] = (*BATTERY_SAVER_MODES, CUSTOM_MODE)
 
 
 def _resolve_entry(hass: HomeAssistant, entry_id: str | None) -> ConfigEntry | None:
@@ -186,7 +188,7 @@ async def websocket_get_battery_saver(
     {
         vol.Required("type"): "gw_energypilot/battery_saver/set",
         vol.Required("entry_id"): str,
-        vol.Required("mode"): vol.In(BATTERY_SAVER_MODES),
+        vol.Required("mode"): vol.In(SELECTABLE_MODES),
     }
 )
 @websocket_api.async_response
@@ -195,7 +197,7 @@ async def websocket_set_battery_saver(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Persist one mode and rebuild the EnergyPilot-owned plan immediately."""
+    """Select a managed preset or Custom and rebuild the plan immediately."""
     entry = _resolve_entry(hass, msg["entry_id"])
     if entry is None:
         connection.send_error(
@@ -203,14 +205,20 @@ async def websocket_set_battery_saver(
         )
         return
 
-    mode = normalize_battery_saver_mode(msg["mode"])
+    requested_mode = str(msg["mode"])
+    mode = None if requested_mode == CUSTOM_MODE else normalize_battery_saver_mode(
+        requested_mode
+    )
     try:
         config = await async_get_emhass_config(hass, entry)
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "emhass_unavailable", str(err))
         return
 
-    if number_of_batteries(config) != 1:
+    # Managed presets currently own one EMHASS battery model. Custom deliberately
+    # releases that ownership and therefore must remain available even when an
+    # installation uses a configuration the managed presets do not support.
+    if mode is not None and number_of_batteries(config) != 1:
         connection.send_error(
             msg["id"],
             "unsupported_battery_count",
@@ -228,7 +236,8 @@ async def websocket_set_battery_saver(
 
     emhass_version = getattr(orchestrator, "emhass_version", None)
     if (
-        mode != MODE_MAD_STEVE
+        mode is not None
+        and mode != MODE_MAD_STEVE
         and emhass_version is not None
         and not emhass_supports_battery_stress(emhass_version)
     ):
@@ -243,15 +252,20 @@ async def websocket_set_battery_saver(
     previous_profile = getattr(orchestrator, "last_battery_saver_profile", None)
     previous_effective_soc = getattr(orchestrator, "last_effective_soc_final", None)
     new_options = dict(old_options)
-    new_options[CONF_BATTERY_SAVER_MODE] = mode
+    if mode is None:
+        # Custom starts from the exact currently effective EMHASS values. Only
+        # release EnergyPilot's preset ownership; do not reset any battery field.
+        new_options.pop(CONF_BATTERY_SAVER_MODE, None)
+    else:
+        new_options[CONF_BATTERY_SAVER_MODE] = mode
     hass.config_entries.async_update_entry(entry, options=new_options)
 
     try:
         await orchestrator.async_optimize(reason="battery_saver_changed")
     except Exception as err:  # noqa: BLE001 - rollback must cover all failed runs
-        # Do not leave a mode or its penalty values active if the first complete
-        # profile+plan cycle failed. Restore only the Battery Saver-owned fields;
-        # required config repairs remain valid independently of the chosen mode.
+        # Do not leave a mode transition active if the first complete policy+plan
+        # cycle failed. Restore only Battery Saver-owned fields; required config
+        # repairs remain valid independently of the chosen mode.
         hass.config_entries.async_update_entry(entry, options=old_options)
         orchestrator.last_battery_saver_profile = previous_profile
         orchestrator.last_effective_soc_final = previous_effective_soc

@@ -1,15 +1,33 @@
 # Battery Saver
 
-GW EnergyPilot provides **Battery Saver** under **Settings → EMHASS**. It is an EnergyPilot policy layer on top of EMHASS: selecting a profile changes the configuration used by the next EnergyPilot-owned EMHASS optimization, while EMHASS remains the canonical optimizer and published `P_batt` / `P_grid` remain the control inputs.
+GW EnergyPilot exposes the battery strategy directly on the customer-facing **Controller** card and keeps the detailed Battery Saver view under **Settings → EMHASS**. It is an EnergyPilot policy layer on top of EMHASS: selecting a managed profile changes the configuration used by the next EnergyPilot-owned EMHASS optimization, while EMHASS remains the canonical optimizer and published `P_batt` / `P_grid` remain the control inputs.
 
 Battery Saver does **not** write a GoodWe EMS mode directly.
 
+## Customer controller
+
+The Controller card presents the four managed strategies plus **Custom**:
+
+- **Mad-Steve**
+- **Gold Rush**
+- **Balanced**
+- **Battery Saver**
+- **Custom**
+
+Selecting a managed strategy is one transaction: EnergyPilot stores the selected strategy, applies its owned EMHASS battery fields, runs a fresh optimization and publishes the resulting plan. If that first apply-and-optimize cycle fails, the previous strategy and Battery Saver-owned EMHASS fields are restored.
+
+Selecting **Custom** deliberately releases managed-profile ownership without resetting the currently effective EMHASS battery values. A fresh optimization is still run so the plan reflects that ownership transition immediately. The customer card exposes the existing minimum/maximum SOC entities as sliders and shows the remaining active EMHASS battery penalties for transparency. It does not create duplicate SOC entities or a second battery configuration path.
+
+The low-level controller command (for example `hybrid_battery_discharge`) remains available in the Diagnostics snapshot rather than the customer-facing Controller metrics.
+
+Every successful EnergyPilot optimization refreshes the persistent plan and advances `plan_revision`. The battery/price graph watches that revision and bypasses its normal cache when the active plan changes, so profile changes and SOC-limit optimizations are reflected in the graph after the new solve is published.
+
 ## Hard limits and ownership
 
-The managed-profile contract for the next release is:
+The managed-profile contract is:
 
 - **Minimum SOC** remains the canonical GoodWe on-grid minimum SOC synchronized into EMHASS.
-- **Maximum SOC** becomes part of the selected EnergyPilot Battery Saver profile.
+- **Maximum SOC** is part of the selected EnergyPilot Battery Saver profile.
 - Runtime `soc_final` is clamped to the effective hard minimum/maximum before every EnergyPilot-owned solve.
 - Unmanaged/custom installations keep their existing EMHASS maximum and battery-cost values until the user explicitly selects an EnergyPilot profile.
 
@@ -115,7 +133,7 @@ The profile percentages are multiplied by this reference.
 Battery Saver remains opt-in.
 
 - Existing/custom EMHASS values are untouched until a profile is explicitly selected.
-- Multi-battery EMHASS configurations are rejected rather than guessed.
+- Multi-battery EMHASS configurations are rejected for managed profiles rather than guessed; Custom can still release managed ownership without rewriting the installation topology.
 - Non-zero power-stress profiles require EMHASS 0.18.1 or newer when the version is known.
 - A failed first profile+optimization transaction restores the previous EnergyPilot mode and every Battery Saver-owned EMHASS field.
 - Maximum SOC participates in the same apply/rollback transaction as the economic profile values.
@@ -151,13 +169,13 @@ set_use_battery = true
 The runtime flow is:
 
 ```text
-Battery Saver mode
+Battery Saver mode / Custom ownership
         ↓
-profile maximum SOC + price-relative virtual costs
+managed profile values or preserved custom EMHASS values
         ↓
 GoodWe-synchronized minimum SOC
         ↓
-complete EMHASS config via /set-config
+complete EMHASS config via /set-config when required
         ↓
 runtime hard min/max + clamped soc_final
         ↓
@@ -169,7 +187,9 @@ EMHASS continual_publish
         ↓
 fresh P_batt / P_grid
         ↓
-existing EnergyPilot Automatic Control
+persistent plan refresh + plan_revision
+        ↓
+existing EnergyPilot Automatic Control + refreshed dashboard graph
         ↓
 GoodWe EMS command
 ```
