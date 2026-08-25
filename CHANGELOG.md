@@ -2,6 +2,39 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.33] - 2026-08-25
+
+### Added
+
+- Added a per-config-entry persistent EMHASS plan mirror backed by Home Assistant Store. EnergyPilot reads the official EMHASS `GET /api/v1/plan` contract, validates `P_batt` / `P_grid` horizon points, infers the active timestep and stores an explicit `valid_until` boundary.
+- Added plan continuity across Home Assistant restart, integration reload and temporary EMHASS Home Assistant entity publication gaps. Live configured `P_batt` / `P_grid` states remain first priority; the still-valid mirror is only a fallback.
+- Added common Battery Saver anti-churn costs through EMHASS `weight_battery_charge` and `weight_battery_discharge`. All four EnergyPilot profiles apply `1.5% × dynamic price reference` per direction so very small quarter-hour spreads are less likely to cause a charge/discharge reversal.
+- Added diagnostics for persistent-plan source, generation/validity timestamps and resolved plan values.
+
+### Fixed
+
+- Fixed false EMHASS `stale_output` failures when a newly published `P_batt` report has the same numeric state/attributes as the previous report. Freshness now prefers Home Assistant `State.last_reported`, with `last_updated` retained as a compatibility fallback.
+- Fixed the Battery · Plan · Price card not rebuilding after a fresh optimization because the duplicate-card guard returned permanently on the existing canonical card. A newer active-plan timestamp now bypasses the normal chart cache and refreshes the canonical card without creating duplicates.
+- Changed the **Gold Rush** high-SOC soft threshold from `98%` to **`96%`** while preserving its existing high-SOC penalty and hard-SOC ownership model.
+- Current Mad-Steve no longer means unrestricted zero-cost micro-arbitrage: it keeps maximum economic freedom and zero SOC/power-stress penalties while still using the shared anti-churn transaction cost.
+
+### Changed
+
+- Battery Saver ownership expands from six to eight EMHASS fields by adding `weight_battery_charge` and `weight_battery_discharge`. Existing unmanaged/custom EMHASS values remain untouched until a user explicitly selects an EnergyPilot profile, and failed first-apply transactions roll back all eight owned fields.
+- Legacy all-zero EMHASS battery costs/weights are now identified as unrestricted legacy behavior rather than being described as behaviorally identical to current Mad-Steve.
+- The battery chart payload uses schema `4` and prefers the validated persistent EMHASS plan horizon, with the existing Home Assistant schedule attributes retained as compatibility fallback.
+- The active runtime uses `controller_v033.py` and `orchestrator_v033.py` on top of the existing controller/orchestrator contracts, and the active frontend wrapper is `gw-energy-pilot-v033.js`.
+
+### Safety / compatibility
+
+- No GoodWe register definition, Modbus read block, EMS mode mapping or `47512 -> wait -> 47511` write order changes.
+- No existing entity ID, unique ID or stable Home Assistant device identity changes.
+- EMHASS remains the canonical plan owner. `gw_energypilot.plan.<config_entry_id>` is a resilience mirror, not a second optimizer or configuration database.
+- A persistent plan is never extrapolated beyond its final inferred timestep. An expired plan becomes unavailable rather than repeating a stale battery/grid command.
+- An explicit live non-ready optimization status remains authoritative and is never bypassed by the mirror.
+- Battery Saver still refuses multi-battery EMHASS ownership rather than scalar-overwriting heterogeneous battery configuration.
+- v0.33 remains **Beta** while the persistent-plan recovery path and revised Battery Saver tuning receive broader live restart/reload and multi-installation validation.
+
 ## [0.32] - 2026-08-25
 
 ### Fixed
@@ -77,7 +110,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - The integration manifest version is now `0.30`.
 - The release workflow validates that the release/tag version matches `manifest.json`, then runs compile, unit, repository, HACS and Hassfest checks before publication.
-- A new manifest version merged to `main` can publish its matching numeric GitHub Release automatically; manually pushed numeric release tags remain supported and are validated against the manifest.
+- A new manifest version merged to `main` can publish its matching numeric GitHub Release automatically; manually pushed numeric tags remain supported and are validated against the manifest version.
 - HACS remains the owner of update discovery/installations; GW EnergyPilot does not add a duplicate Home Assistant `update` entity.
 
 ### Safety / compatibility
@@ -106,7 +139,7 @@ All notable changes to GW EnergyPilot are documented here.
 - Canonical EnergyPilot EMHASS outputs remain `sensor.p_batt_forecast`, `sensor.p_grid_forecast` and `sensor.optim_status` with required state `Optimal`.
 - EMHASS synchronization preserves unrelated configuration, custom PV forecast mappings and custom `var_model` values where safe; multi-battery sensor lists are not rewritten.
 - Issue #22 is closed without a new EnergyPilot residual-grid-capacity allocator because the dynamic grid/import limit is already enforced by GoodWe itself.
-- Issue #30 remains open: negative raw EMHASS SOC-related values are not guessed into percentages or silently rewritten until their exact semantics/source are established.
+- Issue #30 remains open: negative raw EMHASS SOC-related values are not guessed into percentages or silently rewritten until their exact semantics/source is established.
 - v0.29 includes the complete v0.28 Hybrid 9/12 control, Battery · Plan · Price repairs, Max Charge SOC guard and Apple-style Battery/Plan window controls.
 
 ### Safety / compatibility
@@ -297,7 +330,7 @@ All notable changes to GW EnergyPilot are documented here.
 ### Fixed
 
 - Live-flow particles no longer suffer a layered **double reversal**. The geometry-correct Forward/Reverse keyframe selected from live power direction is authoritative; particle `animation-direction` is forced to normal.
-- Expected visual directions are PV → hub, Grid import → hub, hub → Grid export, hub → Battery charge, Battery discharge → hub, and hub → House load.
+- Expected visual directions are PV → hub, Grid import → hub, hub → Grid export, hub → Battery charge, Battery discharge → hub, and hub → House.
 
 ### Accounting/runtime contract
 
