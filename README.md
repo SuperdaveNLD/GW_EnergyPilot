@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.34 · Beta**
+**v0.35 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,8 +19,9 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
-- `docs/RELEASE_NOTES_V034.md` — consolidated v0.34 release scope;
+- `docs/RELEASE_NOTES_V035.md` — v0.35 EMHASS topology-ownership fix;
 - `CHANGELOG.md` — detailed technical history;
+- `docs/EMHASS_CONFIG_SYNC.md` — required EMHASS synchronization and ownership boundaries;
 - `docs/EMHASS_PLAN_RUNTIME.md` — persistent canonical EMHASS plan/recovery contract;
 - `docs/BATTERY_SAVER.md` — Battery Saver profiles, anti-churn tuning and ownership;
 - `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge control contract;
@@ -32,14 +33,14 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.34 highlights
+## v0.35 highlights
 
-- Every successful EnergyPilot-owned optimization advances an explicit `plan_revision` after the persistent EMHASS plan refresh attempt, giving the Battery · Plan · Price card a deterministic cache-invalidation signal.
-- The v0.34 frontend wrapper uses fresh module URLs for both the Battery Saver layer and Battery Plan core, preventing an already-open Home Assistant browser session from retaining stale nested JavaScript.
-- Managed Battery Saver profiles now own their EMHASS hard maximum SOC as part of the existing apply/rollback transaction: **Mad-Steve 100%**, **Gold Rush 96%**, **Balanced 95%** and **Battery Saver/Eco 90%**.
-- The common price-relative Battery Saver anti-churn factor increases from `1.5%` to **`2.25%`** per charge/discharge direction, approximately `0.007` currency/kWh at the field-test price reference around `0.31`.
-- EV anti-discharge now does exactly one safety job: while the EV is charging, battery discharge/neutral operation uses **mode 8 Battery Hold**, while an explicit home-battery charge plan remains allowed through the configured strategy using **mode 9 or mode 11**.
-- No GoodWe register, Modbus block, write ordering, entity ID, unique ID or stable device identity changes are introduced by v0.34.
+- EnergyPilot no longer forces EMHASS `inverter_is_hybrid = true` through either **Synchronize required config** or the automatic pre-optimization policy.
+- `inverter_is_hybrid` and `set_use_pv` are installation-specific EMHASS settings. Existing values are preserved rather than inferred from the physical GoodWe inverter model.
+- Explicit `inverter_is_hybrid = false` remains false, `true` remains true, and an absent key remains absent.
+- Both configuration paths now share one canonical EnergyPilot runtime contract: `continual_publish = true`, `method_ts_round = first` and `set_use_battery = true`.
+- The v0.34 Battery Saver tuning, deterministic Battery Plan refresh and EV anti-discharge behavior are carried forward unchanged.
+- No GoodWe register, Modbus block, EMS mapping, write ordering, entity ID, unique ID or stable device identity changes are introduced by v0.35.
 
 ## Tested hardware
 
@@ -58,6 +59,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - manual access to all twelve EMS modes;
 - three Automatic Control strategies: Battery, Grid and Hybrid;
 - native EMHASS optimization/publishing;
+- safe EMHASS required-config synchronization that preserves installation topology;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
 - deterministic Battery Plan refresh after EnergyPilot optimizations;
 - four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences, profile-owned maximum SOC and anti-churn battery-throughput costs;
@@ -101,9 +103,31 @@ Use only one continuously polling/controlling direct GoodWe integration where pr
 7. Keep Automatic Control OFF during first validation.
 8. Verify PV, Home, Grid, Battery and EMS read-back values.
 9. Configure EMHASS output/status entities and runtime pricing if used.
-10. Press Optimize now and verify fresh numeric `P_batt`, `P_grid` and optimization status.
-11. Select the intended Automatic Control strategy under dashboard gear → GOODWE.
-12. Enable Automatic Control only after telemetry/control semantics are confirmed.
+10. Verify the EMHASS topology settings (`set_use_pv`, `inverter_is_hybrid`) match the model you intentionally want EMHASS to optimize; EnergyPilot preserves these settings.
+11. Press Optimize now and verify fresh numeric `P_batt`, `P_grid` and optimization status.
+12. Select the intended Automatic Control strategy under dashboard gear → GOODWE.
+13. Enable Automatic Control only after telemetry/control semantics are confirmed.
+
+## EMHASS configuration ownership
+
+EnergyPilot's automatic pre-solve preparation and **Synchronize required config** use the same small runtime contract:
+
+```text
+continual_publish = true
+method_ts_round = first
+set_use_battery = true
+```
+
+Those values are required for the EnergyPilot orchestration/publication path. Installation topology is different and remains owned by EMHASS/the operator:
+
+```text
+set_use_pv
+inverter_is_hybrid
+```
+
+EnergyPilot does not derive `inverter_is_hybrid` from the fact that the reference GoodWe hardware is a hybrid inverter. This allows EMHASS to represent the installation topology intentionally, including non-hybrid/external-generation models where appropriate.
+
+See `docs/EMHASS_CONFIG_SYNC.md`.
 
 ## Automatic Control
 

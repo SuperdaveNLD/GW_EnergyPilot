@@ -24,9 +24,19 @@ The required EMHASS runtime contract is:
 - `continual_publish = true`
 - `method_ts_round = first`
 - `set_use_battery = true`
-- `inverter_is_hybrid = true`
 
 `continual_publish = true` is required because EnergyPilot performs full optimizations on its own schedule/events, while EMHASS must advance and republish the saved plan at each `optimization_time_step`. EnergyPilot deliberately does not add a second periodic publish loop.
+
+## Inverter topology is EMHASS-owned
+
+`inverter_is_hybrid` describes the installation topology used by EMHASS and is **not** an EnergyPilot-required value. EnergyPilot preserves the configured value exactly as supplied by EMHASS.
+
+This applies to both write paths:
+
+- **Synchronize required config** does not list or change `inverter_is_hybrid`;
+- the automatic pre-optimization policy does not overwrite `inverter_is_hybrid` before `/action/dayahead-optim`.
+
+Changing Battery Saver mode, running **Optimize now**, or synchronizing required config therefore cannot silently switch an EMHASS installation between hybrid and non-hybrid modelling.
 
 ## PV is optional
 
@@ -58,7 +68,7 @@ An explicit slider change retains the existing safety order: write and verify Go
 
 The manual **Synchronize required config** action itself does not launch an optimization and does not write a GoodWe register. After changing required config manually, run a fresh EnergyPilot optimization before enabling Automatic Control.
 
-EnergyPilot-owned optimization runs also enforce the small core runtime contract immediately before solving, so `continual_publish`, battery use and timestamp rounding cannot silently drift away after a manual EMHASS edit.
+EnergyPilot-owned optimization runs also enforce the small core runtime contract immediately before solving, so `continual_publish`, battery use and timestamp rounding cannot silently drift away after a manual EMHASS edit. Installation-topology settings remain EMHASS-owned.
 
 ## Flow animation regression guard
 

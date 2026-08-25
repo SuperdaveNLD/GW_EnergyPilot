@@ -22,7 +22,7 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.34 Beta
+v0.35 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
@@ -213,7 +213,7 @@ Balanced      95%
 Battery Saver 90%
 ```
 
-v0.34 uses two distinct economic mechanisms:
+v0.34 introduced two distinct economic mechanisms that remain active in v0.35:
 
 - `weight_battery_charge` / `weight_battery_discharge`: linear anti-churn cost per battery-throughput kWh;
 - `battery_stress_cost`: current EMHASS quadratic/PWL penalty for high instantaneous battery power.
@@ -245,7 +245,9 @@ Existing unmanaged/custom values remain untouched until selection. The profile a
 
 ## Hybrid inverter power interpretation
 
-Before changing limits because `P_batt` is below 15 kW, check the shared hybrid inverter constraint. PV and battery share the inverter path in the current EMHASS hybrid model. `P_hybrid_inverter` can already be 15 kW while `P_batt` is lower because PV supplies the remainder.
+Only apply the shared hybrid-inverter power interpretation when the **active EMHASS configuration has `inverter_is_hybrid = true`**. In that topology PV and battery share the modeled inverter path, so `P_hybrid_inverter` can already be 15 kW while `P_batt` is lower because PV supplies the remainder.
+
+Do not set or infer `inverter_is_hybrid` merely because the physical GoodWe reference inverter is hybrid. The EMHASS model can intentionally represent a different installation topology.
 
 Also inspect SOC, neighboring prices and `battery_stress_cost` before concluding that the optimizer left usable power idle.
 
@@ -258,6 +260,19 @@ Also inspect SOC, neighboring prices and `battery_stress_cost` before concluding
 - Treat optimizer readiness and finite numeric outputs as safety gates.
 - Cost-function changes alter the optimizer objective only; never silently change GoodWe actuator strategy with them.
 - Battery Saver policy changes must preserve unrelated config and roll back all EnergyPilot-owned fields on failed first application.
+- The canonical EnergyPilot runtime contract is defined once in `emhass_sync.py` and contains exactly:
+
+```text
+continual_publish = true
+method_ts_round = first
+set_use_battery = true
+```
+
+- Both explicit EMHASS configuration synchronization and automatic pre-solve preparation must use that shared runtime contract rather than maintaining duplicate required-value lists.
+- `set_use_pv` and `inverter_is_hybrid` are installation-specific EMHASS settings. Preserve explicit `false`, explicit `true` and missing values; never infer inverter topology from the GoodWe hardware model.
+- `emhass_sync_api.py` must derive its managed-value list from the canonical sync key definition; do not duplicate an ownership list in the API/frontend path.
+
+See `docs/EMHASS_CONFIG_SYNC.md`.
 
 ## Persistent state
 
@@ -307,16 +322,17 @@ Inspect all active subclasses before changing orchestration behavior.
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v034.js
-  -> gw-energy-pilot-v031-battery-saver.js
-       -> gw-energy-pilot-v031-window-controls.js
-            -> gw-energy-pilot-v031.js
-                 -> gw-energy-pilot-v030.js
-                      -> earlier active layers
-  -> gw-energy-pilot-v027-battery-plan-core.js (explicit v0.34 cache-busted plan core)
+gw-energy-pilot-v035.js
+  -> gw-energy-pilot-v034.js
+       -> gw-energy-pilot-v031-battery-saver.js
+            -> gw-energy-pilot-v031-window-controls.js
+                 -> gw-energy-pilot-v031.js
+                      -> gw-energy-pilot-v030.js
+                           -> earlier active layers
+       -> gw-energy-pilot-v027-battery-plan-core.js (v0.34 behavior retained)
 ```
 
-Do not delete versioned frontend files based on filename alone. Trace imports first. Avoid new behavioral monkey-patch layers unless a bounded compatibility fix requires one.
+Do not delete versioned frontend files based on filename alone. Trace imports first. Avoid new behavioral monkey-patch layers unless a bounded compatibility fix requires one. The v0.35 wrapper is version-only and must not duplicate backend topology behavior.
 
 The Battery · Plan · Price card must keep one canonical instance. A fresh `plan_revision` should rebuild/replace it, not create a duplicate or remain stale behind the frontend cache.
 
@@ -341,6 +357,7 @@ Static CI proves repository consistency, not GoodWe hardware meaning or browser 
 - `docs/DEVELOPMENT.md` — maintainer workflow/current active chain.
 - `docs/MODBUS.md` — register/control semantics and evidence policy.
 - `docs/EMS_MODES.md` — exact modes 1–12.
+- `docs/EMHASS_CONFIG_SYNC.md` — required EMHASS synchronization and topology ownership.
 - `docs/EMHASS_PLAN_RUNTIME.md` — persistent plan resilience.
 - `docs/BATTERY_SAVER.md` — optimizer profile ownership/tuning.
 - `docs/EV_ANTI_DISCHARGE.md` — EV battery-direction protection.

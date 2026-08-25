@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.35** | 2026-08-25 | **Beta** | Preserves the user-owned EMHASS inverter topology instead of forcing `inverter_is_hybrid=true`, and centralizes the small EnergyPilot runtime contract used by config sync and pre-solve preparation. |
 | **0.34** | 2026-08-25 | **Beta** | Consolidates deterministic Battery Plan refresh, Battery Saver hard maximum-SOC/anti-churn tuning, and EV anti-discharge behavior that pauses discharge while allowing strategy-aware charging through mode 9 or 11. |
 | **0.33** | 2026-08-25 | **Beta** | Persists the canonical EMHASS plan across Home Assistant restart/publication gaps, fixes fresh-output and chart refresh handling, and adds shared anti-churn Battery Saver weights with Gold Rush 5–96%. |
 | **0.32** | 2026-08-25 | **Beta** | Hotfixes EMHASS settings saving on current Home Assistant while preserving four-decimal tariff values such as `0.0248`. |
@@ -49,6 +50,28 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.35 — Preserve EMHASS inverter topology
+
+v0.35 corrects an ownership mistake in the v0.34 EMHASS integration path. EnergyPilot previously had two independent paths that could force `inverter_is_hybrid = true`: **Synchronize required config** and the automatic pre-solve policy immediately before an EnergyPilot-owned optimization.
+
+`inverter_is_hybrid` describes the optimizer's installation/model topology. It is therefore not part of the small EnergyPilot publication/runtime contract and must not be inferred from the physical GoodWe reference inverter. v0.35 preserves the existing EMHASS value exactly, including an explicit `false`, an explicit `true`, or an absent key.
+
+Both configuration-write paths now share one canonical EnergyPilot runtime contract:
+
+```text
+continual_publish = true
+method_ts_round = first
+set_use_battery = true
+```
+
+`set_use_pv` and `inverter_is_hybrid` remain installation-specific EMHASS settings. The synchronization API derives its managed-value presentation from the same canonical key list, preventing the UI and backend ownership definitions from drifting apart again.
+
+Regression coverage verifies the explicit sync path, the automatic pre-solve path and false/true/missing inverter-topology values. Battery Saver tuning, hard maximum SOC ownership, EV anti-discharge behavior, persistent-plan recovery and all GoodWe control mappings remain unchanged.
+
+No GoodWe register definitions, Modbus read blocks, EMS mappings, entity IDs, unique IDs or stable device identity are changed. EMS remains on `47511/47512` with the established `47512 -> wait -> 47511` write order.
+
+See `docs/RELEASE_NOTES_V035.md` and `docs/EMHASS_CONFIG_SYNC.md`.
 
 # v0.34 — Consolidated plan refresh, Battery Saver tuning and EV anti-discharge
 
@@ -247,7 +270,7 @@ v0.29 includes the complete v0.28 base: Hybrid mode-9 import / mode-12 discharge
 
 Issue #22 is closed without a second residual-grid-capacity allocator because GoodWe itself already enforces the dynamic grid/import power limit.
 
-Issue #30 remains open. Negative raw EMHASS SOC-related values continue to be shown as invalid/raw diagnostics and are not guessed into percentages or silently rewritten until their exact semantics/source are established.
+Issue #30 remains open. Negative raw EMHASS SOC-related values continue to be shown as invalid/raw diagnostics and are not guessed into percentages or silently rewritten until their exact semantics/source is established.
 
 ## Safety and compatibility
 

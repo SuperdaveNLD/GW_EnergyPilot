@@ -45,7 +45,11 @@ from .const import (
     DOMAIN,
 )
 from .emhass_config import async_get_emhass_config, async_write_emhass_config
-from .emhass_sync import build_emhass_sync_config, emhass_sync_changes
+from .emhass_sync import (
+    SYNCED_CONFIG_KEYS,
+    build_emhass_sync_config,
+    emhass_sync_changes,
+)
 
 ENTITY_KEYS: dict[str, str] = {
     "pv": "pv_total_power",
@@ -112,20 +116,6 @@ def _payload_from_config(
 ) -> dict[str, Any]:
     synced, warnings = build_emhass_sync_config(config, entity_ids)
     changes = emhass_sync_changes(config, synced)
-    managed_keys = (
-        "sensor_power_photovoltaics",
-        "sensor_power_load_no_var_loads",
-        "sensor_power_battery",
-        "sensor_battery_state_of_charge",
-        "sensor_power_photovoltaics_forecast",
-        "sensor_replace_zero",
-        "sensor_linear_interp",
-        "var_model",
-        "continual_publish",
-        "method_ts_round",
-        "set_use_battery",
-        "inverter_is_hybrid",
-    )
     return {
         "entry_id": entry.entry_id,
         "available": error is None,
@@ -139,7 +129,7 @@ def _payload_from_config(
                 "required": synced.get(key),
                 "synchronized": config.get(key) == synced.get(key),
             }
-            for key in managed_keys
+            for key in SYNCED_CONFIG_KEYS
         ],
         "changes": changes,
         "warnings": warnings,

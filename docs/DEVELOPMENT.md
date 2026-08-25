@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.34 runtime structure
+## Current v0.35 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, runtime wiring, v0.34 panel entrypoint
+__init__.py             config-entry setup, APIs, runtime wiring, v0.35 panel entrypoint
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -25,11 +25,13 @@ controller.py           canonical automatic/manual EMS ownership + Battery/Grid/
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
 emhass_config.py        safe full EMHASS config read/write helpers
+emhass_sync.py          canonical EnergyPilot runtime contract + safe required-config synchronization
+emhass_sync_api.py      admin sync/readback API using canonical sync ownership keys
 orchestrator.py         base EMHASS orchestration
 orchestrator_v012.py    reliability/startup/price refinements
 orchestrator_v013.py    G20 load semantics + persistent last_success/optimization log
 orchestrator_v026.py    canonical dashboard price-series cache/read path
-orchestrator_v031.py    Battery Saver policy + min-SOC/final-SOC ownership + fresh-output validation
+orchestrator_v031.py    Battery Saver policy + canonical runtime contract + min-SOC/final-SOC ownership + fresh-output validation
 orchestrator_v033.py    persistent official-plan refresh + deterministic plan_revision
 plan_runtime.py         validated /api/v1/plan mirror + Store lifecycle/current-value lookup
 battery_plan.py         pure plan normalization/timestep/validity helpers
@@ -69,10 +71,35 @@ All layers are active runtime code. Check subclasses before changing a base meth
 Ownership by active layer:
 
 - v026: read-only dashboard/optimizer price-series caching;
-- v031: Battery Saver EMHASS policy, hard-SOC alignment and fresh `P_batt` publication validation;
+- v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
 
 Do not add release inheritance merely to change a label or constant when an existing bounded module can own the behavior.
+
+## EMHASS required-config ownership
+
+`emhass_sync.py` is the canonical definition for the small EnergyPilot runtime contract used by both explicit **Synchronize required config** and automatic pre-solve preparation:
+
+```text
+continual_publish = true
+method_ts_round = first
+set_use_battery = true
+```
+
+The helper `apply_emhass_runtime_contract()` applies only those values to a copy of the complete current EMHASS configuration. `orchestrator_v031.py` must use that helper rather than maintaining a second required-value list.
+
+Installation/model topology is outside this contract:
+
+```text
+set_use_pv
+inverter_is_hybrid
+```
+
+Both are EMHASS/operator-owned. Preserve explicit `false`, explicit `true` and an absent `inverter_is_hybrid` key. Never infer it from the fact that the physical reference GoodWe inverter is hybrid; EMHASS can intentionally model external/AC-coupled or otherwise different topology.
+
+`emhass_sync_api.py` derives its displayed managed values from `SYNCED_CONFIG_KEYS`. Do not recreate a separate ownership tuple in the API/frontend path.
+
+See `docs/EMHASS_CONFIG_SYNC.md`.
 
 ## Active controller layer
 
@@ -90,16 +117,17 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v034.js
-    -> gw-energy-pilot-v031-battery-saver.js
-        -> gw-energy-pilot-v031-window-controls.js
-            -> gw-energy-pilot-v031.js
-                -> gw-energy-pilot-v030.js
-                    -> historical active layers
-    -> gw-energy-pilot-v027-battery-plan-core.js (explicit v0.34 cache-busted plan core)
+gw-energy-pilot-v035.js
+    -> gw-energy-pilot-v034.js
+        -> gw-energy-pilot-v031-battery-saver.js
+            -> gw-energy-pilot-v031-window-controls.js
+                -> gw-energy-pilot-v031.js
+                    -> gw-energy-pilot-v030.js
+                        -> historical active layers
+        -> gw-energy-pilot-v027-battery-plan-core.js (v0.34 behavior retained)
 ```
 
-The v0.34 wrapper owns the release badge/footer and deliberately loads fresh URLs for both modified nested modules. Battery Saver rendering remains in the v031 Battery Saver module and reads current backend profile metadata. The Battery · Plan · Price core owns the bounded revision-aware refresh behavior.
+The v0.35 wrapper owns only release badge/footer presentation. The v0.34 wrapper continues to cache-bust the Battery Saver module and Battery Plan core. Battery Saver rendering remains in the v031 Battery Saver module and reads current backend profile metadata. The Battery · Plan · Price core owns the bounded revision-aware refresh behavior.
 
 **Do not add another behavioral release monkey-patch layer by default.** The layered frontend is technical debt and has caused regressions. New presentation work should prefer functional components or deliberate consolidation under browser-level regression coverage.
 
@@ -252,7 +280,7 @@ battery_stress_cost
     -> determines how expensive high instantaneous power is
 ```
 
-v0.34 applies a shared anti-churn floor to all four managed modes:
+v0.34 introduced a shared anti-churn floor to all four managed modes; v0.35 does not retune it:
 
 ```text
 weight_battery_charge    = 2.25% × dynamic price reference
@@ -281,9 +309,9 @@ Battery Saver currently supports one EMHASS battery model. Do not broadcast a sc
 
 ## Hybrid inverter power interpretation
 
-Before diagnosing “why not 15 kW”, inspect all relevant constraints.
+Before diagnosing “why not 15 kW”, inspect all relevant constraints and the active EMHASS topology.
 
-For current EMHASS hybrid modeling, PV and battery share the inverter path. The following can independently bind:
+When `inverter_is_hybrid = true` in EMHASS, PV and battery share the modeled inverter path. The following can independently bind:
 
 ```text
 battery charge/discharge max
@@ -294,6 +322,8 @@ battery_stress_cost
 ```
 
 A plan with `P_batt = 14.5 kW` can already have `P_hybrid_inverter = 15 kW` when PV contributes the remaining DC power. Do not compensate for that by increasing battery limits or changing GoodWe registers.
+
+If the operator configured `inverter_is_hybrid = false`, do not apply the hybrid-topology interpretation and do not “repair” the setting automatically.
 
 ## EMS / Modbus safety
 
@@ -419,7 +449,8 @@ Static CI does not prove GoodWe hardware semantics or browser rendering.
 GoodWe register/transport -> registers.py / client.py / coordinator.py
 Automatic EMS decision    -> controller.py + controller_v033.py availability/EV override
 SOC config synchronization-> number.py / emhass_config.py / verified client helper
-EMHASS optimization       -> orchestrator*.py / emhass_config.py / event_triggers.py
+EMHASS config ownership   -> emhass_sync.py / emhass_sync_api.py / emhass_config.py
+EMHASS optimization       -> orchestrator*.py / event_triggers.py
 Persistent plan           -> plan_runtime.py / battery_plan.py
 Battery Saver policy      -> battery_saver.py / battery_saver_api.py / orchestrator_v031.py
 Battery/price chart       -> orchestrator_v026.py / price_series.py / battery_price_api.py
@@ -428,7 +459,7 @@ Runtime/log persistence   -> runtime_store.py / optimization_log.py
 Presentation              -> active frontend chain
 ```
 
-Do not fix a presentation issue by changing Modbus semantics unless the data itself is proven wrong. Do not solve an entity lifecycle gap by duplicating control or optimizer ownership.
+Do not fix a presentation issue by changing Modbus semantics unless the data itself is proven wrong. Do not solve an entity lifecycle gap by duplicating control or optimizer ownership. Do not infer EMHASS topology from GoodWe hardware.
 
 ## Current technical debt priorities
 
