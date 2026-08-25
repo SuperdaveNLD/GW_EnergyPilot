@@ -11,14 +11,18 @@ class PriceAdjustmentPrecisionTests(unittest.TestCase):
     def test_home_assistant_selector_step_stays_supported(self) -> None:
         source = (INTEGRATION / "config_flow.py").read_text(encoding="utf-8")
 
-        buy_start = source.index("CONF_BUY_PRICE_ADDER")
-        sell_start = source.index("CONF_SELL_PRICE_DEDUCTION", buy_start)
-        ev_start = source.index("CONF_ENABLE_EV_COORDINATION", sell_start)
+        buy_start = source.index("vol.Required(\n                CONF_BUY_PRICE_ADDER")
+        sell_start = source.index(
+            "vol.Required(\n                CONF_SELL_PRICE_DEDUCTION", buy_start
+        )
+        ev_start = source.index(
+            "vol.Required(\n                CONF_ENABLE_EV_COORDINATION", sell_start
+        )
         price_schema = source[buy_start:ev_start]
 
         self.assertNotIn("step=0.0001", price_schema)
         self.assertEqual(price_schema.count("step=0.001"), 2)
-        self.assertIn("NumberSelectorMode.BOX", price_schema)
+        self.assertEqual(price_schema.count("NumberSelectorMode.BOX"), 2)
 
     def test_dashboard_keeps_four_decimal_input_increment(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v029.js").read_text(encoding="utf-8")
