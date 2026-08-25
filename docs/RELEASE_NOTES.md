@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.34** | 2026-08-25 | **Beta** | Consolidates deterministic Battery Plan refresh, Battery Saver hard maximum-SOC/anti-churn tuning, and EV anti-discharge behavior that pauses discharge while allowing strategy-aware charging through mode 9 or 11. |
 | **0.33** | 2026-08-25 | **Beta** | Persists the canonical EMHASS plan across Home Assistant restart/publication gaps, fixes fresh-output and chart refresh handling, and adds shared anti-churn Battery Saver weights with Gold Rush 5–96%. |
 | **0.32** | 2026-08-25 | **Beta** | Hotfixes EMHASS settings saving on current Home Assistant while preserving four-decimal tariff values such as `0.0248`. |
 | **0.31** | 2026-08-24 | **Beta** | Adds an opt-in, administrator-only debug session to LOG with bounded memory-only runtime tracing, full decoded GoodWe telemetry, controller/read-back and EMHASS status correlation, plus a copyable support report. |
@@ -48,6 +49,20 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.34 — Consolidated plan refresh, Battery Saver tuning and EV anti-discharge
+
+v0.34 consolidates all open post-v0.33 release work into one Beta candidate.
+
+The Battery · Plan · Price card now follows an explicit optimization `plan_revision`, so every successful EnergyPilot optimization can invalidate the cached chart immediately after the persistent plan refresh attempt. A fresh v0.34 frontend wrapper also cache-busts both the updated Battery Saver module and Battery Plan core for already-open Home Assistant sessions.
+
+Battery Saver profiles now own their hard EMHASS maximum SOC when explicitly selected: Mad-Steve 100%, Gold Rush 96%, Balanced 95% and Battery Saver/Eco 90%. The shared charge/discharge anti-churn floor increases from 1.5% to 2.25% of the dynamic price reference per direction based on field comparison.
+
+EV coordination remains an anti-discharge guard. While the EV is charging, battery discharge or a neutral battery plan uses mode 8 Battery Hold. An explicit home-battery charge request is no longer unnecessarily held: Battery control uses mode 11; Grid/Hybrid use mode 9 when a positive `P_grid` import target is available, with a mode-11 fallback for an explicit battery-charge request when needed.
+
+No GoodWe register definitions, Modbus read blocks, entity IDs, unique IDs or stable device identity are changed. EMS remains on `47511/47512` with `47512 -> wait -> 47511`. The v0.33 persistent-plan fallback, optimizer readiness gates and EV-stop fresh-plan protection remain intact.
+
+See `docs/RELEASE_NOTES_V034.md`, `docs/BATTERY_PLAN_CHART.md`, `docs/BATTERY_SAVER.md` and `docs/EV_ANTI_DISCHARGE.md`.
 
 # v0.33 — Persistent EMHASS plan and calmer Battery Saver optimization
 

@@ -132,6 +132,7 @@ gw_energypilot/battery_price/get
 
 v0.33 uses chart schema version **`4`** and includes:
 
+- `plan_revision` — the EnergyPilot optimization generation currently owning the mirrored plan;
 - `battery_energy` — current GoodWe charged/discharged day counters;
 - `battery_plan` — configured entity id, current target/source, future points, persistent-plan source, `generated_at`, `valid_until` and restore diagnostics;
 - timestamped market/effective-price data from the existing EnergyPilot price runtime.
@@ -140,12 +141,12 @@ When `force=true`, or no current plan mirror exists, the read-only API may reque
 
 ## Live plan refresh and duplicate protection
 
-The frontend normally keeps a short chart-data cache. v0.33 adds an explicit freshness path for a newly published plan:
+The frontend normally keeps a short chart-data cache. v0.33 uses two independent freshness paths:
 
-1. compare the configured `P_batt` entity's `last_updated` with the timestamp in the cached chart payload;
-2. when the entity is newer, call the read-only API with force refresh instead of waiting for normal cache expiry;
-3. rebuild/replace the one canonical `.ep-v027-battery-plan-card`;
-4. remove any accidental duplicate card left by a prior layered-render regression.
+1. **EnergyPilot optimization revision.** Every successful call through the central orchestrator refreshes `GWEnergyPilotPlanRuntime`, advances `plan_revision` and emits the existing orchestrator dispatcher signal. The existing Optimize Now button entity already subscribes to that signal and exposes orchestrator attributes, so no new entity is added. The chart compares that live revision with the revision stored in its last `battery_price/get` payload and force-refreshes immediately when they differ.
+2. **External EMHASS publication fallback.** The configured `P_batt` entity's `last_updated` is still compared with the timestamp in the cached chart payload. A plan changed outside EnergyPilot therefore also bypasses normal cache expiry.
+
+After either freshness signal, the chart calls the read-only API with force refresh, rebuilds/replaces the one canonical `.ep-v027-battery-plan-card`, and removes any accidental duplicate card left by a prior layered-render regression.
 
 The duplicate-card guard must therefore **not** return permanently just because a canonical card already exists. It may skip rendering only when the render key is unchanged and no fresh plan evidence exists.
 
@@ -153,7 +154,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 The active v0.33 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-The plan-data freshness check is independent of ordinary five-minute chart-data cache expiry, so a newly published plan does not intentionally remain stale for that full interval.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested chart module itself changes. The v0.33 plan-refresh hotfix imports the Battery Plan chart core directly under the fresh `0.33-planrefresh1` module URL, while the panel registration uses the same release cache-bust. This guarantees that the new refresh logic is executed without requiring a browser process restart.
+
+The optimization revision and `P_batt` freshness checks are independent of ordinary five-minute chart-data cache expiry, so a newly published plan does not intentionally remain stale for that full interval.
 
 ## Safety and compatibility
 

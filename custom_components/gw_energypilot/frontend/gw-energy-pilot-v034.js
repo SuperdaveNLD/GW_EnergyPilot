@@ -1,18 +1,15 @@
-import "./gw-energy-pilot-v031-battery-saver.js?v=0.33-release1";
-// Load the chart core under a fresh module URL as well. During a live upgrade,
-// the browser keeps historical nested ES-module URLs in its module map even
-// when the top-level panel URL changes.
-import "./gw-energy-pilot-v027-battery-plan-core.js?v=0.33-planrefresh1";
+import "./gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1";
+import "./gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1";
 
-const VERSION = "0.33";
+const VERSION = "0.34";
 const PANEL_NAME = "gw-energypilot-panel";
 
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 
-if (!PanelClass.prototype.__epV033RenderInstalled) {
+if (!PanelClass.prototype.__epV034RenderInstalled) {
   const previousRender = PanelClass.prototype._render;
-  PanelClass.prototype._render = function energyPilotV033Render() {
+  PanelClass.prototype._render = function energyPilotV034Render() {
     previousRender.call(this);
     const root = this.shadowRoot;
     if (!root) return;
@@ -25,5 +22,5 @@ if (!PanelClass.prototype.__epV033RenderInstalled) {
       footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
     }
   };
-  PanelClass.prototype.__epV033RenderInstalled = true;
+  PanelClass.prototype.__epV034RenderInstalled = true;
 }

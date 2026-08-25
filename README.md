@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.33 · Beta**
+**v0.34 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,9 +19,11 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V034.md` — consolidated v0.34 release scope;
 - `CHANGELOG.md` — detailed technical history;
 - `docs/EMHASS_PLAN_RUNTIME.md` — persistent canonical EMHASS plan/recovery contract;
 - `docs/BATTERY_SAVER.md` — Battery Saver profiles, anti-churn tuning and ownership;
+- `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge control contract;
 - `docs/DEBUG_LOG.md` — opt-in LOG-tab debug-session/support-report contract;
 - `docs/EMS_MODES.md` — GoodWe EMS modes 1–12;
 - `docs/ACCOUNTING.md` — persistent grid accounting;
@@ -30,14 +32,14 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
-## v0.33 highlights
+## v0.34 highlights
 
-- EnergyPilot now keeps a validated persistent mirror of the canonical EMHASS `P_batt` / `P_grid` horizon from official `GET /api/v1/plan`, so a temporary Home Assistant entity publication gap after restart/reload does not immediately erase the usable plan.
-- Live configured Home Assistant plan entities remain first priority. The persistent mirror is used only while it is still inside its inferred validity window; an explicit non-ready optimizer status remains authoritative.
-- Fresh EMHASS output detection now uses Home Assistant `last_reported`, so a valid newly published `P_batt` value is accepted even when its numeric value did not change.
-- The Battery · Plan · Price card now rebuilds when the active plan changes and bypasses its normal five-minute cache for a newly published plan without reintroducing duplicate cards.
-- All four managed Battery Saver profiles gain the same small price-relative anti-churn charge/discharge weight to suppress low-value quarter-hour reversals. **Gold Rush** now uses a 5–96% soft SOC zone.
-- No GoodWe register, Modbus block, EMS mapping, write ordering, entity ID or unique ID changes are introduced by these v0.33 improvements.
+- Every successful EnergyPilot-owned optimization advances an explicit `plan_revision` after the persistent EMHASS plan refresh attempt, giving the Battery · Plan · Price card a deterministic cache-invalidation signal.
+- The v0.34 frontend wrapper uses fresh module URLs for both the Battery Saver layer and Battery Plan core, preventing an already-open Home Assistant browser session from retaining stale nested JavaScript.
+- Managed Battery Saver profiles now own their EMHASS hard maximum SOC as part of the existing apply/rollback transaction: **Mad-Steve 100%**, **Gold Rush 96%**, **Balanced 95%** and **Battery Saver/Eco 90%**.
+- The common price-relative Battery Saver anti-churn factor increases from `1.5%` to **`2.25%`** per charge/discharge direction, approximately `0.007` currency/kWh at the field-test price reference around `0.31`.
+- EV anti-discharge now does exactly one safety job: while the EV is charging, battery discharge/neutral operation uses **mode 8 Battery Hold**, while an explicit home-battery charge plan remains allowed through the configured strategy using **mode 9 or mode 11**.
+- No GoodWe register, Modbus block, write ordering, entity ID, unique ID or stable device identity changes are introduced by v0.34.
 
 ## Tested hardware
 
@@ -57,7 +59,8 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - three Automatic Control strategies: Battery, Grid and Hybrid;
 - native EMHASS optimization/publishing;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
-- four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences and anti-churn battery-throughput costs;
+- deterministic Battery Plan refresh after EnergyPilot optimizations;
+- four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences, profile-owned maximum SOC and anti-churn battery-throughput costs;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
 - opt-in bounded LOG-tab debug sessions and copyable support reports;
@@ -135,9 +138,26 @@ otherwise -> mode 1 GoodWe Auto / self-use
 
 Hybrid is deliberately asymmetric. Buying is controlled at the PCC through mode 9 and the EMHASS `P_grid` magnitude. Selling is controlled through direct battery discharge mode 12 and the EMHASS `P_batt` magnitude.
 
-A Hybrid charging plan with no planned grid import falls back to GoodWe self-use. That lets locally available PV flow to the battery according to the inverter's own fast control instead of forcing the battery to the forecast-sized EMHASS charging value. A neutral EMHASS battery plan remains neutral through mode 8.
+A Hybrid charging plan with no planned grid import normally falls back to GoodWe self-use. That lets locally available PV flow to the battery according to the inverter's own fast control instead of forcing the battery to the forecast-sized EMHASS charging value. A neutral EMHASS battery plan remains neutral through mode 8.
 
-EV anti-discharge remains a higher-priority directional safety override.
+### EV anti-discharge override
+
+EV coordination is a directional anti-discharge guard, not an EV charging controller. While the configured EV source indicates active charging:
+
+```text
+P_batt > +deadband or inside deadband -> mode 8 Battery Hold
+P_batt < -deadband                    -> home-battery charging remains allowed
+```
+
+For an explicit home-battery charge plan:
+
+```text
+Battery strategy -> mode 11 using abs(P_batt)
+Grid strategy    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Hybrid strategy  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+```
+
+This prevents the home battery from feeding the EV while avoiding the previous blanket hold on legitimate charging. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.
 
 ## EMS / sign conventions
 
@@ -195,13 +215,15 @@ If `45356` is unavailable, neither system is changed. If EMHASS fails after a ve
 
 There is no startup/background SOC synchronization.
 
-The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains EMHASS-only.
+The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains an EMHASS hard limit; when a Battery Saver profile is managed, EnergyPilot owns that EMHASS maximum as part of the selected profile.
 
 ## Battery Saver
 
 Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes a GoodWe mode directly. The public profiles are **Mad-Steve**, **Gold Rush**, **Balanced** and **Battery Saver**.
 
-All four managed modes use the same small price-relative charge/discharge anti-churn cost. This gives low-value battery throughput a real virtual cost even in Mad-Steve; the modes then differ through their soft SOC thresholds and quadratic battery power-stress costs. Gold Rush uses a 5–96% soft SOC zone in v0.33. Minimum/Maximum SOC remain the hard optimizer limits.
+Managed profiles use a common price-relative charge/discharge anti-churn cost and profile-specific hard maximum SOC/power-stress behavior. Current hard maxima are **100% / 96% / 95% / 90%** for Mad-Steve / Gold Rush / Balanced / Battery Saver respectively. Minimum SOC remains the GoodWe-synchronized hard floor.
+
+The common anti-churn factor is **2.25% × price reference per direction**. At the field-test price reference around `0.31`, that is approximately `0.007` per charged or discharged kWh.
 
 See `docs/BATTERY_SAVER.md` for exact profile factors and ownership.
 
@@ -215,7 +237,8 @@ The chart is read-only.
 - future plan blocks prefer the validated persistent official EMHASS plan mirror; current Home Assistant `battery_scheduled_power` and legacy/custom `forecasts` remain compatibility fallbacks;
 - the forecast interval active at NOW is clipped at NOW rather than discarded because it began a few minutes earlier;
 - dashed plan overlays render above solid actual bars;
-- a newly published plan forces a chart refresh without waiting for the normal five-minute cache;
+- every successful EnergyPilot-owned optimization advances `plan_revision`, allowing the frontend to force-refresh the canonical card immediately after the persistent plan refresh attempt;
+- `P_batt.last_updated` remains a compatibility invalidation fallback for plans changed outside EnergyPilot;
 - the market-price series comes from the same EnergyPilot runtime price source used for EMHASS and is rendered as interval steps;
 - the card supports S/M/L layouts and an expanded detail view;
 - native GoodWe day counters `35208` / `35211` are preferred for the headline charged/discharged totals;

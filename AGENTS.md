@@ -22,7 +22,7 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.33 Beta
+v0.34 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
@@ -135,9 +135,19 @@ Hybrid is deliberately asymmetric: buy/import is PCC mode 9; sell/discharge is d
 
 Legacy compatibility remains: missing/false old smart-meter flag -> Battery; explicit true -> Grid.
 
-EV anti-discharge is a higher-priority directional override. See `docs/EV_ANTI_DISCHARGE.md`.
+EV anti-discharge is a higher-priority directional override, but it must only block battery discharge while the EV is charging:
 
-## v0.33 plan-resilience rules
+```text
+EV active + P_batt >= -deadband -> mode 8 Battery Hold
+EV active + explicit charge plan:
+  Battery strategy -> mode 11 using abs(P_batt)
+  Grid strategy -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+  Hybrid strategy -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+```
+
+The EV feature does not control the charger and must not introduce a second fast power-control loop. EV-stop stale-plan protection remains intact. See `docs/EV_ANTI_DISCHARGE.md`.
+
+## Persistent plan-resilience rules
 
 EMHASS remains the canonical plan owner. EnergyPilot mirrors the official `GET /api/v1/plan` result in:
 
@@ -164,7 +174,9 @@ Rules:
 - a failed refresh must not delete a still-valid mirror;
 - do not create duplicate P_batt/P_grid entities or a second optimization engine.
 
-See `docs/EMHASS_PLAN_RUNTIME.md`.
+A successful EnergyPilot optimization advances the existing `plan_revision` after the persistent-plan refresh attempt. Frontend consumers may use that revision to invalidate cached plan data deterministically; `P_batt.last_updated` remains a compatibility fallback for changes outside EnergyPilot.
+
+See `docs/EMHASS_PLAN_RUNTIME.md` and `docs/BATTERY_PLAN_CHART.md`.
 
 ## EMHASS output freshness
 
@@ -190,9 +202,18 @@ Balanced
 Battery Saver
 ```
 
-Hard Minimum/Maximum SOC is separate from soft Battery Saver preferences.
+The verified GoodWe-synchronized Minimum SOC remains a separate hard lower boundary. When a Battery Saver profile is explicitly managed, its EMHASS `battery_maximum_state_of_charge` is part of the profile transaction.
 
-v0.33 uses two distinct mechanisms:
+Current hard maxima are:
+
+```text
+Mad-Steve    100%
+Gold Rush     96%
+Balanced      95%
+Battery Saver 90%
+```
+
+v0.34 uses two distinct economic mechanisms:
 
 - `weight_battery_charge` / `weight_battery_discharge`: linear anti-churn cost per battery-throughput kWh;
 - `battery_stress_cost`: current EMHASS quadratic/PWL penalty for high instantaneous battery power.
@@ -200,15 +221,16 @@ v0.33 uses two distinct mechanisms:
 All four managed profiles use:
 
 ```text
-weight_battery_charge    = 1.5% × dynamic price reference
-weight_battery_discharge = 1.5% × dynamic price reference
+weight_battery_charge    = 2.25% × dynamic price reference
+weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-This prevents unrestricted micro-arbitrage even in current Mad-Steve. Gold Rush uses a **5–96% soft SOC zone**. Do not silently turn 96% into a hard maximum.
+This prevents unrestricted micro-arbitrage even in current Mad-Steve. Profile-specific deficit/surplus thresholds and power-stress penalties remain separate from the hard maximum. Gold Rush has both a 96% hard maximum and a 96% surplus threshold by design.
 
-Battery Saver owns eight EMHASS fields after explicit profile selection:
+Battery Saver owns nine EMHASS fields after explicit profile selection:
 
 ```text
+battery_maximum_state_of_charge
 battery_soc_deficit_threshold
 battery_soc_deficit_cost
 battery_soc_surplus_threshold
@@ -219,7 +241,7 @@ weight_battery_charge
 weight_battery_discharge
 ```
 
-Existing unmanaged/custom values remain untouched until selection. Multi-battery profile ownership is rejected rather than guessed. See `docs/BATTERY_SAVER.md`.
+Existing unmanaged/custom values remain untouched until selection. The profile apply/rollback path must include all nine owned fields. Multi-battery profile ownership is rejected rather than guessed. See `docs/BATTERY_SAVER.md`.
 
 ## Hybrid inverter power interpretation
 
@@ -285,17 +307,18 @@ Inspect all active subclasses before changing orchestration behavior.
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v033.js
+gw-energy-pilot-v034.js
   -> gw-energy-pilot-v031-battery-saver.js
        -> gw-energy-pilot-v031-window-controls.js
             -> gw-energy-pilot-v031.js
                  -> gw-energy-pilot-v030.js
                       -> earlier active layers
+  -> gw-energy-pilot-v027-battery-plan-core.js (explicit v0.34 cache-busted plan core)
 ```
 
 Do not delete versioned frontend files based on filename alone. Trace imports first. Avoid new behavioral monkey-patch layers unless a bounded compatibility fix requires one.
 
-The Battery · Plan · Price card must keep one canonical instance. A fresh plan should rebuild/replace it, not create a duplicate or remain stale behind the frontend cache.
+The Battery · Plan · Price card must keep one canonical instance. A fresh `plan_revision` should rebuild/replace it, not create a duplicate or remain stale behind the frontend cache.
 
 ## Repository checks
 
