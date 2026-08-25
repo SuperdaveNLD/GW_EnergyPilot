@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import voluptuous as vol
@@ -76,20 +77,26 @@ def _battery_plan_payload(
     cached_current = (
         plan_runtime.current_p_batt() if plan_runtime is not None else None
     )
-    diagnostics = (
-        dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
-    )
+    diagnostics = dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
     current_w = live_current if live_current is not None else cached_current
-    forecast_source = diagnostics.get("source") if cached_points else (
-        f"home_assistant_{schedule_attribute}" if live_points and schedule_attribute else None
+    forecast_source = (
+        diagnostics.get("source")
+        if cached_points
+        else f"home_assistant_{schedule_attribute}"
+        if live_points and schedule_attribute
+        else None
     )
 
     return {
         "entity_id": entity_id,
         "available": current_w is not None or bool(points),
         "current_w": current_w,
-        "current_source": "home_assistant" if live_current is not None else (
-            "persistent_plan" if cached_current is not None else None
+        "current_source": (
+            "home_assistant"
+            if live_current is not None
+            else "persistent_plan"
+            if cached_current is not None
+            else None
         ),
         "last_updated": state.last_updated.isoformat() if state is not None else None,
         "schedule_attribute": schedule_attribute,
@@ -124,6 +131,7 @@ async def websocket_get_battery_price(
 
     runtime_data = getattr(entry, "runtime_data", None)
     orchestrator = getattr(runtime_data, "orchestrator", None)
+    plan_runtime = getattr(runtime_data, "plan_runtime", None)
     price_reader = getattr(orchestrator, "async_dashboard_price_payload", None)
     if not callable(price_reader):
         connection.send_error(
@@ -131,7 +139,18 @@ async def websocket_get_battery_price(
         )
         return
 
-    price_payload = await price_reader(force=bool(msg.get("force", False)))
+    force = bool(msg.get("force", False))
+    refresh_plan = bool(
+        plan_runtime is not None and (force or not plan_runtime.has_current_plan())
+    )
+    if refresh_plan:
+        price_payload, _plan_refreshed = await asyncio.gather(
+            price_reader(force=force),
+            plan_runtime.async_refresh(reason="dashboard"),
+        )
+    else:
+        price_payload = await price_reader(force=force)
+
     connection.send_result(
         msg["id"],
         {
