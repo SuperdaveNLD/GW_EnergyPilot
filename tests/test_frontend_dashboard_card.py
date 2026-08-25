@@ -38,6 +38,51 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
 
+    def test_v034_flow_direction_is_semantic_and_geometry_specific(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("function synchronizeFlowDirections", source)
+        self.assertIn('grid > 0\n        ? "from"\n        : "to"', source)
+        self.assertIn('battery > 0\n        ? "to"\n        : "from"', source)
+        self.assertIn(
+            ".ep-link-pv.ep-v034-to-hub .ep-v011-particles span,",
+            source,
+        )
+        self.assertIn(
+            ".ep-link-grid.ep-v034-from-hub .ep-v011-particles span",
+            source,
+        )
+        self.assertIn(
+            ".ep-link-house.ep-v034-from-hub .ep-v011-particles span,",
+            source,
+        )
+        self.assertIn(
+            ".ep-link-battery.ep-v034-to-hub .ep-v011-particles span",
+            source,
+        )
+        self.assertIn("animation-direction: normal !important", source)
+        self.assertIn("@keyframes epV034FlowHForward", source)
+        self.assertIn("@keyframes epV034FlowHReverse", source)
+        self.assertIn("@keyframes epV034FlowVForward", source)
+        self.assertIn("@keyframes epV034FlowVReverse", source)
+
+    def test_v034_flow_layout_tracks_narrow_card_resize(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("const FLOW_COMPACT_BREAKPOINT_PX = 430", source)
+        self.assertIn("const FLOW_TIGHT_BREAKPOINT_PX = 340", source)
+        self.assertIn("function updateResponsiveFlowLayout", source)
+        self.assertIn("typeof globalThis.ResizeObserver", source)
+        self.assertIn('flow.classList.toggle("ep-v034-flow-compact", compact)', source)
+        self.assertIn("--ep-v034-node-width", source)
+        self.assertIn("--ep-v034-stage-height", source)
+        self.assertIn("height: auto !important", source)
+        self.assertIn("updateParticleGeometry(flow)", source)
+
     def test_v035_wraps_v034_cache_busted_frontend_modules(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
@@ -47,8 +92,8 @@ class FrontendDashboardCardTests(unittest.TestCase):
         )
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
-        # v0.34 still owns the behavioral cache-busting for the two modified
-        # nested modules. v0.35 deliberately remains a version-only wrapper.
+        # v0.34 owns the retained behavioral layers and the bounded live-flow
+        # compatibility fix. v0.35 remains a version-only release wrapper.
         self.assertIn(
             'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
             release_v034,
@@ -58,14 +103,16 @@ class FrontendDashboardCardTests(unittest.TestCase):
             release_v034,
         )
         self.assertIn('const VERSION = "0.34"', release_v034)
+        self.assertIn("synchronizeFlowDirections", release_v034)
 
         self.assertIn(
-            'gw-energy-pilot-v034.js?v=0.35-release1',
+            'gw-energy-pilot-v034.js?v=0.35-release2',
             release_v035,
         )
         self.assertIn('const VERSION = "0.35"', release_v035)
+        self.assertNotIn("synchronizeFlowDirections", release_v035)
         self.assertIn(
-            'gw-energy-pilot-v035.js?v=0.35-release1',
+            'gw-energy-pilot-v035.js?v=0.35-release2',
             integration,
         )
 
