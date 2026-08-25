@@ -111,7 +111,7 @@ The v0.36 test suite adds regression contracts for:
 - relevant-state render filtering and 80 ms batching;
 - destructive-render deferral during an actual pointer/keyboard press.
 
-The repository release candidate is expected to pass the normal **Quality**, **HACS validation** and **Hassfest** workflows before merge.
+The repository release candidate is expected to pass the normal **Quality**, **HACS validation** and **Hassfest** workflows before merge. A dedicated live-validation checklist is provided in `docs/RELEASE_NOTES_V036_TEST.md` for strategy transitions, graph refresh, high-update interaction and phone/rotation behavior.
 
 ## Safety and compatibility
 
@@ -126,4 +126,4 @@ The repository release candidate is expected to pass the normal **Quality**, **H
 - Custom mode preserves current EMHASS battery values instead of silently resetting them.
 - The internal controller command remains available in Diagnostics for support analysis.
 
-See also `docs/BATTERY_SAVER.md`, `docs/BATTERY_PLAN_CHART.md` and `docs/RELEASE_NOTES.md`.
+See also `docs/BATTERY_SAVER.md`, `docs/BATTERY_PLAN_CHART.md`, `docs/RELEASE_NOTES_V036_TEST.md` and `docs/RELEASE_NOTES.md`.
