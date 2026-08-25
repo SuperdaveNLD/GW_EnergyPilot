@@ -2,6 +2,30 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.35] - 2026-08-25
+
+### Fixed
+
+- Stopped EnergyPilot from forcing EMHASS `inverter_is_hybrid = true` during explicit **Synchronize required config** operations.
+- Stopped the automatic pre-optimization policy from re-forcing `inverter_is_hybrid = true` before every EnergyPilot-owned solve.
+- Removed `inverter_is_hybrid` from the EMHASS synchronization API's managed-value list so the dashboard no longer presents installation topology as an EnergyPilot-owned requirement.
+
+### Changed
+
+- Added one canonical EnergyPilot EMHASS runtime contract shared by required-config synchronization and the automatic pre-solve path: `continual_publish = true`, `method_ts_round = first` and `set_use_battery = true`.
+- `set_use_pv` and `inverter_is_hybrid` are explicitly installation-specific EMHASS settings. Existing `false`, `true` and missing topology values are preserved instead of inferred from the GoodWe hardware model.
+- Added regression coverage for both configuration-write paths and for false/true/missing inverter-topology values.
+- Added the v0.35 release wrapper and release documentation without changing the existing v0.34 dashboard behavior.
+
+### Safety / compatibility
+
+- No GoodWe register definition or Modbus read-block changes.
+- No EMS mode mapping or `47512 -> wait -> 47511` write-order changes.
+- No Automatic Control strategy changes.
+- No entity ID, unique ID, stable device identity or persistent Store-key changes.
+- Battery Saver v0.34 profile tuning, hard maximum SOC ownership and anti-churn settings remain unchanged.
+- EMHASS remains the canonical optimizer and plan owner; v0.35 only corrects configuration ownership.
+
 ## [0.34] - 2026-08-25
 
 ### Added
@@ -185,7 +209,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Fixed
 
-- Corrected **Hybrid control** to the intended asymmetric mapping: buying/import uses GoodWe mode `9` with the EMHASS `P_grid` import magnitude, while selling/discharging uses GoodWe mode `12` with the EMHASS `P_batt` discharge magnitude.
+- Corrected **Hybrid control** to the intended asymmetric mapping: buying/import uses GoodWe mode `9` with the EMHASS `P_grid` import magnitude, while selling/discharging uses mode `12` with the EMHASS `P_batt` discharge magnitude.
 - Hybrid no longer interprets buying as direct mode-11 battery charging or selling as mode-10 PCC export control.
 - A neutral Hybrid battery plan remains mode `8` Battery Hold.
 - A Hybrid battery-charge plan without planned grid import falls back to GoodWe mode `1` self-use so locally available PV can be absorbed without forcing the forecast-sized `P_batt` charge target.
@@ -455,7 +479,7 @@ All notable changes to GW EnergyPilot are documented here.
 ### Changed
 
 - The active frontend is `gw-energy-pilot-v020.js`, layered on top of the complete consolidated v0.19 frontend so grid-neutral charging feedback and all v0.19 controls remain unchanged.
-- The EMHASS setting label is clarified as **EnergyPilot runtime final SOC target** and explicitly notes that externally orchestrated/manual-only EMHASS may use a different runtime target.
+- The EMHASS setting label **Target final SOC** is clarified as **EnergyPilot runtime final SOC target** and explicitly notes that externally orchestrated/manual-only EMHASS may use a different runtime target.
 - Unit tests now cover the field-observed invalid raw values `battery_target_state_of_charge=-0.9` and `battery_soc_deficit_threshold=-6.9` without accepting them as valid SOC percentages.
 
 ### Safety boundary
