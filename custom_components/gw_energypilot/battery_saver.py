@@ -69,7 +69,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         ),
         deficit_threshold=0.05,
         deficit_cost_factor=0.0,
-        surplus_threshold=0.98,
+        surplus_threshold=0.96,
         surplus_cost_factor=0.05,
         stress_cost_factor=0.03,
     ),
