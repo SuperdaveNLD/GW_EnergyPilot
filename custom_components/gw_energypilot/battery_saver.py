@@ -21,6 +21,7 @@ BATTERY_SAVER_MODES: tuple[str, ...] = (
 )
 
 BATTERY_SAVER_CONFIG_KEYS: tuple[str, ...] = (
+    "battery_maximum_state_of_charge",
     "battery_soc_deficit_threshold",
     "battery_soc_deficit_cost",
     "battery_soc_surplus_threshold",
@@ -33,12 +34,14 @@ BATTERY_SAVER_CONFIG_KEYS: tuple[str, ...] = (
 
 MINIMUM_STRESS_SAFE_EMHASS_VERSION = (0, 18, 1)
 DEFAULT_PRICE_REFERENCE = 0.20
-# Field validation on the primary installation showed that ~0.005 currency/kWh
-# on both charge and discharge removed low-value quarter-hour reversals while
-# preserving the high-value 12-15 kW evening dispatch. The observed Battery
-# Saver price reference was ~0.31, so 1.5% reproduces that friction without
-# hard-coding EUR and keeps the policy proportional in other currencies.
-ANTI_CHURN_COST_FACTOR = 0.015
+# Field validation on the primary installation first showed that ~0.005
+# currency/kWh per direction removed several low-value quarter-hour reversals
+# without suppressing high-value 12-15 kW dispatch. A follow-up comparison at
+# ~0.007 per direction reduced the remaining low-value churn while still
+# preserving full-power evening operation. At the observed price reference of
+# ~0.31, 2.25% reproduces ~0.007 without hard-coding EUR and remains
+# proportional in other currencies.
+ANTI_CHURN_COST_FACTOR = 0.0225
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +51,7 @@ class BatterySaverPreset:
     key: str
     label: str
     short_description: str
+    maximum_soc: float
     deficit_threshold: float
     deficit_cost_factor: float
     surplus_threshold: float
@@ -61,11 +65,12 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_MAD_STEVE,
         label="Mad-Steve",
         short_description=(
-            "Maximum economic freedom with a small anti-churn trading cost; no extra SOC or power-stress penalty."
+            "Maximum economic freedom up to 100% SOC with anti-churn protection and no extra SOC or power-stress penalty."
         ),
+        maximum_soc=1.00,
         deficit_threshold=0.05,
         deficit_cost_factor=0.0,
-        surplus_threshold=0.98,
+        surplus_threshold=1.00,
         surplus_cost_factor=0.0,
         stress_cost_factor=0.0,
     ),
@@ -73,8 +78,9 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_GOLD_RUSH,
         label="Gold Rush",
         short_description=(
-            "Profit first with anti-churn protection, a light high-SOC cost above 96% and light power stress."
+            "Profit first with a 96% hard maximum, anti-churn protection and light power stress."
         ),
+        maximum_soc=0.96,
         deficit_threshold=0.05,
         deficit_cost_factor=0.0,
         surplus_threshold=0.96,
@@ -85,8 +91,9 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_BALANCED,
         label="Balanced",
         short_description=(
-            "Balances trading value with the shared anti-churn cost and moderate SOC and high-power penalties."
+            "Balances trading value and battery preservation with a 95% hard maximum and moderate power stress."
         ),
+        maximum_soc=0.95,
         deficit_threshold=0.10,
         deficit_cost_factor=0.05,
         surplus_threshold=0.95,
@@ -97,8 +104,9 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_BATTERY_SAVER,
         label="Battery Saver",
         short_description=(
-            "Keeps the anti-churn floor and makes extended extreme SOC and high power materially less attractive."
+            "Uses a 90% hard maximum and the strongest low-SOC and high-power preservation penalties."
         ),
+        maximum_soc=0.90,
         deficit_threshold=0.15,
         deficit_cost_factor=0.10,
         surplus_threshold=0.90,
@@ -124,9 +132,10 @@ def battery_saver_mode_payloads() -> list[dict[str, Any]]:
             "key": preset.key,
             "label": preset.label,
             "description": preset.short_description,
+            "maximum_soc_pct": round(preset.maximum_soc * 100),
             "deficit_threshold_pct": round(preset.deficit_threshold * 100),
             "surplus_threshold_pct": round(preset.surplus_threshold * 100),
-            "anti_churn_cost_factor_pct": round(ANTI_CHURN_COST_FACTOR * 100, 1),
+            "anti_churn_cost_factor_pct": round(ANTI_CHURN_COST_FACTOR * 100, 2),
             "recommended": preset.key == MODE_BALANCED,
         }
         for preset in PRESETS.values()
@@ -213,6 +222,7 @@ def build_battery_saver_profile(
         "mode": preset.key,
         "label": preset.label,
         "price_reference": reference,
+        "battery_maximum_state_of_charge": preset.maximum_soc,
         "battery_soc_deficit_threshold": preset.deficit_threshold,
         "battery_soc_deficit_cost": round(reference * preset.deficit_cost_factor, 6),
         "battery_soc_surplus_threshold": preset.surplus_threshold,
