@@ -142,14 +142,13 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn('this.style.setProperty("overflow-anchor", "none")', source)
         self.assertIn("function stabilizeScrollAfterRender", source)
         self.assertGreaterEqual(source.count("globalThis.requestAnimationFrame?."), 2)
+        render_call = source.index("previousRender.call(this)")
+        restore_call = source.rindex("stabilizeScrollAfterRender(snapshots)")
         self.assertLess(
             source.index("const snapshots = preserveScroll ? captureScrollPositions(this) : []"),
-            source.index("previousRender.call(this)"),
+            render_call,
         )
-        self.assertLess(
-            source.index("previousRender.call(this)"),
-            source.index("stabilizeScrollAfterRender(snapshots)"),
-        )
+        self.assertLess(render_call, restore_call)
 
     def test_v0362_loads_customer_controller_and_release_wiring(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
