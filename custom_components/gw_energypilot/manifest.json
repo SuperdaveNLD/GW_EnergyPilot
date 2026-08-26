@@ -1,25 +1,15 @@
 {
   "domain": "gw_energypilot",
   "name": "GW EnergyPilot",
-  "after_dependencies": [
-    "recorder"
-  ],
-  "codeowners": [
-    "@SuperdaveNLD"
-  ],
+  "after_dependencies": ["recorder"],
+  "codeowners": ["@SuperdaveNLD"],
   "config_flow": true,
-  "dependencies": [
-    "http"
-  ],
+  "dependencies": ["http"],
   "documentation": "https://github.com/SuperdaveNLD/GW_EnergyPilot",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/SuperdaveNLD/GW_EnergyPilot/issues",
-  "loggers": [
-    "pymodbus"
-  ],
-  "requirements": [
-    "pymodbus==3.13.1"
-  ],
+  "loggers": ["pymodbus"],
+  "requirements": ["pymodbus==3.13.1"],
   "version": "0.40"
 }
