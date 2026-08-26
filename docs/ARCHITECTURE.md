@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.35 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.38 Beta**.
 
 ## High-level flow
 
@@ -357,19 +357,19 @@ The frontend keeps one canonical Battery · Plan · Price card. A mismatch betwe
 Active top-level module:
 
 ```text
-gw-energy-pilot-v035.js
-    -> gw-energy-pilot-v034.js
-        -> gw-energy-pilot-v031-battery-saver.js
-            -> gw-energy-pilot-v031-window-controls.js
-                -> gw-energy-pilot-v031.js
-                    -> gw-energy-pilot-v030.js
-                        -> existing v0.29/v0.28/v0.27/... chain
-        -> gw-energy-pilot-v027-battery-plan-core.js (v0.34 behavior retained)
+gw-energy-pilot-v038.js
+    -> gw-energy-pilot-v038-runtime.js
+        -> gw-energy-pilot-v034.js
+            -> existing v0.34 feature chain
 ```
 
-The v0.35 wrapper is release/version presentation only. It carries forward the v0.34 Battery Saver and revision-aware Battery Plan frontend behavior without adding another behavioral monkey patch.
+v0.38 deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners.
 
-This layering remains technical debt: future releases should avoid adding behavioral monkey-patch layers where a bounded backend/module change is sufficient. A frontend consolidation must preserve behavior under browser/regression tests before historical assets are removed.
+The v0.38 frontend is split by responsibility: `gw-energy-pilot-v038-model.js` owns pure localization/profile/physical-flow models, `gw-energy-pilot-v038-strategy.js` owns key-based delegated Battery Strategy actions and active state, `gw-energy-pilot-v038-styles.js` owns final control/particle presentation, and `gw-energy-pilot-v038-runtime.js` owns relevant-state rendering, interaction completion, scroll stability and applying physical flow motion to the live DOM.
+
+Visible/translated text is never a control identity. Canonical profile keys plus `aria-pressed` define action and selected state. Live-flow direction is likewise single-owner through explicit physical motion instead of accumulated animation reversals. See `docs/FRONTEND_CONTROL_REBUILD.md`.
+
+Historical frontend layering remains technical debt below the v0.34 base. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
 
 ## Synchronized minimum SOC
 

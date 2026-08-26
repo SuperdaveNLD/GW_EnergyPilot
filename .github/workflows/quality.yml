@@ -19,8 +19,23 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Compile Python sources
         run: python -m compileall -q custom_components/gw_energypilot scripts tests
+
+      - name: Validate v0.38 frontend JavaScript
+        run: |
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-model.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-styles.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-strategy.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038.js
+          node tests/test_frontend_v038.mjs
+          node tests/test_frontend_v038_controls.mjs
 
       - name: Run unit tests
         run: python -m unittest discover -s tests -v

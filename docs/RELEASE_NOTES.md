@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.38** | 2026-08-26 | **Beta** | Rebuilds dashboard controls around language-independent mode keys/delegated actions and makes live-flow direction a single explicit physical mapping, replacing the v0.37 stale-button-node stabilization path. |
 | **0.37** | 2026-08-26 | **Beta** | Publishes the complete current 0.36.x dashboard-stability stack as a clean numeric release, retaining mobile scroll stability and stable button DOM nodes while synchronizing HACS/HA/frontend release metadata. |
 | **0.36.2** | 2026-08-26 | **Beta** | Stabilizes the mobile viewport across periodic relevant telemetry refreshes by preserving the Home Assistant scroll container through complete dashboard renders while leaving GoodWe polling and live telemetry unchanged. |
 | **0.36.1** | 2026-08-26 | **Beta** | Hotfixes mobile scrolling through the Battery strategy buttons by removing touch pointer capture, deferring destructive renders through touch-scroll settle, and adding a stuck-interaction safety timeout. |
@@ -54,6 +55,20 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.38 — Rebuilt controls and canonical live-flow direction
+
+v0.38 replaces the v0.37 dashboard-control stabilization approach instead of adding another monkey-patch layer. Fresh sessions load the new v0.38 runtime directly over the v0.34 feature base and therefore do not execute the v0.35 pointer/render lock or v0.36.3 old-button-node reuse.
+
+Battery Strategy actions use stable backend mode keys (`mad_steve`, `gold_rush`, `balanced`, `battery_saver`, `custom`) and selected/highlight state uses `aria-pressed`. English/Dutch labels and descriptions are presentation only. A delegated ShadowRoot listener executes the existing Battery Saver API, so translated text and stale per-node listener closures cannot define control behavior.
+
+Live-flow animation has one final physical owner: PV production flows to the hub, grid import to the hub, grid export away from the hub, house load away from the hub, battery discharge to the hub and battery charge away from the hub. Explicit geometry keyframes are selected from that mapping with normal animation direction, preventing older reversal rules from reinterpreting the final result.
+
+Quality now executes JavaScript syntax checks plus Node regression tests for localization/profile identity, delegated clicks, control re-enable behavior and physical flow mapping, alongside the full Python unit suite and repository validator. HACS and Hassfest remain release gates.
+
+No GoodWe register, Modbus, EMS, Automatic Control, EMHASS backend, entity-ID or persistent-state contract changes.
+
+See `docs/RELEASE_NOTES_V038.md` and `docs/FRONTEND_CONTROL_REBUILD.md`.
 
 # v0.37 — Clean stable-control release
 
