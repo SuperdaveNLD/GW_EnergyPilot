@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v038-runtime.js?v=0.38-runtime2";
+import "./gw-energy-pilot-v038-runtime.js?v=0.38-runtime3";
 
 const VERSION = "0.37";
 
