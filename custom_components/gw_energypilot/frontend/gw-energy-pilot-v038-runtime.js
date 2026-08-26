@@ -6,7 +6,7 @@ import {
   installV038DelegatedControls,
 } from "./gw-energy-pilot-v038-strategy.js?v=0.38-strategy3";
 
-const VERSION = "0.37";
+const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";
 const HASS_RENDER_BATCH_MS = 150;
 const MOBILE_SCROLL_BREAKPOINT_PX = 720;

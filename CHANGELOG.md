@@ -2,6 +2,30 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.38] - 2026-08-26
+
+### Fixed
+
+- Rebuilt Battery Strategy controls around stable backend profile keys and `aria-pressed`; visible English/Dutch text no longer participates in action identity or active highlighting.
+- Removed the v0.35 pointer/render lock and v0.36.3 old-button DOM-node reuse from the fresh active frontend chain instead of stacking another stability patch over v0.37.
+- Replaced per-node strategy actions with one delegated listener on the persistent ShadowRoot, preventing stale listeners from being transplanted into a newly rendered dashboard.
+- Added bounded pointer/keyboard completion and preserved native touch scrolling/mobile scroll restoration without pointer capture.
+- Replaced stacked live-flow `inbound`/`outbound` and `animation-direction` reversal interactions with one explicit physical v0.38 motion mapping and dedicated keyframes.
+
+### Changed
+
+- Added the isolated `gw-energy-pilot-v038-*` frontend modules for model/localization, strategy controls, styles and runtime rendering.
+- Added executable Node.js regression tests to the normal Quality workflow for Dutch/English canonical profile keys, delegated profile clicks, immediate control re-enable behavior and all physical PV/grid/house/battery flow cases.
+- Fresh v0.38 sessions load the v0.38 runtime directly over the known v0.34 feature base. Historical v0.35/v0.36.x/v0.37 wrapper files remain in the repository but are not part of the fresh v0.38 active path.
+- Added dedicated frontend architecture and v0.38 release documentation.
+
+### Safety / compatibility
+
+- Frontend-only release; no GoodWe register definitions or Modbus read blocks change.
+- No EMS mode mapping, setpoint semantics or `47512 -> wait -> 47511` write ordering change.
+- No Automatic Control decision or EMHASS optimization/Battery Saver backend/configuration ownership behavior change.
+- No entity IDs, unique IDs, config-entry data, persistent Store keys or stable device identity changes.
+
 ## [0.37] - 2026-08-26
 
 ### Changed

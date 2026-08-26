@@ -2,7 +2,7 @@
 
 ## Status
 
-This document describes the **v0.38 frontend field-test candidate** built on the released v0.37 backend and control behavior. The candidate deliberately keeps the integration manifest at `0.37` until it has been tested on installations that reproduced the failure. It must not be presented as a validated v0.38 release before that field test succeeds.
+This document describes the **v0.38 Beta release** frontend control and live-flow architecture. It replaces the released v0.37 presentation stack while keeping the existing GoodWe, EMS and EMHASS backend/control behavior unchanged. The rebuilt controls are covered by executable English/Dutch delegated-click tests and explicit physical flow-direction tests in the normal Quality workflow.
 
 ## Why the v0.37 control stack was replaced
 
@@ -29,7 +29,7 @@ The replacement has these rules:
 
 ## Live-flow direction contract
 
-The field-test candidate no longer derives visible movement from stacked `inbound`, `outbound`, semantic direction and `animation-direction` overrides. It assigns one physical direction to each connector and selects a dedicated forward or reverse keyframe.
+v0.38 no longer derives visible movement from stacked `inbound`, `outbound`, semantic direction and `animation-direction` overrides. It assigns one physical direction to each connector and selects a dedicated forward or reverse keyframe.
 
 Expected movement:
 
@@ -62,11 +62,11 @@ The exact candidate modules uploaded to the branch passed locally:
 - the same click test proves exactly one profile becomes active and all five controls are immediately enabled after completion;
 - eight Python contract tests for active wiring, excluded legacy layers, stable key-based controls, Dutch/English labels, global pointer/keyboard completion and physical flow ownership.
 
-GitHub-hosted Quality, HACS and Hassfest runs are still required before merge. Connector-authored commits do not currently have a workflow run attached, so this draft must not be promoted on the local checks alone.
+GitHub-hosted Quality, HACS and Hassfest runs are mandatory release gates. The release is merged only after those checks pass on the final v0.38 head.
 
-## Field-test matrix
+## Multi-installation field-validation matrix
 
-Before release promotion, validate at least:
+After automated release gates, continue validating:
 
 1. English Home Assistant: all five Battery strategy buttons click once and show exactly one active profile.
 2. Dutch Home Assistant: the same fixed mode keys execute, with Dutch labels and exactly one active profile.

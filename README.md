@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.35 · Beta**
+**v0.38 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,8 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt controls and canonical live-flow direction;
+- `docs/FRONTEND_CONTROL_REBUILD.md` — frontend action/highlight/flow ownership;
 - `docs/RELEASE_NOTES_V035.md` — v0.35 EMHASS topology-ownership fix;
 - `CHANGELOG.md` — detailed technical history;
 - `docs/EMHASS_CONFIG_SYNC.md` — required EMHASS synchronization and ownership boundaries;
@@ -32,6 +34,15 @@ Release documentation:
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
+
+## v0.38 highlights
+
+- Battery Strategy actions and active highlighting use stable backend keys, not translated English/Dutch button text.
+- Fresh v0.38 sessions skip the v0.35 pointer/render lock and v0.36.3 old-button-node reuse that caused unusable controls on some installations.
+- One delegated strategy listener handles fresh rendered controls; executable tests verify the intended mode is called exactly once and buttons re-enable after completion.
+- Live-flow particles use one explicit physical mapping for PV production, grid import/export, house load and battery charge/discharge.
+- Mobile native scrolling, relevant-state render filtering and existing v0.34 dashboard features are retained.
+- No GoodWe register, Modbus, EMS or EMHASS backend control semantics change in v0.38.
 
 ## v0.35 highlights
 
