@@ -9,7 +9,7 @@ FRONTEND = INTEGRATION / "frontend"
 
 
 class V039ReleaseTests(unittest.TestCase):
-    def test_v039_release_is_wired_consistently(self) -> None:
+    def test_v039_behavior_layer_remains_wired_consistently(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
@@ -21,8 +21,17 @@ class V039ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertEqual("0.39", manifest["version"])
-        self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
+        # v0.39 remains a tested behavior layer even when a later release
+        # wrapper owns the active panel/version presentation.
+        if manifest["version"] == "0.39":
+            self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
+        else:
+            self.assertIn("gw-energy-pilot-v040.js?v=0.40-release1", init_source)
+            v040 = (FRONTEND / "gw-energy-pilot-v040.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('import "./gw-energy-pilot-v039.js?v=', v040)
+
         self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
         self.assertIn('const VERSION = "0.39"', release)
         self.assertIn("__epV039Installed", release)
