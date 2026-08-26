@@ -33,6 +33,9 @@ jobs:
       - name: Prepare v0.40 release files
         run: python scripts/prepare_v040.py
 
+      - name: Keep workflow update for connector-owned cleanup
+        run: git checkout -- .github/workflows/quality.yml
+
       - name: Validate v0.40 candidate
         shell: bash
         run: |
@@ -61,7 +64,6 @@ jobs:
           git add custom_components/gw_energypilot/frontend/gw-energy-pilot-v040.js
           git add custom_components/gw_energypilot/manifest.json
           git add custom_components/gw_energypilot/__init__.py
-          git add .github/workflows/quality.yml
           git add tests/test_frontend_v040_render_settle.py
           git add CHANGELOG.md
           git add docs/RELEASE_NOTES.md
