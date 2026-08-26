@@ -111,8 +111,8 @@ export function resolveHousePower(rawLoad, pv, grid, battery) {
 export function flowMotionMap(values, threshold = FLOW_THRESHOLD_W) {
   const pv = finite(values?.pv);
   const grid = finite(values?.grid);
-  const house = finite(values?.house);
   const battery = finite(values?.battery);
+  const house = resolveHousePower(values?.house, pv, grid, battery);
 
   return {
     // PV node is left of the hub; production moves right.
