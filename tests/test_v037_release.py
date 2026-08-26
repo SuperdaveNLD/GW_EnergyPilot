@@ -19,25 +19,31 @@ class V038FrontendCandidateTests(unittest.TestCase):
 
         self.assertEqual("0.37", manifest["version"])
         self.assertIn(
-            'gw-energy-pilot-v038.js?v=0.38-control-flow-rebuild2',
+            'gw-energy-pilot-v038.js?v=0.38-control-flow-rebuild3',
             init_source,
         )
         self.assertIn(
-            'gw-energy-pilot-v038-runtime.js?v=0.38-runtime2',
+            'gw-energy-pilot-v038-runtime.js?v=0.38-runtime3',
             candidate,
         )
         self.assertIn('const VERSION = "0.37"', candidate)
         self.assertIn('const VERSION = "0.37"', runtime)
         self.assertIn("__epV038Installed", runtime)
 
-    def test_candidate_has_executable_model_regression_test(self) -> None:
-        test_path = ROOT / "tests" / "test_frontend_v038.mjs"
-        self.assertTrue(test_path.is_file())
-        source = test_path.read_text(encoding="utf-8")
+    def test_candidate_has_executable_model_regression_tests(self) -> None:
+        model_test = ROOT / "tests" / "test_frontend_v038.mjs"
+        controls_test = ROOT / "tests" / "test_frontend_v038_controls.mjs"
+        self.assertTrue(model_test.is_file())
+        self.assertTrue(controls_test.is_file())
+        source = model_test.read_text(encoding="utf-8") + controls_test.read_text(
+            encoding="utf-8"
+        )
         self.assertIn("flowMotionMap", source)
         self.assertIn("resolveHousePower", source)
+        self.assertIn("canonicalProfiles", source)
         self.assertIn("Batterijbesparing", source)
         self.assertIn("Battery Saver", source)
+        self.assertIn("gw_energypilot/battery_saver/set", source)
 
     def test_architecture_note_records_field_test_boundary(self) -> None:
         notes = (ROOT / "docs" / "FRONTEND_CONTROL_REBUILD.md").read_text(
