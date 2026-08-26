@@ -47,6 +47,16 @@ GoodWe meter power: positive export, negative import
 GoodWe battery power: positive discharge, negative charge
 ```
 
+## Automated pre-PR checks
+
+The exact candidate modules uploaded to the branch passed:
+
+- Python contract tests for active wiring, stable key-based controls, Dutch/English labels, global pointer completion and physical flow ownership;
+- JavaScript syntax validation for all five v0.38 modules;
+- executable Node assertions for Dutch/English profile mapping and import/export/charge/discharge movement.
+
+The pull request must additionally pass the repository-wide Quality, HACS and Hassfest workflows.
+
 ## Field-test matrix
 
 Before release promotion, validate at least:
