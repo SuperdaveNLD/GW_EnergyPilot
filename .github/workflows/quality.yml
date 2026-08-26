@@ -35,6 +35,7 @@ jobs:
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038.js
           node tests/test_frontend_v038.mjs
+          node tests/test_frontend_v038_controls.mjs
 
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
