@@ -2,7 +2,7 @@ import {
   CUSTOM_MODE,
   localizedProfile,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=0.38-model1";
+} from "./gw-energy-pilot-v038-model.js?v=0.38-model2";
 
 const DEFAULT_PROFILE_KEYS = [
   "mad_steve",
@@ -128,7 +128,7 @@ function strategySignature(panel, cache) {
     error: cache.error || "",
     message: cache.message || "",
     tone: cache.tone || "",
-    modes: (cache.data?.modes || []).map((mode) => mode?.key || ""),
+    modes: DEFAULT_PROFILE_KEYS,
     min: min.value,
     max: max.value,
     values: stableConfigEntries(cache.data?.current_emhass_values),
@@ -332,9 +332,14 @@ function renderCustomerStrategy(panel, wrap, cache) {
 
   const t = copy(panel);
   const activeMode = activeProfileMode(cache);
-  const sourceModes = cache.data?.modes?.length
-    ? cache.data.modes
-    : DEFAULT_PROFILE_KEYS.map((key) => ({ key }));
+  const backendModes = new Map(
+    (cache.data?.modes || [])
+      .filter((mode) => mode?.key)
+      .map((mode) => [mode.key, mode])
+  );
+  const sourceModes = DEFAULT_PROFILE_KEYS.map(
+    (key) => backendModes.get(key) || { key }
+  );
   const modes = [...sourceModes, { key: CUSTOM_MODE }].map((mode) =>
     profileMeta(panel, mode)
   );
