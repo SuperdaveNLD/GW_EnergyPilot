@@ -1,7 +1,7 @@
-import "./gw-energy-pilot-v038-runtime.js?v=0.38-runtime3";
+import "./gw-energy-pilot-v038-runtime.js?v=0.38-release1";
 
-const VERSION = "0.37";
+const VERSION = "0.38";
 
-// The field-test candidate intentionally reports the released backend version
-// until the English/Dutch control and physical live-flow tests are complete.
+// Release wrapper: runtime owns behavior; this constant keeps repository and
+// frontend release metadata synchronized with the integration manifest.
 void VERSION;
