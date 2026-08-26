@@ -3,6 +3,9 @@ import "./gw-energy-pilot-v034.js?v=0.36-flowmobile1";
 const VERSION = "0.35";
 const PANEL_NAME = "gw-energypilot-panel";
 const HASS_RENDER_BATCH_MS = 80;
+const TOUCH_SCROLL_THRESHOLD_PX = 8;
+const TOUCH_SCROLL_SETTLE_MS = 350;
+const POINTER_SAFETY_TIMEOUT_MS = 5000;
 const INTERACTIVE_SELECTOR =
   'button, input, select, textarea, a[href], [role="button"], [tabindex]';
 const LEGACY_EXTERNAL_ENTITIES = [
@@ -44,10 +47,46 @@ function flushDeferredRender(panel) {
   panel._queueRender();
 }
 
-function finishPointerInteraction(panel) {
+function clearPointerTimer(panel, key) {
+  const timer = panel[key];
+  if (!timer) return;
+  window.clearTimeout(timer);
+  panel[key] = null;
+}
+
+function completePointerInteraction(panel) {
   if (!panel.__epV035PointerActive) return;
+  clearPointerTimer(panel, "__epV035PointerFinishTimer");
+  clearPointerTimer(panel, "__epV035PointerSafetyTimer");
   panel.__epV035PointerActive = false;
+  panel.__epV035PointerId = null;
+  panel.__epV035PointerType = null;
+  panel.__epV035PointerStartX = null;
+  panel.__epV035PointerStartY = null;
+  panel.__epV035TouchMoved = false;
   flushDeferredRender(panel);
+}
+
+function finishPointerInteraction(panel, settleTouchScroll = false) {
+  if (!panel.__epV035PointerActive) return;
+  const touchScroll =
+    panel.__epV035PointerType === "touch" && panel.__epV035TouchMoved;
+  if (settleTouchScroll && touchScroll) {
+    clearPointerTimer(panel, "__epV035PointerFinishTimer");
+    panel.__epV035PointerFinishTimer = window.setTimeout(
+      () => completePointerInteraction(panel),
+      TOUCH_SCROLL_SETTLE_MS
+    );
+    return;
+  }
+  completePointerInteraction(panel);
+}
+
+function pointerMatches(panel, event) {
+  return (
+    panel.__epV035PointerId == null ||
+    panel.__epV035PointerId === event.pointerId
+  );
 }
 
 function installInteractionGuard(panel, root) {
@@ -57,17 +96,55 @@ function installInteractionGuard(panel, root) {
   // The legacy renderer replaces the complete shadow DOM. Keep the current
   // target alive only for the duration of an actual press so a relevant state
   // update cannot remove it between pointer-down and the browser click event.
-  // Hover alone never freezes telemetry updates.
+  // Touch scrolling remains native: touch pointers are never captured, and a
+  // moved touch keeps destructive renders deferred until the gesture settles.
   root.addEventListener(
     "pointerdown",
     (event) => {
       const target = interactiveTarget(event);
       if (!target || (typeof event.button === "number" && event.button !== 0)) return;
+
+      clearPointerTimer(panel, "__epV035PointerFinishTimer");
+      clearPointerTimer(panel, "__epV035PointerSafetyTimer");
       panel.__epV035PointerActive = true;
-      try {
-        target.setPointerCapture?.(event.pointerId);
-      } catch (_err) {
-        // Pointer capture is only a robustness aid.
+      panel.__epV035PointerId = event.pointerId;
+      panel.__epV035PointerType = event.pointerType || null;
+      panel.__epV035PointerStartX = event.clientX;
+      panel.__epV035PointerStartY = event.clientY;
+      panel.__epV035TouchMoved = false;
+      panel.__epV035PointerSafetyTimer = window.setTimeout(
+        () => completePointerInteraction(panel),
+        POINTER_SAFETY_TIMEOUT_MS
+      );
+
+      // Explicit capture is useful for a desktop mouse press that leaves the
+      // control, but it can fight native panning in mobile HA WebViews.
+      if (event.pointerType === "mouse") {
+        try {
+          target.setPointerCapture?.(event.pointerId);
+        } catch (_err) {
+          // Pointer capture is only a robustness aid for mouse input.
+        }
+      }
+    },
+    true
+  );
+
+  root.addEventListener(
+    "pointermove",
+    (event) => {
+      if (
+        !panel.__epV035PointerActive ||
+        panel.__epV035PointerType !== "touch" ||
+        !pointerMatches(panel, event) ||
+        panel.__epV035TouchMoved
+      ) {
+        return;
+      }
+      const dx = Math.abs(event.clientX - panel.__epV035PointerStartX);
+      const dy = Math.abs(event.clientY - panel.__epV035PointerStartY);
+      if (Math.max(dx, dy) >= TOUCH_SCROLL_THRESHOLD_PX) {
+        panel.__epV035TouchMoved = true;
       }
     },
     true
@@ -75,15 +152,23 @@ function installInteractionGuard(panel, root) {
 
   // A click is dispatched after pointer-up. Finish in the next task so the
   // target's existing click listener always gets the completed interaction
-  // before a deferred destructive render may run.
+  // before a deferred destructive render may run. A moved touch gets a short
+  // settle window so momentum scrolling is not interrupted by innerHTML work.
   root.addEventListener(
     "pointerup",
-    () => window.setTimeout(() => finishPointerInteraction(panel), 0),
+    (event) => {
+      if (!pointerMatches(panel, event)) return;
+      window.setTimeout(() => finishPointerInteraction(panel, true), 0);
+    },
     true
   );
   root.addEventListener(
     "pointercancel",
-    () => finishPointerInteraction(panel),
+    (event) => {
+      if (!pointerMatches(panel, event)) return;
+      if (panel.__epV035PointerType === "touch") panel.__epV035TouchMoved = true;
+      finishPointerInteraction(panel, true);
+    },
     true
   );
 
