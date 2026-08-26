@@ -1,0 +1,121 @@
+export const CUSTOM_MODE = "custom";
+export const FLOW_THRESHOLD_W = 50;
+
+const PROFILE_TEXT = {
+  en: {
+    mad_steve: {
+      label: "Mad-Steve",
+      description:
+        "Maximum economic freedom up to 100% SOC with anti-churn protection and no extra SOC or power-stress penalty.",
+    },
+    gold_rush: {
+      label: "Gold Rush",
+      description:
+        "Profit first with a 96% hard maximum, anti-churn protection and light power stress.",
+    },
+    balanced: {
+      label: "Balanced",
+      description:
+        "Balances trading value and battery preservation with a 95% hard maximum and moderate power stress.",
+    },
+    battery_saver: {
+      label: "Battery Saver",
+      description:
+        "Uses a 90% hard maximum and the strongest low-SOC and high-power preservation penalties.",
+    },
+    custom: {
+      label: "Custom",
+      description:
+        "Keep the current EMHASS battery values and tune the main limits manually.",
+    },
+  },
+  nl: {
+    mad_steve: {
+      label: "Mad-Steve",
+      description:
+        "Maximale economische vrijheid tot 100% SOC, met anti-churnbescherming en zonder extra SOC- of vermogensstraf.",
+    },
+    gold_rush: {
+      label: "Gold Rush",
+      description:
+        "Winst voorop met een harde bovengrens van 96%, anti-churnbescherming en lichte vermogensstress.",
+    },
+    balanced: {
+      label: "Gebalanceerd",
+      description:
+        "Balanceert handelswaarde en batterijbehoud met een harde bovengrens van 95% en gematigde vermogensstress.",
+    },
+    battery_saver: {
+      label: "Batterijbesparing",
+      description:
+        "Gebruikt een harde bovengrens van 90% en de sterkste bescherming tegen lage SOC en hoog vermogen.",
+    },
+    custom: {
+      label: "Aangepast",
+      description:
+        "Behoud de huidige EMHASS-batterijwaarden en stel de belangrijkste limieten handmatig af.",
+    },
+  },
+};
+
+export function normalizeLanguage(value) {
+  return String(value || "en").toLowerCase().split(/[-_]/)[0] === "nl"
+    ? "nl"
+    : "en";
+}
+
+export function localizedProfile(language, mode) {
+  const key = typeof mode === "string" ? mode : mode?.key;
+  const source = typeof mode === "object" && mode ? mode : {};
+  const localized = PROFILE_TEXT[normalizeLanguage(language)]?.[key];
+  return {
+    key,
+    label: localized?.label || source.label || String(key || ""),
+    description: localized?.description || source.description || "",
+  };
+}
+
+function finite(value) {
+  const number = Number(value);
+  return value !== null && value !== undefined && Number.isFinite(number)
+    ? number
+    : null;
+}
+
+export function flowMotionMap(values, threshold = FLOW_THRESHOLD_W) {
+  const pv = finite(values?.pv);
+  const grid = finite(values?.grid);
+  const house = finite(values?.house);
+  const battery = finite(values?.battery);
+
+  return {
+    // PV node is left of the hub; production moves right.
+    pv: pv !== null && pv > threshold ? "right" : "idle",
+
+    // GoodWe meter: positive export moves right from hub to grid; negative
+    // import moves left from grid to hub.
+    grid:
+      grid === null || Math.abs(grid) < threshold
+        ? "idle"
+        : grid > 0
+          ? "right"
+          : "left",
+
+    // House is above the hub. Positive house load is supplied upward.
+    house:
+      house === null || Math.abs(house) < threshold
+        ? "idle"
+        : house > 0
+          ? "up"
+          : "down",
+
+    // GoodWe battery: positive discharge moves up to the hub; negative charge
+    // moves down from the hub to the battery.
+    battery:
+      battery === null || Math.abs(battery) < threshold
+        ? "idle"
+        : battery > 0
+          ? "up"
+          : "down",
+  };
+}
