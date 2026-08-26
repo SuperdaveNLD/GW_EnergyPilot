@@ -19,7 +19,7 @@ class V038ReleaseTests(unittest.TestCase):
 
         self.assertEqual("0.38", manifest["version"])
         self.assertIn(
-            'gw-energy-pilot-v038.js?v=0.38-release1',
+            'gw-energy-pilot-v038.js?v=0.38-hover1',
             init_source,
         )
         self.assertIn(
