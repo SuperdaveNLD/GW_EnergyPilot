@@ -79,13 +79,23 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Set up Node.js
+        if: steps.release_status.outputs.needs_publish == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Compile Python sources
         if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m compileall -q custom_components/gw_energypilot scripts tests
 
-      - name: Run unit tests
+      - name: Run Python unit tests
         if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m unittest discover -s tests -v
+
+      - name: Run frontend runtime tests
+        if: steps.release_status.outputs.needs_publish == 'true'
+        run: node --test tests/frontend_v036_runtime.mjs
 
       - name: Validate repository invariants
         if: steps.release_status.outputs.needs_publish == 'true'
