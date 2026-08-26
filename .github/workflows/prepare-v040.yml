@@ -1,5 +1,6 @@
 name: Prepare v0.40
 
+# Temporary branch-only preparer; removed before the release PR.
 on:
   push:
     branches:
