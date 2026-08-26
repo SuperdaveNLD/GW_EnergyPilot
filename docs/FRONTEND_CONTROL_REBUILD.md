@@ -17,13 +17,15 @@ The replacement has these rules:
 
 - visible text is never a control identity;
 - Battery strategy actions use only fixed mode keys such as `mad_steve`, `balanced` and `battery_saver`;
+- English and Dutch always receive the same canonical four profiles plus `custom`, in the same order;
 - active state uses `aria-pressed`, not label matching;
 - the complete strategy section is retained across telemetry renders, but its actions are handled by one listener on the persistent ShadowRoot;
 - English and Dutch labels/descriptions are rendered explicitly from the same fixed keys;
 - `translate="no"` prevents browser translation from mutating the strategy-control DOM;
 - no old button node with a per-node event-listener closure is transplanted;
 - no pointer is captured;
-- pointer completion is observed at `window` level, with cancel, blur and a short safety timeout, so a render guard cannot remain stuck when a pointer leaves the ShadowRoot.
+- pointer and keyboard completion are observed through pointer-up/cancel, focus-out, window blur and independent three-second safety timers;
+- an action updates and re-enables all profile buttons immediately after its WebSocket result, before depending on another dashboard render.
 
 ## Live-flow direction contract
 
@@ -40,6 +42,8 @@ Battery charging: top to bottom, hub -> battery
 Battery discharging: bottom to top, battery -> hub
 ```
 
+House movement uses the same corrected GoodWe load resolution as the visible overview. A negative or clearly inconsistent raw house value therefore cannot make the particles contradict the displayed house load.
+
 The existing confirmed sign conventions remain unchanged:
 
 ```text
@@ -49,13 +53,16 @@ GoodWe battery power: positive discharge, negative charge
 
 ## Automated pre-PR checks
 
-The exact candidate modules uploaded to the branch passed:
+The exact candidate modules uploaded to the branch passed locally:
 
-- Python contract tests for active wiring, stable key-based controls, Dutch/English labels, global pointer completion and physical flow ownership;
-- JavaScript syntax validation for all five v0.38 modules;
-- executable Node assertions for Dutch/English profile mapping and import/export/charge/discharge movement.
+- five JavaScript syntax checks;
+- executable Node flow assertions for PV, grid import/export, house load and battery charge/discharge;
+- executable Node localization assertions proving English and Dutch both produce exactly five identical mode keys;
+- an executable delegated-click test proving translated visible text still sends exactly one `battery_saver` WebSocket action;
+- the same click test proves exactly one profile becomes active and all five controls are immediately enabled after completion;
+- eight Python contract tests for active wiring, excluded legacy layers, stable key-based controls, Dutch/English labels, global pointer/keyboard completion and physical flow ownership.
 
-The pull request must additionally pass the repository-wide Quality, HACS and Hassfest workflows.
+GitHub-hosted Quality, HACS and Hassfest runs are still required before merge. Connector-authored commits do not currently have a workflow run attached, so this draft must not be promoted on the local checks alone.
 
 ## Field-test matrix
 
