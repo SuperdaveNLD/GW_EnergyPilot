@@ -31,13 +31,23 @@ class FrontendHoverStabilityTests(unittest.TestCase):
         self.assertNotIn("setPointerCapture", entry)
         self.assertNotIn("interactionActive", entry)
 
-        # Release wrappers may sit above v0.38. The hover regression only owns
-        # reachability of the v0.38 behavior, not the release cache token.
-        if "gw-energy-pilot-v039.js?v=" in init_source:
-            release = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
+        # Release wrappers may sit above v0.38. The hover regression owns
+        # reachability of the v0.38 behavior, not whichever release wrapper is
+        # currently active.
+        if "gw-energy-pilot-v040.js?v=" in init_source:
+            v040 = (FRONTEND / "gw-energy-pilot-v040.js").read_text(
                 encoding="utf-8"
             )
-            self.assertIn('import "./gw-energy-pilot-v038.js?v=', release)
+            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('import "./gw-energy-pilot-v039.js?v=', v040)
+            self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
+        elif "gw-energy-pilot-v039.js?v=" in init_source:
+            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
         else:
             self.assertIn("gw-energy-pilot-v038.js?v=", init_source)
 
