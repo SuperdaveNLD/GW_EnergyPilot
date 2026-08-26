@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.35 · Beta**
+**v0.38 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt control path and canonical live-flow direction;
 - `docs/RELEASE_NOTES_V035.md` — v0.35 EMHASS topology-ownership fix;
 - `CHANGELOG.md` — detailed technical history;
 - `docs/EMHASS_CONFIG_SYNC.md` — required EMHASS synchronization and ownership boundaries;
@@ -32,6 +33,14 @@ Release documentation:
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
+
+## v0.38 highlights
+
+- Battery Strategy buttons use stable backend mode keys for actions and `aria-pressed` for selected/highlight state; translated labels no longer affect behavior.
+- Fresh v0.38 sessions skip the v0.35 pointer/render lock and v0.36.3 old-button-node reuse layers.
+- Relevant-state render filtering and mobile scroll preservation remain, without pointer capture or blocking native click behavior.
+- Live-flow direction is owned by one final mapping: PV/grid import/battery discharge flow toward the hub; grid export/house load/battery charge flow away from it.
+- v0.38 is frontend-only and does not change GoodWe, Modbus, EMS or EMHASS backend control semantics.
 
 ## v0.35 highlights
 

@@ -2,6 +2,29 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.38] - 2026-08-26
+
+### Fixed
+
+- Replaced the active v0.37 equivalent-button DOM-node reuse. Fresh renders now keep fresh button nodes/listeners instead of reinserting old translated controls after the dashboard rebuilds.
+- Rebuilt Battery Strategy actions and active highlighting around stable backend mode keys plus `aria-pressed`; English/Dutch labels and descriptions are presentation only and no longer participate in control identity.
+- Removed the v0.35 pointer-capture/render-lock stack from the fresh v0.38 active import chain. A short 300 ms render quiet window delays only HASS-triggered telemetry rebuilds after a press and does not block native click/service behavior.
+- Replaced inherited live-flow reversal layers with one final semantic mapping and explicit v0.38 geometry keyframes: PV to hub, grid import to hub, grid export from hub, hub to house, battery discharge to hub and battery charge from hub.
+
+### Changed
+
+- Added `gw-energy-pilot-v038.js` as a consolidated post-v0.34 frontend layer. Fresh v0.38 sessions no longer import the historical v0.35/v0.36.x/v0.37 stabilization wrappers.
+- Retained relevant Home Assistant state filtering with 80 ms batching and consolidated the v0.36.2 mobile scroll-position protection into the v0.38 layer.
+- Added compatibility handling for an already-open browser realm that previously executed v0.37 so the historical v0.36.3 layer cannot restore stale button nodes during the transition.
+- Added dedicated regression coverage and `docs/FRONTEND_V038.md` for language-independent control identity and canonical flow-direction ownership.
+
+### Safety / compatibility
+
+- Frontend-only release; no GoodWe register definitions or Modbus read blocks change.
+- No EMS mode mapping, setpoint semantics or `47512 -> wait -> 47511` write ordering change.
+- No Automatic Control or EMHASS optimization/Battery Saver backend behavior changes.
+- No entity IDs, unique IDs, config-entry data, persistent Store keys or stable device identity changes.
+
 ## [0.37] - 2026-08-26
 
 ### Changed

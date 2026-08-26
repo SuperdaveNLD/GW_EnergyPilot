@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.35 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.38 Beta**.
 
 ## High-level flow
 

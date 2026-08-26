@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.38** | 2026-08-26 | **Beta** | Rebuilds dashboard controls around language-independent mode keys and delegated actions, removes stale button-node/pointer-lock behavior from the fresh active path, and makes live-flow direction a single canonical v0.38 mapping. |
 | **0.37** | 2026-08-26 | **Beta** | Publishes the complete current 0.36.x dashboard-stability stack as a clean numeric release, retaining mobile scroll stability and stable button DOM nodes while synchronizing HACS/HA/frontend release metadata. |
 | **0.36.2** | 2026-08-26 | **Beta** | Stabilizes the mobile viewport across periodic relevant telemetry refreshes by preserving the Home Assistant scroll container through complete dashboard renders while leaving GoodWe polling and live telemetry unchanged. |
 | **0.36.1** | 2026-08-26 | **Beta** | Hotfixes mobile scrolling through the Battery strategy buttons by removing touch pointer capture, deferring destructive renders through touch-scroll settle, and adding a stuck-interaction safety timeout. |
@@ -54,6 +55,20 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.38 — Rebuilt controls and canonical live-flow direction
+
+v0.38 replaces the v0.37 dashboard-control stabilization approach instead of stacking another fix on top of it. A fresh session now loads `gw-energy-pilot-v038.js` directly over the v0.34 chain; the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are historical files and are no longer in the fresh active import path.
+
+Battery Strategy actions use stable backend keys (`mad_steve`, `gold_rush`, `balanced`, `battery_saver`, `custom`) and selected state uses `aria-pressed`. Dutch/English labels and descriptions are presentation only. Actions are delegated from the persistent ShadowRoot, so translated text, button order and old per-node listener closures cannot define behavior.
+
+Relevant Home Assistant state filtering remains and batches relevant bursts for 80 ms. A short 300 ms press quiet window only postpones a telemetry-triggered render; it does not pointer-capture, prevent the click, stop propagation or block explicit action renders. Mobile scroll-position preservation is consolidated into the same v0.38 layer.
+
+Live-flow animation also gets one final owner: PV production flows to the hub, grid import to the hub, grid export from the hub, house load from the hub, battery discharge to the hub and battery charge from the hub. Explicit v0.38 geometry keyframes are selected from this semantic mapping with `animation-direction: normal`, so inherited reversal rules cannot reinterpret the final direction.
+
+No GoodWe register, Modbus, EMS, Automatic Control, EMHASS backend, entity-ID or persistence contract changes.
+
+See `docs/RELEASE_NOTES_V038.md` and `docs/FRONTEND_V038.md`.
 
 # v0.37 — Clean stable-control release
 
