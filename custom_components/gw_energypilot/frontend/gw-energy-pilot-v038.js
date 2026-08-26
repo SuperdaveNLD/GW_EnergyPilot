@@ -1,4 +1,5 @@
 import "./gw-energy-pilot-v038-runtime.js?v=0.38-release1";
+import { localizeV038Controller } from "./gw-energy-pilot-v038-i18n.js?v=0.38-i18n1";
 
 const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -76,6 +77,7 @@ if (!PanelClass.prototype.__epV038HoverStabilityInstalled) {
     const root = this.shadowRoot;
     if (!root) return;
 
+    localizeV038Controller(this, root);
     ensureHoverStabilityStyle(root);
     installHoverTracking(this, root);
 
