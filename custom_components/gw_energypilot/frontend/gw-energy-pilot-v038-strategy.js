@@ -111,6 +111,12 @@ function numberModel(panel, key, fallback) {
   return { entityId, value: Number.isFinite(value) ? value : fallback };
 }
 
+function stableConfigEntries(values) {
+  return Object.entries(values || {}).sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
+}
+
 function strategySignature(panel, cache) {
   const min = numberModel(panel, "emhass_minimum_soc", 0);
   const max = numberModel(panel, "emhass_maximum_soc", 100);
@@ -125,7 +131,7 @@ function strategySignature(panel, cache) {
     modes: (cache.data?.modes || []).map((mode) => mode?.key || ""),
     min: min.value,
     max: max.value,
-    values: cache.data?.current_emhass_values || {},
+    values: stableConfigEntries(cache.data?.current_emhass_values),
   });
 }
 
@@ -138,7 +144,7 @@ function updateStrategyVisualState(panel) {
   for (const button of root.querySelectorAll("[data-ep-v038-profile]")) {
     const active = button.dataset.epV038Profile === activeMode;
     button.setAttribute("aria-pressed", active ? "true" : "false");
-    button.disabled = Boolean(cache.busy || cache.loading);
+    button.disabled = Boolean(cache.busy || cache.loading || !cache.data);
     const badge = button.querySelector(".ep-v038-badge");
     if (active && !badge) {
       button.insertAdjacentHTML(
@@ -152,7 +158,8 @@ function updateStrategyVisualState(panel) {
   const message = root.querySelector(".ep-v038-message");
   if (message) {
     message.className = `ep-v038-message ${cache.tone || ""}`;
-    message.textContent = cache.error || cache.message || "";
+    message.textContent =
+      cache.error || cache.message || (!cache.data ? t.loading : "");
   }
   const strategy = root.querySelector(".ep-v038-strategy");
   if (strategy) strategy.dataset.epV038Signature = strategySignature(panel, cache);
@@ -160,10 +167,10 @@ function updateStrategyVisualState(panel) {
 
 async function selectProfile(panel, mode) {
   const cache = batterySaverCache(panel);
-  if (!panel._hass?.callWS || cache.busy) return;
+  if (!panel._hass?.callWS || cache.busy || cache.loading) return;
   if (!cache.data?.entry_id) await loadBatterySaver(panel, true);
   const entryId = cache.data?.entry_id;
-  if (!entryId || cache.busy) return;
+  if (!entryId || cache.busy || cache.loading) return;
 
   const t = copy(panel);
   cache.busy = true;
@@ -331,6 +338,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
   const modes = [...sourceModes, { key: CUSTOM_MODE }].map((mode) =>
     profileMeta(panel, mode)
   );
+  const controlsDisabled = Boolean(cache.busy || cache.loading || !cache.data);
 
   wrap.innerHTML = `
     <div>
@@ -342,7 +350,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
       ${modes
         .map(
           (mode) => `
-            <button type="button" class="ep-v038-profile" data-ep-v038-profile="${panel._escape(mode.key)}" aria-pressed="${activeMode === mode.key ? "true" : "false"}" ${cache.busy || cache.loading ? "disabled" : ""}>
+            <button type="button" class="ep-v038-profile" data-ep-v038-profile="${panel._escape(mode.key)}" aria-pressed="${activeMode === mode.key ? "true" : "false"}" ${controlsDisabled ? "disabled" : ""}>
               ${activeMode === mode.key ? `<span class="ep-v038-badge">${panel._escape(t.active)}</span>` : ""}
               <strong>${panel._escape(mode.label)}</strong>
               <small>${panel._escape(mode.description)}</small>
@@ -351,7 +359,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
         .join("")}
     </div>
     ${activeMode === CUSTOM_MODE ? customSocHtml(panel, t, cache.data) : ""}
-    <div class="ep-v038-message ${panel._escape(cache.tone || "")}">${panel._escape(cache.error || cache.message || (cache.loading ? t.loading : ""))}</div>
+    <div class="ep-v038-message ${panel._escape(cache.tone || "")}">${panel._escape(cache.error || cache.message || (!cache.data || cache.loading ? t.loading : ""))}</div>
     <div class="ep-v038-diagnostic-note">${panel._escape(t.diagnostics)}</div>`;
   wrap.dataset.epV038Signature = signature;
 }
