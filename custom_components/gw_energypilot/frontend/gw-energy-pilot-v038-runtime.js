@@ -1,17 +1,17 @@
 import "./gw-energy-pilot-v034.js?v=0.38-clean-base1";
-import { FLOW_THRESHOLD_W, flowMotionMap } from "./gw-energy-pilot-v038-model.js?v=0.38-model1";
+import { FLOW_THRESHOLD_W, flowMotionMap } from "./gw-energy-pilot-v038-model.js?v=0.38-model2";
 import { ensureV038Styles } from "./gw-energy-pilot-v038-styles.js?v=0.38-styles1";
 import {
   installV038CustomerStrategy,
   installV038DelegatedControls,
-} from "./gw-energy-pilot-v038-strategy.js?v=0.38-strategy1";
+} from "./gw-energy-pilot-v038-strategy.js?v=0.38-strategy2";
 
 const VERSION = "0.37";
 const PANEL_NAME = "gw-energypilot-panel";
 const HASS_RENDER_BATCH_MS = 150;
 const MOBILE_SCROLL_BREAKPOINT_PX = 720;
 const TOUCH_SCROLL_THRESHOLD_PX = 8;
-const INTERACTION_SAFETY_TIMEOUT_MS = 1500;
+const INTERACTION_SAFETY_TIMEOUT_MS = 3000;
 const INTERACTIVE_SELECTOR =
   'button, input, select, textarea, a[href], [role="button"], [tabindex]';
 const LEGACY_EXTERNAL_ENTITIES = [
@@ -78,7 +78,8 @@ function interactionState(panel) {
     startX: 0,
     startY: 0,
     keyboard: false,
-    safetyTimer: null,
+    pointerSafetyTimer: null,
+    keyboardSafetyTimer: null,
   };
   return panel.__epV038Interaction;
 }
@@ -96,10 +97,24 @@ function flushDeferredRender(panel) {
 
 function completePointerInteraction(panel) {
   const state = interactionState(panel);
-  if (state.safetyTimer) window.clearTimeout(state.safetyTimer);
-  state.safetyTimer = null;
+  if (state.pointerSafetyTimer) window.clearTimeout(state.pointerSafetyTimer);
+  state.pointerSafetyTimer = null;
   state.pointerId = null;
   state.pointerType = null;
+  flushDeferredRender(panel);
+}
+
+function completeKeyboardInteraction(panel) {
+  const state = interactionState(panel);
+  if (state.keyboardSafetyTimer) window.clearTimeout(state.keyboardSafetyTimer);
+  state.keyboardSafetyTimer = null;
+  state.keyboard = false;
+  flushDeferredRender(panel);
+}
+
+function completeAllInteractions(panel) {
+  completePointerInteraction(panel);
+  completeKeyboardInteraction(panel);
   flushDeferredRender(panel);
 }
 
@@ -113,12 +128,13 @@ function installInteractionGuard(panel, root) {
     (event) => {
       if (!eventInteractiveElement(event)) return;
       if (typeof event.button === "number" && event.button !== 0) return;
-      if (state.safetyTimer) window.clearTimeout(state.safetyTimer);
+      if (event.isPrimary === false || state.pointerId !== null) return;
+      if (state.pointerSafetyTimer) window.clearTimeout(state.pointerSafetyTimer);
       state.pointerId = event.pointerId;
       state.pointerType = event.pointerType || "";
       state.startX = event.clientX;
       state.startY = event.clientY;
-      state.safetyTimer = window.setTimeout(
+      state.pointerSafetyTimer = window.setTimeout(
         () => completePointerInteraction(panel),
         INTERACTION_SAFETY_TIMEOUT_MS
       );
@@ -154,14 +170,23 @@ function installInteractionGuard(panel, root) {
     },
     true
   );
-  globalThis.addEventListener?.("blur", () => completePointerInteraction(panel));
+  globalThis.addEventListener?.("blur", () => completeAllInteractions(panel));
 
   root.addEventListener(
     "keydown",
     (event) => {
-      if ((event.key === "Enter" || event.key === " ") && eventInteractiveElement(event)) {
-        state.keyboard = true;
+      if (
+        (event.key !== "Enter" && event.key !== " ") ||
+        !eventInteractiveElement(event)
+      ) {
+        return;
       }
+      if (state.keyboardSafetyTimer) window.clearTimeout(state.keyboardSafetyTimer);
+      state.keyboard = true;
+      state.keyboardSafetyTimer = window.setTimeout(
+        () => completeKeyboardInteraction(panel),
+        INTERACTION_SAFETY_TIMEOUT_MS
+      );
     },
     true
   );
@@ -169,20 +194,13 @@ function installInteractionGuard(panel, root) {
     "keyup",
     (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
-      window.setTimeout(() => {
-        state.keyboard = false;
-        flushDeferredRender(panel);
-      }, 0);
+      window.setTimeout(() => completeKeyboardInteraction(panel), 0);
     },
     true
   );
   root.addEventListener(
     "focusout",
-    () => {
-      if (!state.keyboard) return;
-      state.keyboard = false;
-      flushDeferredRender(panel);
-    },
+    () => completeKeyboardInteraction(panel),
     true
   );
 }
