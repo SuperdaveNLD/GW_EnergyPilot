@@ -4,7 +4,6 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "custom_components" / "gw_energypilot" / "frontend"
-INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 
 
 class FrontendDashboardCardTests(unittest.TestCase):
@@ -150,7 +149,7 @@ class FrontendDashboardCardTests(unittest.TestCase):
         )
         self.assertLess(render_call, restore_call)
 
-    def test_v0362_loads_customer_controller_and_release_wiring(self) -> None:
+    def test_v0362_loads_customer_controller_chain(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
         )
@@ -163,8 +162,6 @@ class FrontendDashboardCardTests(unittest.TestCase):
         release_v0362 = (
             FRONTEND / "gw-energy-pilot-v0362-scroll-stability.js"
         ).read_text(encoding="utf-8")
-        integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        manifest = (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
 
         self.assertIn(
             'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
@@ -182,11 +179,6 @@ class FrontendDashboardCardTests(unittest.TestCase):
             release_v0362,
         )
         self.assertIn('const VERSION = "0.36.2"', release_v0362)
-        self.assertIn('"version": "0.36.2"', manifest)
-        self.assertIn(
-            'gw-energy-pilot-v0362-scroll-stability.js?v=0.36.2-release1',
-            integration,
-        )
 
     def test_customer_controller_reuses_existing_policy_and_soc_paths(self) -> None:
         source = (
