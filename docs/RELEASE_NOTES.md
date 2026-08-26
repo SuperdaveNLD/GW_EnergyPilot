@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.36.2** | 2026-08-26 | **Beta** | Stabilizes the mobile viewport across periodic relevant telemetry refreshes by preserving the Home Assistant scroll container through complete dashboard renders while leaving GoodWe polling and live telemetry unchanged. |
 | **0.36.1** | 2026-08-26 | **Beta** | Hotfixes mobile scrolling through the Battery strategy buttons by removing touch pointer capture, deferring destructive renders through touch-scroll settle, and adding a stuck-interaction safety timeout. |
 | **0.36** | 2026-08-25 | **Beta** | Adds customer-facing Mad-Steve/Gold Rush/Balanced/Battery Saver/Custom strategy controls, preserves Custom EMHASS values, fixes dashboard render storms and lost clicks, and corrects live-flow direction/mobile sizing. |
 | **0.35** | 2026-08-25 | **Beta** | Preserves the user-owned EMHASS inverter topology instead of forcing `inverter_is_hybrid=true`, and centralizes the small EnergyPilot runtime contract used by config sync and pre-solve preparation. |
@@ -52,6 +53,16 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.36.2 — Periodic refresh scroll stability
+
+v0.36.2 fixes the remaining mobile viewport jump that could occur on a configured GoodWe polling cycle after the v0.36.1 touch fix. Relevant EnergyPilot state updates still have to refresh the live dashboard, and the current layered frontend still rebuilds the complete Shadow DOM for such renders. On mobile Home Assistant/WebView that structural replacement could cause the browser to choose a different scroll anchor after layout, moving the viewport even when the user was no longer touching a control.
+
+On narrow/mobile layouts, EnergyPilot now captures the actual composed Home Assistant scroll containers before the complete render chain runs and restores their exact positions immediately after rendering and across two animation frames. The panel subtree also opts out of browser scroll anchoring with `overflow-anchor: none`. GoodWe polling cadence and live telemetry remain unchanged; this hotfix stabilizes presentation rather than suppressing refreshes.
+
+No GoodWe register definitions, Modbus read blocks, EMS mappings, Automatic Control behavior, Battery Saver/EMHASS policy, entity IDs, unique IDs or device identity change.
+
+See `docs/RELEASE_NOTES_V0362.md`.
 
 # v0.36.1 — Mobile strategy scrolling hotfix
 
@@ -105,7 +116,7 @@ See `docs/RELEASE_NOTES_V035.md` and `docs/EMHASS_CONFIG_SYNC.md`.
 
 v0.34 consolidates all open post-v0.33 release work into one Beta candidate.
 
-The Battery · Plan · Price card now follows an explicit optimization `plan_revision`, so every successful EnergyPilot optimization can invalidate the cached chart immediately after the persistent plan refresh attempt. A fresh v0.34 frontend wrapper also cache-busts both the updated Battery Saver module and Battery Plan core for already-open Home Assistant sessions.
+The Battery · Plan · Price card now follows an explicit optimization `plan_revision`, so every successful EnergyPilot optimization can invalidate the cached chart immediately after the persistent EMHASS plan refresh attempt. A fresh v0.34 frontend wrapper also cache-busts both the updated Battery Saver module and Battery Plan core for already-open Home Assistant sessions.
 
 Battery Saver profiles now own their hard EMHASS maximum SOC when explicitly selected: Mad-Steve 100%, Gold Rush 96%, Balanced 95% and Battery Saver/Eco 90%. The shared charge/discharge anti-churn floor increases from 1.5% to 2.25% of the dynamic price reference per direction based on field comparison.
 
