@@ -33,7 +33,9 @@ PANEL_MODULE_RE = re.compile(
 FRONTEND_VERSION_RE = re.compile(
     r"\bconst\s+VERSION\s*=\s*[\"'](?P<version>[^\"']+)[\"']"
 )
-CHANGELOG_VERSION_RE = re.compile(r"^## \[(?P<version>\d+\.\d+)\]", re.MULTILINE)
+CHANGELOG_VERSION_RE = re.compile(
+    r"^## \[(?P<version>\d+\.\d+(?:\.\d+)?)\]", re.MULTILINE
+)
 
 
 def _load_register_module() -> ModuleType:

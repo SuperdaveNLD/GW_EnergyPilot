@@ -2,6 +2,23 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.36.1] - 2026-08-26
+
+### Fixed
+
+- Fixed mobile Home Assistant scrolling over the v0.36 Battery strategy buttons by keeping touch gestures on the native vertical-pan path instead of pointer-capturing them as button presses.
+- Deferred destructive dashboard rebuilds through a moved-touch settle window and added a pointer safety timeout so interrupted gestures cannot leave the frontend render-locked.
+
+### Changed
+
+- Touch movement at or above 8 px is classified as a scroll gesture for the v0.35 interaction guard; desktop mouse click protection is retained.
+- Battery strategy buttons explicitly allow native vertical panning with `touch-action: pan-y`.
+- Bumped manifest/frontend cache wiring to 0.36.1 and added mobile-scroll regression coverage.
+
+### Safety / compatibility
+
+- Frontend-only hotfix; no GoodWe register definitions, Modbus read blocks, EMS mappings, Automatic Control behavior, EMHASS optimization/config ownership, entity IDs, unique IDs or stable device identity changes.
+
 ## [0.36] - 2026-08-25
 
 ### Added
@@ -290,11 +307,12 @@ All notable changes to GW EnergyPilot are documented here.
 - **Charged today** and **Discharged today** now prefer the inverter-native GoodWe day counters when available; the Recorder-integrated graph value remains visible as a comparison rather than being presented as authoritative accounting.
 - The Battery & Price chart now distinguishes solid actual GoodWe battery-power bars from translucent/dashed historical and future plan blocks while keeping the market-price line and NOW marker on the same local-day timeline.
 - The legacy direct minimum-SOC field-test panel is removed from the normal dashboard. The synchronized on-grid minimum-SOC NumberEntity remains the supported operator path; the existing low-level Beta SOC API is retained for diagnostics/backwards-compatible tooling.
+- The Support card becomes a compact operational summary with GoodWe telemetry, control ownership, optimizer state and EMHASS/GoodWe minimum-SOC synchronization at a glance. Deep raw-register and lifetime diagnostics remain available through the support-report copy action.
 - The active frontend is `gw-energy-pilot-v027-battery-plan.js`, which layers the v0.26 support cleanup underneath the v0.27 plan-versus-actual chart.
 
 ### Safety / compatibility
 
-- No new or guessed GoodWe register definition or Modbus read block is introduced.
+- No new GoodWe register definition or Modbus read block is introduced.
 - EMS registers remain `47511` / `47512` with the existing write order.
 - Battery and Grid Automatic Control strategies are unchanged; only the diagnosed Hybrid neutral branch changes to the already-supported mode `8` hold behavior.
 - No existing entity ID, unique ID, stable device identity, persistent grid-accounting store or optimization-log contract changes.
@@ -572,7 +590,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - A settings gear in the EnergyPilot dashboard header for Home Assistant administrators.
 - Dedicated **EP**, **EMHASS** and **GOODWE** configuration pages backed by the existing Home Assistant config entry.
-- Admin-only WebSocket settings commands for reading and updating the existing configuration.
+- Admin-only WebSocket settings commands for reading/updating the existing configuration.
 - GoodWe connection validation before host, Modbus TCP port or unit-ID changes are saved.
 - Multi-entry selection for installations with more than one GW EnergyPilot config entry.
 - Enabled-by-default Home Assistant Diagnostic sensors for the Beta SOC candidates `45356`, `45358` and `47500`.

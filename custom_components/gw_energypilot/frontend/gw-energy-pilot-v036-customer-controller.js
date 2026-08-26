@@ -1,6 +1,6 @@
-import "./gw-energy-pilot-v035.js?v=0.36-renderguard1";
+import "./gw-energy-pilot-v035.js?v=0.36.1-mobile-scroll1";
 
-const VERSION = "0.36";
+const VERSION = "0.36.1";
 const PANEL_NAME = "gw-energypilot-panel";
 const CUSTOM_MODE = "custom";
 
@@ -59,12 +59,13 @@ function ensureStyles(root) {
   style.id = "ep-v036-controller-style";
   style.textContent = `
     .ep-v036-strategy { margin-top:15px; padding-top:14px; border-top:1px solid rgba(81,168,211,.10); }
+    .ep-v015-costfun-button { touch-action:pan-y; }
     .ep-v036-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
     .ep-v036-kicker { color:#62e5f7; font-size:8px; font-weight:900; letter-spacing:.15em; }
     .ep-v036-title { margin-top:3px; color:#e8f7fc; font-size:14px; font-weight:860; }
     .ep-v036-description { max-width:720px; margin-top:5px; color:#7696aa; font-size:9px; line-height:1.5; }
     .ep-v036-profile-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:12px; }
-    .ep-v036-profile { position:relative; min-height:78px; padding:10px; border:1px solid rgba(75,164,209,.12); border-radius:11px; color:#a7c3d1; background:rgba(5,27,47,.48); cursor:pointer; text-align:left; }
+    .ep-v036-profile { position:relative; min-height:78px; padding:10px; border:1px solid rgba(75,164,209,.12); border-radius:11px; color:#a7c3d1; background:rgba(5,27,47,.48); cursor:pointer; text-align:left; touch-action:pan-y; }
     .ep-v036-profile:hover { border-color:rgba(55,213,231,.30); background:rgba(7,43,66,.62); }
     .ep-v036-profile.active { border-color:rgba(41,226,181,.46); background:linear-gradient(145deg,rgba(10,82,91,.52),rgba(8,67,52,.47)); box-shadow:inset 0 0 18px rgba(37,220,174,.05); }
     .ep-v036-profile:disabled { opacity:.52; cursor:wait; }

@@ -99,7 +99,7 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("function installInteractionGuard", source)
         self.assertIn('root.addEventListener(\n    "pointerdown"', source)
         self.assertIn('root.addEventListener(\n    "pointerup"', source)
-        self.assertIn("window.setTimeout(() => finishPointerInteraction(panel), 0)", source)
+        self.assertIn("window.setTimeout(() => finishPointerInteraction(panel, true), 0)", source)
         self.assertNotIn('"pointerover"', source)
         self.assertNotIn("__epV035HoverActive", source)
         self.assertIn("function interactionActive", source)
@@ -113,6 +113,22 @@ class FrontendDashboardCardTests(unittest.TestCase):
             source.index("previousRender.call(this)"),
             source.index("installInteractionGuard(this, root)"),
         )
+
+    def test_v035_mobile_touch_scroll_is_not_pointer_captured(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
+        customer = (
+            FRONTEND / "gw-energy-pilot-v036-customer-controller.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("const TOUCH_SCROLL_THRESHOLD_PX = 8", source)
+        self.assertIn("const TOUCH_SCROLL_SETTLE_MS = 350", source)
+        self.assertIn("const POINTER_SAFETY_TIMEOUT_MS = 5000", source)
+        self.assertIn('root.addEventListener(\n    "pointermove"', source)
+        self.assertIn('if (event.pointerType === "mouse")', source)
+        self.assertIn("panel.__epV035TouchMoved = true", source)
+        self.assertIn("finishPointerInteraction(panel, true)", source)
+        self.assertIn("completePointerInteraction(panel)", source)
+        self.assertIn("touch-action:pan-y", customer)
 
     def test_v036_loads_consolidated_customer_controller_release(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
@@ -136,11 +152,11 @@ class FrontendDashboardCardTests(unittest.TestCase):
             release_v034,
         )
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)
-        self.assertIn('gw-energy-pilot-v035.js?v=0.36-renderguard1', release_v036)
-        self.assertIn('const VERSION = "0.36"', release_v036)
-        self.assertIn('"version": "0.36"', manifest)
+        self.assertIn('gw-energy-pilot-v035.js?v=0.36.1-mobile-scroll1', release_v036)
+        self.assertIn('const VERSION = "0.36.1"', release_v036)
+        self.assertIn('"version": "0.36.1"', manifest)
         self.assertIn(
-            'gw-energy-pilot-v036-customer-controller.js?v=0.36-release1',
+            'gw-energy-pilot-v036-customer-controller.js?v=0.36.1-release1',
             integration,
         )
 
