@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.39** | 2026-08-26 | **Beta** | Stabilizes Battery Strategy hover during full renders and completes Dutch customer-facing Controller localization without changing GoodWe, EMS or EMHASS behavior. |
 | **0.38** | 2026-08-26 | **Beta** | Rebuilds dashboard controls around language-independent mode keys/delegated actions and makes live-flow direction a single explicit physical mapping, replacing the v0.37 stale-button-node stabilization path. |
 | **0.37** | 2026-08-26 | **Beta** | Publishes the complete current 0.36.x dashboard-stability stack as a clean numeric release, retaining mobile scroll stability and stable button DOM nodes while synchronizing HACS/HA/frontend release metadata. |
 | **0.36.2** | 2026-08-26 | **Beta** | Stabilizes the mobile viewport across periodic relevant telemetry refreshes by preserving the Home Assistant scroll container through complete dashboard renders while leaving GoodWe polling and live telemetry unchanged. |
@@ -55,6 +56,16 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.39 — Stable strategy hover and complete Dutch Controller copy
+
+v0.39 is a focused frontend follow-up to the rebuilt v0.38 control path. The Battery Strategy control under a stationary desktop mouse no longer visibly blinks when the inherited full ShadowRoot render briefly detaches and reinserts the already-reused strategy node. Hover continuity is presentation-only: it never delays telemetry, captures a pointer or reinstates the removed v0.35 hover/render lock.
+
+Dutch Home Assistant sessions also receive the remaining customer-facing controller localization inherited from older frontend layers: controller headings, automatic-control copy, GoodWe EMS mode names/tooltips, manual EMS status messages, strategy fallback copy, profile descriptions and telemetry presentation. Technical identifiers such as `EMS`, `P_grid`, `P_batt` and `PCC`, plus profile names such as Mad-Steve and Gold Rush, remain intentionally stable.
+
+The new `gw-energy-pilot-v039.js` entrypoint is release/version-only and imports the tested v0.38 behavior with a fresh cache key. No GoodWe register, Modbus, EMS mapping/write order, Automatic Control, EMHASS, entity-ID or persistent-state contract changes.
+
+See `docs/RELEASE_NOTES_V039.md`.
 
 # v0.38 — Rebuilt controls and canonical live-flow direction
 

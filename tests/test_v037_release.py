@@ -8,11 +8,12 @@ INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
 
 
-class V038ReleaseTests(unittest.TestCase):
-    def test_v038_release_is_wired_consistently(self) -> None:
+class V039ReleaseTests(unittest.TestCase):
+    def test_v039_release_is_wired_consistently(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        release = (FRONTEND / "gw-energy-pilot-v038.js").read_text(encoding="utf-8")
+        release = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
+        v038 = (FRONTEND / "gw-energy-pilot-v038.js").read_text(encoding="utf-8")
         runtime = (FRONTEND / "gw-energy-pilot-v038-runtime.js").read_text(
             encoding="utf-8"
         )
@@ -20,21 +21,15 @@ class V038ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertEqual("0.38", manifest["version"])
-        self.assertIn(
-            'gw-energy-pilot-v038.js?v=0.38-i18n1',
-            init_source,
-        )
-        self.assertIn(
-            'gw-energy-pilot-v038-runtime.js?v=0.38-release1',
-            release,
-        )
-        self.assertIn(
-            'gw-energy-pilot-v038-i18n.js?v=0.38-i18n1',
-            release,
-        )
-        self.assertIn("localizeV038Controller(this, root)", release)
-        self.assertIn('const VERSION = "0.38"', release)
+        self.assertEqual("0.39", manifest["version"])
+        self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
+        self.assertIn('const VERSION = "0.39"', release)
+        self.assertIn("__epV039Installed", release)
+        self.assertIn("energyPilotV039Render", release)
+        self.assertIn('gw-energy-pilot-v038-runtime.js?v=0.38-release1', v038)
+        self.assertIn('gw-energy-pilot-v038-i18n.js?v=0.38-i18n1', v038)
+        self.assertIn("localizeV038Controller(this, root)", v038)
         self.assertIn('const VERSION = "0.38"', runtime)
         self.assertIn("__epV038Installed", runtime)
         self.assertIn('windowLabel: "Regelaar"', i18n)
@@ -73,11 +68,13 @@ class V038ReleaseTests(unittest.TestCase):
         self.assertIn("No GoodWe register", notes)
 
     def test_dedicated_release_notes_exist(self) -> None:
-        notes = ROOT / "docs" / "RELEASE_NOTES_V038.md"
+        notes = ROOT / "docs" / "RELEASE_NOTES_V039.md"
         self.assertTrue(notes.is_file())
         source = notes.read_text(encoding="utf-8")
-        self.assertIn("GW EnergyPilot v0.38 Beta", source)
-        self.assertIn("Canonical live-flow direction", source)
+        self.assertIn("GW EnergyPilot v0.39 Beta", source)
+        self.assertIn("hover", source.lower())
+        self.assertIn("Dutch", source)
+        self.assertTrue((ROOT / "docs" / "RELEASE_NOTES_V038.md").is_file())
 
 
 if __name__ == "__main__":
