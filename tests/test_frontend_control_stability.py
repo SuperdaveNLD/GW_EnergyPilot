@@ -26,7 +26,7 @@ class FrontendControlStabilityTests(unittest.TestCase):
         )
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
-        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.38-runtime2", self.entry)
+        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.38-runtime3", self.entry)
         self.assertIn('gw-energy-pilot-v034.js?v=0.38-clean-base1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
@@ -47,20 +47,23 @@ class FrontendControlStabilityTests(unittest.TestCase):
         )
         self.assertIn('.ep-v038-profile[aria-pressed="true"]', self.styles)
         self.assertIn('wrap.setAttribute("translate", "no")', self.strategy)
-        self.assertIn("DEFAULT_PROFILE_KEYS", self.strategy)
+        self.assertIn("PROFILE_KEYS", self.strategy)
+        self.assertIn("canonicalProfiles", self.strategy)
         self.assertIn("reusableStrategy", self.strategy)
         self.assertIn("strategySignature", self.strategy)
         self.assertIn("wrap.dataset.epV038Signature", self.strategy)
-        self.assertIn("const backendModes = new Map", self.strategy)
-        self.assertIn("DEFAULT_PROFILE_KEYS.map", self.strategy)
         self.assertIn("cache.busy || cache.loading || !cache.data", self.strategy)
+        self.assertIn("updateStrategyVisualState(panel, true)", self.strategy)
+        self.assertIn("updateStrategyVisualState(panel);", self.strategy)
 
     def test_v038_profile_identity_is_language_independent(self) -> None:
         self.assertIn('label: "Battery Saver"', self.model)
         self.assertIn('label: "Batterijbesparing"', self.model)
         self.assertIn('label: "Custom"', self.model)
         self.assertIn('label: "Aangepast"', self.model)
+        self.assertIn("export const PROFILE_KEYS", self.model)
         self.assertIn("export function localizedProfile", self.model)
+        self.assertIn("export function canonicalProfiles", self.model)
         self.assertIn(
             'const key = typeof mode === "string" ? mode : mode?.key',
             self.model,
