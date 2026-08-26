@@ -1,0 +1,400 @@
+name: Prepare v0.39 release
+
+on:
+  push:
+    branches:
+      - release/v0.39
+    paths:
+      - .github/workflows/prepare-v039.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v0.39
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Prepare v0.39 files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          ROOT = Path(".")
+          INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
+          FRONTEND = INTEGRATION / "frontend"
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected exactly one anchor in {path}: {old!r}; found {count}")
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          def replace_regex_once(path: Path, pattern: str, replacement: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              updated, count = re.subn(pattern, replacement, text, count=1, flags=re.DOTALL)
+              if count != 1:
+                  raise RuntimeError(f"Expected exactly one regex anchor in {path}: {pattern!r}; found {count}")
+              path.write_text(updated, encoding="utf-8")
+
+          replace_once(
+              INTEGRATION / "manifest.json",
+              '  "version": "0.38"',
+              '  "version": "0.39"',
+          )
+          replace_once(
+              INTEGRATION / "__init__.py",
+              'PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v038.js?v=0.38-i18n1"',
+              'PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v039.js?v=0.39-release1"',
+          )
+
+          (FRONTEND / "gw-energy-pilot-v039.js").write_text(
+              '''import "./gw-energy-pilot-v038.js?v=0.39-v0381";
+
+          const VERSION = "0.39";
+          const PANEL_NAME = "gw-energypilot-panel";
+
+          function updateVersion(root) {
+            const versionBadge = root?.querySelector(".version");
+            if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
+            const footerItems = root?.querySelectorAll("footer span") || [];
+            if (footerItems.length > 0) {
+              footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
+            }
+          }
+
+          await customElements.whenDefined(PANEL_NAME);
+          const PanelClass = customElements.get(PANEL_NAME);
+
+          if (PanelClass && !PanelClass.prototype.__epV039Installed) {
+            const previousRender = PanelClass.prototype._render;
+            PanelClass.prototype._render = function energyPilotV039Render(...args) {
+              const result = previousRender.apply(this, args);
+              updateVersion(this.shadowRoot);
+              return result;
+            };
+            PanelClass.prototype.__epV039Installed = true;
+          }
+          ''',
+              encoding="utf-8",
+          )
+
+          test_path = ROOT / "tests" / "test_v037_release.py"
+          test_path.write_text(
+              '''from pathlib import Path
+          import json
+          import unittest
+
+
+          ROOT = Path(__file__).resolve().parents[1]
+          INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
+          FRONTEND = INTEGRATION / "frontend"
+
+
+          class V039ReleaseTests(unittest.TestCase):
+              def test_v039_release_is_wired_consistently(self) -> None:
+                  manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+                  init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+                  release = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
+                  v038 = (FRONTEND / "gw-energy-pilot-v038.js").read_text(encoding="utf-8")
+                  runtime = (FRONTEND / "gw-energy-pilot-v038-runtime.js").read_text(
+                      encoding="utf-8"
+                  )
+                  i18n = (FRONTEND / "gw-energy-pilot-v038-i18n.js").read_text(
+                      encoding="utf-8"
+                  )
+
+                  self.assertEqual("0.39", manifest["version"])
+                  self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
+                  self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
+                  self.assertIn('const VERSION = "0.39"', release)
+                  self.assertIn("__epV039Installed", release)
+                  self.assertIn("energyPilotV039Render", release)
+                  self.assertIn('gw-energy-pilot-v038-runtime.js?v=0.38-release1', v038)
+                  self.assertIn('gw-energy-pilot-v038-i18n.js?v=0.38-i18n1', v038)
+                  self.assertIn("localizeV038Controller(this, root)", v038)
+                  self.assertIn('const VERSION = "0.38"', runtime)
+                  self.assertIn("__epV038Installed", runtime)
+                  self.assertIn('windowLabel: "Regelaar"', i18n)
+                  self.assertIn('manualKicker: "HANDMATIGE EMS-TEST"', i18n)
+                  self.assertIn('12: ["Batterijontlaadvermogen"', i18n)
+
+              def test_release_has_executable_frontend_regression_tests(self) -> None:
+                  model_test = ROOT / "tests" / "test_frontend_v038.mjs"
+                  controls_test = ROOT / "tests" / "test_frontend_v038_controls.mjs"
+                  i18n_test = ROOT / "tests" / "test_frontend_v038_i18n.mjs"
+                  self.assertTrue(model_test.is_file())
+                  self.assertTrue(controls_test.is_file())
+                  self.assertTrue(i18n_test.is_file())
+                  source = (
+                      model_test.read_text(encoding="utf-8")
+                      + controls_test.read_text(encoding="utf-8")
+                      + i18n_test.read_text(encoding="utf-8")
+                  )
+                  self.assertIn("flowMotionMap", source)
+                  self.assertIn("resolveHousePower", source)
+                  self.assertIn("canonicalProfiles", source)
+                  self.assertIn("Batterijbesparing", source)
+                  self.assertIn("Battery Saver", source)
+                  self.assertIn("gw_energypilot/battery_saver/set", source)
+                  self.assertIn("buttons.every((button) => button.disabled === false)", source)
+                  self.assertIn("Batterijontlaadvermogen", source)
+                  self.assertIn("English backend Balanced description", source)
+
+              def test_architecture_note_records_rebuilt_control_contract(self) -> None:
+                  notes = (ROOT / "docs" / "FRONTEND_CONTROL_REBUILD.md").read_text(
+                      encoding="utf-8"
+                  )
+                  self.assertIn("v0.38 Beta release", notes)
+                  self.assertIn("visible text is never a control identity", notes)
+                  self.assertIn("PV production: left to right", notes)
+                  self.assertIn("No GoodWe register", notes)
+
+              def test_dedicated_release_notes_exist(self) -> None:
+                  notes = ROOT / "docs" / "RELEASE_NOTES_V039.md"
+                  self.assertTrue(notes.is_file())
+                  source = notes.read_text(encoding="utf-8")
+                  self.assertIn("GW EnergyPilot v0.39 Beta", source)
+                  self.assertIn("hover", source.lower())
+                  self.assertIn("Dutch", source)
+                  self.assertTrue((ROOT / "docs" / "RELEASE_NOTES_V038.md").is_file())
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          ''',
+              encoding="utf-8",
+          )
+
+          release_notes_039 = '''# GW EnergyPilot v0.39 Beta
+
+          v0.39 is a focused frontend reliability and localization release on top of the rebuilt v0.38 control path. It publishes the already-reviewed strategy-hover fix and completes the remaining Dutch customer-facing Controller copy without changing GoodWe, EMS or EMHASS control semantics.
+
+          ## Battery Strategy hover stability
+
+          The v0.38 strategy controls already use stable backend profile keys and delegated actions. A remaining visual flicker could still appear under a stationary desktop mouse because the inherited full ShadowRoot render briefly detaches and reinserts the reused strategy node. Native CSS `:hover` disappears during that synchronous detach and returns afterwards, making the transition look like a blink.
+
+          v0.39 carries forward the presentation-only hover-continuity fix:
+
+          - the already-hovered v0.38 strategy button keeps a visual stable-hover class through the synchronous inherited render;
+          - delegated pointer movement keeps that class aligned with the real mouse position and panel leave clears it;
+          - touch/non-mouse input does not keep a synthetic hover state;
+          - hover never blocks telemetry, never queues a second render lock and never captures a pointer.
+
+          This is deliberately separate from click ownership. The v0.38 delegated strategy-control contract remains authoritative.
+
+          ## Complete Dutch Controller copy
+
+          Dutch Home Assistant sessions now localize the remaining inherited customer-facing controller text, including:
+
+          - Controller window label, EnergyPilot control heading and Automatic Control button;
+          - EMS mode label and localized GoodWe mode names for modes 1–12;
+          - EMS setpoint / EnergyPilot target labels and restart safety note;
+          - Battery Strategy descriptions, using canonical frontend profile localization rather than English backend metadata;
+          - manual EMS heading, lock/status text, setpoint label, ARIA label and mode tooltips;
+          - known manual operator/status messages;
+          - the automatic-strategy fallback note and telemetry badge.
+
+          Technical identifiers and product/profile names remain unchanged where that is clearer and safer, including `EMS`, `P_grid`, `P_batt`, `PCC`, GoodWe mode numbers, **Mad-Steve** and **Gold Rush**.
+
+          ## Release wiring
+
+          `gw-energy-pilot-v039.js` is a thin immutable release wrapper over the merged v0.38 behavior. It owns only the v0.39 dashboard/footer version presentation and a fresh cache key. The v0.38 runtime remains the behavioral owner for rebuilt controls, relevant-state rendering, interaction/scroll stability, physical live-flow direction, hover continuity and Dutch controller localization.
+
+          ## Safety and compatibility
+
+          v0.39 does **not** change:
+
+          - GoodWe register definitions or Modbus read blocks;
+          - EMS mode mapping, setpoint semantics or the `47512 -> wait -> 47511` write order;
+          - Automatic Control Battery/Grid/Hybrid decisions;
+          - EMHASS optimization, topology ownership, Battery Saver policy or persistent-plan behavior;
+          - Home Assistant entity IDs, unique IDs, config-entry data, Store keys or stable device identity.
+
+          ## Validation
+
+          The release candidate must pass Quality, HACS validation and Hassfest on the exact final release head. Quality retains the executable v0.38 model/control/localization regression suite and the full Python repository test/validator set, with the v0.39 release wiring additionally checked.
+          '''
+          (ROOT / "docs" / "RELEASE_NOTES_V039.md").write_text(
+              release_notes_039.replace("\n          ", "\n").lstrip(),
+              encoding="utf-8",
+          )
+
+          changelog_path = ROOT / "CHANGELOG.md"
+          changelog_entry = '''## [0.39] - 2026-08-26
+
+          ### Fixed
+
+          - Fixed the remaining Battery Strategy hover flicker caused by native CSS `:hover` dropping while the inherited full ShadowRoot render briefly detaches and reinserts the reused v0.38 strategy node.
+          - Completed Dutch localization of the customer Controller card, including inherited controller labels, GoodWe mode names/tooltips, manual EMS status copy, automatic-strategy fallback text, profile descriptions and telemetry presentation.
+
+          ### Changed
+
+          - Added `gw-energy-pilot-v039.js` as a thin release/version wrapper over the merged v0.38 control/localization chain with a fresh browser cache key.
+          - Kept the hover continuity presentation-only: it does not defer telemetry renders, capture pointers or restore the removed v0.35 hover/render lock.
+          - Updated release regression coverage and maintainer documentation for the active v0.39 -> v0.38 frontend chain.
+
+          ### Safety / compatibility
+
+          - Frontend-only release; no GoodWe register definitions, Modbus read blocks, EMS mappings, setpoint semantics or `47512 -> wait -> 47511` write ordering change.
+          - No Automatic Control decision, EMHASS optimization/topology/Battery Saver behavior, entity ID, unique ID, config-entry data, persistent Store key or stable device identity change.
+
+          '''
+          changelog_entry = changelog_entry.replace("\n          ", "\n")
+          replace_once(
+              changelog_path,
+              "All notable changes to GW EnergyPilot are documented here.\n\n## [0.38]",
+              "All notable changes to GW EnergyPilot are documented here.\n\n" + changelog_entry + "## [0.38]",
+          )
+
+          release_index = ROOT / "docs" / "RELEASE_NOTES.md"
+          replace_once(
+              release_index,
+              "| **0.38** | 2026-08-26 | **Beta** |",
+              "| **0.39** | 2026-08-26 | **Beta** | Stabilizes Battery Strategy hover during full renders and completes Dutch customer-facing Controller localization without changing GoodWe, EMS or EMHASS behavior. |\n| **0.38** | 2026-08-26 | **Beta** |",
+          )
+          release_index_section = '''# v0.39 — Stable strategy hover and complete Dutch Controller copy
+
+          v0.39 is a focused frontend follow-up to the rebuilt v0.38 control path. The Battery Strategy control under a stationary desktop mouse no longer visibly blinks when the inherited full ShadowRoot render briefly detaches and reinserts the already-reused strategy node. Hover continuity is presentation-only: it never delays telemetry, captures a pointer or reinstates the removed v0.35 hover/render lock.
+
+          Dutch Home Assistant sessions also receive the remaining customer-facing controller localization inherited from older frontend layers: controller headings, automatic-control copy, GoodWe EMS mode names/tooltips, manual EMS status messages, strategy fallback copy, profile descriptions and telemetry presentation. Technical identifiers such as `EMS`, `P_grid`, `P_batt` and `PCC`, plus profile names such as Mad-Steve and Gold Rush, remain intentionally stable.
+
+          The new `gw-energy-pilot-v039.js` entrypoint is release/version-only and imports the tested v0.38 behavior with a fresh cache key. No GoodWe register, Modbus, EMS mapping/write order, Automatic Control, EMHASS, entity-ID or persistent-state contract changes.
+
+          See `docs/RELEASE_NOTES_V039.md`.
+
+          '''
+          release_index_section = release_index_section.replace("\n          ", "\n")
+          replace_once(
+              release_index,
+              "# v0.38 — Rebuilt controls and canonical live-flow direction",
+              release_index_section + "# v0.38 — Rebuilt controls and canonical live-flow direction",
+          )
+
+          readme = ROOT / "README.md"
+          replace_once(readme, "**v0.38 · Beta**", "**v0.39 · Beta**")
+          replace_once(
+              readme,
+              "- `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt controls and canonical live-flow direction;",
+              "- `docs/RELEASE_NOTES_V039.md` — v0.39 stable strategy hover and complete Dutch Controller copy;\n- `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt controls and canonical live-flow direction;",
+          )
+          readme_039 = '''## v0.39 highlights
+
+          - Battery Strategy hover stays visually stable across the inherited full ShadowRoot render without blocking telemetry, capturing pointers or restoring the removed v0.35 render lock.
+          - Dutch Home Assistant sessions now localize the remaining inherited customer-facing Controller, manual EMS, GoodWe mode/tooltips, strategy fallback, profile-description and telemetry copy.
+          - `gw-energy-pilot-v039.js` is a thin release wrapper over the tested v0.38 control/localization path with a fresh browser cache key and synchronized v0.39 dashboard/footer badge.
+          - No GoodWe register, Modbus, EMS, Automatic Control, EMHASS backend, entity-ID or persistent-state semantics change in v0.39.
+
+          '''
+          readme_039 = readme_039.replace("\n          ", "\n")
+          replace_once(readme, "## v0.38 highlights", readme_039 + "## v0.38 highlights")
+
+          agents = ROOT / "AGENTS.md"
+          replace_once(agents, "v0.38 Beta", "v0.39 Beta")
+          agents_frontend = '''## Active frontend chain
+
+          The top-level module is selected in `__init__.py`:
+
+          ```text
+          gw-energy-pilot-v039.js
+            -> gw-energy-pilot-v038.js
+                 -> gw-energy-pilot-v038-runtime.js
+                      -> gw-energy-pilot-v034.js (clean functional base)
+                 -> gw-energy-pilot-v038-i18n.js
+          ```
+
+          v0.39 is a release/version wrapper only. The v0.38 layer owns rebuilt strategy controls, relevant-state rendering, interaction/scroll stability, physical live-flow direction, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into the release wrapper.
+
+          Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
+
+          The Battery · Plan · Price card must keep one canonical instance. A fresh `plan_revision` should rebuild/replace it, not create a duplicate or remain stale behind the frontend cache.
+
+          ## Repository checks'''
+          agents_frontend = agents_frontend.replace("\n          ", "\n")
+          replace_regex_once(
+              agents,
+              r"## Active frontend chain\n\n.*?\n## Repository checks",
+              agents_frontend,
+          )
+
+          development = ROOT / "docs" / "DEVELOPMENT.md"
+          replace_once(
+              development,
+              "## Current v0.35 runtime structure",
+              "## Current v0.39 runtime structure",
+          )
+          replace_once(
+              development,
+              "__init__.py             config-entry setup, APIs, runtime wiring, v0.35 panel entrypoint",
+              "__init__.py             config-entry setup, APIs, runtime wiring, v0.39 panel entrypoint",
+          )
+          development_frontend = '''## Active frontend chain
+
+          Top level:
+
+          ```text
+          gw-energy-pilot-v039.js
+              -> gw-energy-pilot-v038.js
+                  -> gw-energy-pilot-v038-runtime.js
+                      -> gw-energy-pilot-v034.js (clean functional base)
+                  -> gw-energy-pilot-v038-i18n.js
+          ```
+
+          The v0.39 wrapper owns only release badge/footer presentation and cache separation. The v0.38 modules own the current rebuilt strategy model/actions, relevant-state render filtering, interaction/mobile-scroll stability, physical live-flow direction, presentation-only hover continuity and Dutch Controller localization. The v0.34 clean base still supplies established dashboard feature behavior, including the canonical Battery · Plan · Price path.
+
+          **Do not add another behavioral release monkey-patch layer by default.** Keep release wrappers version-only; functional frontend changes belong in bounded modules with executable browser-level regression coverage.
+
+          ## Automatic-control contract'''
+          development_frontend = development_frontend.replace("\n          ", "\n")
+          replace_regex_once(
+              development,
+              r"## Active frontend chain\n\n.*?\n## Automatic-control contract",
+              development_frontend,
+          )
+          PY
+
+      - name: Validate prepared release
+        shell: bash
+        run: |
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v039.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-model.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-styles.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-strategy.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-i18n.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038.js
+          node tests/test_frontend_v038.mjs
+          node tests/test_frontend_v038_controls.mjs
+          node tests/test_frontend_v038_i18n.mjs
+          python -m compileall -q custom_components/gw_energypilot scripts tests
+          python -m unittest discover -s tests -v
+          python scripts/validate_repo.py
+          git diff --check
+
+      - name: Commit prepared release
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/gw_energypilot README.md CHANGELOG.md AGENTS.md docs tests
+          git diff --cached --quiet && { echo "No release changes produced"; exit 1; }
+          git commit -m "Prepare GW EnergyPilot v0.39 Beta"
+          git push origin HEAD:release/v0.39
