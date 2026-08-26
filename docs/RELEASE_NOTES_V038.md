@@ -41,7 +41,7 @@ The normal Quality workflow now also runs executable Node.js frontend tests in a
 - import/export/charge/discharge flow cases resolve to the expected physical direction;
 - all new v0.38 JavaScript modules pass `node --check`.
 
-HACS validation and Hassfest remain required before release.
+Final pre-merge validation completed successfully on candidate `c8107acaac701cfe3caa416e507af529a0d80dba`: Quality, HACS validation and Hassfest all passed. The normal main release workflow repeats repository, HACS and Hassfest validation before publishing the numeric GitHub Release.
 
 ## Architecture
 
