@@ -2,6 +2,25 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.40] - 2026-08-26
+
+### Fixed
+
+- Stabilized the remaining dashboard, menu and card-window controls that could visibly blink when a relevant Home Assistant update rebuilt the complete ShadowRoot under a stationary pointer.
+- Prevented recreated layout/menu controls, switches, Automatic Control presentation and card window buttons from replaying their CSS transition from a fresh non-hovered DOM node on every telemetry-driven render.
+
+### Changed
+
+- Added `gw-energy-pilot-v040.js` as a thin render-settle/release layer over v0.39. It temporarily suppresses CSS **transitions** on interactive controls while the inherited synchronous ShadowRoot rebuild settles, then restores normal transitions after the rebuilt controls have painted once.
+- Uses a persistent `adoptedStyleSheets` rule where supported, with an ordinary ShadowRoot style fallback, and a render-generation guard so rapid consecutive renders cannot release a newer settle window early.
+- Keeps the v0.38 relevant-state render filtering, live telemetry cadence, active-press guard, mobile scroll preservation, delegated Battery Strategy actions and v0.39 strategy-hover continuity unchanged.
+
+### Safety / compatibility
+
+- Frontend-only release; no GoodWe register definitions, Modbus read blocks, EMS mappings, setpoint semantics or `47512 -> wait -> 47511` write ordering change.
+- No Automatic Control decision, EMHASS optimization/topology/Battery Saver behavior, entity ID, unique ID, config-entry data, persistent Store key or stable device identity change.
+- v0.40 does not restore the removed v0.35 hover/render lock, does not capture pointers and does not transplant old button DOM nodes/listener closures.
+
 ## [0.39] - 2026-08-26
 
 ### Fixed

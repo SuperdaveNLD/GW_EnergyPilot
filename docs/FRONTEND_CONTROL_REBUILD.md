@@ -4,6 +4,14 @@
 
 This document describes the **v0.38 Beta release** frontend control and live-flow architecture. It replaces the released v0.37 presentation stack while keeping the existing GoodWe, EMS and EMHASS backend/control behavior unchanged. The rebuilt controls are covered by executable English/Dutch delegated-click tests and explicit physical flow-direction tests in the normal Quality workflow.
 
+## v0.40 render-settle follow-up
+
+v0.39 proved that the remaining visible blink was a presentation problem caused by a full ShadowRoot rebuild under a stationary pointer, not by control identity or click ownership. The Battery Strategy section already has explicit hover continuity because that section is intentionally reused. Older dashboard/menu/window controls are still recreated and can therefore restart their CSS transitions when the fresh node immediately matches `:hover`.
+
+v0.40 addresses that shared cause at the render boundary instead of adding per-button patches. A persistent ShadowRoot stylesheet temporarily disables **transitions** for interactive controls while the inherited synchronous rebuild settles and until the rebuilt controls have painted once. A generation token prevents an older render callback from releasing a newer settle period. The fallback style is inserted in the same render task when constructable/adopted stylesheets are unavailable.
+
+This mechanism intentionally does not suppress CSS animations, defer telemetry while a pointer merely hovers, capture pointers or transplant old DOM nodes/listener closures. The v0.38 interaction guard remains responsible only for a real active press, and v0.39 remains responsible for Battery Strategy hover continuity.
+
 ## Why the v0.37 control stack was replaced
 
 The released frontend combined two mechanisms that interacted badly:
