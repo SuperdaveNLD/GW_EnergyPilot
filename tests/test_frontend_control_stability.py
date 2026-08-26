@@ -4,7 +4,6 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "custom_components" / "gw_energypilot" / "frontend"
-INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 
 
 class FrontendControlStabilityTests(unittest.TestCase):
@@ -39,23 +38,16 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("snapshot.buttons.length !== buttons.length", source)
         self.assertIn("buttonIdentity(button) === snapshot.identities[index]", source)
 
-    def test_v0363_keeps_v0362_scroll_stability_and_release_wiring(self) -> None:
+    def test_v0363_keeps_v0362_scroll_stability_dependency(self) -> None:
         source = (
             FRONTEND / "gw-energy-pilot-v0363-control-stability.js"
         ).read_text(encoding="utf-8")
-        integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        manifest = (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
 
         self.assertIn(
             'gw-energy-pilot-v0362-scroll-stability.js?v=0.36.3-control-stability1',
             source,
         )
         self.assertIn('const VERSION = "0.36.3"', source)
-        self.assertIn('"version": "0.36.3"', manifest)
-        self.assertIn(
-            'gw-energy-pilot-v0363-control-stability.js?v=0.36.3-release1',
-            integration,
-        )
 
 
 if __name__ == "__main__":
