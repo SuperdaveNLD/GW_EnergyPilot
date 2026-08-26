@@ -19,8 +19,12 @@ class V038FrontendCandidateTests(unittest.TestCase):
 
         self.assertEqual("0.37", manifest["version"])
         self.assertIn(
-            'gw-energy-pilot-v038.js?v=0.38-control-flow-rebuild1',
+            'gw-energy-pilot-v038.js?v=0.38-control-flow-rebuild2',
             init_source,
+        )
+        self.assertIn(
+            'gw-energy-pilot-v038-runtime.js?v=0.38-runtime2',
+            candidate,
         )
         self.assertIn('const VERSION = "0.37"', candidate)
         self.assertIn('const VERSION = "0.37"', runtime)
@@ -31,6 +35,7 @@ class V038FrontendCandidateTests(unittest.TestCase):
         self.assertTrue(test_path.is_file())
         source = test_path.read_text(encoding="utf-8")
         self.assertIn("flowMotionMap", source)
+        self.assertIn("resolveHousePower", source)
         self.assertIn("Batterijbesparing", source)
         self.assertIn("Battery Saver", source)
 
