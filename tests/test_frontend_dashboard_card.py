@@ -130,7 +130,27 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("completePointerInteraction(panel)", source)
         self.assertIn("touch-action:pan-y", customer)
 
-    def test_v036_loads_consolidated_customer_controller_release(self) -> None:
+    def test_v0362_preserves_mobile_scroll_across_refresh_render(self) -> None:
+        source = (
+            FRONTEND / "gw-energy-pilot-v0362-scroll-stability.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("const MOBILE_SCROLL_BREAKPOINT_PX = 720", source)
+        self.assertIn("function composedParent", source)
+        self.assertIn("function captureScrollPositions", source)
+        self.assertIn("globalThis.document?.scrollingElement", source)
+        self.assertIn('this.style.setProperty("overflow-anchor", "none")', source)
+        self.assertIn("function stabilizeScrollAfterRender", source)
+        self.assertGreaterEqual(source.count("globalThis.requestAnimationFrame?."), 2)
+        render_call = source.index("previousRender.call(this)")
+        restore_call = source.rindex("stabilizeScrollAfterRender(snapshots)")
+        self.assertLess(
+            source.index("const snapshots = preserveScroll ? captureScrollPositions(this) : []"),
+            render_call,
+        )
+        self.assertLess(render_call, restore_call)
+
+    def test_v0362_loads_customer_controller_and_release_wiring(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
         )
@@ -139,6 +159,9 @@ class FrontendDashboardCardTests(unittest.TestCase):
         )
         release_v036 = (
             FRONTEND / "gw-energy-pilot-v036-customer-controller.js"
+        ).read_text(encoding="utf-8")
+        release_v0362 = (
+            FRONTEND / "gw-energy-pilot-v0362-scroll-stability.js"
         ).read_text(encoding="utf-8")
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         manifest = (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
@@ -154,9 +177,14 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)
         self.assertIn('gw-energy-pilot-v035.js?v=0.36.1-mobile-scroll1', release_v036)
         self.assertIn('const VERSION = "0.36.1"', release_v036)
-        self.assertIn('"version": "0.36.1"', manifest)
         self.assertIn(
-            'gw-energy-pilot-v036-customer-controller.js?v=0.36.1-release1',
+            'gw-energy-pilot-v036-customer-controller.js?v=0.36.2-scroll-stability1',
+            release_v0362,
+        )
+        self.assertIn('const VERSION = "0.36.2"', release_v0362)
+        self.assertIn('"version": "0.36.2"', manifest)
+        self.assertIn(
+            'gw-energy-pilot-v0362-scroll-stability.js?v=0.36.2-release1',
             integration,
         )
 

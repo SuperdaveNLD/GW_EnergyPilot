@@ -2,6 +2,25 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.36.2] - 2026-08-26
+
+### Fixed
+
+- Fixed the remaining mobile viewport jump caused by periodic relevant Home Assistant state refreshes rebuilding the complete dashboard Shadow DOM while the user was scrolled around SOC Forecast / Battery Plan / strategy content.
+- Added a top-level narrow/mobile scroll-stability layer that captures the actual composed Home Assistant scroll containers before a complete dashboard render and restores their exact positions after the full v0.36 customer-controller render chain.
+- Restores scroll position immediately and across two animation frames so late layout and `ResizeObserver` settling cannot select a new browser/WebView scroll anchor.
+- Disabled browser scroll anchoring for the EnergyPilot panel subtree on narrow/mobile layouts with `overflow-anchor: none`.
+
+### Changed
+
+- GoodWe coordinator polling and live telemetry refresh cadence remain unchanged; the hotfix stabilizes the viewport instead of slowing or suppressing inverter updates.
+- The active frontend release is `gw-energy-pilot-v0362-scroll-stability.js`, layered over the complete v0.36.1 customer-controller and touch-interaction stack.
+- Manifest/frontend cache wiring is bumped to `0.36.2` with regression coverage for composed scroll-container capture, post-render restoration and release wiring.
+
+### Safety / compatibility
+
+- Frontend-only hotfix; no GoodWe register definitions, Modbus read blocks, EMS mappings, Automatic Control behavior, EMHASS optimization/config ownership, entity IDs, unique IDs, config-entry data or stable device identity changes.
+
 ## [0.36.1] - 2026-08-26
 
 ### Fixed
@@ -237,7 +256,6 @@ All notable changes to GW EnergyPilot are documented here.
 ### Fixed
 
 - Added a final live-flow animation guard that forces the existing geometry-correct particle keyframes to use `animation-direction: normal`, preventing later frontend layers from reversing an already-correct direction a second time.
-
 ### Changed
 
 - Canonical EnergyPilot EMHASS outputs remain `sensor.p_batt_forecast`, `sensor.p_grid_forecast` and `sensor.optim_status` with required state `Optimal`.
