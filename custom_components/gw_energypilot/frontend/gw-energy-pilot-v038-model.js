@@ -82,6 +82,32 @@ function finite(value) {
     : null;
 }
 
+export function resolveHousePower(rawLoad, pv, grid, battery) {
+  const load = finite(rawLoad);
+  const pvPower = finite(pv);
+  const gridPower = finite(grid);
+  const batteryPower = finite(battery);
+  const calculated =
+    pvPower !== null && gridPower !== null && batteryPower !== null
+      ? pvPower - gridPower + batteryPower
+      : null;
+
+  if (load === null) {
+    return calculated !== null && calculated >= 0 ? calculated : null;
+  }
+  if (load < 0 && calculated !== null && calculated >= 0) {
+    return calculated;
+  }
+  if (
+    calculated !== null &&
+    calculated >= 0 &&
+    Math.abs(load - calculated) > Math.max(1500, Math.abs(calculated) * 0.8)
+  ) {
+    return calculated;
+  }
+  return Math.max(0, load);
+}
+
 export function flowMotionMap(values, threshold = FLOW_THRESHOLD_W) {
   const pv = finite(values?.pv);
   const grid = finite(values?.grid);
