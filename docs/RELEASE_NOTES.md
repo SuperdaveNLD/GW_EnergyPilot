@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.36.1** | 2026-08-26 | **Beta** | Hotfixes mobile scrolling through the Battery strategy buttons by removing touch pointer capture, deferring destructive renders through touch-scroll settle, and adding a stuck-interaction safety timeout. |
 | **0.36** | 2026-08-25 | **Beta** | Adds customer-facing Mad-Steve/Gold Rush/Balanced/Battery Saver/Custom strategy controls, preserves Custom EMHASS values, fixes dashboard render storms and lost clicks, and corrects live-flow direction/mobile sizing. |
 | **0.35** | 2026-08-25 | **Beta** | Preserves the user-owned EMHASS inverter topology instead of forcing `inverter_is_hybrid=true`, and centralizes the small EnergyPilot runtime contract used by config sync and pre-solve preparation. |
 | **0.34** | 2026-08-25 | **Beta** | Consolidates deterministic Battery Plan refresh, Battery Saver hard maximum-SOC/anti-churn tuning, and EV anti-discharge behavior that pauses discharge while allowing strategy-aware charging through mode 9 or 11. |
@@ -51,6 +52,16 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.36.1 — Mobile strategy scrolling hotfix
+
+v0.36.1 fixes a mobile Home Assistant interaction regression around the large Battery strategy buttons introduced in v0.36. A vertical swipe can start on any interactive control; the v0.35 interaction guard previously captured that touch pointer immediately to protect clicks from a concurrent destructive render. On narrow phone layouts the strategy buttons occupy most of the viewport width, so normal scrolling could enter that protected-press path and interfere with native WebView panning.
+
+Touch pointers are no longer explicitly captured. Movement of at least 8 px is treated as a scroll gesture, and full Shadow DOM rebuilds remain deferred until a short 350 ms post-gesture settle window has elapsed. A 5 second safety timeout clears interrupted pointer interactions so the dashboard cannot remain render-locked. Desktop mouse capture remains in place for click reliability, and the strategy buttons explicitly advertise `touch-action: pan-y`.
+
+This is a frontend-only hotfix. It does not change GoodWe registers, Modbus reads/writes, EMS mappings, Automatic Control, EMHASS optimization/configuration ownership, entity IDs, unique IDs or device identity.
+
+See `docs/RELEASE_NOTES_V0361.md`.
 
 # v0.36 — Customer strategy controls and dashboard reliability
 
@@ -253,7 +264,7 @@ v0.29 is deliberately published as a new version because v0.28 had already reach
 
 The EMHASS settings page adds two explicit administrator actions:
 
-- **Restore recommended defaults** fills the GW EnergyPilot EMHASS form with the current recommended values for review. It does not save automatically.
+- **Restore recommended defaults** fills the GW EnergyPilot EMHASS form with the current canonical defaults for review. It does not save automatically.
 - **Synchronize required config** reads the complete live EMHASS configuration, changes only the mappings required by EnergyPilot, writes the complete merged configuration and reads it back again for verification.
 
 Canonical EnergyPilot outputs remain:
