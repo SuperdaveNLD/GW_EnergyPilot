@@ -1,5 +1,11 @@
 export const CUSTOM_MODE = "custom";
 export const FLOW_THRESHOLD_W = 50;
+export const PROFILE_KEYS = Object.freeze([
+  "mad_steve",
+  "gold_rush",
+  "balanced",
+  "battery_saver",
+]);
 
 const PROFILE_TEXT = {
   en: {
@@ -73,6 +79,18 @@ export function localizedProfile(language, mode) {
     label: localized?.label || source.label || String(key || ""),
     description: localized?.description || source.description || "",
   };
+}
+
+export function canonicalProfiles(language, modes = []) {
+  const backendModes = new Map(
+    modes.filter((mode) => mode?.key).map((mode) => [mode.key, mode])
+  );
+  return [
+    ...PROFILE_KEYS.map((key) =>
+      localizedProfile(language, backendModes.get(key) || { key })
+    ),
+    localizedProfile(language, { key: CUSTOM_MODE }),
+  ];
 }
 
 function finite(value) {
