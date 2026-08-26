@@ -22,7 +22,7 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.38 Beta
+v0.39 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
@@ -322,17 +322,16 @@ Inspect all active subclasses before changing orchestration behavior.
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v035.js
-  -> gw-energy-pilot-v034.js
-       -> gw-energy-pilot-v031-battery-saver.js
-            -> gw-energy-pilot-v031-window-controls.js
-                 -> gw-energy-pilot-v031.js
-                      -> gw-energy-pilot-v030.js
-                           -> earlier active layers
-       -> gw-energy-pilot-v027-battery-plan-core.js (v0.34 behavior retained)
+gw-energy-pilot-v039.js
+  -> gw-energy-pilot-v038.js
+       -> gw-energy-pilot-v038-runtime.js
+  -> gw-energy-pilot-v034.js (clean functional base)
+       -> gw-energy-pilot-v038-i18n.js
 ```
 
-Do not delete versioned frontend files based on filename alone. Trace imports first. Avoid new behavioral monkey-patch layers unless a bounded compatibility fix requires one. The v0.35 wrapper is version-only and must not duplicate backend topology behavior.
+v0.39 is a release/version wrapper only. The v0.38 layer owns rebuilt strategy controls, relevant-state rendering, interaction/scroll stability, physical live-flow direction, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into the release wrapper.
+
+Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 
 The Battery · Plan · Price card must keep one canonical instance. A fresh `plan_revision` should rebuild/replace it, not create a duplicate or remain stale behind the frontend cache.
 

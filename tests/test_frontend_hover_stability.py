@@ -31,10 +31,15 @@ class FrontendHoverStabilityTests(unittest.TestCase):
         self.assertNotIn("setPointerCapture", entry)
         self.assertNotIn("interactionActive", entry)
 
-        # The release wiring test owns the exact cache-bust token. This test
-        # only needs to guarantee that the active panel still loads the v0.38
-        # wrapper containing the hover-continuity layer.
-        self.assertIn("gw-energy-pilot-v038.js?v=", init_source)
+        # Release wrappers may sit above v0.38. The hover regression only owns
+        # reachability of the v0.38 behavior, not the release cache token.
+        if "gw-energy-pilot-v039.js?v=" in init_source:
+            release = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('import "./gw-energy-pilot-v038.js?v=', release)
+        else:
+            self.assertIn("gw-energy-pilot-v038.js?v=", init_source)
 
 
 if __name__ == "__main__":

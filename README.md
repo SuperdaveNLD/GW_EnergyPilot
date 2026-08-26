@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.38 · Beta**
+**v0.39 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V039.md` — v0.39 stable strategy hover and complete Dutch Controller copy;
 - `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt controls and canonical live-flow direction;
 - `docs/FRONTEND_CONTROL_REBUILD.md` — frontend action/highlight/flow ownership;
 - `docs/RELEASE_NOTES_V035.md` — v0.35 EMHASS topology-ownership fix;
@@ -34,6 +35,13 @@ Release documentation:
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
+
+## v0.39 highlights
+
+- Battery Strategy hover stays visually stable across the inherited full ShadowRoot render without blocking telemetry, capturing pointers or restoring the removed v0.35 render lock.
+- Dutch Home Assistant sessions now localize the remaining inherited customer-facing Controller, manual EMS, GoodWe mode/tooltips, strategy fallback, profile-description and telemetry copy.
+- `gw-energy-pilot-v039.js` is a thin release wrapper over the tested v0.38 control/localization path with a fresh browser cache key and synchronized v0.39 dashboard/footer badge.
+- No GoodWe register, Modbus, EMS, Automatic Control, EMHASS backend, entity-ID or persistent-state semantics change in v0.39.
 
 ## v0.38 highlights
 

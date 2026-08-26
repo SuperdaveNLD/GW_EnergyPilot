@@ -27,8 +27,9 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q custom_components/gw_energypilot scripts tests
 
-      - name: Validate v0.38 frontend JavaScript
+      - name: Validate active frontend JavaScript
         run: |
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v039.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-model.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-styles.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-strategy.js

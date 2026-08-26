@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.35 runtime structure
+## Current v0.39 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, runtime wiring, v0.35 panel entrypoint
+__init__.py             config-entry setup, APIs, runtime wiring, v0.39 panel entrypoint
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -117,19 +117,16 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v035.js
-    -> gw-energy-pilot-v034.js
-        -> gw-energy-pilot-v031-battery-saver.js
-            -> gw-energy-pilot-v031-window-controls.js
-                -> gw-energy-pilot-v031.js
-                    -> gw-energy-pilot-v030.js
-                        -> historical active layers
-        -> gw-energy-pilot-v027-battery-plan-core.js (v0.34 behavior retained)
+gw-energy-pilot-v039.js
+    -> gw-energy-pilot-v038.js
+        -> gw-energy-pilot-v038-runtime.js
+  -> gw-energy-pilot-v034.js (clean functional base)
+        -> gw-energy-pilot-v038-i18n.js
 ```
 
-The v0.35 wrapper owns only release badge/footer presentation. The v0.34 wrapper continues to cache-bust the Battery Saver module and Battery Plan core. Battery Saver rendering remains in the v031 Battery Saver module and reads current backend profile metadata. The Battery · Plan · Price core owns the bounded revision-aware refresh behavior.
+The v0.39 wrapper owns only release badge/footer presentation and cache separation. The v0.38 modules own the current rebuilt strategy model/actions, relevant-state render filtering, interaction/mobile-scroll stability, physical live-flow direction, presentation-only hover continuity and Dutch Controller localization. The v0.34 clean base still supplies established dashboard feature behavior, including the canonical Battery · Plan · Price path.
 
-**Do not add another behavioral release monkey-patch layer by default.** The layered frontend is technical debt and has caused regressions. New presentation work should prefer functional components or deliberate consolidation under browser-level regression coverage.
+**Do not add another behavioral release monkey-patch layer by default.** Keep release wrappers version-only; functional frontend changes belong in bounded modules with executable browser-level regression coverage.
 
 ## Automatic-control contract
 

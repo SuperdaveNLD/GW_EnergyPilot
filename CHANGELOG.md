@@ -2,6 +2,24 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.39] - 2026-08-26
+
+### Fixed
+
+- Fixed the remaining Battery Strategy hover flicker caused by native CSS `:hover` dropping while the inherited full ShadowRoot render briefly detaches and reinserts the reused v0.38 strategy node.
+- Completed Dutch localization of the customer Controller card, including inherited controller labels, GoodWe mode names/tooltips, manual EMS status copy, automatic-strategy fallback text, profile descriptions and telemetry presentation.
+
+### Changed
+
+- Added `gw-energy-pilot-v039.js` as a thin release/version wrapper over the merged v0.38 control/localization chain with a fresh browser cache key.
+- Kept the hover continuity presentation-only: it does not defer telemetry renders, capture pointers or restore the removed v0.35 hover/render lock.
+- Updated release regression coverage and maintainer documentation for the active v0.39 -> v0.38 frontend chain.
+
+### Safety / compatibility
+
+- Frontend-only release; no GoodWe register definitions, Modbus read blocks, EMS mappings, setpoint semantics or `47512 -> wait -> 47511` write ordering change.
+- No Automatic Control decision, EMHASS optimization/topology/Battery Saver behavior, entity ID, unique ID, config-entry data, persistent Store key or stable device identity change.
+
 ## [0.38] - 2026-08-26
 
 ### Fixed
