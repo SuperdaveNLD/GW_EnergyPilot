@@ -8,35 +8,40 @@ INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
 
 
-class V037ReleaseTests(unittest.TestCase):
-    def test_v037_frontend_wraps_stable_control_stack(self) -> None:
-        source = (FRONTEND / "gw-energy-pilot-v037.js").read_text(encoding="utf-8")
-
-        self.assertIn(
-            'gw-energy-pilot-v0363-control-stability.js?v=0.37-stable-controls1',
-            source,
-        )
-        self.assertIn('const VERSION = "0.37"', source)
-        self.assertIn("__epV037ReleaseInstalled", source)
-        self.assertIn("previousRender.call(this)", source)
-        self.assertIn("updateVersion(this.shadowRoot)", source)
-
-    def test_v037_manifest_and_panel_wiring_match(self) -> None:
+class V038FrontendCandidateTests(unittest.TestCase):
+    def test_candidate_is_wired_without_republishing_v037(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        candidate = (FRONTEND / "gw-energy-pilot-v038.js").read_text(encoding="utf-8")
+        runtime = (FRONTEND / "gw-energy-pilot-v038-runtime.js").read_text(
+            encoding="utf-8"
+        )
 
         self.assertEqual("0.37", manifest["version"])
         self.assertIn(
-            'gw-energy-pilot-v037.js?v=0.37-release1',
+            'gw-energy-pilot-v038.js?v=0.38-control-flow-rebuild1',
             init_source,
         )
+        self.assertIn('const VERSION = "0.37"', candidate)
+        self.assertIn('const VERSION = "0.37"', runtime)
+        self.assertIn("__epV038Installed", runtime)
 
-    def test_v037_release_notes_exist(self) -> None:
-        notes = (ROOT / "docs" / "RELEASE_NOTES_V037.md").read_text(encoding="utf-8")
+    def test_candidate_has_executable_model_regression_test(self) -> None:
+        test_path = ROOT / "tests" / "test_frontend_v038.mjs"
+        self.assertTrue(test_path.is_file())
+        source = test_path.read_text(encoding="utf-8")
+        self.assertIn("flowMotionMap", source)
+        self.assertIn("Batterijbesparing", source)
+        self.assertIn("Battery Saver", source)
 
-        self.assertIn("# GW EnergyPilot v0.37 Beta", notes)
-        self.assertIn("button DOM nodes", notes)
-        self.assertIn("No GoodWe register definitions", notes)
+    def test_architecture_note_records_field_test_boundary(self) -> None:
+        notes = (ROOT / "docs" / "FRONTEND_CONTROL_REBUILD.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("v0.38 frontend field-test candidate", notes)
+        self.assertIn("visible text is never a control identity", notes)
+        self.assertIn("PV production: left to right", notes)
+        self.assertIn("No GoodWe register", notes)
 
 
 if __name__ == "__main__":
