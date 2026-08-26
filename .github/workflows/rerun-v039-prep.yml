@@ -1,0 +1,78 @@
+name: Rerun v0.39 preparer
+
+on:
+  push:
+    branches:
+      - release/v0.39
+    paths:
+      - .github/workflows/rerun-v039-prep.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v0.39
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Execute canonical release preparation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/prepare-v039.yml").read_text(encoding="utf-8")
+          start = "          python - <<'PY'\n"
+          end = "\n          PY\n\n      - name: Validate prepared release"
+          if workflow.count(start) != 1 or workflow.count(end) != 1:
+              raise RuntimeError("Unable to extract canonical v0.39 preparation script")
+          body = workflow.split(start, 1)[1].split(end, 1)[0]
+          body = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in body.splitlines()
+          )
+          exec(compile(body, "prepare-v039.yml", "exec"))
+          PY
+
+      - name: Validate prepared release
+        shell: bash
+        run: |
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v039.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-model.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-styles.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-strategy.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-i18n.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038.js
+          node tests/test_frontend_v038.mjs
+          node tests/test_frontend_v038_controls.mjs
+          node tests/test_frontend_v038_i18n.mjs
+          python -m compileall -q custom_components/gw_energypilot scripts tests
+          python -m unittest discover -s tests -v
+          python scripts/validate_repo.py
+          git diff --check
+
+      - name: Commit prepared release
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/gw_energypilot README.md CHANGELOG.md AGENTS.md docs tests
+          git diff --cached --quiet && { echo "No release changes produced"; exit 1; }
+          git commit -m "Prepare GW EnergyPilot v0.39 Beta"
+          git push origin HEAD:release/v0.39
