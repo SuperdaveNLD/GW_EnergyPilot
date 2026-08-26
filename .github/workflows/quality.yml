@@ -5,7 +5,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -18,29 +18,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-
-      - name: Promote v0.38 release metadata
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/v038-controls-and-flow' && github.actor != 'github-actions[bot]'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/promote_v038_release.py
-          if git diff --quiet; then
-            echo "v0.38 metadata already promoted."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add \
-              custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js \
-              docs/FRONTEND_CONTROL_REBUILD.md \
-              CHANGELOG.md \
-              docs/RELEASE_NOTES.md \
-              README.md \
-              AGENTS.md \
-              docs/ARCHITECTURE.md
-            git commit -m "Promote GW EnergyPilot v0.38 release metadata"
-            git push origin HEAD:fix/v038-controls-and-flow
-          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
