@@ -141,6 +141,13 @@ assert.equal(calls[0].type, "gw_energypilot/battery_saver/set");
 assert.equal(calls[0].entry_id, "entry-1");
 assert.equal(calls[0].mode, "battery_saver");
 assert.equal(renders >= 2, true);
+assert.equal(buttons.every((button) => button.disabled === false), true);
+assert.deepEqual(
+  buttons
+    .filter((button) => button.attributes.get("aria-pressed") === "true")
+    .map((button) => button.dataset.epV038Profile),
+  ["battery_saver"]
+);
 
 buttons[1].disabled = true;
 root.listeners.get("click")({
