@@ -16,27 +16,42 @@ class V038ReleaseTests(unittest.TestCase):
         runtime = (FRONTEND / "gw-energy-pilot-v038-runtime.js").read_text(
             encoding="utf-8"
         )
+        i18n = (FRONTEND / "gw-energy-pilot-v038-i18n.js").read_text(
+            encoding="utf-8"
+        )
 
         self.assertEqual("0.38", manifest["version"])
         self.assertIn(
-            'gw-energy-pilot-v038.js?v=0.38-hover1',
+            'gw-energy-pilot-v038.js?v=0.38-i18n1',
             init_source,
         )
         self.assertIn(
             'gw-energy-pilot-v038-runtime.js?v=0.38-release1',
             release,
         )
+        self.assertIn(
+            'gw-energy-pilot-v038-i18n.js?v=0.38-i18n1',
+            release,
+        )
+        self.assertIn("localizeV038Controller(this, root)", release)
         self.assertIn('const VERSION = "0.38"', release)
         self.assertIn('const VERSION = "0.38"', runtime)
         self.assertIn("__epV038Installed", runtime)
+        self.assertIn('windowLabel: "Regelaar"', i18n)
+        self.assertIn('manualKicker: "HANDMATIGE EMS-TEST"', i18n)
+        self.assertIn('12: ["Batterijontlaadvermogen"', i18n)
 
     def test_release_has_executable_frontend_regression_tests(self) -> None:
         model_test = ROOT / "tests" / "test_frontend_v038.mjs"
         controls_test = ROOT / "tests" / "test_frontend_v038_controls.mjs"
+        i18n_test = ROOT / "tests" / "test_frontend_v038_i18n.mjs"
         self.assertTrue(model_test.is_file())
         self.assertTrue(controls_test.is_file())
-        source = model_test.read_text(encoding="utf-8") + controls_test.read_text(
-            encoding="utf-8"
+        self.assertTrue(i18n_test.is_file())
+        source = (
+            model_test.read_text(encoding="utf-8")
+            + controls_test.read_text(encoding="utf-8")
+            + i18n_test.read_text(encoding="utf-8")
         )
         self.assertIn("flowMotionMap", source)
         self.assertIn("resolveHousePower", source)
@@ -45,6 +60,8 @@ class V038ReleaseTests(unittest.TestCase):
         self.assertIn("Battery Saver", source)
         self.assertIn("gw_energypilot/battery_saver/set", source)
         self.assertIn("buttons.every((button) => button.disabled === false)", source)
+        self.assertIn("Batterijontlaadvermogen", source)
+        self.assertIn("English backend Balanced description", source)
 
     def test_architecture_note_records_rebuilt_control_contract(self) -> None:
         notes = (ROOT / "docs" / "FRONTEND_CONTROL_REBUILD.md").read_text(

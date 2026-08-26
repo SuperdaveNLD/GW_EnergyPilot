@@ -30,7 +30,11 @@ class FrontendHoverStabilityTests(unittest.TestCase):
         self.assertNotIn("_queueRender(", entry)
         self.assertNotIn("setPointerCapture", entry)
         self.assertNotIn("interactionActive", entry)
-        self.assertIn("gw-energy-pilot-v038.js?v=0.38-hover1", init_source)
+
+        # The release wiring test owns the exact cache-bust token. This test
+        # only needs to guarantee that the active panel still loads the v0.38
+        # wrapper containing the hover-continuity layer.
+        self.assertIn("gw-energy-pilot-v038.js?v=", init_source)
 
 
 if __name__ == "__main__":

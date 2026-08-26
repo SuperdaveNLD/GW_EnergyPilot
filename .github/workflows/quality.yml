@@ -32,10 +32,12 @@ jobs:
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-model.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-styles.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-strategy.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-i18n.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038.js
           node tests/test_frontend_v038.mjs
           node tests/test_frontend_v038_controls.mjs
+          node tests/test_frontend_v038_i18n.mjs
 
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
