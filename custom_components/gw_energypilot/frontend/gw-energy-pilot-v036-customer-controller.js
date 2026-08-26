@@ -59,6 +59,7 @@ function ensureStyles(root) {
   style.id = "ep-v036-controller-style";
   style.textContent = `
     .ep-v036-strategy { margin-top:15px; padding-top:14px; border-top:1px solid rgba(81,168,211,.10); }
+    .ep-v015-costfun-button { touch-action:pan-y; }
     .ep-v036-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
     .ep-v036-kicker { color:#62e5f7; font-size:8px; font-weight:900; letter-spacing:.15em; }
     .ep-v036-title { margin-top:3px; color:#e8f7fc; font-size:14px; font-weight:860; }
