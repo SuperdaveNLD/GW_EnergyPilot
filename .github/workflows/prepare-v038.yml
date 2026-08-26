@@ -1,0 +1,37 @@
+name: Prepare v0.38 release docs
+
+on:
+  push:
+    branches:
+      - release/v0.38
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v0.38
+          fetch-depth: 0
+
+      - name: Prepare release metadata
+        run: python scripts/prepare_v038_release.py
+
+      - name: Commit generated documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Release metadata already prepared."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md docs/RELEASE_NOTES.md README.md AGENTS.md docs/ARCHITECTURE.md
+          git commit -m "Prepare v0.38 release documentation"
+          git push origin HEAD:release/v0.38
