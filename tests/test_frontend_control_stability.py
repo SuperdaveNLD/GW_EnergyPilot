@@ -26,7 +26,7 @@ class FrontendControlStabilityTests(unittest.TestCase):
         )
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
-        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.38-runtime1", self.entry)
+        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.38-runtime2", self.entry)
         self.assertIn('gw-energy-pilot-v034.js?v=0.38-clean-base1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
@@ -51,6 +51,9 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("reusableStrategy", self.strategy)
         self.assertIn("strategySignature", self.strategy)
         self.assertIn("wrap.dataset.epV038Signature", self.strategy)
+        self.assertIn("const backendModes = new Map", self.strategy)
+        self.assertIn("DEFAULT_PROFILE_KEYS.map", self.strategy)
+        self.assertIn("cache.busy || cache.loading || !cache.data", self.strategy)
 
     def test_v038_profile_identity_is_language_independent(self) -> None:
         self.assertIn('label: "Battery Saver"', self.model)
@@ -63,13 +66,18 @@ class FrontendControlStabilityTests(unittest.TestCase):
             self.model,
         )
 
-    def test_v038_interaction_guard_cannot_depend_on_shadow_root_pointerup(self) -> None:
+    def test_v038_interaction_guard_cannot_remain_stuck(self) -> None:
         self.assertIn("function installInteractionGuard", self.runtime)
         self.assertIn('globalThis.addEventListener?.(\n    "pointerup"', self.runtime)
         self.assertIn('globalThis.addEventListener?.(\n    "pointercancel"', self.runtime)
         self.assertIn('globalThis.addEventListener?.("blur"', self.runtime)
-        self.assertIn("const INTERACTION_SAFETY_TIMEOUT_MS = 1500", self.runtime)
+        self.assertIn("function completePointerInteraction", self.runtime)
+        self.assertIn("function completeKeyboardInteraction", self.runtime)
+        self.assertIn("function completeAllInteractions", self.runtime)
+        self.assertIn("const INTERACTION_SAFETY_TIMEOUT_MS = 3000", self.runtime)
         self.assertIn("const TOUCH_SCROLL_THRESHOLD_PX = 8", self.runtime)
+        self.assertIn("pointerSafetyTimer", self.runtime)
+        self.assertIn("keyboardSafetyTimer", self.runtime)
         self.assertIn("this.__epV038RenderDeferred = true", self.runtime)
         self.assertLess(
             self.runtime.index("if (interactionActive(this))"),
@@ -77,7 +85,12 @@ class FrontendControlStabilityTests(unittest.TestCase):
         )
 
     def test_v038_flow_uses_one_physical_direction_contract(self) -> None:
+        self.assertIn("export function resolveHousePower", self.model)
         self.assertIn("export function flowMotionMap", self.model)
+        self.assertIn(
+            "const house = resolveHousePower(values?.house, pv, grid, battery)",
+            self.model,
+        )
         self.assertIn('grid > 0\n          ? "right"\n          : "left"', self.model)
         self.assertIn('battery > 0\n          ? "up"\n          : "down"', self.model)
         self.assertIn('data-ep-v038-motion="right"', self.styles)
