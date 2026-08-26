@@ -5,6 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "custom_components" / "gw_energypilot" / "frontend"
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
+WORKFLOWS = ROOT / ".github" / "workflows"
 
 
 class FrontendDashboardCardTests(unittest.TestCase):
@@ -38,7 +39,7 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
 
-    def test_v035_wraps_v034_cache_busted_frontend_modules(self) -> None:
+    def test_v035_loads_rewritten_controls_and_authoritative_flow_layer(self) -> None:
         release_v034 = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
         )
@@ -47,8 +48,6 @@ class FrontendDashboardCardTests(unittest.TestCase):
         )
         integration = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
-        # v0.34 still owns behavioral cache-busting for its modified nested
-        # modules. v0.35 adds the outer render-storm and interaction guard.
         self.assertIn(
             'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
             release_v034,
@@ -57,60 +56,93 @@ class FrontendDashboardCardTests(unittest.TestCase):
             'gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1',
             release_v034,
         )
-        self.assertIn('const VERSION = "0.34"', release_v034)
-
         self.assertIn(
-            'gw-energy-pilot-v034.js?v=0.35-release1',
+            'gw-energy-pilot-v031-window-controls.js?v=0.35-controls-rewrite1',
+            release_v035,
+        )
+        self.assertIn(
+            'gw-energy-pilot-v036-flow-direction.js?v=0.35-flow-direction1',
             release_v035,
         )
         self.assertIn('const VERSION = "0.35"', release_v035)
         self.assertIn(
-            'gw-energy-pilot-v035.js?v=0.35-renderstorm1',
+            'gw-energy-pilot-v035.js?v=0.35-controls-flow2',
             integration,
         )
 
-    def test_v035_filters_unrelated_hass_updates_before_rendering(self) -> None:
+    def test_v035_filters_hass_updates_without_pointer_locking(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
 
-        self.assertIn("function installHassRenderGuard", source)
-        self.assertIn("function relevantHassStateChanged", source)
+        self.assertIn("function installRelevantHassGuard", source)
+        self.assertIn("function relevantStateObjectsChanged", source)
+        self.assertIn("function uiContextSignature", source)
         self.assertIn("function relevantEntityIds", source)
         self.assertIn("Object.values(panel._entityMap || {})", source)
         self.assertIn('"p_batt_entity", "p_grid_entity", "optim_status_entity"', source)
-        self.assertIn("previousState !== nextState", source)
+        self.assertIn("previousStates[entityId] !== nextStates[entityId]", source)
         self.assertIn("this._hass = value", source)
         self.assertIn("scheduleHassRender(this)", source)
-        self.assertIn("const HASS_RENDER_BATCH_MS = 80", source)
+        self.assertIn("const HASS_RENDER_BATCH_MS = 100", source)
 
-        setter_start = source.index("function installHassRenderGuard")
-        render_start = source.index("if (!PanelClass.prototype.__epV035RenderInstalled)")
-        setter = source[setter_start:render_start]
-        self.assertNotIn("descriptor.set.call(this, value);\n      }", setter)
-        self.assertLess(
-            setter.index("this._hass = value"),
-            setter.index("relevantHassStateChanged(this, previousHass, value)"),
+        self.assertNotIn("setPointerCapture", source)
+        self.assertNotIn('"pointerdown"', source)
+        self.assertNotIn('"pointerup"', source)
+        self.assertNotIn("interactionActive", source)
+        self.assertNotIn("__epV035PointerActive", source)
+        self.assertNotIn("__epV035KeyboardActive", source)
+
+    def test_window_controls_are_css_only_and_click_delegated(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v031-window-controls.js").read_text(
+            encoding="utf-8"
         )
 
-    def test_v035_defers_destructive_render_only_during_active_press(self) -> None:
-        source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
+        self.assertIn("function installDelegatedActions", source)
+        self.assertIn('root.addEventListener("click"', source)
+        self.assertIn('data-ep-window-action="close"', source)
+        self.assertIn('data-ep-window-action="minimize"', source)
+        self.assertIn('data-ep-window-action="maximize"', source)
+        self.assertIn(".ep-v036-window-button:hover", source)
+        self.assertIn(".ep-v036-window-button:focus-visible", source)
+        self.assertIn("touch-action:manipulation", source)
+        self.assertIn("applyWindowState(card, state)", source)
 
-        self.assertIn("function installInteractionGuard", source)
-        self.assertIn('root.addEventListener(\n    "pointerdown"', source)
-        self.assertIn('root.addEventListener(\n    "pointerup"', source)
-        self.assertIn("window.setTimeout(() => finishPointerInteraction(panel), 0)", source)
-        self.assertNotIn('"pointerover"', source)
-        self.assertNotIn("__epV035HoverActive", source)
-        self.assertIn("function interactionActive", source)
-        self.assertIn("this.__epV035RenderDeferred = true", source)
-        self.assertIn("flushDeferredRender(panel)", source)
-        self.assertLess(
-            source.index("if (interactionActive(this))"),
-            source.index("previousRender.call(this)"),
+        self.assertNotIn("setPointerCapture", source)
+        self.assertNotIn('"pointerdown"', source)
+        self.assertNotIn('"pointerup"', source)
+        self.assertNotIn("_queueRender()", source)
+        self.assertNotIn("__epV035PointerActive", source)
+
+    def test_flow_direction_has_one_final_animation_authority(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v036-flow-direction.js").read_text(
+            encoding="utf-8"
         )
-        self.assertLess(
-            source.index("previousRender.call(this)"),
-            source.index("installInteractionGuard(this, root)"),
+
+        self.assertIn("function flowAnimationDirections", source)
+        self.assertIn('grid: direction(grid, "normal", "reverse")', source)
+        self.assertIn('house: direction(house, "reverse", "normal")', source)
+        self.assertIn('battery: direction(battery, "reverse", "normal")', source)
+        self.assertIn("ep-v036-flow-normal", source)
+        self.assertIn("ep-v036-flow-reverse", source)
+        self.assertIn("animation-direction:normal!important", source)
+        self.assertIn("animation-direction:reverse!important", source)
+        self.assertIn("__epV036FlowDirectionRenderInstalled", source)
+
+    def test_frontend_runtime_contract_is_executed_by_node_ci(self) -> None:
+        runtime = (FRONTEND / "gw-energy-pilot-v036-runtime.js").read_text(
+            encoding="utf-8"
         )
+        node_test = (ROOT / "tests" / "frontend_v036_runtime.mjs").read_text(
+            encoding="utf-8"
+        )
+        workflow = (WORKFLOWS / "quality.yml").read_text(encoding="utf-8")
+
+        self.assertIn("export function flowAnimationDirections", runtime)
+        self.assertIn("export function relevantStateObjectsChanged", runtime)
+        self.assertIn("export function uiContextSignature", runtime)
+        self.assertIn("flow directions match the rendered dashboard geometry", node_test)
+        self.assertIn("unrelated Home Assistant state objects do not request a render", node_test)
+        self.assertIn("actions/setup-node@v4", workflow)
+        self.assertIn("node --test tests/frontend_v036_runtime.mjs", workflow)
 
     def test_release_layer_reconciles_existing_duplicate_cards(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v030.js").read_text(encoding="utf-8")
