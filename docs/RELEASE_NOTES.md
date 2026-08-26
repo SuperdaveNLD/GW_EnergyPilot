@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.37** | 2026-08-26 | **Beta** | Publishes the complete current 0.36.x dashboard-stability stack as a clean numeric release, retaining mobile scroll stability and stable button DOM nodes while synchronizing HACS/HA/frontend release metadata. |
 | **0.36.2** | 2026-08-26 | **Beta** | Stabilizes the mobile viewport across periodic relevant telemetry refreshes by preserving the Home Assistant scroll container through complete dashboard renders while leaving GoodWe polling and live telemetry unchanged. |
 | **0.36.1** | 2026-08-26 | **Beta** | Hotfixes mobile scrolling through the Battery strategy buttons by removing touch pointer capture, deferring destructive renders through touch-scroll settle, and adding a stuck-interaction safety timeout. |
 | **0.36** | 2026-08-25 | **Beta** | Adds customer-facing Mad-Steve/Gold Rush/Balanced/Battery Saver/Custom strategy controls, preserves Custom EMHASS values, fixes dashboard render storms and lost clicks, and corrects live-flow direction/mobile sizing. |
@@ -53,6 +54,18 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.37 — Clean stable-control release
+
+v0.37 publishes the complete current dashboard-stability stack as one clean numeric HACS/Home Assistant release. It carries forward the v0.36.2 mobile scroll fix and the interim v0.36.3 stable-control layer without changing GoodWe or EMHASS control behavior.
+
+The active frontend is now `gw-energy-pilot-v037.js`. It cache-busts and wraps the v0.36.3 stable-control module, which preserves equivalent button DOM nodes across telemetry-driven full renders so controls no longer visibly flash or lose hover/focus state. The underlying v0.36.2 layer continues to preserve Home Assistant scroll containers on narrow/mobile layouts.
+
+The interim v0.36.3 code reached `main` but its manifest version was not added to the central changelog/release index, so the repository release validator could not publish a matching GitHub Release. v0.37 restores that release metadata contract and is intended to be the next installable update.
+
+No GoodWe register definitions, Modbus read blocks, EMS mappings, Automatic Control behavior, EMHASS optimization/configuration ownership, entity IDs, unique IDs, config-entry data, persistent Store keys or stable device identity change.
+
+See `docs/RELEASE_NOTES_V037.md`.
 
 # v0.36.2 — Periodic refresh scroll stability
 

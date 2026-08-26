@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/SuperdaveNLD/GW_EnergyPilot/issues",
   "loggers": ["pymodbus"],
   "requirements": ["pymodbus==3.13.1"],
-  "version": "0.36.3"
+  "version": "0.37"
 }

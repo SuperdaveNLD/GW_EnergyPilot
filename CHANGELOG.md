@@ -2,6 +2,28 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.37] - 2026-08-26
+
+### Changed
+
+- Promoted the complete current dashboard-stability stack to a clean numeric `0.37` release for HACS/Home Assistant.
+- Added `gw-energy-pilot-v037.js` as a release wrapper over the existing v0.36.3 control-stability layer, with a fresh cache key and synchronized dashboard/footer badge.
+- Synchronized the integration manifest, release notes and release workflow inputs to `0.37`.
+- The interim v0.36.3 code that reached `main` is carried forward unchanged; v0.37 fixes the missing release metadata that prevented that interim manifest version from passing the repository release validator and becoming a GitHub Release.
+
+### Retained fixes
+
+- Retains v0.36.2 mobile scroll-position preservation across relevant telemetry-driven full dashboard renders.
+- Retains the v0.36.3 equivalent-button DOM-node reuse that prevents periodic control flashing while preserving hover/focus and live state updates.
+
+### Safety / compatibility
+
+- No GoodWe register definitions or Modbus read blocks change.
+- No EMS mode mappings, setpoints or `47512 -> wait -> 47511` write ordering change.
+- No Automatic Control or EMHASS optimization/configuration ownership behavior changes.
+- No entity IDs, unique IDs, config-entry data, persistent Store keys or stable device identity changes.
+- GoodWe polling and live telemetry cadence remain unchanged.
+
 ## [0.36.2] - 2026-08-26
 
 ### Fixed
