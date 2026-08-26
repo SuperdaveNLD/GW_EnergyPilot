@@ -19,11 +19,19 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Compile Python sources
         run: python -m compileall -q custom_components/gw_energypilot scripts tests
 
-      - name: Run unit tests
+      - name: Run Python unit tests
         run: python -m unittest discover -s tests -v
+
+      - name: Run frontend runtime tests
+        run: node --test tests/frontend_v036_runtime.mjs
 
       - name: Validate repository invariants
         run: python scripts/validate_repo.py
