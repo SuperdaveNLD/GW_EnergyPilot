@@ -1,15 +1,9 @@
 import {
   CUSTOM_MODE,
-  localizedProfile,
+  PROFILE_KEYS,
+  canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=0.38-model2";
-
-const DEFAULT_PROFILE_KEYS = [
-  "mad_steve",
-  "gold_rush",
-  "balanced",
-  "battery_saver",
-];
+} from "./gw-energy-pilot-v038-model.js?v=0.38-model3";
 
 const TEXT = {
   en: {
@@ -94,6 +88,7 @@ async function loadBatterySaver(panel, force = false) {
     cache.error = err?.message || String(err);
   } finally {
     cache.loading = false;
+    updateStrategyVisualState(panel);
     panel._queueRender();
   }
 }
@@ -128,14 +123,14 @@ function strategySignature(panel, cache) {
     error: cache.error || "",
     message: cache.message || "",
     tone: cache.tone || "",
-    modes: DEFAULT_PROFILE_KEYS,
+    modes: PROFILE_KEYS,
     min: min.value,
     max: max.value,
     values: stableConfigEntries(cache.data?.current_emhass_values),
   });
 }
 
-function updateStrategyVisualState(panel) {
+function updateStrategyVisualState(panel, commitSignature = false) {
   const root = panel.shadowRoot;
   if (!root) return;
   const cache = batterySaverCache(panel);
@@ -161,8 +156,12 @@ function updateStrategyVisualState(panel) {
     message.textContent =
       cache.error || cache.message || (!cache.data ? t.loading : "");
   }
-  const strategy = root.querySelector(".ep-v038-strategy");
-  if (strategy) strategy.dataset.epV038Signature = strategySignature(panel, cache);
+  if (commitSignature) {
+    const strategy = root.querySelector(".ep-v038-strategy");
+    if (strategy) {
+      strategy.dataset.epV038Signature = strategySignature(panel, cache);
+    }
+  }
 }
 
 async function selectProfile(panel, mode) {
@@ -178,7 +177,7 @@ async function selectProfile(panel, mode) {
   cache.message = t.applying;
   cache.tone = "";
   cache.error = null;
-  updateStrategyVisualState(panel);
+  updateStrategyVisualState(panel, true);
   panel._queueRender();
 
   try {
@@ -196,6 +195,7 @@ async function selectProfile(panel, mode) {
   } finally {
     cache.busy = false;
     cache.pendingMode = null;
+    updateStrategyVisualState(panel);
     panel._queueRender();
   }
 }
@@ -312,10 +312,6 @@ export function installV038DelegatedControls(panel, root) {
   );
 }
 
-function profileMeta(panel, mode) {
-  return localizedProfile(language(panel), mode);
-}
-
 function removeLowLevelCommand(card) {
   for (const metric of card.querySelectorAll(".metric")) {
     const label = metric
@@ -332,17 +328,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
 
   const t = copy(panel);
   const activeMode = activeProfileMode(cache);
-  const backendModes = new Map(
-    (cache.data?.modes || [])
-      .filter((mode) => mode?.key)
-      .map((mode) => [mode.key, mode])
-  );
-  const sourceModes = DEFAULT_PROFILE_KEYS.map(
-    (key) => backendModes.get(key) || { key }
-  );
-  const modes = [...sourceModes, { key: CUSTOM_MODE }].map((mode) =>
-    profileMeta(panel, mode)
-  );
+  const modes = canonicalProfiles(language(panel), cache.data?.modes || []);
   const controlsDisabled = Boolean(cache.busy || cache.loading || !cache.data);
 
   wrap.innerHTML = `
