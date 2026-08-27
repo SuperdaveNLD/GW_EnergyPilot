@@ -64,6 +64,34 @@ class V039ReleaseTests(unittest.TestCase):
                 'gw-energy-pilot-v038-runtime.js?v=0.41-stable1',
                 v038,
             )
+        elif version == "0.41.1":
+            self.assertIn(
+                "gw-energy-pilot-v0411.js?v=0.41.1-optimize-scroll1",
+                init_source,
+            )
+            v0411 = (FRONTEND / "gw-energy-pilot-v0411.js").read_text(
+                encoding="utf-8"
+            )
+            v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                'import "./gw-energy-pilot-v041.js?v=0.41.1-optimize-scroll1"',
+                v0411,
+            )
+            self.assertIn(
+                'import "./gw-energy-pilot-v039.js?v=0.41-stable1"',
+                v041,
+            )
+            self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
+            self.assertIn(
+                'import "./gw-energy-pilot-v038.js?v=0.41-stable1"',
+                release,
+            )
+            self.assertIn(
+                'gw-energy-pilot-v038-runtime.js?v=0.41-stable1',
+                v038,
+            )
         else:
             self.fail(f"Unsupported release version in regression: {version}")
 
