@@ -74,12 +74,24 @@ function batterySaverCache(panel) {
   return panel.__epV038BatterySaver;
 }
 
+function requestStrategyRefresh(panel) {
+  if (
+    panel.__epV041StableRuntime &&
+    typeof panel.__epV041RefreshStrategy === "function"
+  ) {
+    panel.__epV041RefreshStrategy();
+    return;
+  }
+  panel._queueRender();
+}
+
 async function loadBatterySaver(panel, force = false) {
   const cache = batterySaverCache(panel);
   if (!panel._hass?.callWS || cache.loading || cache.busy) return;
   if (!force && cache.data) return;
   cache.loading = true;
   cache.error = null;
+  requestStrategyRefresh(panel);
   try {
     cache.data = await panel._hass.callWS({
       type: "gw_energypilot/battery_saver/get",
@@ -88,8 +100,7 @@ async function loadBatterySaver(panel, force = false) {
     cache.error = err?.message || String(err);
   } finally {
     cache.loading = false;
-    updateStrategyVisualState(panel);
-    panel._queueRender();
+    requestStrategyRefresh(panel);
   }
 }
 
@@ -177,8 +188,7 @@ async function selectProfile(panel, mode) {
   cache.message = t.applying;
   cache.tone = "";
   cache.error = null;
-  updateStrategyVisualState(panel, true);
-  panel._queueRender();
+  requestStrategyRefresh(panel);
 
   try {
     cache.data = await panel._hass.callWS({
@@ -195,8 +205,7 @@ async function selectProfile(panel, mode) {
   } finally {
     cache.busy = false;
     cache.pendingMode = null;
-    updateStrategyVisualState(panel);
-    panel._queueRender();
+    requestStrategyRefresh(panel);
   }
 }
 
@@ -263,7 +272,7 @@ async function updateSoc(panel, input) {
     window.alert(`${t.socError}: ${err?.message || err}`);
   } finally {
     input.disabled = false;
-    panel._queueRender();
+    requestStrategyRefresh(panel);
   }
 }
 
@@ -376,5 +385,14 @@ export function installV038CustomerStrategy(panel, root, reusableStrategy = null
   const manualPad = card.querySelector(".ep-v021-manual-pad");
   if (manualPad) card.insertBefore(wrap, manualPad);
   else card.appendChild(wrap);
+
+  panel.__epV041RefreshStrategy = () => {
+    const currentRoot = panel.shadowRoot;
+    const currentWrap = currentRoot?.querySelector(".ep-v038-strategy");
+    if (!currentWrap) return;
+    renderCustomerStrategy(panel, currentWrap, batterySaverCache(panel));
+    updateStrategyVisualState(panel, true);
+    panel.__epV041FreezeMotion?.();
+  };
   return wrap;
 }
