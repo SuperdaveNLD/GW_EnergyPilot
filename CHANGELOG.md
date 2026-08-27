@@ -2,6 +2,37 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.41] - 2026-08-27
+
+### Fixed
+
+- Replaced normal telemetry-driven full ShadowRoot rebuilds with in-place updates of existing dashboard values, classes, attributes and meter widths, so the page, buttons and scroll container remain stable while GoodWe and EMHASS states change.
+- Removed the inherited v0.38 pointer/render guard and mobile scroll snapshot restoration from the active v0.41 telemetry path. Native browser/WebView scrolling now owns the viewport without delayed EnergyPilot writes of an older `scrollTop`.
+- Scoped Battery Strategy loading/apply feedback to the strategy section and scoped Battery · Plan · Price updates to the graph card, preventing either action from rebuilding unrelated controls.
+- Fixed re-entrant graph refresh while a plan request is starting by treating both the loading flag and active promise as one busy state.
+- Disabled EnergyPilot animations, transitions, moving flow particles and modal backdrop filters in v0.41, including pseudo-elements and late-added graph/modal content.
+
+### Changed
+
+- Added `gw-energy-pilot-v041.js` as the active frontend entrypoint with a stable-DOM telemetry contract.
+- Limited complete structural renders to first initialization and genuine context/structure changes such as language, user/theme, entity-registry or optional-card topology changes.
+- Added fresh nested module cache keys for every modified runtime, strategy and graph module so a v0.40 browser cache cannot retain an older implementation after upgrade.
+- Added deterministic real-browser regressions for desktop Chromium, iPad WebKit touch and iPhone WebKit touch.
+- Added `docs/FRONTEND_STABLE_DOM.md` as the persistent frontend architecture decision.
+
+### Validation
+
+- Desktop Chromium: 1440 × 900.
+- iPad WebKit touch profile: 834 × 1112.
+- iPhone WebKit touch profile: 390 × 844.
+- The matrix verifies stable DOM identity during telemetry, monotonic scrolling, zero idle scroll drift, menu open/close, two Automatic Control toggles, Battery Strategy apply, graph-only plan refresh, Dutch structural localization, controls after a deliberate structural render, zero active EnergyPilot animations/transitions, no JavaScript errors and no unknown WebSocket calls.
+- Full Python/Node Quality suite, repository validator, frontend architecture audit, HACS validation and Hassfest validation remain required gates.
+
+### Safety and compatibility
+
+- No GoodWe register, Modbus read block, EMS mode/setpoint/write order, Automatic Control decision, EMHASS optimization/configuration ownership, entity ID, unique ID, config-entry data, persistent Store key or stable device identity changes.
+- v0.38-v0.40 compatibility behavior remains available in its historical modules; only the active v0.41 runtime bypasses their legacy interaction and scroll-restoration guards.
+
 ## [0.40] - 2026-08-26
 
 ### Fixed

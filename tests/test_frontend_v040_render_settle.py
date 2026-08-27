@@ -12,24 +12,20 @@ class FrontendV040RenderSettleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.source = (FRONTEND / "gw-energy-pilot-v040.js").read_text(encoding="utf-8")
 
-    def test_v040_is_active_and_version_synchronized(self) -> None:
+    def test_v040_remains_a_valid_historical_entrypoint_under_v041(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
-        v038 = (FRONTEND / "gw-energy-pilot-v038.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.40")
-        self.assertIn('gw-energy-pilot-v040.js?v=0.40-mobile-scroll1', init)
+        v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
+        self.assertEqual(manifest["version"], "0.41")
+        self.assertIn('gw-energy-pilot-v041.js?v=0.41-stable1', init)
+        self.assertIn(
+            'import "./gw-energy-pilot-v039.js?v=0.41-stable1"',
+            v041,
+        )
+        self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
         self.assertIn(
             'import "./gw-energy-pilot-v039.js?v=0.40-mobile-scroll1"',
             self.source,
-        )
-        self.assertIn(
-            'import "./gw-energy-pilot-v038.js?v=0.40-mobile-scroll1"',
-            v039,
-        )
-        self.assertIn(
-            'import "./gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1"',
-            v038,
         )
         self.assertIn('const VERSION = "0.40"', self.source)
 

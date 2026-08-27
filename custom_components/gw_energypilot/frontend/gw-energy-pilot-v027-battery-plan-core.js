@@ -2,10 +2,99 @@ import "./gw-energy-pilot-v026-complete.js?v=0.26-complete1";
 import {
   CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartSize,
   formatTime, loadChartData, saveChartSize, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.28-chart1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.41-stable1";
 import {
   cardBody, ensureStyles, sizeControlHtml,
 } from "./gw-energy-pilot-v027-battery-plan-view.js?v=0.28-chart1";
+
+const V041_PANEL_STYLE_ID = "ep-v041-scoped-no-motion";
+const V041_GLOBAL_STYLE_ID = "ep-v041-scoped-global-no-motion";
+const V041_STATIC_ATTRIBUTE = "data-ep-v041-static";
+const V041_STATIC_SELECTOR = `[${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}]`;
+
+function freezeV041Element(element) {
+  if (!(element instanceof Element)) return;
+  element.setAttribute(V041_STATIC_ATTRIBUTE, "");
+  element.style.setProperty("animation", "none", "important");
+  element.style.setProperty("animation-name", "none", "important");
+  element.style.setProperty("animation-duration", "0s", "important");
+  element.style.setProperty("transition", "none", "important");
+  element.style.setProperty("transition-property", "none", "important");
+  element.style.setProperty("transition-duration", "0s", "important");
+  element.style.setProperty("scroll-behavior", "auto", "important");
+}
+
+function freezeV041GlobalMotion() {
+  if (!globalThis.document) return;
+  document.body?.setAttribute("data-ep-v041-no-motion", "");
+  if (!document.getElementById(V041_GLOBAL_STYLE_ID)) {
+    const style = document.createElement("style");
+    style.id = V041_GLOBAL_STYLE_ID;
+    style.textContent = `
+      body[data-ep-v041-no-motion] .ep-v027-backdrop,
+      body[data-ep-v041-no-motion] .ep-v027-backdrop *,
+      body[data-ep-v041-no-motion] .ep-v027-backdrop *::before,
+      body[data-ep-v041-no-motion] .ep-v027-backdrop *::after,
+      body[data-ep-v041-no-motion] .ep-v026-bp-backdrop,
+      body[data-ep-v041-no-motion] .ep-v026-bp-backdrop *,
+      body[data-ep-v041-no-motion] .ep-v026-bp-backdrop *::before,
+      body[data-ep-v041-no-motion] .ep-v026-bp-backdrop *::after,
+      body[data-ep-v041-no-motion] .ep13-backdrop,
+      body[data-ep-v041-no-motion] .ep13-backdrop *,
+      body[data-ep-v041-no-motion] .ep13-backdrop *::before,
+      body[data-ep-v041-no-motion] .ep13-backdrop *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+      body[data-ep-v041-no-motion] .ep-v027-backdrop,
+      body[data-ep-v041-no-motion] .ep-v026-bp-backdrop,
+      body[data-ep-v041-no-motion] .ep13-backdrop {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  for (const element of document.querySelectorAll(
+    ".ep-v027-backdrop, .ep-v027-backdrop *, .ep-v026-bp-backdrop, .ep-v026-bp-backdrop *, .ep13-backdrop, .ep13-backdrop *"
+  )) {
+    freezeV041Element(element);
+  }
+}
+
+export function freezeV041Motion(panel) {
+  if (!panel?.__epV041StableRuntime) return;
+  const root = panel.shadowRoot;
+  if (!root) return;
+  panel.setAttribute("data-ep-v041-no-motion", "");
+  if (!root.querySelector(`#${V041_PANEL_STYLE_ID}`)) {
+    const style = document.createElement("style");
+    style.id = V041_PANEL_STYLE_ID;
+    style.textContent = `
+      :host([data-ep-v041-no-motion]) ${V041_STATIC_SELECTOR}::before,
+      :host([data-ep-v041-no-motion]) ${V041_STATIC_SELECTOR}::after {
+        animation: none !important;
+        animation-name: none !important;
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        animation-iteration-count: 1 !important;
+        transition: none !important;
+        transition-property: none !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+      }
+    `;
+    root.appendChild(style);
+  }
+  for (const element of root.querySelectorAll("*")) freezeV041Element(element);
+  for (const element of root.querySelectorAll(
+    ".ep-flow-arrows, .ep-flow-live span, .ep-v011-particles, .ep-v011-particles span"
+  )) {
+    element.style.setProperty("display", "none", "important");
+  }
+  freezeV041GlobalMotion();
+}
 
 function openModal(panel) {
   document.querySelector(".ep-v027-backdrop")?.remove();
@@ -29,6 +118,7 @@ function openModal(panel) {
   backdrop.addEventListener("click", (event) => { if (event.target === backdrop) close(); });
   document.addEventListener("keydown", escape);
   document.body.appendChild(backdrop);
+  freezeV041Motion(panel);
 }
 
 function currentOptimizationPlanRevision(panel) {
@@ -63,6 +153,13 @@ function activePlanChanged(panel, data) {
   return state.last_updated !== plan.last_updated;
 }
 
+function chartRefreshIdle(panel) {
+  return Boolean(
+    !panel.__epV027BatteryPlanLoading &&
+    !panel.__epV027BatteryPlanPromise
+  );
+}
+
 function installEnhancedCard(panel, root) {
   const layout = root.querySelector(".ep-dashboard-layout");
   if (!layout) return;
@@ -80,9 +177,9 @@ function installEnhancedCard(panel, root) {
 
   const renderKey = `${data?.at || 0}:${size}:${hidden ? 1 : 0}`;
   if (existingCard?.dataset.epRenderKey === renderKey) {
-    if (data && activePlanChanged(panel, data) && !panel.__epV027BatteryPlanPromise) {
+    if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) {
       void loadChartData(panel, true);
-    } else if (data && Date.now() - data.at >= DATA_CACHE_MS && !panel.__epV027BatteryPlanPromise) {
+    } else if (data && Date.now() - data.at >= DATA_CACHE_MS && chartRefreshIdle(panel)) {
       void loadChartData(panel);
     }
     return;
@@ -109,16 +206,25 @@ function installEnhancedCard(panel, root) {
   card.querySelectorAll("[data-chart-size]").forEach((button) => {
     button.addEventListener("click", () => {
       saveChartSize(button.dataset.chartSize);
-      panel._queueRender();
+      if (panel.__epV041StableRuntime) refreshBatteryPlanCard(panel);
+      else panel._queueRender();
     });
   });
   card.querySelector(".ep-v027-expand")?.addEventListener("click", () => openModal(panel));
   card.querySelector('[data-action="details"]')?.addEventListener("click", () => openModal(panel));
   card.querySelector('[data-action="refresh"]')?.addEventListener("click", () => void loadChartData(panel, true));
 
-  if (!data && !panel.__epV027BatteryPlanPromise) void loadChartData(panel);
-  else if (data && activePlanChanged(panel, data) && !panel.__epV027BatteryPlanPromise) void loadChartData(panel, true);
-  else if (data && Date.now() - data.at >= DATA_CACHE_MS && !panel.__epV027BatteryPlanPromise) void loadChartData(panel);
+  if (!data && chartRefreshIdle(panel)) void loadChartData(panel);
+  else if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) void loadChartData(panel, true);
+  else if (data && Date.now() - data.at >= DATA_CACHE_MS && chartRefreshIdle(panel)) void loadChartData(panel);
+}
+
+export function refreshBatteryPlanCard(panel) {
+  const root = panel?.shadowRoot;
+  if (!root) return;
+  ensureStyles(root);
+  installEnhancedCard(panel, root);
+  freezeV041Motion(panel);
 }
 
 await customElements.whenDefined(PANEL_NAME);
@@ -128,8 +234,12 @@ PanelClass.prototype._render = function energyPilotV027BatteryPlanRender() {
   previousRender.call(this);
   const root = this.shadowRoot;
   if (!root) return;
-  ensureStyles(root);
-  installEnhancedCard(this, root);
+  if (this.__epV041StableRuntime) {
+    this.__epV041FreezeMotion = () => freezeV041Motion(this);
+    queueMicrotask(() => freezeV041Motion(this));
+  }
+  this.__epV041RefreshBatteryPlan = () => refreshBatteryPlanCard(this);
+  refreshBatteryPlanCard(this);
   const versionBadge = root.querySelector(".version");
   if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
   const footerItems = root.querySelectorAll("footer span");

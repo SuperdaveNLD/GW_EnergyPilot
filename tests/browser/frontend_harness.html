@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>GW EnergyPilot frontend stability harness</title>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #061126;
+    }
+    #ha-scroll {
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+    gw-energypilot-panel { display: block; min-height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="ha-scroll"></div>
+  <script type="module">
+    const ENTRY_ID = "test_entry";
+    const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
+    const ENTRYPOINT = requestedEntry === "v041" ? "v041" : "v040";
+    const ENTITY_KEYS = [
+      "pv_total_power", "total_load_power", "battery_power",
+      "meter_total_power_fast", "total_inverter_power", "ac_active_power",
+      "pv1_power", "pv2_power", "pv3_power", "pv4_power",
+      "battery_soc", "battery_soh", "battery_voltage", "battery_current",
+      "battery_max_cell_temperature", "bms_package_temperature",
+      "inverter_radiator_temperature", "bms_max_charge_current",
+      "bms_max_discharge_current", "meter_l1_active_power",
+      "meter_l2_active_power", "meter_l3_active_power", "meter_l1_voltage",
+      "meter_l2_voltage", "meter_l3_voltage", "meter_l1_current",
+      "meter_l2_current", "meter_l3_current", "ems_mode", "ems_setpoint",
+      "target_power", "control_command", "automatic_control", "optimize_now",
+      "manual_mode", "manual_power", "control_strategy",
+      "grid_energy_imported_today", "grid_energy_exported_today",
+      "grid_energy_import_total", "grid_energy_export_total",
+      "battery_charge_energy_today", "battery_discharge_energy_today",
+      "battery_charge_energy_total", "battery_discharge_energy_total",
+      "emhass_minimum_soc", "emhass_maximum_soc", "maximum_export",
+      "pause_battery", "maximum_charge", "battery_auto",
+    ];
+
+    let batterySaverMode = "balanced";
+    let planRevision = 1;
+
+    const stateValues = {
+      pv_total_power: 4800,
+      total_load_power: 2500,
+      battery_power: -1200,
+      meter_total_power_fast: 1100,
+      total_inverter_power: 3600,
+      ac_active_power: 3550,
+      pv1_power: 1600,
+      pv2_power: 1600,
+      pv3_power: 1600,
+      pv4_power: 0,
+      battery_soc: 54,
+      battery_soh: 99,
+      battery_voltage: 384.2,
+      battery_current: -3.1,
+      battery_max_cell_temperature: 25.3,
+      bms_package_temperature: 24.8,
+      inverter_radiator_temperature: 31.4,
+      bms_max_charge_current: 40,
+      bms_max_discharge_current: 40,
+      meter_l1_active_power: 360,
+      meter_l2_active_power: 370,
+      meter_l3_active_power: 370,
+      meter_l1_voltage: 231.2,
+      meter_l2_voltage: 230.9,
+      meter_l3_voltage: 231.4,
+      meter_l1_current: 1.6,
+      meter_l2_current: 1.6,
+      meter_l3_current: 1.6,
+      ems_mode: 11,
+      ems_setpoint: 1200,
+      target_power: -1200,
+      control_command: "battery_charge",
+      automatic_control: "on",
+      optimize_now: "unknown",
+      manual_mode: "1",
+      manual_power: 0,
+      control_strategy: "battery",
+      grid_energy_imported_today: 3.2,
+      grid_energy_exported_today: 7.8,
+      grid_energy_import_total: 1234.5,
+      grid_energy_export_total: 2345.6,
+      battery_charge_energy_today: 5.4,
+      battery_discharge_energy_today: 4.1,
+      battery_charge_energy_total: 4567.8,
+      battery_discharge_energy_total: 4321.0,
+      emhass_minimum_soc: 5,
+      emhass_maximum_soc: 95,
+      maximum_export: 15000,
+      pause_battery: "off",
+      maximum_charge: "off",
+      battery_auto: "off",
+    };
+
+    function domainForKey(key) {
+      if (key === "automatic_control" || key.startsWith("pause_") || key.endsWith("_auto")) return "switch";
+      if (["manual_mode", "control_strategy"].includes(key)) return "select";
+      if (["manual_power", "emhass_minimum_soc", "emhass_maximum_soc"].includes(key)) return "number";
+      if (["optimize_now", "maximum_export", "maximum_charge"].includes(key)) return "button";
+      return "sensor";
+    }
+
+    function entityIdForKey(key) {
+      return `${domainForKey(key)}.gw_ep_${key}`;
+    }
+
+    function unitForKey(key) {
+      if (key.includes("temperature")) return "°C";
+      if (key.includes("voltage")) return "V";
+      if (key.includes("current")) return "A";
+      if (key.includes("energy")) return "kWh";
+      if (key.includes("soc") || key.includes("soh")) return "%";
+      if (key.includes("power") || key.includes("setpoint") || key.includes("export")) return "W";
+      return undefined;
+    }
+
+    function makeState(key, value) {
+      const entityId = entityIdForKey(key);
+      const unit = unitForKey(key);
+      const attributes = {
+        friendly_name: key.replaceAll("_", " "),
+        ...(unit ? { unit_of_measurement: unit } : {}),
+      };
+      if (key === "ems_mode") attributes.mode_name = "Battery charge power";
+      if (key === "optimize_now") {
+        Object.assign(attributes, {
+          p_batt_entity: "sensor.p_batt_forecast",
+          p_grid_entity: "sensor.p_grid_forecast",
+          optim_status_entity: "sensor.optim_status",
+          plan_revision: planRevision,
+          telemetry_refresh_seconds: 15,
+          optimization_interval_minutes: 60,
+          controller_enabled: true,
+          controller_command: "battery_charge",
+          controller_target_power: -1200,
+          controller_expected_mode: 11,
+          controller_max_power: 15000,
+          controller_deadband: 50,
+          ems_mode: 11,
+          ems_mode_name: "Battery charge power",
+          ems_setpoint: 1200,
+          battery_soc: 54,
+          battery_soh: 99,
+          battery_power: -1200,
+          house_load_register_35172: 2500,
+          house_load_phase_sum: 2500,
+          system_balance_power: 2500,
+          meter_total_power_fast: 1100,
+          total_inverter_power: 3600,
+          ac_active_power: 3550,
+          battery_charge_energy_total: 4567.8,
+          battery_charge_energy_today: 5.4,
+          battery_discharge_energy_total: 4321.0,
+          battery_discharge_energy_today: 4.1,
+          meter_total_energy_import: 1234.5,
+          meter_total_energy_export: 2345.6,
+          battery_discharge_depth_on_grid_45356: 5,
+          soc_init: 0.54,
+          configured_runtime_soc_final: 0.55,
+          runtime_soc_final: 0.55,
+          p_batt_value: -1200,
+          p_grid_value: 1100,
+          optim_status_value: "Optimal",
+          orchestrator_status: "ready",
+          last_reason: "browser_harness",
+          price_points: 24,
+          load_forecast_points: 24,
+        });
+      }
+      if (key === "grid_energy_imported_today" || key === "grid_energy_exported_today") {
+        Object.assign(attributes, { last_period: 2.4, accounting_day: "2026-08-27", bootstrap_complete: true });
+      }
+      if (key === "manual_power") Object.assign(attributes, { min: 0, max: 15000, step: 100 });
+      return {
+        entity_id: entityId,
+        state: String(value),
+        attributes,
+        last_changed: new Date().toISOString(),
+        last_updated: new Date().toISOString(),
+        last_reported: new Date().toISOString(),
+      };
+    }
+
+    function makeExternalState(entityId, value, unit) {
+      return {
+        entity_id: entityId,
+        state: String(value),
+        attributes: unit ? { unit_of_measurement: unit } : {},
+        last_changed: new Date().toISOString(),
+        last_updated: new Date().toISOString(),
+        last_reported: new Date().toISOString(),
+      };
+    }
+
+    const registry = ENTITY_KEYS.map((key) => ({
+      entity_id: entityIdForKey(key),
+      platform: "gw_energypilot",
+      config_entry_id: ENTRY_ID,
+      unique_id: `${ENTRY_ID}_${key}`,
+    }));
+
+    const initialStates = Object.fromEntries(
+      ENTITY_KEYS.map((key) => [entityIdForKey(key), makeState(key, stateValues[key] ?? 0)])
+    );
+    initialStates["sensor.p_batt_forecast"] = makeExternalState("sensor.p_batt_forecast", -1200, "W");
+    initialStates["sensor.p_grid_forecast"] = makeExternalState("sensor.p_grid_forecast", 1100, "W");
+    initialStates["sensor.optim_status"] = makeExternalState("sensor.optim_status", "Optimal");
+    initialStates["sensor.soc_batt_forecast"] = makeExternalState("sensor.soc_batt_forecast", 0.56);
+    initialStates["sensor.p_load_forecast"] = makeExternalState("sensor.p_load_forecast", 2500, "W");
+    initialStates["sensor.p_pv_forecast"] = makeExternalState("sensor.p_pv_forecast", 4800, "W");
+
+    function batterySaverPayload() {
+      const modes = [
+        ["mad_steve", "Mad-Steve"],
+        ["gold_rush", "Gold Rush"],
+        ["balanced", "Balanced"],
+        ["battery_saver", "Battery Saver"],
+      ].map(([key, label]) => ({ key, label, description: `${label} test profile` }));
+      return {
+        entry_id: ENTRY_ID,
+        managed: true,
+        mode: batterySaverMode,
+        modes,
+        current_emhass_values: {
+          battery_minimum_state_of_charge: 0.05,
+          battery_maximum_state_of_charge: 0.95,
+          battery_soc_deficit_cost: 0.002,
+          battery_soc_surplus_cost: 0.002,
+          battery_stress_cost: 0.001,
+          weight_battery_charge: 0.001,
+          weight_battery_discharge: 0.001,
+        },
+        emhass_version: "0.18.1",
+      };
+    }
+
+    function settingsPayload() {
+      return {
+        entry_id: ENTRY_ID,
+        selected_entry_id: ENTRY_ID,
+        entries: [{
+          entry_id: ENTRY_ID,
+          title: "GW15K-ETA-G20",
+          data: { host: "192.0.2.1", port: 502, slave: 247 },
+          options: {
+            scan_interval: 15,
+            control_strategy: "battery",
+            emhass_minimum_soc: 5,
+            emhass_maximum_soc: 95,
+          },
+        }],
+      };
+    }
+
+    function batteryPricePayload() {
+      const now = new Date();
+      const hour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
+      const points = Array.from({ length: 24 }, (_, index) => ({
+        start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
+        market_price: 0.12 + index * 0.001,
+        buy_price: 0.22 + index * 0.001,
+        sell_price: 0.08 + index * 0.001,
+      }));
+      const plan = Array.from({ length: 24 }, (_, index) => ({
+        start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
+        value_w: index % 4 === 0 ? -1600 : index % 5 === 0 ? 1100 : 0,
+      }));
+      const pBattState = window.__epHass?.states?.["sensor.p_batt_forecast"];
+      return {
+        schema: 4,
+        entry_id: ENTRY_ID,
+        generated_at: new Date().toISOString(),
+        plan_revision: planRevision,
+        points,
+        battery_energy: { charged_today_kwh: 5.4, discharged_today_kwh: 4.1 },
+        battery_plan: {
+          entity_id: "sensor.p_batt_forecast",
+          last_updated: pBattState?.last_updated || new Date().toISOString(),
+          points: plan,
+        },
+        actual: [],
+        historical_plan: [],
+        future_plan: plan,
+        prices: points,
+        native_today: { charged: 5.4, discharged: 4.1 },
+      };
+    }
+
+    const unknownWsTypes = new Set();
+    async function callWS(message) {
+      const type = message?.type || "";
+      if (type === "config/entity_registry/list") return registry;
+      if (type === "gw_energypilot/battery_saver/get") return batterySaverPayload();
+      if (type === "gw_energypilot/battery_saver/set") {
+        batterySaverMode = String(message.mode || batterySaverMode);
+        window.__epAdvancePlan?.();
+        return batterySaverPayload();
+      }
+      if (type === "gw_energypilot/settings/get") return settingsPayload();
+      if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
+      if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
+      if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
+      if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
+      if (type.includes("history") || type.includes("statistic")) return {};
+      unknownWsTypes.add(type);
+      return {};
+    }
+
+    async function callService(domain, service, data) {
+      const entityId = data?.entity_id;
+      if (domain === "switch" && entityId) {
+        const current = window.__epHass.states[entityId];
+        if (current) {
+          const next = service === "turn_on" ? "on" : service === "turn_off" ? "off" : current.state;
+          window.__epSetEntity(entityId, next);
+        }
+      } else if (domain === "number" && service === "set_value" && entityId) {
+        window.__epSetEntity(entityId, data.value);
+      } else if (domain === "select" && service === "select_option" && entityId) {
+        window.__epSetEntity(entityId, data.option);
+      } else if (domain === "button" && service === "press") {
+        window.__epAdvancePlan?.();
+      }
+      return undefined;
+    }
+
+    function makeHass(states, language = "en") {
+      return {
+        states,
+        language,
+        locale: { language, number_format: "language", time_format: "language" },
+        user: { id: "test-user", is_admin: true, name: "Frontend Test" },
+        themes: { darkMode: true, theme: "default" },
+        config: { unit_system: { temperature: "°C" } },
+        callWS,
+        callService,
+        formatEntityState: (stateObj) => `${stateObj.state}${stateObj.attributes?.unit_of_measurement ? ` ${stateObj.attributes.unit_of_measurement}` : ""}`,
+      };
+    }
+
+    window.confirm = () => true;
+    window.__epEntryPoint = ENTRYPOINT;
+    window.__epUnknownWsTypes = unknownWsTypes;
+    window.__epHass = makeHass(initialStates);
+    window.__epErrors = [];
+    window.addEventListener("error", (event) => window.__epErrors.push(String(event.error || event.message)));
+    window.addEventListener("unhandledrejection", (event) => window.__epErrors.push(String(event.reason)));
+
+    const modulePath = ENTRYPOINT === "v041"
+      ? "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v041.js?browser-harness=1"
+      : "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v040.js?browser-harness=1";
+    await import(modulePath);
+    await customElements.whenDefined("gw-energypilot-panel");
+
+    const panel = document.createElement("gw-energypilot-panel");
+    panel.id = "panel";
+    panel.narrow = matchMedia("(max-width: 720px)").matches;
+    panel.panel = { config: {} };
+    document.getElementById("ha-scroll").appendChild(panel);
+
+    window.__epPanel = panel;
+    window.__epScroller = document.getElementById("ha-scroll");
+    window.__epSetEntity = (entityId, value, attributes = null) => {
+      const previous = window.__epHass.states[entityId] || makeExternalState(entityId, value);
+      const nextState = {
+        ...previous,
+        state: String(value),
+        attributes: attributes ? { ...previous.attributes, ...attributes } : previous.attributes,
+        last_updated: new Date().toISOString(),
+        last_reported: new Date().toISOString(),
+      };
+      const states = { ...window.__epHass.states, [entityId]: nextState };
+      window.__epHass = makeHass(states, window.__epHass.language);
+      panel.hass = window.__epHass;
+      return nextState;
+    };
+    window.__epSetEntityByKey = (key, value, attributes = null) =>
+      window.__epSetEntity(entityIdForKey(key), value, attributes);
+    window.__epAdvancePlan = () => {
+      planRevision += 1;
+      const optimizeId = entityIdForKey("optimize_now");
+      const optimize = window.__epHass.states[optimizeId];
+      window.__epSetEntity(optimizeId, optimize.state, {
+        plan_revision: planRevision,
+        last_reason: "browser_plan_refresh",
+      });
+      const nextPower = planRevision % 2 === 0 ? -1400 : 950;
+      window.__epSetEntity("sensor.p_batt_forecast", nextPower, { unit_of_measurement: "W" });
+      return planRevision;
+    };
+    window.__epTelemetryBurst = async (count = 30, delayMs = 5) => {
+      for (let index = 0; index < count; index += 1) {
+        const battery = index % 2 === 0 ? -1200 - index : 900 + index;
+        window.__epSetEntityByKey("battery_power", battery);
+        window.__epSetEntityByKey("battery_soc", 54 + (index % 4));
+        window.__epSetEntityByKey("pv_total_power", 4800 + index * 3);
+        window.__epSetEntityByKey("meter_total_power_fast", index % 3 === 0 ? -650 : 1100);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    };
+    window.__epSetLanguage = (nextLanguage) => {
+      window.__epHass = makeHass(window.__epHass.states, nextLanguage);
+      panel.hass = window.__epHass;
+    };
+
+    panel.hass = window.__epHass;
+
+    window.__epReady = new Promise((resolve, reject) => {
+      const started = performance.now();
+      const wait = () => {
+        const root = panel.shadowRoot;
+        const cards = root?.querySelectorAll("[data-ep-card]").length || 0;
+        const ready = Boolean(
+          root?.querySelector("main") &&
+          root?.querySelector(".ep-dashboard-layout") &&
+          root?.querySelector(".ep-layout-button") &&
+          root?.querySelector("#auto-toggle") &&
+          root?.querySelector("[data-ep-v038-profile]") &&
+          cards >= 8 &&
+          (ENTRYPOINT !== "v041" || root.querySelector("main")?.dataset.epV041StableDom === "1")
+        );
+        if (ready) {
+          resolve(true);
+          return;
+        }
+        if (performance.now() - started > 10000) {
+          reject(new Error(`Frontend did not become ready: entry=${ENTRYPOINT}, cards=${cards}`));
+          return;
+        }
+        requestAnimationFrame(wait);
+      };
+      wait();
+    });
+  </script>
+</body>
+</html>

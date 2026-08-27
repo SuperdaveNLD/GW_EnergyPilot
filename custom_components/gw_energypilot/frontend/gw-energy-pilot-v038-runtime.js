@@ -4,7 +4,7 @@ import { ensureV038Styles } from "./gw-energy-pilot-v038-styles.js?v=0.38-styles
 import {
   installV038CustomerStrategy,
   installV038DelegatedControls,
-} from "./gw-energy-pilot-v038-strategy.js?v=0.38-strategy3";
+} from "./gw-energy-pilot-v038-strategy.js?v=0.41-stable1";
 
 const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -37,6 +37,10 @@ const LEGACY_EXTERNAL_SUFFIXES = [
   ".p_pv_forecast",
   "_p_pv_forecast",
 ];
+
+function stableRuntimeActive(panel) {
+  return panel?.__epV041StableRuntime === true;
+}
 
 function finitePower(panel, key) {
   const raw = panel._numberByKey?.(key, null);
@@ -147,7 +151,7 @@ function completeAllInteractions(panel) {
 }
 
 function installInteractionGuard(panel, root) {
-  if (panel.__epV038InteractionGuardInstalled) return;
+  if (stableRuntimeActive(panel) || panel.__epV038InteractionGuardInstalled) return;
   panel.__epV038InteractionGuardInstalled = true;
   const state = interactionState(panel);
 
@@ -452,7 +456,8 @@ installHassRenderGuard(PanelClass);
 if (!PanelClass.prototype.__epV038Installed) {
   const previousRender = PanelClass.prototype._render;
   PanelClass.prototype._render = function energyPilotV038Render() {
-    if (interactionActive(this)) {
+    const stableRuntime = stableRuntimeActive(this);
+    if (!stableRuntime && interactionActive(this)) {
       this.__epV038RenderDeferred = true;
       return;
     }
@@ -460,9 +465,10 @@ if (!PanelClass.prototype.__epV038Installed) {
     const rootBefore = this.shadowRoot;
     const reusableStrategy = rootBefore?.querySelector(".ep-v038-strategy") || null;
     const focusedProfile = rootBefore?.activeElement?.dataset?.epV038Profile || null;
-    const preserveScroll = shouldPreserveScroll(this);
+    const preserveScroll = !stableRuntime && shouldPreserveScroll(this);
     const scrollSnapshots = preserveScroll ? captureScrollPositions(this) : [];
-    if (preserveScroll) this.style.setProperty("overflow-anchor", "none");
+    if (stableRuntime) this.style.removeProperty("overflow-anchor");
+    else if (preserveScroll) this.style.setProperty("overflow-anchor", "none");
     else this.style.removeProperty("overflow-anchor");
 
     if (this.__epV038HassRenderTimer) {
@@ -476,11 +482,11 @@ if (!PanelClass.prototype.__epV038Installed) {
 
     ensureV038Styles(root);
     installV038DelegatedControls(this, root);
-    installInteractionGuard(this, root);
+    if (!stableRuntime) installInteractionGuard(this, root);
     const strategy = installV038CustomerStrategy(this, root, reusableStrategy);
     synchronizeFlowDirections(this, root);
     updateVersion(root);
-    stabilizeScrollAfterRender(this, scrollSnapshots);
+    if (!stableRuntime) stabilizeScrollAfterRender(this, scrollSnapshots);
 
     if (focusedProfile && strategy) {
       const focused = [...strategy.querySelectorAll("[data-ep-v038-profile]")].find(

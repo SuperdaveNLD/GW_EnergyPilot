@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1";
+import "./gw-energy-pilot-v038-runtime.js?v=0.41-stable1";
 import { localizeV038Controller } from "./gw-energy-pilot-v038-i18n.js?v=0.38-i18n1";
 
 const VERSION = "0.38";

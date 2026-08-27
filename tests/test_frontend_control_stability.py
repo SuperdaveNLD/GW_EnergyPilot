@@ -26,7 +26,7 @@ class FrontendControlStabilityTests(unittest.TestCase):
         )
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
-        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1", self.entry)
+        self.assertIn("gw-energy-pilot-v038-runtime.js?v=", self.entry)
         self.assertIn('gw-energy-pilot-v034.js?v=0.38-clean-base1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
@@ -53,8 +53,10 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("strategySignature", self.strategy)
         self.assertIn("wrap.dataset.epV038Signature", self.strategy)
         self.assertIn("cache.busy || cache.loading || !cache.data", self.strategy)
+        self.assertIn("function requestStrategyRefresh(panel)", self.strategy)
+        self.assertIn("panel.__epV041RefreshStrategy", self.strategy)
+        self.assertIn("requestStrategyRefresh(panel)", self.strategy)
         self.assertIn("updateStrategyVisualState(panel, true)", self.strategy)
-        self.assertIn("updateStrategyVisualState(panel);", self.strategy)
 
     def test_v038_profile_identity_is_language_independent(self) -> None:
         self.assertIn('label: "Battery Saver"', self.model)
@@ -85,8 +87,9 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("pointerSafetyTimer", self.runtime)
         self.assertIn("keyboardSafetyTimer", self.runtime)
         self.assertIn("this.__epV038RenderDeferred = true", self.runtime)
+        self.assertIn("function stableRuntimeActive(panel)", self.runtime)
         self.assertLess(
-            self.runtime.index("if (interactionActive(this))"),
+            self.runtime.index("if (!stableRuntime && interactionActive(this))"),
             self.runtime.index("previousRender.call(this)"),
         )
 
