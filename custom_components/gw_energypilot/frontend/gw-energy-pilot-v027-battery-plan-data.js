@@ -83,6 +83,17 @@ function localDayBounds() {
   return { now, start, end };
 }
 
+function requestPanelRefresh(panel) {
+  if (
+    panel?.__epV041StableRuntime === true &&
+    typeof panel.__epV041RefreshBatteryPlan === "function"
+  ) {
+    panel.__epV041RefreshBatteryPlan();
+    return;
+  }
+  panel?._queueRender?.();
+}
+
 function normalizeStatisticRows(rows, startMs, endMs) {
   return (rows || [])
     .map((row) => ({ t: timestampMs(row.start), w: finiteNumber(row.mean) }))
@@ -251,7 +262,7 @@ export async function loadChartData(panel, force = false) {
 
   const bounds = localDayBounds();
   panel.__epV027BatteryPlanLoading = true;
-  panel._queueRender();
+  requestPanelRefresh(panel);
 
   const request = { type: "gw_energypilot/battery_price/get", force };
   const entryId = panel.__epV016SettingsData?.entry_id;
@@ -309,7 +320,7 @@ export async function loadChartData(panel, force = false) {
     .finally(() => {
       panel.__epV027BatteryPlanLoading = false;
       panel.__epV027BatteryPlanPromise = null;
-      panel._queueRender();
+      requestPanelRefresh(panel);
     });
 
   return panel.__epV027BatteryPlanPromise;
