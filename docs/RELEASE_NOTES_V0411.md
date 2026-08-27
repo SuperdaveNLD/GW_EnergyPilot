@@ -30,7 +30,8 @@ Each profile verifies:
 - exactly one Optimize service execution;
 - zero complete dashboard renders;
 - stable `main`, Optimize, Dashboard layout, Automatic Control and Battery Strategy DOM identities;
-- no scroll-position jump;
+- no destructive scroll reset or visible movement of the touched control;
+- native browser anchoring when the targeted plan-card refresh changes document height;
 - working scrolling after optimization;
 - targeted Battery Plan refresh to the new plan revision;
 - the Optimize control returns to its idle state;
