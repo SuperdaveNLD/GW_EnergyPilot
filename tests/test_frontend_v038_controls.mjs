@@ -81,14 +81,28 @@ const buttons = [
 const root = new FakeRoot(buttons);
 const calls = [];
 let renders = 0;
+let targetedRefreshes = 0;
 const modes = PROFILE_KEYS.map((key) => ({ key }));
 const panel = {
   shadowRoot: root,
+  __epV041StableRuntime: true,
   _escape(value) {
     return String(value ?? "");
   },
   _queueRender() {
     renders += 1;
+  },
+  __epV041RefreshStrategy() {
+    targetedRefreshes += 1;
+    const cache = this.__epV038BatterySaver;
+    const activeMode = cache.pendingMode || cache.data?.mode || null;
+    for (const button of buttons) {
+      button.disabled = Boolean(cache.busy || cache.loading || !cache.data);
+      button.setAttribute(
+        "aria-pressed",
+        button.dataset.epV038Profile === activeMode ? "true" : "false"
+      );
+    }
   },
   _hass: {
     async callWS(request) {
@@ -140,7 +154,8 @@ assert.equal(calls.length, 1);
 assert.equal(calls[0].type, "gw_energypilot/battery_saver/set");
 assert.equal(calls[0].entry_id, "entry-1");
 assert.equal(calls[0].mode, "battery_saver");
-assert.equal(renders >= 2, true);
+assert.equal(targetedRefreshes >= 2, true);
+assert.equal(renders, 0);
 assert.equal(buttons.every((button) => button.disabled === false), true);
 assert.deepEqual(
   buttons
@@ -149,12 +164,25 @@ assert.deepEqual(
   ["battery_saver"]
 );
 
+// Older v0.38-v0.40 entrypoints retain their full-render fallback. The fake
+// panel cannot rebuild the DOM, so this branch validates the queued render and
+// service request rather than duplicating the real renderer in the unit test.
+panel.__epV041StableRuntime = false;
+root.listeners.get("click")({
+  composedPath: () => [buttons[2]],
+  preventDefault: () => {},
+});
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(calls.length, 2);
+assert.equal(calls[1].mode, "balanced");
+assert.equal(renders >= 2, true);
+
 buttons[1].disabled = true;
 root.listeners.get("click")({
   composedPath: () => [buttons[1]],
   preventDefault: () => {},
 });
 await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(calls.length, 1);
+assert.equal(calls.length, 2);
 
 console.log("v0.38 delegated profile control tests passed");
