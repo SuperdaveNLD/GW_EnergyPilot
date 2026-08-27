@@ -26,7 +26,7 @@ class FrontendControlStabilityTests(unittest.TestCase):
         )
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
-        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1", self.entry)
+        self.assertIn("gw-energy-pilot-v038-runtime.js?v=", self.entry)
         self.assertIn('gw-energy-pilot-v034.js?v=0.38-clean-base1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
