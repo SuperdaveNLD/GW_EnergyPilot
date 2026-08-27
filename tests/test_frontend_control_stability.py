@@ -53,8 +53,10 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("strategySignature", self.strategy)
         self.assertIn("wrap.dataset.epV038Signature", self.strategy)
         self.assertIn("cache.busy || cache.loading || !cache.data", self.strategy)
+        self.assertIn("function requestStrategyRefresh(panel)", self.strategy)
+        self.assertIn("panel.__epV041RefreshStrategy", self.strategy)
+        self.assertIn("requestStrategyRefresh(panel)", self.strategy)
         self.assertIn("updateStrategyVisualState(panel, true)", self.strategy)
-        self.assertIn("updateStrategyVisualState(panel);", self.strategy)
 
     def test_v038_profile_identity_is_language_independent(self) -> None:
         self.assertIn('label: "Battery Saver"', self.model)
