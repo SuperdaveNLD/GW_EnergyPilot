@@ -2,6 +2,24 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.41.1] - 2026-08-27
+
+### Fixed
+
+- Removed the inherited Optimize-now completion render that detached the touched dashboard button after the Home Assistant button service returned and could restart Safari/WebKit blinking or break native scrolling.
+- Replaced only the inherited Optimize listener with a v0.41.1 stable-DOM action that patches busy/idle state, orchestrator status, last-success details and errors in place.
+- Preserved the same Optimize button, dashboard `main`, layout control, Automatic Control and Battery Strategy DOM nodes for the complete solve/publish transaction.
+
+### Validation
+
+- Added a real-browser Optimize regression for desktop Chromium, iPad WebKit touch and iPhone WebKit touch.
+- The regression verifies one service execution, zero complete dashboard renders, stable control identities, no scroll jump, working post-optimization scrolling and targeted plan-card refresh.
+- Existing Python/Node Quality, repository invariants, frontend architecture audit, HACS, Hassfest and the full v0.41 browser matrix remain required gates.
+
+### Safety and compatibility
+
+- Frontend-only hotfix; no GoodWe register, Modbus block, EMS mapping/write order, Automatic Control decision, EMHASS solve/publish ownership, entity ID, unique ID, config-entry or persistent-state change.
+
 ## [0.41] - 2026-08-27
 
 ### Fixed

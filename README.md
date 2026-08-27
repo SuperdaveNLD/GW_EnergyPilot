@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.41 · Beta**
+**v0.41.1 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V0411.md` — v0.41.1 Optimize-now stable-DOM and scrolling hotfix;
 - `docs/RELEASE_NOTES_V041.md` — v0.41 stable DOM, native scrolling and no-motion dashboard;
 - `docs/FRONTEND_STABLE_DOM.md` — structural-render, telemetry-patch, interaction and browser-regression contract;
 
@@ -40,10 +41,17 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
 
+## v0.41.1 highlights
+
+- Optimize now keeps the same button and dashboard DOM connected throughout the complete Home Assistant service call.
+- Busy/idle state and orchestrator details update in place; the action no longer ends with `_queueRender()`.
+- Desktop Chromium plus iPad/iPhone WebKit touch regressions verify zero full renders, no scroll jump and working scrolling after optimization.
+- The backend EMHASS solve/publish path, GoodWe execution and all entity identities remain unchanged.
+
 ## v0.41 highlights
 
 - Normal GoodWe and EMHASS telemetry updates mutate the existing dashboard DOM instead of rebuilding the complete ShadowRoot, preserving button identity, focus, hover and the Home Assistant scroll container.
-- Battery Strategy and Battery · Plan · Price refreshes are scoped to their own sections/cards; a fresh optimization no longer rebuilds unrelated controls.
+- Battery Strategy feedback and Battery · Plan · Price refreshes are scoped to their own sections/cards; v0.41.1 separately fixes the inherited Optimize-now completion render.
 - The active v0.41 path removes inherited pointer/render guarding and delayed mobile scroll restoration, leaving vertical pan and momentum scrolling under native browser/WebView ownership.
 - All EnergyPilot animations, transitions, flow particles and modal backdrop filters are intentionally disabled for deterministic desktop, iPad and iPhone behavior.
 - Real-browser CI covers desktop Chromium, iPad WebKit touch and iPhone WebKit touch, including telemetry during scrolling, menu/buttons, plan refresh, Dutch localization and deliberate structural rerender recovery.

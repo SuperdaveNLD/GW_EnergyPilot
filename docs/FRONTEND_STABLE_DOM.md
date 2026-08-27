@@ -73,3 +73,9 @@ The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touc
 - Do not add pointer capture or global gesture cancellation to protect a control from telemetry.
 - Do not re-enable motion without a separately documented ownership model and browser regressions on all three profiles.
 - Preserve entity IDs, unique IDs, settings, backend APIs and GoodWe/EMHASS semantics unless a separate change explicitly requires them.
+
+## v0.41.1 action-specific render contract
+
+The stable-DOM rule also applies to asynchronous dashboard actions. A control may update its own text, disabled state, accessibility state and related status rows in place, but it must not request a complete panel render when the service promise settles.
+
+The Optimize-now control is the first explicit regression for this rule. v0.41.1 removes the inherited completion `_queueRender()` by replacing that historical listener at the active release boundary. The backend button entity and orchestrator transaction are unchanged. Browser CI captures `main` and control identities before the click and requires zero complete renders plus usable scrolling after the new plan has refreshed.

@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.41.1** | 2026-08-27 | **Beta** | Hotfixes Optimize now so its solve/publish transaction patches the existing control in place, never rebuilds the touched dashboard and keeps desktop/iPad/iPhone scrolling usable. |
 | **0.41** | 2026-08-27 | **Beta** | Replaces normal telemetry full renders with stable in-place DOM updates, targeted plan/strategy refreshes, native touch scrolling and a no-motion dashboard validated in Chromium and WebKit desktop/iPad/iPhone profiles. |
 
 | **0.40** | 2026-08-26 | **Beta** | Stabilizes the remaining dashboard, menu and card-window controls across telemetry-driven full renders by suppressing transition restart for one painted frame without delaying telemetry or reusing stale button nodes. |
@@ -59,6 +60,14 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.41.1 — Optimize now stable-DOM hotfix
+
+v0.41.1 closes the action-specific gap left in v0.41. The historical Optimize button listener still requested a complete dashboard render after the asynchronous Home Assistant button service completed. On Safari/WebKit that could detach the touched node during the interaction lifecycle, making the dashboard blink and leaving native scrolling unusable.
+
+The v0.41.1 entrypoint replaces only that inherited listener. Busy/idle state and orchestrator details are patched on the existing nodes, while the established backend optimization, publish and plan-revision transaction remains unchanged. A dedicated real-browser matrix presses Optimize while scrolled and verifies zero full renders plus working scrolling afterward on desktop Chromium and iPad/iPhone WebKit touch profiles.
+
+See `docs/RELEASE_NOTES_V0411.md`.
 
 # v0.41 — Stable DOM and native mobile scrolling
 

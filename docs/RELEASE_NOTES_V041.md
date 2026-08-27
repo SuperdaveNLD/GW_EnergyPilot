@@ -1,5 +1,7 @@
 # GW EnergyPilot v0.41 Beta
 
+> **Follow-up:** v0.41.1 removes an inherited action-specific full render that still ran after pressing **Optimize now**. Ordinary telemetry, strategy and plan-card stable-DOM behavior described below remains the v0.41 foundation.
+
 v0.41 is the frontend stability release requested after repeated mobile scroll and control failures. It changes the active dashboard render architecture rather than adding another visual, pointer or scroll-restoration patch.
 
 ## Operator-visible behavior
