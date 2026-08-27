@@ -6,7 +6,6 @@ from __future__ import annotations
 import contextlib
 import http.server
 import json
-import os
 import socket
 import threading
 from dataclasses import dataclass
@@ -68,8 +67,7 @@ def animation_summary(page: Page) -> dict[str, int]:
     return page.evaluate(
         """
         () => {
-          const panel = window.__epPanel;
-          const root = panel.shadowRoot;
+          const root = window.__epPanel.shadowRoot;
           let animations = 0;
           let transitions = 0;
           let animatedElements = 0;
@@ -92,8 +90,7 @@ def animation_summary(page: Page) -> dict[str, int]:
 
 
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
-    page.goto(page.url or "about:blank")
-    page.goto(f"{page.context._options.get('base_url', '')}{HARNESS}" if page.context._options.get('base_url') else HARNESS)
+    page.goto(HARNESS, wait_until="domcontentloaded")
     page.evaluate("window.__epReady")
     page.wait_for_timeout(600)
 
@@ -174,11 +171,27 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
           if (auto) {
             const before = auto.textContent.trim();
             auto.click();
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await new Promise((resolve) => setTimeout(resolve, 250));
             const current = root.querySelector('#auto-toggle');
             result.autoChanged = Boolean(current && current.textContent.trim() !== before);
           }
           return result;
+        }
+        """
+    )
+
+    orientation = page.evaluate(
+        """
+        async () => {
+          const scroller = window.__epScroller;
+          const before = scroller.scrollTop;
+          window.__epPanel.narrow = !window.__epPanel.narrow;
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return {
+            before,
+            after: scroller.scrollTop,
+            max: scroller.scrollHeight - scroller.clientHeight,
+          };
         }
         """
     )
@@ -192,6 +205,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "main_stable": main_stable,
         "motion": motion,
         "controls": controls,
+        "orientation": orientation,
         "animation": animation_summary(page),
         "errors": page.evaluate("window.__epErrors"),
         "unknown_ws": page.evaluate("Array.from(window.__epUnknownWsTypes).sort()"),
@@ -226,13 +240,18 @@ def main() -> int:
                     failures.append(f"{profile.name}: dashboard menu did not open")
                 if result["controls"]["menuClosed"] is not True:
                     failures.append(f"{profile.name}: dashboard menu did not close")
+                if result["controls"]["autoPresent"] is not True:
+                    failures.append(f"{profile.name}: automatic-control button is missing")
                 if result["errors"] or page_errors:
                     failures.append(f"{profile.name}: JavaScript errors were reported")
             finally:
                 context.close()
                 browser.close()
 
-    print(json.dumps({"results": results, "failures": failures}, indent=2, sort_keys=True))
+    report = {"results": results, "failures": failures}
+    print(json.dumps(report, indent=2, sort_keys=True))
+    output = Path("frontend-browser-results.json")
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if failures:
         print("Browser diagnostic failures:")
         for failure in failures:
