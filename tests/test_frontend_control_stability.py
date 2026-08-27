@@ -85,8 +85,9 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("pointerSafetyTimer", self.runtime)
         self.assertIn("keyboardSafetyTimer", self.runtime)
         self.assertIn("this.__epV038RenderDeferred = true", self.runtime)
+        self.assertIn("function stableRuntimeActive(panel)", self.runtime)
         self.assertLess(
-            self.runtime.index("if (interactionActive(this))"),
+            self.runtime.index("if (!stableRuntime && interactionActive(this))"),
             self.runtime.index("previousRender.call(this)"),
         )
 
