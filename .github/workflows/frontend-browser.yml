@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/frontend-stability-v041
+      - fix/v041-optimize-scroll
   pull_request:
     paths:
       - "custom_components/gw_energypilot/frontend/**"
@@ -36,12 +37,16 @@ jobs:
           python -m playwright install --with-deps chromium webkit
 
       - name: Run desktop, iPad and iPhone stability diagnostics
-        run: python tests/browser/test_frontend_stability_v041.py
+        run: |
+          python tests/browser/test_frontend_stability_v041.py
+          python tests/browser/test_frontend_optimize_v0411.py
 
       - name: Upload browser results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: frontend-browser-stability
-          path: frontend-browser-results.json
+          path: |
+            frontend-browser-results.json
+            frontend-optimize-results.json
           if-no-files-found: warn
