@@ -29,6 +29,7 @@ jobs:
 
       - name: Validate active frontend JavaScript
         run: |
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v041.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v040.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v039.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-model.js
@@ -37,6 +38,8 @@ jobs:
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-i18n.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v027-battery-plan-data.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v027-battery-plan-core.js
           node tests/test_frontend_v038.mjs
           node tests/test_frontend_v038_controls.mjs
           node tests/test_frontend_v038_i18n.mjs
