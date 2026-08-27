@@ -36,7 +36,7 @@ Each profile verifies:
 - the Optimize control returns to its idle state;
 - no JavaScript/page errors or unknown WebSocket calls.
 
-The existing v0.41 full browser matrix, Python/Node Quality suite, repository validator, frontend architecture audit, HACS validation and Hassfest remain required gates.
+The existing v0.41 full browser matrix, Python/Node Quality suite, repository validator, frontend architecture audit, HACS validation and Hassfest remain required gates. The hotfix is eligible for merge only after those gates pass on the exact release-head commit.
 
 ## Safety and compatibility
 
