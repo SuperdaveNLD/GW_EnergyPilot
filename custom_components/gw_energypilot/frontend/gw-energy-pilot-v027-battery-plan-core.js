@@ -121,6 +121,13 @@ function installEnhancedCard(panel, root) {
   else if (data && Date.now() - data.at >= DATA_CACHE_MS && !panel.__epV027BatteryPlanPromise) void loadChartData(panel);
 }
 
+export function refreshBatteryPlanCard(panel) {
+  const root = panel?.shadowRoot;
+  if (!root) return;
+  ensureStyles(root);
+  installEnhancedCard(panel, root);
+}
+
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 const previousRender = PanelClass.prototype._render;
@@ -128,8 +135,8 @@ PanelClass.prototype._render = function energyPilotV027BatteryPlanRender() {
   previousRender.call(this);
   const root = this.shadowRoot;
   if (!root) return;
-  ensureStyles(root);
-  installEnhancedCard(this, root);
+  this.__epV041RefreshBatteryPlan = () => refreshBatteryPlanCard(this);
+  refreshBatteryPlanCard(this);
   const versionBadge = root.querySelector(".version");
   if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
   const footerItems = root.querySelectorAll("footer span");
