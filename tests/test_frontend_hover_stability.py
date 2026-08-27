@@ -34,7 +34,21 @@ class FrontendHoverStabilityTests(unittest.TestCase):
         # Release wrappers may sit above v0.38. The hover regression owns
         # reachability of the v0.38 behavior, not whichever release wrapper is
         # currently active.
-        if "gw-energy-pilot-v041.js?v=" in init_source:
+        if "gw-energy-pilot-v0411.js?v=" in init_source:
+            v0411 = (FRONTEND / "gw-energy-pilot-v0411.js").read_text(
+                encoding="utf-8"
+            )
+            v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
+                encoding="utf-8"
+            )
+            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('import "./gw-energy-pilot-v041.js?v=', v0411)
+            self.assertIn('import "./gw-energy-pilot-v039.js?v=', v041)
+            self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
+            self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
+        elif "gw-energy-pilot-v041.js?v=" in init_source:
             v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
                 encoding="utf-8"
             )
