@@ -10,7 +10,22 @@ v0.39 proved that the remaining visible blink was a presentation problem caused 
 
 v0.40 addresses that shared cause at the render boundary instead of adding per-button patches. A persistent ShadowRoot stylesheet temporarily disables **transitions** for interactive controls while the inherited synchronous rebuild settles and until the rebuilt controls have painted once. A generation token prevents an older render callback from releasing a newer settle period. The fallback style is inserted in the same render task when constructable/adopted stylesheets are unavailable.
 
-This mechanism intentionally does not suppress CSS animations, defer telemetry while a pointer merely hovers, capture pointers or transplant old DOM nodes/listener closures. The v0.38 interaction guard remains responsible only for a real active press, and v0.39 remains responsible for Battery Strategy hover continuity.
+This mechanism intentionally does not suppress CSS animations, defer telemetry while a mouse pointer merely hovers, capture pointers or transplant old DOM nodes/listener closures. v0.39 remains responsible for Battery Strategy hover continuity.
+
+### Mobile touch/render contract
+
+Phone field validation of the v0.40 candidate exposed a separate regression in the v0.38 runtime's touch/render boundary. The runtime had copied mobile scroll-position restoration from v0.36.2, but its newer interaction guard only started on interactive controls and released the guard as soon as a touch moved 8 px. The queued post-render scroll restores could therefore write an old `scrollTop` while the browser was already processing a swipe or momentum scroll.
+
+The active v0.40 chain keeps the v0.38 architecture but restores these explicit rules:
+
+- a primary **touch** beginning anywhere inside the EnergyPilot ShadowRoot starts an interaction guard; mouse/pen still require an actual interactive target;
+- a touch movement of at least 8 px marks the interaction as a scroll gesture but does not end it;
+- full dashboard renders remain deferred until pointer-up/cancel and, for a moved touch, a 350 ms settle interval;
+- pending animation-frame scroll restorations abort when a touch interaction is active, so an older telemetry snapshot cannot overwrite the browser/WebView's current native scroll position;
+- touch handling never calls `preventDefault` and never captures the pointer;
+- the existing three-second pointer safety timeout and window-blur cleanup remain the final stuck-interaction escape path.
+
+This keeps two responsibilities separate: scroll-position restoration protects an idle mobile viewport from a telemetry-driven DOM rebuild, while the touch guard gives the browser exclusive ownership of `scrollTop` during an active native pan/momentum gesture.
 
 ## Why the v0.37 control stack was replaced
 
@@ -33,6 +48,7 @@ The replacement has these rules:
 - no old button node with a per-node event-listener closure is transplanted;
 - no pointer is captured;
 - pointer and keyboard completion are observed through pointer-up/cancel, focus-out, window blur and independent three-second safety timers;
+- moved touch gestures retain render ownership through their short momentum-settle window;
 - an action updates and re-enables all profile buttons immediately after its WebSocket result, before depending on another dashboard render.
 
 ## Live-flow direction contract
@@ -63,14 +79,14 @@ GoodWe battery power: positive discharge, negative charge
 
 The exact candidate modules uploaded to the branch passed locally:
 
-- five JavaScript syntax checks;
+- JavaScript syntax checks for the active release/runtime chain;
 - executable Node flow assertions for PV, grid import/export, house load and battery charge/discharge;
 - executable Node localization assertions proving English and Dutch both produce exactly five identical mode keys;
 - an executable delegated-click test proving translated visible text still sends exactly one `battery_saver` WebSocket action;
 - the same click test proves exactly one profile becomes active and all five controls are immediately enabled after completion;
-- eight Python contract tests for active wiring, excluded legacy layers, stable key-based controls, Dutch/English labels, global pointer/keyboard completion and physical flow ownership.
+- Python contract tests for active wiring, excluded legacy layers, stable key-based controls, Dutch/English labels, global pointer/keyboard completion, mobile touch-scroll ownership and physical flow ownership.
 
-GitHub-hosted Quality, HACS and Hassfest runs are mandatory release gates. The release is merged only after those checks pass on the final v0.38 head.
+GitHub-hosted Quality, HACS and Hassfest runs are mandatory release gates. The release is merged only after those checks pass on the final release head.
 
 ## Multi-installation field-validation matrix
 
@@ -81,7 +97,9 @@ After automated release gates, continue validating:
 3. Browser translation disabled and enabled: strategy identity and API mode values remain unchanged.
 4. Repeated GoodWe telemetry refresh while hovering and pressing a profile button: no flashing active state, no lost click and no stuck disabled state.
 5. Mouse and touch scrolling across the strategy grid: normal vertical scrolling remains available.
-6. PV production, grid import/export, battery charge/discharge and house load each show the physical movement listed above.
+6. Start a phone swipe on non-interactive dashboard content while telemetry is updating: the viewport must continue moving smoothly and must not snap toward the top.
+7. Release a phone swipe with momentum: no full dashboard render or stale `scrollTop` restore may interrupt the short momentum window.
+8. PV production, grid import/export, battery charge/discharge and house load each show the physical movement listed above.
 
 ## Safety and compatibility
 

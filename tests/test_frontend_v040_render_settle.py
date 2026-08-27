@@ -15,9 +15,22 @@ class FrontendV040RenderSettleTests(unittest.TestCase):
     def test_v040_is_active_and_version_synchronized(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
+        v038 = (FRONTEND / "gw-energy-pilot-v038.js").read_text(encoding="utf-8")
         self.assertEqual(manifest["version"], "0.40")
-        self.assertIn('gw-energy-pilot-v040.js?v=0.40-release1', init)
-        self.assertIn('import "./gw-energy-pilot-v039.js?v=0.40-v0391"', self.source)
+        self.assertIn('gw-energy-pilot-v040.js?v=0.40-mobile-scroll1', init)
+        self.assertIn(
+            'import "./gw-energy-pilot-v039.js?v=0.40-mobile-scroll1"',
+            self.source,
+        )
+        self.assertIn(
+            'import "./gw-energy-pilot-v038.js?v=0.40-mobile-scroll1"',
+            v039,
+        )
+        self.assertIn(
+            'import "./gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1"',
+            v038,
+        )
         self.assertIn('const VERSION = "0.40"', self.source)
 
     def test_v040_suppresses_only_transition_restart_during_render_settle(self) -> None:

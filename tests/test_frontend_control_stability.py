@@ -26,7 +26,7 @@ class FrontendControlStabilityTests(unittest.TestCase):
         )
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
-        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.38-release1", self.entry)
+        self.assertIn("gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1", self.entry)
         self.assertIn('gw-energy-pilot-v034.js?v=0.38-clean-base1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
@@ -75,10 +75,13 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn('globalThis.addEventListener?.(\n    "pointercancel"', self.runtime)
         self.assertIn('globalThis.addEventListener?.("blur"', self.runtime)
         self.assertIn("function completePointerInteraction", self.runtime)
+        self.assertIn("function finishPointerInteraction", self.runtime)
         self.assertIn("function completeKeyboardInteraction", self.runtime)
         self.assertIn("function completeAllInteractions", self.runtime)
         self.assertIn("const INTERACTION_SAFETY_TIMEOUT_MS = 3000", self.runtime)
         self.assertIn("const TOUCH_SCROLL_THRESHOLD_PX = 8", self.runtime)
+        self.assertIn("const TOUCH_SCROLL_SETTLE_MS = 350", self.runtime)
+        self.assertIn("pointerFinishTimer", self.runtime)
         self.assertIn("pointerSafetyTimer", self.runtime)
         self.assertIn("keyboardSafetyTimer", self.runtime)
         self.assertIn("this.__epV038RenderDeferred = true", self.runtime)
@@ -86,6 +89,28 @@ class FrontendControlStabilityTests(unittest.TestCase):
             self.runtime.index("if (interactionActive(this))"),
             self.runtime.index("previousRender.call(this)"),
         )
+
+    def test_v038_touch_scroll_owns_viewport_until_gesture_settles(self) -> None:
+        self.assertIn('const touchPointer = event.pointerType === "touch"', self.runtime)
+        self.assertIn(
+            "if (!touchPointer && !eventInteractiveElement(event)) return;",
+            self.runtime,
+        )
+        self.assertIn("state.touchMoved = false", self.runtime)
+        self.assertIn("state.touchMoved = true", self.runtime)
+        self.assertIn("finishPointerInteraction(panel, true)", self.runtime)
+        self.assertIn("function touchInteractionActive", self.runtime)
+        self.assertIn("function stabilizeScrollAfterRender(panel, snapshots)", self.runtime)
+        self.assertIn("if (touchInteractionActive(panel)) return;", self.runtime)
+        self.assertIn("stabilizeScrollAfterRender(this, scrollSnapshots)", self.runtime)
+
+        move_start = self.runtime.index('globalThis.addEventListener?.(\n    "pointermove"')
+        move_end = self.runtime.index('globalThis.addEventListener?.(\n    "pointerup"', move_start)
+        pointermove = self.runtime[move_start:move_end]
+        self.assertIn("state.touchMoved = true", pointermove)
+        self.assertNotIn("completePointerInteraction(panel)", pointermove)
+        self.assertNotIn("preventDefault", pointermove)
+        self.assertNotIn("setPointerCapture", self.runtime)
 
     def test_v038_flow_uses_one_physical_direction_contract(self) -> None:
         self.assertIn("export function resolveHousePower", self.model)
