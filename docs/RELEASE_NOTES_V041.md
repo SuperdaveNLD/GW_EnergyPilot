@@ -1,15 +1,15 @@
-
 # GW EnergyPilot v0.41 Beta
 
-v0.41 is the frontend stability release requested after repeated mobile scroll and control failures. It changes the active dashboard render architecture rather than adding another visual or pointer patch.
+v0.41 is the frontend stability release requested after repeated mobile scroll and control failures. It changes the active dashboard render architecture rather than adding another visual, pointer or scroll-restoration patch.
 
 ## Operator-visible behavior
 
-- The dashboard remains scrollable while GoodWe and EMHASS telemetry updates arrive.
+- Ordinary GoodWe and EMHASS telemetry no longer rebuilds the complete dashboard DOM.
 - The Dashboard menu, Automatic Control button and Battery Strategy buttons keep the same DOM identity during ordinary telemetry updates.
+- Native browser and Home Assistant WebView scrolling owns the viewport; the active v0.41 path does not restore an older EnergyPilot `scrollTop` snapshot during a pan or momentum scroll.
 - Selecting a Battery Strategy updates only the strategy section while the existing Battery Saver API applies the mode and starts the established optimization/publish transaction.
 - A changed EMHASS plan refreshes only the Battery · Plan · Price card. The rest of the dashboard is not rebuilt.
-- EnergyPilot animations, transitions, moving flow particles and modal backdrop filters are disabled. Static direction/state labels remain available.
+- EnergyPilot animations, transitions, moving flow particles and modal backdrop filters are disabled. Static direction and state labels remain available.
 
 ## Stable-DOM architecture
 
@@ -28,10 +28,10 @@ A full render remains valid only for:
 - first panel initialization;
 - Home Assistant language, user or theme changes;
 - entity-registry changes;
-- optional-card topology changes, such as PV4 becoming structurally present/absent;
-- an explicit layout/narrow-mode structural change.
+- optional-card topology changes, such as PV4 becoming structurally present or absent;
+- an explicit layout or narrow-mode structural change.
 
-The inherited v0.38 pointer/render guard and mobile scroll snapshot restoration remain available to historical v0.38-v0.40 entrypoints. The active v0.41 runtime explicitly bypasses them. It does not write an old `scrollTop` back during a pan or momentum scroll.
+The inherited v0.38 pointer/render guard and mobile scroll snapshot restoration remain available to historical v0.38-v0.40 entrypoints. The active v0.41 runtime explicitly bypasses them.
 
 ## Scoped refresh ownership
 
@@ -68,13 +68,13 @@ The release matrix runs the exact v0.41 entrypoint in real browser engines:
 
 Each profile verifies scroll range, idle scroll stability, monotonic telemetry scrolling, stable control identity, menu open/close, Automatic Control OFF/ON, Battery Strategy apply, graph-only plan refresh, Dutch localization, post-structure controls, zero active motion and clean JavaScript/WebSocket diagnostics.
 
-These are browser-engine/viewport regressions, not a claim of broad physical-device, firmware or Home Assistant Companion App validation. That wider field validation remains part of the Beta status.
+These are deterministic browser-engine and viewport regressions. They are not a claim of broad physical-device, firmware or Home Assistant Companion App validation; that wider field validation remains part of the Beta status.
 
 ## Upgrade notes
 
 1. Install v0.41 through HACS after the release is published.
 2. Restart Home Assistant as requested by HACS.
-3. Reload the dashboard/browser so the new `0.41-stable1` frontend cache keys are used.
+3. Reload the dashboard or browser so the new `0.41-stable1` frontend cache keys are used.
 4. Verify scrolling and the Dashboard menu before enabling Automatic Control.
 5. Confirm Battery Strategy and Optimize now update the plan graph without moving the page.
 
