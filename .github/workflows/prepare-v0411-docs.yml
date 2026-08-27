@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   prepare-docs:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
@@ -19,98 +18,8 @@ jobs:
           ref: fix/v041-optimize-scroll
           fetch-depth: 0
 
-      - name: Update release documentation
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          changelog = Path("CHANGELOG.md")
-          text = changelog.read_text(encoding="utf-8")
-          if "## [0.41.1] - 2026-08-27" not in text:
-              block = """## [0.41.1] - 2026-08-27
-
-### Fixed
-
-- Removed the inherited Optimize-now completion render that detached the touched dashboard button after the Home Assistant button service returned and could restart Safari/WebKit blinking or break native scrolling.
-- Replaced only the inherited Optimize listener with a v0.41.1 stable-DOM action that patches busy/idle state, orchestrator status, last-success details and errors in place.
-- Preserved the same Optimize button, dashboard `main`, layout control, Automatic Control and Battery Strategy DOM nodes for the complete solve/publish transaction.
-
-### Validation
-
-- Added a real-browser Optimize regression for desktop Chromium, iPad WebKit touch and iPhone WebKit touch.
-- The regression verifies one service execution, zero complete dashboard renders, stable control identities, no scroll jump, working post-optimization scrolling and targeted plan-card refresh.
-- Existing Python/Node Quality, repository invariants, frontend architecture audit, HACS, Hassfest and the full v0.41 browser matrix remain required gates.
-
-### Safety and compatibility
-
-- Frontend-only hotfix; no GoodWe register, Modbus block, EMS mapping/write order, Automatic Control decision, EMHASS solve/publish ownership, entity ID, unique ID, config-entry or persistent-state change.
-
-"""
-              text = text.replace("## [0.41] - 2026-08-27", block + "## [0.41] - 2026-08-27", 1)
-              changelog.write_text(text, encoding="utf-8")
-
-          release_index = Path("docs/RELEASE_NOTES.md")
-          text = release_index.read_text(encoding="utf-8")
-          row = "| **0.41.1** | 2026-08-27 | **Beta** | Hotfixes Optimize now so its full solve/publish transaction patches the existing control in place, never rebuilds the touched dashboard and keeps desktop/iPad/iPhone scrolling usable. |"
-          if row not in text:
-              separator = "|---|---|---|---|\n"
-              text = text.replace(separator, separator + row + "\n", 1)
-          section = """# v0.41.1 — Optimize now stable-DOM hotfix
-
-v0.41.1 closes the action-specific gap left in v0.41. The historical Optimize button listener still requested a complete dashboard render after the asynchronous Home Assistant button service completed. On Safari/WebKit that could detach the touched node during the interaction lifecycle, making the dashboard blink and leaving native scrolling unusable.
-
-The v0.41.1 entrypoint replaces only that inherited listener. Busy/idle state and orchestrator details are patched on the existing nodes, while the established backend optimization, publish and plan-revision transaction remains unchanged. A dedicated real-browser matrix presses Optimize while scrolled and verifies zero full renders plus working scrolling afterward on desktop Chromium and iPad/iPhone WebKit touch profiles.
-
-See `docs/RELEASE_NOTES_V0411.md`.
-
-"""
-          if "# v0.41.1 — Optimize now stable-DOM hotfix" not in text:
-              text = text.replace("# v0.41 — Stable DOM and native mobile scrolling", section + "# v0.41 — Stable DOM and native mobile scrolling", 1)
-          release_index.write_text(text, encoding="utf-8")
-
-          readme = Path("README.md")
-          text = readme.read_text(encoding="utf-8")
-          text = text.replace("**v0.41 · Beta**", "**v0.41.1 · Beta**", 1)
-          notes_line = "- `docs/RELEASE_NOTES_V0411.md` — v0.41.1 Optimize-now stable-DOM and scrolling hotfix;\n"
-          if notes_line not in text:
-              text = text.replace("- `docs/RELEASE_NOTES.md` — current release index and Beta scope;\n", "- `docs/RELEASE_NOTES.md` — current release index and Beta scope;\n" + notes_line, 1)
-          old_claim = "- Battery Strategy and Battery · Plan · Price refreshes are scoped to their own sections/cards; a fresh optimization no longer rebuilds unrelated controls."
-          corrected_claim = "- Battery Strategy feedback and Battery · Plan · Price refreshes are scoped to their own sections/cards; v0.41.1 separately fixes the inherited Optimize-now completion render."
-          text = text.replace(old_claim, corrected_claim, 1)
-          highlights = """## v0.41.1 highlights
-
-- Optimize now keeps the same button and dashboard DOM connected throughout the complete Home Assistant service call.
-- Busy/idle state and orchestrator details update in place; the action no longer ends with `_queueRender()`.
-- Desktop Chromium plus iPad/iPhone WebKit touch regressions verify zero full renders, no scroll jump and working scrolling after optimization.
-- The backend EMHASS solve/publish path, GoodWe execution and all entity identities remain unchanged.
-
-"""
-          if "## v0.41.1 highlights" not in text:
-              text = text.replace("## v0.41 highlights", highlights + "## v0.41 highlights", 1)
-          readme.write_text(text, encoding="utf-8")
-
-          v041_notes = Path("docs/RELEASE_NOTES_V041.md")
-          text = v041_notes.read_text(encoding="utf-8")
-          follow_up = "> **Follow-up:** v0.41.1 removes an inherited action-specific full render that still ran after pressing **Optimize now**. Ordinary telemetry, strategy and plan-card stable-DOM behavior described below remains the v0.41 foundation.\n\n"
-          if follow_up not in text:
-              marker = "# GW EnergyPilot v0.41 Beta\n\n"
-              text = text.replace(marker, marker + follow_up, 1)
-              v041_notes.write_text(text, encoding="utf-8")
-
-          architecture = Path("docs/FRONTEND_STABLE_DOM.md")
-          text = architecture.read_text(encoding="utf-8")
-          addition = """
-
-## v0.41.1 action-specific render contract
-
-The stable-DOM rule also applies to asynchronous dashboard actions. A control may update its own text, disabled state, accessibility state and related status rows in place, but it must not request a complete panel render when the service promise settles.
-
-The Optimize-now control is the first explicit regression for this rule. v0.41.1 removes the inherited completion `_queueRender()` by replacing that historical listener at the active release boundary. The backend button entity and orchestrator transaction are unchanged. Browser CI captures `main` and control identities before the click and requires zero complete renders plus usable scrolling after the new plan has refreshed.
-"""
-          if "## v0.41.1 action-specific render contract" not in text:
-              architecture.write_text(text.rstrip() + addition + "\n", encoding="utf-8")
-          PY
+      - name: Prepare documentation
+        run: python scripts/prepare_v0411_docs.py
 
       - name: Commit documentation
         shell: bash
@@ -118,10 +27,6 @@ The Optimize-now control is the first explicit regression for this rule. v0.41.1
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md README.md docs/RELEASE_NOTES.md docs/RELEASE_NOTES_V041.md docs/FRONTEND_STABLE_DOM.md
-          if git diff --cached --quiet; then
-            echo "Documentation already prepared."
-            exit 0
-          fi
+          git add -A
           git commit -m "Document v0.41.1 optimize scroll hotfix"
           git push origin HEAD:fix/v041-optimize-scroll
