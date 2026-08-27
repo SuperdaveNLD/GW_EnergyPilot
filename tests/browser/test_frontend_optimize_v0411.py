@@ -35,8 +35,8 @@ def load_active_hotfix(page: Page) -> None:
     page.route(ACTIVE_MODULE_REQUEST, fulfill)
 
 
-def exercise_optimize(page: Page) -> dict[str, object]:
-    """Press Optimize now while scrolled and prove the interaction DOM survives."""
+def exercise_optimize(page: Page, profile: stability.Profile) -> dict[str, object]:
+    """Press a visible Optimize control and prove its interaction DOM survives."""
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
     page.wait_for_function(
@@ -57,22 +57,28 @@ def exercise_optimize(page: Page) -> dict[str, object]:
         timeout=15_000,
     )
 
+    button = stability.shadow(page, ".ep-optimize-now")
+    button.evaluate(
+        "node => node.scrollIntoView({block: 'center', inline: 'nearest'})"
+    )
+    page.wait_for_timeout(180)
+
     initial = page.evaluate(
         """
         () => {
           const panel = window.__epPanel;
           const root = panel.shadowRoot;
           const scroller = window.__epScroller;
-          const maximum = scroller.scrollHeight - scroller.clientHeight;
-          scroller.scrollTop = Math.max(200, Math.round(maximum * 0.45));
           const optimizeId = panel._entityId('optimize_now');
           const revision = Number(
             window.__epHass.states[optimizeId]?.attributes?.plan_revision || 0
           );
+          const optimize = root.querySelector('.ep-optimize-now');
+          const rect = optimize?.getBoundingClientRect();
 
           window.__epOptimizeIdentity = {
             main: root.querySelector('main'),
-            optimize: root.querySelector('.ep-optimize-now'),
+            optimize,
             layout: root.querySelector('.ep-layout-button'),
             automatic: root.querySelector('#auto-toggle'),
             strategy: root.querySelector('[data-ep-v038-profile="mad_steve"]'),
@@ -85,17 +91,23 @@ def exercise_optimize(page: Page) -> dict[str, object]:
           };
 
           return {
-            maximum,
+            maximum: scroller.scrollHeight - scroller.clientHeight,
             scrollTop: scroller.scrollTop,
             revision,
+            buttonVisible: Boolean(
+              rect &&
+              rect.bottom > 0 &&
+              rect.top < scroller.clientHeight
+            ),
           };
         }
         """
     )
-    page.wait_for_timeout(120)
 
-    button = stability.shadow(page, ".ep-optimize-now")
-    button.click(timeout=5_000)
+    if profile.touch:
+        button.tap(timeout=5_000)
+    else:
+        button.click(timeout=5_000)
     page.wait_for_function(
         """
         previousRevision => {
@@ -132,10 +144,13 @@ def exercise_optimize(page: Page) -> dict[str, object]:
           const scroller = window.__epScroller;
           const afterOptimize = scroller.scrollTop;
           const maximum = scroller.scrollHeight - scroller.clientHeight;
-          const probeTarget = Math.min(
-            maximum,
-            afterOptimize + Math.max(320, Math.round(scroller.clientHeight * 0.45))
-          );
+          const distance = Math.max(320, Math.round(scroller.clientHeight * 0.45));
+          const downSpace = maximum - afterOptimize;
+          const upSpace = afterOptimize;
+          const probeTarget = downSpace >= 250
+            ? Math.min(maximum, afterOptimize + distance)
+            : Math.max(0, afterOptimize - Math.min(distance, upSpace));
+          const probeDistance = Math.abs(probeTarget - afterOptimize);
           scroller.scrollTop = probeTarget;
           await new Promise((resolve) => setTimeout(resolve, 180));
           const optimizeId = panel._entityId('optimize_now');
@@ -157,6 +172,7 @@ def exercise_optimize(page: Page) -> dict[str, object]:
             scrollBefore: initial.scrollTop,
             scrollAfterOptimize: afterOptimize,
             probeTarget,
+            probeDistance,
             scrollAfterProbe: scroller.scrollTop,
             revision: Number(
               window.__epHass.states[optimizeId]?.attributes?.plan_revision || 0
@@ -188,6 +204,8 @@ def failures_for(
 
     if initial["maximum"] < 500:
         failures.append(f"{name}: harness is not sufficiently scrollable")
+    if initial["buttonVisible"] is not True:
+        failures.append(f"{name}: Optimize control was not visible before activation")
     if result["renderCount"] != 0:
         failures.append(
             f"{name}: Optimize now triggered {result['renderCount']} complete render(s)"
@@ -206,7 +224,7 @@ def failures_for(
             f"{name}: Optimize now moved scroll by "
             f"{result['scrollAfterOptimize'] - result['scrollBefore']} px"
         )
-    if result["probeTarget"] - result["scrollAfterOptimize"] < 200:
+    if result["probeDistance"] < 200:
         failures.append(f"{name}: no useful post-optimize scroll range remained")
     if abs(result["scrollAfterProbe"] - result["probeTarget"]) > 5:
         failures.append(f"{name}: scrolling stopped working after Optimize now")
@@ -244,12 +262,12 @@ def main() -> int:
             page.on("pageerror", lambda error: page_errors.append(str(error)))
             load_active_hotfix(page)
             try:
-                payload = exercise_optimize(page)
+                payload = exercise_optimize(page, profile)
                 payload["profile"] = profile.name
                 payload["page_errors"] = page_errors
                 results.append(payload)
                 failures.extend(failures_for(profile, payload, page_errors))
-            except (PlaywrightError, Exception) as err:  # noqa: BLE001
+            except PlaywrightError as err:
                 results.append(
                     {
                         "profile": profile.name,
