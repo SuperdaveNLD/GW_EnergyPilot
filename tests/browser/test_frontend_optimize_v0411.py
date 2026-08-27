@@ -75,6 +75,7 @@ def exercise_optimize(page: Page, profile: stability.Profile) -> dict[str, objec
           );
           const optimize = root.querySelector('.ep-optimize-now');
           const rect = optimize?.getBoundingClientRect();
+          const maximum = scroller.scrollHeight - scroller.clientHeight;
 
           window.__epOptimizeIdentity = {
             main: root.querySelector('main'),
@@ -91,8 +92,10 @@ def exercise_optimize(page: Page, profile: stability.Profile) -> dict[str, objec
           };
 
           return {
-            maximum: scroller.scrollHeight - scroller.clientHeight,
+            maximum,
             scrollTop: scroller.scrollTop,
+            bottomDistance: maximum - scroller.scrollTop,
+            buttonTop: rect?.top ?? null,
             revision,
             buttonVisible: Boolean(
               rect &&
@@ -151,11 +154,11 @@ def exercise_optimize(page: Page, profile: stability.Profile) -> dict[str, objec
             ? Math.min(maximum, afterOptimize + distance)
             : Math.max(0, afterOptimize - Math.min(distance, upSpace));
           const probeDistance = Math.abs(probeTarget - afterOptimize);
-          scroller.scrollTop = probeTarget;
-          await new Promise((resolve) => setTimeout(resolve, 180));
           const optimizeId = panel._entityId('optimize_now');
           const button = root.querySelector('.ep-optimize-now');
-          return {
+          const buttonRect = button?.getBoundingClientRect();
+          const bottomDistance = maximum - afterOptimize;
+          const preProbe = {
             maximum,
             renderCount: window.__epOptimizeRenderCount,
             mainStable: window.__epOptimizeIdentity.main === root.querySelector('main'),
@@ -171,9 +174,16 @@ def exercise_optimize(page: Page, profile: stability.Profile) -> dict[str, objec
               ),
             scrollBefore: initial.scrollTop,
             scrollAfterOptimize: afterOptimize,
+            scrollRangeDelta: maximum - initial.maximum,
+            scrollTopDelta: afterOptimize - initial.scrollTop,
+            bottomAnchorDelta: bottomDistance - initial.bottomDistance,
+            buttonTopAfter: buttonRect?.top ?? null,
+            buttonTopDelta:
+              buttonRect && initial.buttonTop !== null
+                ? buttonRect.top - initial.buttonTop
+                : null,
             probeTarget,
             probeDistance,
-            scrollAfterProbe: scroller.scrollTop,
             revision: Number(
               window.__epHass.states[optimizeId]?.attributes?.plan_revision || 0
             ),
@@ -183,6 +193,12 @@ def exercise_optimize(page: Page, profile: stability.Profile) -> dict[str, objec
             version: root.querySelector('.version')?.textContent || '',
             errors: window.__epErrors,
             unknownWs: Array.from(window.__epUnknownWsTypes).sort(),
+          };
+          scroller.scrollTop = probeTarget;
+          await new Promise((resolve) => setTimeout(resolve, 180));
+          return {
+            ...preProbe,
+            scrollAfterProbe: scroller.scrollTop,
           };
         }
         """,
@@ -219,11 +235,27 @@ def failures_for(
     ):
         if result[key] is not True:
             failures.append(f"{name}: Optimize now replaced {key}")
-    if abs(result["scrollAfterOptimize"] - result["scrollBefore"]) > 5:
+
+    # A targeted plan-card refresh may legitimately change the document height.
+    # Native browser scroll anchoring can then adjust scrollTop by the same
+    # amount. Reject an EnergyPilot reset or visible jump, not that native and
+    # desirable compensation.
+    if abs(result["bottomAnchorDelta"]) > 5:
         failures.append(
-            f"{name}: Optimize now moved scroll by "
-            f"{result['scrollAfterOptimize'] - result['scrollBefore']} px"
+            f"{name}: Optimize now changed the native bottom anchor by "
+            f"{result['bottomAnchorDelta']} px"
         )
+    if result["buttonTopDelta"] is None or abs(result["buttonTopDelta"]) > 5:
+        failures.append(
+            f"{name}: touched Optimize control moved in the viewport by "
+            f"{result['buttonTopDelta']} px"
+        )
+    if abs(result["scrollTopDelta"] - result["scrollRangeDelta"]) > 5:
+        failures.append(
+            f"{name}: scrollTop changed independently of document height "
+            f"({result['scrollTopDelta']} px vs {result['scrollRangeDelta']} px)"
+        )
+
     if result["probeDistance"] < 200:
         failures.append(f"{name}: no useful post-optimize scroll range remained")
     if abs(result["scrollAfterProbe"] - result["probeTarget"]) > 5:
