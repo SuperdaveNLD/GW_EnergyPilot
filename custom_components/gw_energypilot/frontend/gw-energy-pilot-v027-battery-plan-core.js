@@ -29,6 +29,7 @@ function openModal(panel) {
   backdrop.addEventListener("click", (event) => { if (event.target === backdrop) close(); });
   document.addEventListener("keydown", escape);
   document.body.appendChild(backdrop);
+  panel.__epV041FreezeMotion?.();
 }
 
 function currentOptimizationPlanRevision(panel) {
@@ -63,6 +64,13 @@ function activePlanChanged(panel, data) {
   return state.last_updated !== plan.last_updated;
 }
 
+function chartRefreshIdle(panel) {
+  return Boolean(
+    !panel.__epV027BatteryPlanLoading &&
+    !panel.__epV027BatteryPlanPromise
+  );
+}
+
 function installEnhancedCard(panel, root) {
   const layout = root.querySelector(".ep-dashboard-layout");
   if (!layout) return;
@@ -80,9 +88,9 @@ function installEnhancedCard(panel, root) {
 
   const renderKey = `${data?.at || 0}:${size}:${hidden ? 1 : 0}`;
   if (existingCard?.dataset.epRenderKey === renderKey) {
-    if (data && activePlanChanged(panel, data) && !panel.__epV027BatteryPlanPromise) {
+    if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) {
       void loadChartData(panel, true);
-    } else if (data && Date.now() - data.at >= DATA_CACHE_MS && !panel.__epV027BatteryPlanPromise) {
+    } else if (data && Date.now() - data.at >= DATA_CACHE_MS && chartRefreshIdle(panel)) {
       void loadChartData(panel);
     }
     return;
@@ -109,16 +117,17 @@ function installEnhancedCard(panel, root) {
   card.querySelectorAll("[data-chart-size]").forEach((button) => {
     button.addEventListener("click", () => {
       saveChartSize(button.dataset.chartSize);
-      panel._queueRender();
+      if (panel.__epV041StableRuntime) refreshBatteryPlanCard(panel);
+      else panel._queueRender();
     });
   });
   card.querySelector(".ep-v027-expand")?.addEventListener("click", () => openModal(panel));
   card.querySelector('[data-action="details"]')?.addEventListener("click", () => openModal(panel));
   card.querySelector('[data-action="refresh"]')?.addEventListener("click", () => void loadChartData(panel, true));
 
-  if (!data && !panel.__epV027BatteryPlanPromise) void loadChartData(panel);
-  else if (data && activePlanChanged(panel, data) && !panel.__epV027BatteryPlanPromise) void loadChartData(panel, true);
-  else if (data && Date.now() - data.at >= DATA_CACHE_MS && !panel.__epV027BatteryPlanPromise) void loadChartData(panel);
+  if (!data && chartRefreshIdle(panel)) void loadChartData(panel);
+  else if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) void loadChartData(panel, true);
+  else if (data && Date.now() - data.at >= DATA_CACHE_MS && chartRefreshIdle(panel)) void loadChartData(panel);
 }
 
 export function refreshBatteryPlanCard(panel) {
@@ -126,6 +135,7 @@ export function refreshBatteryPlanCard(panel) {
   if (!root) return;
   ensureStyles(root);
   installEnhancedCard(panel, root);
+  panel.__epV041FreezeMotion?.();
 }
 
 await customElements.whenDefined(PANEL_NAME);
