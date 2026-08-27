@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>GW EnergyPilot v0.41 browser harness loader</title>
+<script>
+  fetch("/tests/browser/frontend_harness.html", { cache: "no-store" })
+    .then((response) => response.text())
+    .then((html) => {
+      document.open();
+      document.write(
+        html.replace(
+          "gw-energy-pilot-v040.js?browser-harness=1",
+          "gw-energy-pilot-v041.js?browser-harness=1"
+        )
+      );
+      document.close();
+    });
+</script>
