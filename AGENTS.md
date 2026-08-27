@@ -22,7 +22,7 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.39 Beta
+v0.40 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.

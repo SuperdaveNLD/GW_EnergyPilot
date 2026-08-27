@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.40** | 2026-08-26 | **Beta** | Stabilizes the remaining dashboard, menu and card-window controls across telemetry-driven full renders by suppressing transition restart for one painted frame without delaying telemetry or reusing stale button nodes. |
 | **0.39** | 2026-08-26 | **Beta** | Stabilizes Battery Strategy hover during full renders and completes Dutch customer-facing Controller localization without changing GoodWe, EMS or EMHASS behavior. |
 | **0.38** | 2026-08-26 | **Beta** | Rebuilds dashboard controls around language-independent mode keys/delegated actions and makes live-flow direction a single explicit physical mapping, replacing the v0.37 stale-button-node stabilization path. |
 | **0.37** | 2026-08-26 | **Beta** | Publishes the complete current 0.36.x dashboard-stability stack as a clean numeric release, retaining mobile scroll stability and stable button DOM nodes while synchronizing HACS/HA/frontend release metadata. |
@@ -56,6 +57,14 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.40 — Stable dashboard and menu controls across full renders
+
+v0.40 extends the v0.39 presentation fix from Battery Strategy to the rest of the interactive dashboard. Relevant Home Assistant updates still use the established full ShadowRoot render path, but recreated controls no longer visibly replay their hover/switch transition under a stationary pointer.
+
+The new render-settle layer disables CSS transitions only for interactive controls during the synchronous rebuild and through the first painted frame. It does not pause telemetry, capture a pointer, reuse old button nodes or restore the removed v0.35 hover/render lock. Live-flow animations remain enabled because v0.40 does not suppress CSS animations.
+
+See `docs/RELEASE_NOTES_V040.md`.
 
 # v0.39 — Stable strategy hover and complete Dutch Controller copy
 

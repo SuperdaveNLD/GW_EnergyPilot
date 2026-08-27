@@ -9,7 +9,7 @@ FRONTEND = INTEGRATION / "frontend"
 
 
 class V039ReleaseTests(unittest.TestCase):
-    def test_v039_release_is_wired_consistently(self) -> None:
+    def test_v039_behavior_layer_remains_wired_consistently(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
@@ -21,13 +21,36 @@ class V039ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertEqual("0.39", manifest["version"])
-        self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
+        # v0.39 remains a tested behavior layer even when a later release
+        # wrapper owns the active panel/version presentation. v0.40 refreshes
+        # the nested v0.38 runtime cache key for the mobile scroll correction.
+        if manifest["version"] == "0.39":
+            self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
+        else:
+            self.assertIn("gw-energy-pilot-v040.js?v=0.40-mobile-scroll1", init_source)
+            v040 = (FRONTEND / "gw-energy-pilot-v040.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                'import "./gw-energy-pilot-v039.js?v=0.40-mobile-scroll1"',
+                v040,
+            )
+
+        if manifest["version"] == "0.39":
+            self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
+            self.assertIn('gw-energy-pilot-v038-runtime.js?v=0.38-release1', v038)
+        else:
+            self.assertIn(
+                'import "./gw-energy-pilot-v038.js?v=0.40-mobile-scroll1"',
+                release,
+            )
+            self.assertIn(
+                'gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1',
+                v038,
+            )
         self.assertIn('const VERSION = "0.39"', release)
         self.assertIn("__epV039Installed", release)
         self.assertIn("energyPilotV039Render", release)
-        self.assertIn('gw-energy-pilot-v038-runtime.js?v=0.38-release1', v038)
         self.assertIn('gw-energy-pilot-v038-i18n.js?v=0.38-i18n1', v038)
         self.assertIn("localizeV038Controller(this, root)", v038)
         self.assertIn('const VERSION = "0.38"', runtime)
@@ -64,6 +87,8 @@ class V039ReleaseTests(unittest.TestCase):
         )
         self.assertIn("v0.38 Beta release", notes)
         self.assertIn("visible text is never a control identity", notes)
+        self.assertIn("Mobile touch/render contract", notes)
+        self.assertIn("350 ms settle interval", notes)
         self.assertIn("PV production: left to right", notes)
         self.assertIn("No GoodWe register", notes)
 

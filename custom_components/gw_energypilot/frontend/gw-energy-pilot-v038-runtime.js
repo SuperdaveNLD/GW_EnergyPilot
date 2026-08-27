@@ -11,6 +11,7 @@ const PANEL_NAME = "gw-energypilot-panel";
 const HASS_RENDER_BATCH_MS = 150;
 const MOBILE_SCROLL_BREAKPOINT_PX = 720;
 const TOUCH_SCROLL_THRESHOLD_PX = 8;
+const TOUCH_SCROLL_SETTLE_MS = 350;
 const INTERACTION_SAFETY_TIMEOUT_MS = 3000;
 const INTERACTIVE_SELECTOR =
   'button, input, select, textarea, a[href], [role="button"], [tabindex]';
@@ -77,7 +78,9 @@ function interactionState(panel) {
     pointerType: null,
     startX: 0,
     startY: 0,
+    touchMoved: false,
     keyboard: false,
+    pointerFinishTimer: null,
     pointerSafetyTimer: null,
     keyboardSafetyTimer: null,
   };
@@ -89,6 +92,11 @@ function interactionActive(panel) {
   return state.pointerId !== null || state.keyboard;
 }
 
+function touchInteractionActive(panel) {
+  const state = interactionState(panel);
+  return state.pointerId !== null && state.pointerType === "touch";
+}
+
 function flushDeferredRender(panel) {
   if (interactionActive(panel) || !panel.__epV038RenderDeferred) return;
   panel.__epV038RenderDeferred = false;
@@ -97,11 +105,31 @@ function flushDeferredRender(panel) {
 
 function completePointerInteraction(panel) {
   const state = interactionState(panel);
+  if (state.pointerFinishTimer) window.clearTimeout(state.pointerFinishTimer);
   if (state.pointerSafetyTimer) window.clearTimeout(state.pointerSafetyTimer);
+  state.pointerFinishTimer = null;
   state.pointerSafetyTimer = null;
   state.pointerId = null;
   state.pointerType = null;
+  state.startX = 0;
+  state.startY = 0;
+  state.touchMoved = false;
   flushDeferredRender(panel);
+}
+
+function finishPointerInteraction(panel, settleTouchScroll = false) {
+  const state = interactionState(panel);
+  if (state.pointerId === null) return;
+  const touchScroll = state.pointerType === "touch" && state.touchMoved;
+  if (settleTouchScroll && touchScroll) {
+    if (state.pointerFinishTimer) window.clearTimeout(state.pointerFinishTimer);
+    state.pointerFinishTimer = window.setTimeout(
+      () => completePointerInteraction(panel),
+      TOUCH_SCROLL_SETTLE_MS
+    );
+    return;
+  }
+  completePointerInteraction(panel);
 }
 
 function completeKeyboardInteraction(panel) {
@@ -126,14 +154,21 @@ function installInteractionGuard(panel, root) {
   root.addEventListener(
     "pointerdown",
     (event) => {
-      if (!eventInteractiveElement(event)) return;
+      const touchPointer = event.pointerType === "touch";
+      if (!touchPointer && !eventInteractiveElement(event)) return;
       if (typeof event.button === "number" && event.button !== 0) return;
-      if (event.isPrimary === false || state.pointerId !== null) return;
+
+      const settlingTouch = Boolean(state.pointerFinishTimer);
+      if (state.pointerFinishTimer) window.clearTimeout(state.pointerFinishTimer);
+      state.pointerFinishTimer = null;
+      if (event.isPrimary === false || (state.pointerId !== null && !settlingTouch)) return;
+
       if (state.pointerSafetyTimer) window.clearTimeout(state.pointerSafetyTimer);
       state.pointerId = event.pointerId;
       state.pointerType = event.pointerType || "";
       state.startX = event.clientX;
       state.startY = event.clientY;
+      state.touchMoved = false;
       state.pointerSafetyTimer = window.setTimeout(
         () => completePointerInteraction(panel),
         INTERACTION_SAFETY_TIMEOUT_MS
@@ -150,7 +185,7 @@ function installInteractionGuard(panel, root) {
         Math.abs(event.clientX - state.startX),
         Math.abs(event.clientY - state.startY)
       );
-      if (distance >= TOUCH_SCROLL_THRESHOLD_PX) completePointerInteraction(panel);
+      if (distance >= TOUCH_SCROLL_THRESHOLD_PX) state.touchMoved = true;
     },
     true
   );
@@ -159,14 +194,16 @@ function installInteractionGuard(panel, root) {
     "pointerup",
     (event) => {
       if (state.pointerId !== event.pointerId) return;
-      window.setTimeout(() => completePointerInteraction(panel), 0);
+      window.setTimeout(() => finishPointerInteraction(panel, true), 0);
     },
     true
   );
   globalThis.addEventListener?.(
     "pointercancel",
     (event) => {
-      if (state.pointerId === event.pointerId) completePointerInteraction(panel);
+      if (state.pointerId !== event.pointerId) return;
+      if (state.pointerType === "touch") state.touchMoved = true;
+      finishPointerInteraction(panel, true);
     },
     true
   );
@@ -383,12 +420,19 @@ function restoreScrollPositions(snapshots) {
   }
 }
 
-function stabilizeScrollAfterRender(snapshots) {
+function stabilizeScrollAfterRender(panel, snapshots) {
   if (!snapshots.length) return;
   restoreScrollPositions(snapshots);
   globalThis.requestAnimationFrame?.(() => {
+    // A touch may begin after the synchronous render but before this callback.
+    // In that case the browser now owns scrollTop; never overwrite the user's
+    // native pan or momentum movement with an older telemetry snapshot.
+    if (touchInteractionActive(panel)) return;
     restoreScrollPositions(snapshots);
-    globalThis.requestAnimationFrame?.(() => restoreScrollPositions(snapshots));
+    globalThis.requestAnimationFrame?.(() => {
+      if (touchInteractionActive(panel)) return;
+      restoreScrollPositions(snapshots);
+    });
   });
 }
 
@@ -436,7 +480,7 @@ if (!PanelClass.prototype.__epV038Installed) {
     const strategy = installV038CustomerStrategy(this, root, reusableStrategy);
     synchronizeFlowDirections(this, root);
     updateVersion(root);
-    stabilizeScrollAfterRender(scrollSnapshots);
+    stabilizeScrollAfterRender(this, scrollSnapshots);
 
     if (focusedProfile && strategy) {
       const focused = [...strategy.querySelectorAll("[data-ep-v038-profile]")].find(

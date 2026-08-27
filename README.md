@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.39 · Beta**
+**v0.40 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V040.md` — v0.40 stable dashboard/menu controls across full renders;
 - `docs/RELEASE_NOTES_V039.md` — v0.39 stable strategy hover and complete Dutch Controller copy;
 - `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt controls and canonical live-flow direction;
 - `docs/FRONTEND_CONTROL_REBUILD.md` — frontend action/highlight/flow ownership;
@@ -35,6 +36,13 @@ Release documentation:
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
+
+## v0.40 highlights
+
+- Extends render stability from Battery Strategy to the other dashboard/menu/window controls that are recreated during relevant telemetry-driven full ShadowRoot renders.
+- Suppresses only interactive CSS transition restart through the rebuilt controls' first painted frame; normal hover/focus transitions resume immediately afterwards.
+- Keeps live telemetry rendering, live-flow animations, v0.38 click/touch protection and v0.39 strategy-hover continuity active.
+- Does not restore the old hover render-lock or stale-button-node reuse mechanisms and does not change GoodWe, EMS or EMHASS control semantics.
 
 ## v0.39 highlights
 
