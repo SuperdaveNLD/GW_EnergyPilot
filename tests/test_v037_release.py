@@ -22,11 +22,14 @@ class V039ReleaseTests(unittest.TestCase):
         )
 
         # v0.39 remains a tested behavior layer even when a later release
-        # wrapper owns the active panel/version presentation. v0.40 refreshes
-        # the nested v0.38 runtime cache key for the mobile scroll correction.
-        if manifest["version"] == "0.39":
+        # wrapper owns the active panel/version presentation. Later releases
+        # may refresh nested cache keys without changing the v0.39 contract.
+        version = manifest["version"]
+        if version == "0.39":
             self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
-        else:
+            self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
+            self.assertIn('gw-energy-pilot-v038-runtime.js?v=0.38-release1', v038)
+        elif version == "0.40":
             self.assertIn("gw-energy-pilot-v040.js?v=0.40-mobile-scroll1", init_source)
             v040 = (FRONTEND / "gw-energy-pilot-v040.js").read_text(
                 encoding="utf-8"
@@ -35,11 +38,6 @@ class V039ReleaseTests(unittest.TestCase):
                 'import "./gw-energy-pilot-v039.js?v=0.40-mobile-scroll1"',
                 v040,
             )
-
-        if manifest["version"] == "0.39":
-            self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
-            self.assertIn('gw-energy-pilot-v038-runtime.js?v=0.38-release1', v038)
-        else:
             self.assertIn(
                 'import "./gw-energy-pilot-v038.js?v=0.40-mobile-scroll1"',
                 release,
@@ -48,6 +46,27 @@ class V039ReleaseTests(unittest.TestCase):
                 'gw-energy-pilot-v038-runtime.js?v=0.40-mobile-scroll1',
                 v038,
             )
+        elif version == "0.41":
+            self.assertIn("gw-energy-pilot-v041.js?v=0.41-stable1", init_source)
+            v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                'import "./gw-energy-pilot-v039.js?v=0.41-stable1"',
+                v041,
+            )
+            self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
+            self.assertIn(
+                'import "./gw-energy-pilot-v038.js?v=0.41-stable1"',
+                release,
+            )
+            self.assertIn(
+                'gw-energy-pilot-v038-runtime.js?v=0.41-stable1',
+                v038,
+            )
+        else:
+            self.fail(f"Unsupported release version in regression: {version}")
+
         self.assertIn('const VERSION = "0.39"', release)
         self.assertIn("__epV039Installed", release)
         self.assertIn("energyPilotV039Render", release)
