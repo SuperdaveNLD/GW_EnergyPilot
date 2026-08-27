@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v039.js?v=0.41-stable-dom1";
+import "./gw-energy-pilot-v039.js?v=0.41-stable-dom2";
 import {
   FLOW_THRESHOLD_W,
   flowMotionMap,
@@ -7,12 +7,17 @@ import {
 import {
   dashboardLanguage,
   localizedEmsMode,
+  localizeV038Controller,
 } from "./gw-energy-pilot-v038-i18n.js?v=0.38-i18n1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.28-chart1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
 const MOTION_STYLE_ID = "ep-v041-no-motion";
+const GLOBAL_MOTION_STYLE_ID = "ep-v041-global-no-motion";
 const LIVE_PATCH_DELAY_MS = 40;
+const PLAN_PATCH_DELAY_MS = 220;
 
 const COPY = Object.freeze({
   en: Object.freeze({
@@ -35,6 +40,9 @@ const COPY = Object.freeze({
     locked: "LOCKED · AUTOMATIC",
     manualReady: "MANUAL READY",
     entitiesMissing: "ENTITIES MISSING",
+    today: "Today",
+    yesterday: "Yesterday",
+    motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
   }),
   nl: Object.freeze({
     autoActive: "AUTO ACTIEF",
@@ -56,6 +64,9 @@ const COPY = Object.freeze({
     locked: "VERGRENDELD · AUTOMATISCH",
     manualReady: "HANDMATIG GEREED",
     entitiesMissing: "ENTITEITEN ONTBREKEN",
+    today: "Vandaag",
+    yesterday: "Gisteren",
+    motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
   }),
 });
 
@@ -71,18 +82,29 @@ const NO_MOTION_CSS = `
   :host {
     overflow-anchor: auto !important;
   }
-  :host .page,
-  :host .ep-dashboard-layout,
-  :host [data-ep-card],
   :host button,
   :host a,
-  :host label {
+  :host label,
+  :host input,
+  :host select,
+  :host textarea,
+  :host [role="button"],
+  :host [tabindex] {
     touch-action: manipulation;
   }
   :host .ep-layout-menu {
     max-height: calc(100dvh - 104px) !important;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+  }
+  :host .ep-v041-motion-disabled {
+    opacity: .58;
+  }
+  :host .ep-v041-motion-disabled input {
+    cursor: not-allowed !important;
   }
   :host .ep-flow-link::after,
   :host .ep-flow-arrows,
@@ -90,6 +112,40 @@ const NO_MOTION_CSS = `
   :host .ep-flow-hub::after,
   :host .ep-v011-particles span {
     display: none !important;
+  }
+  @media (max-width: 720px) {
+    :host .ep-layout-menu {
+      top: calc(74px + env(safe-area-inset-top)) !important;
+      right: calc(14px + env(safe-area-inset-right)) !important;
+      left: calc(14px + env(safe-area-inset-left)) !important;
+      width: auto !important;
+      max-height: calc(100dvh - 94px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    }
+  }
+`;
+
+const GLOBAL_NO_MOTION_CSS = `
+  .ep-v027-backdrop,
+  .ep-v027-backdrop *,
+  .ep-v027-backdrop *::before,
+  .ep-v027-backdrop *::after,
+  .ep-v026-bp-backdrop,
+  .ep-v026-bp-backdrop *,
+  .ep-v026-bp-backdrop *::before,
+  .ep-v026-bp-backdrop *::after,
+  .ep13-backdrop,
+  .ep13-backdrop *,
+  .ep13-backdrop *::before,
+  .ep13-backdrop *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .ep-v027-backdrop,
+  .ep-v026-bp-backdrop,
+  .ep13-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 `;
 
@@ -106,6 +162,12 @@ function finite(panel, key) {
   return Number.isFinite(value) ? value : null;
 }
 
+function finiteValue(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function normalize(value) {
   return String(value || "")
     .trim()
@@ -120,6 +182,12 @@ function setText(root, selector, value) {
   const node = root?.querySelector(selector);
   if (node && node.textContent !== String(value)) node.textContent = String(value);
   return node;
+}
+
+function setStrong(root, selector, value) {
+  const row = root?.querySelector(selector);
+  const node = row?.querySelector("strong") || row;
+  if (node && node.textContent !== String(value)) node.textContent = String(value);
 }
 
 function setStatus(node, active, text) {
@@ -182,7 +250,7 @@ function patchBalanceRows(card, panel, load, inverter, acActive) {
     let next = null;
     if (label.includes("inverter") || label.includes("omvormer")) next = inverter;
     else if (label.includes("ac active") || label.includes("ac actief")) next = acActive;
-    else if (label.includes("phase sum") || label.includes("fasesom")) next = load;
+    else if (label.includes("phase sum") || label.includes("fasesom") || label.includes("som belasting fasen")) next = load;
     else if (label.includes("system power balance") || label.includes("systeemvermogensbalans")) next = balance;
     if (next !== null) value.textContent = panel._formatPower(next);
   }
@@ -218,6 +286,21 @@ function patchPill(card, presentation) {
 
 function externalState(panel, exact, suffixes) {
   return panel._findState?.(exact) || panel._findStateBySuffix?.(suffixes) || null;
+}
+
+function formatEnergy(value) {
+  const number = finiteValue(value);
+  return number === null ? "—" : `${number.toFixed(number >= 10 ? 1 : 2)} kWh`;
+}
+
+function formatPercent(value, decimals = 1) {
+  const number = finiteValue(value);
+  return number === null ? "—" : `${number.toFixed(decimals)}%`;
+}
+
+function formatDecimal(value, decimals = 4) {
+  const number = finiteValue(value);
+  return number === null ? "—" : number.toFixed(decimals);
 }
 
 function patchFlow(panel, root, pv, load, grid, battery, soc) {
@@ -285,7 +368,7 @@ function patchController(panel, root, automaticOn) {
   patchMetric(card, ["EMS setpoint", "EMS-setpoint"], panel._formatPower(finite(panel, "ems_setpoint")));
   patchMetric(
     card,
-    ["EnergyPilot target", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel"],
+    ["EnergyPilot target", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel"],
     panel._formatPower(finite(panel, "target_power"))
   );
   patchMetric(card, ["Command", "Commando"], panel._textByKey?.("control_command") || "—");
@@ -293,17 +376,35 @@ function patchController(panel, root, automaticOn) {
   const manual = card.querySelector(".ep-v021-manual-pad");
   if (manual) {
     const controlsReady = Boolean(panel._entityId?.("manual_mode") && panel._entityId?.("manual_power"));
+    const busy = Boolean(panel.__epV021ManualBusy);
     manual.classList.toggle("locked", automaticOn || !controlsReady);
     const state = manual.querySelector(".ep-v021-manual-state");
     if (state) state.textContent = automaticOn ? t.locked : controlsReady ? t.manualReady : t.entitiesMissing;
     for (const modeButton of manual.querySelectorAll(".ep-v021-mode-button")) {
       const active = Number(modeButton.dataset.mode) === mode;
       modeButton.classList.toggle("active", active);
-      modeButton.disabled = automaticOn || !controlsReady || Boolean(panel.__epV021ManualBusy);
+      modeButton.disabled = automaticOn || !controlsReady || busy;
     }
     const slider = manual.querySelector(".ep-v021-power-slider");
-    if (slider) slider.disabled = automaticOn || !controlsReady || Boolean(panel.__epV021ManualBusy);
+    const powerState = panel._stateByKey?.("manual_power");
+    const power = finiteValue(powerState?.state);
+    if (slider) {
+      slider.disabled = automaticOn || !controlsReady || busy;
+      if (
+        Number.isFinite(power) &&
+        root.activeElement !== slider &&
+        !panel.__epV021ManualPowerDirty
+      ) {
+        slider.value = String(power);
+      }
+    }
+    const powerLabel = manual.querySelector(".ep-v021-power-label strong");
+    if (powerLabel && Number.isFinite(power) && !panel.__epV021ManualPowerDirty) {
+      powerLabel.textContent = `${Math.round(power)} W`;
+    }
   }
+
+  localizeV038Controller(panel, root);
 }
 
 function patchEmhass(panel, root) {
@@ -339,9 +440,9 @@ function patchEmhass(panel, root) {
   const optimText = optimState?.state || "Not detected";
   setStatus(card.querySelector(".section-title-row .status"), normalize(optimText) === "optimal", optimText);
   setText(card, ".emhass-target strong", panel._formatPower(pBatt));
-  patchMetric(card, ["SOC forecast", "SOC-voorspelling"], panel._formatState(socForecast));
-  patchMetric(card, ["Load forecast", "Belastingsvoorspelling"], panel._formatState(loadForecast));
-  patchMetric(card, ["PV forecast", "PV-voorspelling"], panel._formatState(pvForecast));
+  patchMetric(card, ["SOC forecast", "SOC-voorspelling", "SOC-prognose"], panel._formatState(socForecast));
+  patchMetric(card, ["Load forecast", "Belastingsvoorspelling", "Verbruiksprognose"], panel._formatState(loadForecast));
+  patchMetric(card, ["PV forecast", "PV-voorspelling", "PV-prognose"], panel._formatState(pvForecast));
   const mapping = !Number.isFinite(pBatt)
     ? t.waiting
     : pBatt < -FLOW_THRESHOLD_W
@@ -349,7 +450,17 @@ function patchEmhass(panel, root) {
       : pBatt > FLOW_THRESHOLD_W
         ? t.modeDischarge
         : t.modeHold;
-  patchMetric(card, ["Mapping", "Toewijzing"], mapping);
+  patchMetric(card, ["Mapping", "Toewijzing", "Aansturing"], mapping);
+
+  for (const input of card.querySelectorAll("input[data-soc-slider]")) {
+    const kind = input.dataset.socSlider;
+    const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
+    const value = finite(panel, key);
+    if (!Number.isFinite(value)) continue;
+    if (root.activeElement !== input) input.value = String(value);
+    const label = card.querySelector(`[data-soc-value="${kind}"]`);
+    if (label) label.textContent = `${Math.round(value)}%`;
+  }
 }
 
 function patchStrategy(panel, root) {
@@ -366,9 +477,216 @@ function patchStrategy(panel, root) {
   }
 }
 
+function patchAccountingDay(day, label, imported, exported) {
+  if (!day) return;
+  const strong = day.querySelector("strong");
+  if (strong) strong.textContent = label;
+  let valueNode = [...day.childNodes]
+    .reverse()
+    .find((node) => node.nodeType === Node.TEXT_NODE);
+  if (!valueNode) {
+    day.append(document.createElement("br"));
+    valueNode = document.createTextNode("");
+    day.append(valueNode);
+  }
+  valueNode.textContent = `↓ ${formatEnergy(imported)} · ↑ ${formatEnergy(exported)}`;
+}
+
+function patchGridAccounting(panel, gridCard) {
+  const imported = panel._stateByKey?.("grid_energy_imported_today");
+  const exported = panel._stateByKey?.("grid_energy_exported_today");
+  const days = gridCard?.querySelectorAll(".ep-v013-grid-day") || [];
+  if (!imported || !exported || days.length < 2) return;
+  const t = copy(panel);
+  patchAccountingDay(days[0], t.today, imported.state, exported.state);
+  patchAccountingDay(
+    days[1],
+    t.yesterday,
+    imported.attributes?.last_period,
+    exported.attributes?.last_period
+  );
+}
+
+function optimizeAttributes(panel) {
+  const entityId = panel._entityId?.("optimize_now");
+  return (entityId ? panel._state?.(entityId)?.attributes : null) || {};
+}
+
+function diagnosticConfigAttributes(panel) {
+  return panel._stateByKey?.("emhass_cost_function")?.attributes || {};
+}
+
+function validatedPercent(percentValue, rawValue) {
+  const percent = finiteValue(percentValue);
+  if (percent !== null) return formatPercent(percent);
+  const raw = finiteValue(rawValue);
+  return raw === null ? "—" : `invalid raw ${raw}`;
+}
+
+function diagnosticValue(panel, label, attrs, configAttrs) {
+  const key = normalize(label);
+  const power = (value) => panel._formatPower(finiteValue(value));
+  const text = (value) => value === null || value === undefined || value === "" ? "—" : String(value);
+
+  if (key.includes("current battery soc")) return formatPercent(attrs.battery_soc);
+  if (key.includes("last energypilot optimization soc init") || key.includes("last optimization soc init")) {
+    const value = finiteValue(attrs.soc_init);
+    return formatPercent(value === null ? null : value * 100);
+  }
+  if (key.includes("configured energypilot final soc target")) {
+    const value = finiteValue(attrs.configured_runtime_soc_final);
+    return formatPercent(value === null ? null : value * 100);
+  }
+  if (key.includes("last successful energypilot runtime final soc") || key.includes("runtime final soc target")) {
+    const value = finiteValue(attrs.runtime_soc_final);
+    return formatPercent(value === null ? null : value * 100);
+  }
+  if (key === "emhass minimum soc") {
+    return formatPercent(
+      finite(panel, "emhass_minimum_soc") ?? configAttrs.emhass_minimum_soc_pct
+    );
+  }
+  if (key.includes("emhass config target soc")) {
+    return validatedPercent(
+      configAttrs.emhass_config_target_soc_pct,
+      configAttrs.emhass_config_target_soc_raw
+    );
+  }
+  if (key.includes("emhass deficit threshold")) {
+    return validatedPercent(
+      configAttrs.emhass_soc_deficit_threshold_pct,
+      configAttrs.emhass_soc_deficit_threshold_raw
+    );
+  }
+  if (key.includes("emhass deficit cost")) {
+    return `${formatDecimal(configAttrs.emhass_soc_deficit_cost)} currency/kWh/h`;
+  }
+  if (key.includes("goodwe on-grid minimum soc")) {
+    return formatPercent(attrs.battery_discharge_depth_on_grid_45356);
+  }
+  if (key.includes("ems mode")) {
+    return attrs.ems_mode === null || attrs.ems_mode === undefined
+      ? "—"
+      : `${attrs.ems_mode} · ${attrs.ems_mode_name || "Unknown"}`;
+  }
+  if (key.includes("ems setpoint")) return power(attrs.ems_setpoint);
+  if (key.includes("app / work")) return text(attrs.app_work_mode_47000);
+  if (key.includes("work mode")) return text(attrs.work_mode_35187);
+  if (key.includes("operation mode")) return text(attrs.operation_mode_35188);
+  if (key.includes("grid mode")) return text(attrs.grid_mode_35136);
+  if (key.includes("house load") || key.includes("goodwe load")) return power(attrs.house_load_register_35172);
+  if (key.includes("load phase sum")) return power(attrs.house_load_phase_sum);
+  if (key.includes("power-balance") || key.includes("system power balance")) {
+    return power(attrs.system_balance_power ?? attrs.house_load_power_balance);
+  }
+  if (key.includes("meter fast total") || key.includes("grid meter fast total")) return power(attrs.meter_total_power_fast);
+  if (key.includes("inverter active")) return power(attrs.ac_active_power);
+  if (key.includes("inverter power") || key.includes("inverter total")) return power(attrs.total_inverter_power);
+  if (key === "battery power") return power(attrs.battery_power);
+  if (key === "battery soc") return formatPercent(attrs.battery_soc);
+  if (key === "battery soh") return formatPercent(attrs.battery_soh, 0);
+  if (key.includes("battery charged lifetime")) return formatEnergy(attrs.battery_charge_energy_total);
+  if (key.includes("battery discharged lifetime")) return formatEnergy(attrs.battery_discharge_energy_total);
+  if (key.includes("battery charged today")) return formatEnergy(attrs.battery_charge_energy_today);
+  if (key.includes("battery discharged today")) return formatEnergy(attrs.battery_discharge_energy_today);
+  if (key.includes("grid energy imported total")) return formatEnergy(attrs.meter_total_energy_import);
+  if (key.includes("grid energy exported total")) return formatEnergy(attrs.meter_total_energy_export);
+  if (key.includes("automatic control")) return attrs.controller_enabled ? "ON" : "OFF";
+  if (key === "command" || key.includes("controller command")) return text(attrs.controller_command);
+  if (key.includes("controller target")) return power(attrs.controller_target_power);
+  if (key.includes("expected ems mode")) return text(attrs.controller_expected_mode);
+  if (key.includes("maximum power")) return power(attrs.controller_max_power);
+  if (key.includes("deadband")) return power(attrs.controller_deadband);
+  if (key === "p_batt") return power(attrs.p_batt_value);
+  if (key.includes("p_batt entity")) return text(attrs.p_batt_entity);
+  if (key === "p_grid") return power(attrs.p_grid_value);
+  if (key.includes("p_grid entity")) return text(attrs.p_grid_entity);
+  if (key.includes("optim status entity") || key.includes("optimization status entity")) return text(attrs.optim_status_entity);
+  if (key.includes("optim status") || key === "optimization status") return text(attrs.optim_status_value);
+  if (key === "soc init") {
+    const value = finiteValue(attrs.soc_init);
+    return formatPercent(value === null ? null : value * 100);
+  }
+  if (key.includes("orchestrator")) return text(attrs.orchestrator_status);
+  if (key.includes("last trigger") || key.includes("last reason")) return text(attrs.last_reason);
+  if (key.includes("telemetry refresh")) return text(attrs.telemetry_refresh_seconds);
+  if (key.includes("optimization interval")) return text(attrs.optimization_interval_minutes);
+  if (key.includes("emhass health")) return text(attrs.emhass_health);
+  if (key.includes("emhass version")) return text(attrs.emhass_version);
+  if (key.includes("price source")) return text(attrs.price_runtime_source);
+  if (key.includes("price entity")) return text(attrs.price_entity);
+  if (key.includes("price area")) return text(attrs.price_area);
+  if (key.includes("price points")) return text(attrs.price_points);
+  if (key.includes("load forecast source")) return text(attrs.load_forecast_source);
+  if (key.includes("load forecast points")) return text(attrs.load_forecast_points);
+  if (key.includes("optimize http")) return text(attrs.optimize_http_status);
+  if (key.includes("publish http")) return text(attrs.publish_http_status);
+  if (key.includes("last error")) return text(attrs.last_error);
+  return null;
+}
+
+function patchDiagnostics(panel, root) {
+  const card = root.querySelector(".panel-card.diagnostics");
+  if (!card) return;
+  const attrs = optimizeAttributes(panel);
+  const configAttrs = diagnosticConfigAttributes(panel);
+  for (const row of card.querySelectorAll(".ep-v011-diag-row")) {
+    const label = row.querySelector("span")?.textContent || "";
+    const value = diagnosticValue(panel, label, attrs, configAttrs);
+    const valueNode = row.querySelector("strong");
+    if (value !== null && valueNode && valueNode.textContent !== value) {
+      valueNode.textContent = value;
+    }
+  }
+}
+
+function buildDiagnosticSnapshot(root) {
+  const lines = ["GW EnergyPilot diagnostics"];
+  for (const row of root.querySelectorAll(".panel-card.diagnostics .ep-v011-diag-row")) {
+    const label = row.querySelector("span")?.textContent?.trim();
+    const value = row.querySelector("strong")?.textContent?.trim();
+    if (label) lines.push(`${label}: ${value || "—"}`);
+  }
+  return lines.join("\n");
+}
+
+function installFreshDiagnosticsCopy(panel, root) {
+  const previous = root.querySelector(".panel-card.diagnostics .ep-v011-copy");
+  if (!previous || previous.dataset.epV041Fresh === "1") return;
+  const copyButton = previous.cloneNode(true);
+  copyButton.dataset.epV041Fresh = "1";
+  previous.replaceWith(copyButton);
+  copyButton.addEventListener("click", async () => {
+    patchDiagnostics(panel, root);
+    const text = buildDiagnosticSnapshot(root);
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = copyButton.textContent;
+      copyButton.textContent = language(panel) === "nl" ? "Gekopieerd" : "Copied";
+      globalThis.setTimeout(() => { copyButton.textContent = original; }, 1200);
+    } catch (_err) {
+      window.prompt("Copy GW EnergyPilot diagnostics", text);
+    }
+  });
+}
+
+function patchMotionMenu(panel, root) {
+  const input = root.querySelector('[data-ep-setting="animations"]');
+  if (!input) return;
+  input.checked = false;
+  input.disabled = true;
+  input.setAttribute("aria-disabled", "true");
+  const row = input.closest(".ep-menu-row");
+  row?.classList.add("ep-v041-motion-disabled");
+  const detail = row?.querySelector("small");
+  if (detail) detail.textContent = copy(panel).motionDisabled;
+}
+
 function patchLiveDom(panel) {
   const root = panel.shadowRoot;
-  if (!root?.querySelector("main")) return;
+  const main = root?.querySelector("main");
+  if (!main) return;
+  main.dataset.epV041StableDom = "1";
   const pv = finite(panel, "pv_total_power");
   const load = finite(panel, "total_load_power");
   const grid = finite(panel, "meter_total_power_fast");
@@ -409,6 +727,7 @@ function patchLiveDom(panel) {
       `${panel._formatState(panel._stateByKey?.(voltage))} · ${panel._formatState(panel._stateByKey?.(current))}`
     );
   }
+  patchGridAccounting(panel, gridCard);
 
   const batteryCard = root.querySelector(".energy-card.battery");
   patchPill(batteryCard, batteryPresentation(panel, battery));
@@ -425,6 +744,8 @@ function patchLiveDom(panel) {
   patchEmhass(panel, root);
   patchStrategy(panel, root);
   patchFlow(panel, root, pv, load, grid, battery, soc);
+  patchDiagnostics(panel, root);
+  patchMotionMenu(panel, root);
 
   const thermal = root.querySelector(".panel-card.thermal");
   patchMetric(thermal, ["Inverter radiator", "Omvormerradiator"], panel._formatState(panel._stateByKey?.("inverter_radiator_temperature")));
@@ -440,6 +761,14 @@ function ensureNoMotionStyle(root) {
   style.id = MOTION_STYLE_ID;
   style.textContent = NO_MOTION_CSS;
   root.appendChild(style);
+}
+
+function ensureGlobalNoMotionStyle() {
+  if (!globalThis.document || document.getElementById(GLOBAL_MOTION_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = GLOBAL_MOTION_STYLE_ID;
+  style.textContent = GLOBAL_NO_MOTION_CSS;
+  document.head.appendChild(style);
 }
 
 function contextSignature(hass) {
@@ -465,12 +794,28 @@ function structureSignature(panel) {
   );
   const pBatt = panel._numberState?.(pBattState, null);
   const pv4 = finite(panel, "pv4_power");
+  const entityMap = Object.entries(panel._entityMap || {})
+    .sort(([left], [right]) => left.localeCompare(right));
   return JSON.stringify({
     registryLoaded: Boolean(panel._registryLoaded),
-    entities: Object.keys(panel._entityMap || {}).length,
+    entityMap,
     pBattState: Boolean(pBattState),
     pBattNumeric: Number.isFinite(pBatt),
     pv4Visible: Number.isFinite(pv4) && Math.abs(pv4) > 20,
+  });
+}
+
+function planSignature(panel, hass = panel?._hass) {
+  const optimizeId = panel?._entityId?.("optimize_now");
+  const attrs = optimizeId ? hass?.states?.[optimizeId]?.attributes || {} : {};
+  const entityId = typeof attrs.p_batt_entity === "string"
+    ? attrs.p_batt_entity
+    : "sensor.p_batt_forecast";
+  const planState = hass?.states?.[entityId] || null;
+  return JSON.stringify({
+    revision: attrs.plan_revision ?? null,
+    entityId,
+    lastUpdated: planState?.last_updated || planState?.last_changed || "",
   });
 }
 
@@ -482,19 +827,35 @@ function scheduleLivePatch(panel) {
   }, LIVE_PATCH_DELAY_MS);
 }
 
+function schedulePlanRefresh(panel) {
+  if (panel.__epV041PlanPatchTimer) return;
+  panel.__epV041PlanPatchTimer = globalThis.setTimeout(() => {
+    panel.__epV041PlanPatchTimer = null;
+    void loadChartData(panel, true).catch((err) => {
+      console.error("GW EnergyPilot: v0.41 battery plan refresh failed", err);
+    });
+  }, PLAN_PATCH_DELAY_MS);
+}
+
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 
 if (PanelClass && !PanelClass.prototype.__epV041Installed) {
   const previousRender = PanelClass.prototype._render;
   PanelClass.prototype._render = function energyPilotV041StructuralRender(...args) {
-    // The v0.38 interaction guard was necessary only while telemetry could
-    // destroy the pressed node. v0.41 patches telemetry in place, so do not
-    // install another pointer/touch ownership layer in fresh sessions.
+    // v0.41 keeps the interaction node alive for normal telemetry. The legacy
+    // v0.38 press guard and delayed mobile scroll restoration are therefore
+    // explicitly bypassed only in this release path.
     this.__epV041StableRuntime = true;
     this.__epV038InteractionGuardInstalled = true;
     const result = previousRender.apply(this, args);
     ensureNoMotionStyle(this.shadowRoot);
+    ensureGlobalNoMotionStyle();
+    this.__epV041RefreshBatteryPlan = () => {
+      refreshBatteryPlanCard(this);
+      ensureNoMotionStyle(this.shadowRoot);
+      patchLiveDom(this);
+    };
     const root = this.shadowRoot;
     const versionBadge = root?.querySelector(".version");
     if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
@@ -502,6 +863,8 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     if (footerItems.length > 0) footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
     this.__epV041ContextSignature = contextSignature(this._hass);
     this.__epV041StructureSignature = structureSignature(this);
+    this.__epV041PlanSignature = planSignature(this);
+    installFreshDiagnosticsCopy(this, root);
     patchLiveDom(this);
     return result;
   };
@@ -526,7 +889,17 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
           globalThis.clearTimeout(this.__epV038HassRenderTimer);
           this.__epV038HassRenderTimer = null;
         }
-        if (this.__epV016SettingsOpen) return;
+
+        const nextPlanSignature = planSignature(this, value);
+        if (nextPlanSignature !== this.__epV041PlanSignature) {
+          this.__epV041PlanSignature = nextPlanSignature;
+          schedulePlanRefresh(this);
+        }
+
+        if (this.__epV016SettingsOpen) {
+          scheduleLivePatch(this);
+          return;
+        }
 
         const context = contextSignature(value);
         const structure = structureSignature(this);
