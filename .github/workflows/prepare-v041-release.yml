@@ -20,17 +20,39 @@ jobs:
           ref: fix/frontend-stability-v041
           fetch-depth: 0
 
-      - name: Patch v0.41 release files
+      - name: Align release preparer with current repository markers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/scripts/prepare_v041_release.py")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace("{STATIC_URL}", "{PANEL_STATIC_URL}")
+          text = text.replace(
+              '"The current release is **v0.40 Beta**.",',
+              '"Current release line:\\n\\n```text\\nv0.40 Beta\\n```",',
+          )
+          text = text.replace(
+              '"The current release is **v0.41 Beta**.",',
+              '"Current release line:\\n\\n```text\\nv0.41 Beta\\n```",',
+          )
+          text = text.replace('"## Purpose",', '"## Before changing code",')
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Patch and verify v0.41 release files
         run: python .github/scripts/prepare_v041_release.py
+
+      - name: Remove one-shot release preparation files
+        run: |
+          rm -f .github/scripts/prepare_v041_release.py
+          rm -f .github/workflows/prepare-v041-release.yml
 
       - name: Commit release preparation
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --cached --quiet; then
-            echo "Release files already prepared."
-            exit 0
-          fi
+          git diff --cached --stat
           git commit -m "Prepare v0.41 stable frontend release"
           git push origin HEAD:fix/frontend-stability-v041
