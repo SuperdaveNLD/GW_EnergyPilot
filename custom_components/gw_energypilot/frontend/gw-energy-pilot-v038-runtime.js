@@ -4,7 +4,7 @@ import { ensureV038Styles } from "./gw-energy-pilot-v038-styles.js?v=0.38-styles
 import {
   installV038CustomerStrategy,
   installV038DelegatedControls,
-} from "./gw-energy-pilot-v038-strategy.js?v=0.38-strategy3";
+} from "./gw-energy-pilot-v038-strategy.js?v=0.41-stable1";
 
 const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";

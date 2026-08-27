@@ -22,10 +22,20 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.40 Beta
+v0.41 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
+
+## Frontend stability contract (v0.41)
+
+- Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
+- A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry or optional-card topology.
+- The active v0.41 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
+- EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
+- Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
+- `docs/FRONTEND_STABLE_DOM.md` is the canonical architecture decision for this contract.
 
 ## Before changing code
 

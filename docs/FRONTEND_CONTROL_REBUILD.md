@@ -4,6 +4,8 @@
 
 This document describes the **v0.38 Beta release** frontend control and live-flow architecture. It replaces the released v0.37 presentation stack while keeping the existing GoodWe, EMS and EMHASS backend/control behavior unchanged. The rebuilt controls are covered by executable English/Dutch delegated-click tests and explicit physical flow-direction tests in the normal Quality workflow.
 
+> **v0.41 supersession:** the v0.38-v0.40 control/scroll mechanisms below remain historical compatibility behavior, but the active v0.41 runtime no longer uses a complete render for ordinary telemetry. It patches stable DOM nodes in place, scopes strategy/graph refreshes and disables EnergyPilot motion. See `docs/FRONTEND_STABLE_DOM.md`.
+
 ## v0.40 render-settle follow-up
 
 v0.39 proved that the remaining visible blink was a presentation problem caused by a full ShadowRoot rebuild under a stationary pointer, not by control identity or click ownership. The Battery Strategy section already has explicit hover continuity because that section is intentionally reused. Older dashboard/menu/window controls are still recreated and can therefore restart their CSS transitions when the fresh node immediately matches `:hover`.

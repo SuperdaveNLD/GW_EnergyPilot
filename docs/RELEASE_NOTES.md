@@ -15,6 +15,8 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.41** | 2026-08-27 | **Beta** | Replaces normal telemetry full renders with stable in-place DOM updates, targeted plan/strategy refreshes, native touch scrolling and a no-motion dashboard validated in Chromium and WebKit desktop/iPad/iPhone profiles. |
+
 | **0.40** | 2026-08-26 | **Beta** | Stabilizes the remaining dashboard, menu and card-window controls across telemetry-driven full renders by suppressing transition restart for one painted frame without delaying telemetry or reusing stale button nodes. |
 | **0.39** | 2026-08-26 | **Beta** | Stabilizes Battery Strategy hover during full renders and completes Dutch customer-facing Controller localization without changing GoodWe, EMS or EMHASS behavior. |
 | **0.38** | 2026-08-26 | **Beta** | Rebuilds dashboard controls around language-independent mode keys/delegated actions and makes live-flow direction a single explicit physical mapping, replacing the v0.37 stale-button-node stabilization path. |
@@ -57,6 +59,20 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.41 — Stable DOM and native mobile scrolling
+
+v0.41 replaces the active dashboard's normal telemetry-driven full ShadowRoot rebuild with in-place updates of the existing DOM. Live values, status classes, labels, diagnostics and meter widths still follow current Home Assistant state, but the page, layout menu, Automatic Control button and Battery Strategy controls are not detached during an ordinary GoodWe/EMHASS refresh.
+
+Battery Strategy feedback is updated inside the strategy section and a new EMHASS plan refresh replaces only the Battery · Plan · Price card. Genuine structure changes — first initialization, language/user/theme changes, entity-registry changes and optional-card topology changes — still use a complete render. The active v0.41 path no longer writes saved scroll positions back into the Home Assistant scroll container and does not use the inherited v0.38 pointer/render guard.
+
+EnergyPilot motion is deliberately disabled in this release: no moving flow particles, CSS animations, CSS transitions or modal backdrop filters remain active. This is a reliability decision, not a presentation fallback.
+
+The candidate was exercised with a deterministic Playwright matrix using desktop Chromium plus WebKit touch profiles at iPad and iPhone dimensions. The matrix verifies scroll movement, stable control identity, menu operation, Automatic Control, Battery Strategy, graph-only plan refresh, Dutch localization, deliberate structural rerender recovery, zero active motion and clean JavaScript/WebSocket diagnostics. Physical-device/firmware diversity remains Beta field scope.
+
+No GoodWe, Modbus, EMS, Automatic Control, EMHASS backend, entity identity or persistent-state contract changes.
+
+See `docs/RELEASE_NOTES_V041.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
 # v0.40 — Stable dashboard and menu controls across full renders
 
