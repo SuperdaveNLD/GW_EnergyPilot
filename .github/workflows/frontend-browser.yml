@@ -36,7 +36,7 @@ jobs:
           python -m playwright install --with-deps chromium webkit
 
       - name: Run desktop, iPad and iPhone stability diagnostics
-        run: python tests/browser/test_frontend_stability.py
+        run: python tests/browser/test_frontend_stability_v041.py
 
       - name: Upload browser results
         if: always()
