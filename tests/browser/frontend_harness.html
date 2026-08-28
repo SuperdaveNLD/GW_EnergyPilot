@@ -28,7 +28,9 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = requestedEntry === "v041" ? "v041" : "v040";
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043"].includes(requestedEntry)
+      ? requestedEntry
+      : "v040";
     const ENTITY_KEYS = [
       "pv_total_power", "total_load_power", "battery_power",
       "meter_total_power_fast", "total_inverter_power", "ac_active_power",
@@ -46,8 +48,8 @@
       "grid_energy_import_total", "grid_energy_export_total",
       "battery_charge_energy_today", "battery_discharge_energy_today",
       "battery_charge_energy_total", "battery_discharge_energy_total",
-      "emhass_minimum_soc", "emhass_maximum_soc", "maximum_export",
-      "pause_battery", "maximum_charge", "battery_auto",
+      "emhass_minimum_soc", "emhass_maximum_soc", "emhass_cost_function",
+      "max_export", "battery_pause", "max_charge", "resume_auto",
     ];
 
     let batterySaverMode = "balanced";
@@ -101,17 +103,18 @@
       battery_discharge_energy_total: 4321.0,
       emhass_minimum_soc: 5,
       emhass_maximum_soc: 95,
-      maximum_export: 15000,
-      pause_battery: "off",
-      maximum_charge: "off",
-      battery_auto: "off",
+      emhass_cost_function: "Profit",
+      max_export: "unknown",
+      battery_pause: "unknown",
+      max_charge: "unknown",
+      resume_auto: "unknown",
     };
 
     function domainForKey(key) {
+      if (["optimize_now", "max_export", "battery_pause", "max_charge", "resume_auto"].includes(key)) return "button";
       if (key === "automatic_control" || key.startsWith("pause_") || key.endsWith("_auto")) return "switch";
-      if (["manual_mode", "control_strategy"].includes(key)) return "select";
+      if (["manual_mode", "control_strategy", "emhass_cost_function"].includes(key)) return "select";
       if (["manual_power", "emhass_minimum_soc", "emhass_maximum_soc"].includes(key)) return "number";
-      if (["optimize_now", "maximum_export", "maximum_charge"].includes(key)) return "button";
       return "sensor";
     }
 
@@ -137,6 +140,12 @@
         ...(unit ? { unit_of_measurement: unit } : {}),
       };
       if (key === "ems_mode") attributes.mode_name = "Battery charge power";
+      if (key === "emhass_cost_function") {
+        Object.assign(attributes, {
+          emhass_costfun: "profit",
+          source: "browser harness",
+        });
+      }
       if (key === "optimize_now") {
         Object.assign(attributes, {
           p_batt_entity: "sensor.p_batt_forecast",
@@ -302,11 +311,22 @@
     }
 
     const unknownWsTypes = new Set();
+    const serviceCalls = [];
+    const wsCalls = [];
+    const actionDelay = () => new Promise((resolve) => setTimeout(resolve, 18));
+    const snapshot = (value) => JSON.parse(JSON.stringify(value || {}));
+
+    function keyForEntityId(entityId) {
+      return ENTITY_KEYS.find((key) => entityIdForKey(key) === entityId) || null;
+    }
+
     async function callWS(message) {
       const type = message?.type || "";
+      wsCalls.push(snapshot(message));
       if (type === "config/entity_registry/list") return registry;
       if (type === "gw_energypilot/battery_saver/get") return batterySaverPayload();
       if (type === "gw_energypilot/battery_saver/set") {
+        await actionDelay();
         batterySaverMode = String(message.mode || batterySaverMode);
         window.__epAdvancePlan?.();
         return batterySaverPayload();
@@ -325,6 +345,8 @@
 
     async function callService(domain, service, data) {
       const entityId = data?.entity_id;
+      serviceCalls.push({ domain, service, data: snapshot(data) });
+      await actionDelay();
       if (domain === "switch" && entityId) {
         const current = window.__epHass.states[entityId];
         if (current) {
@@ -334,9 +356,27 @@
       } else if (domain === "number" && service === "set_value" && entityId) {
         window.__epSetEntity(entityId, data.value);
       } else if (domain === "select" && service === "select_option" && entityId) {
-        window.__epSetEntity(entityId, data.option);
+        const raw = {
+          Profit: "profit",
+          Cost: "cost",
+          "Self-consumption": "self-consumption",
+        }[data.option];
+        window.__epSetEntity(entityId, data.option, raw ? { emhass_costfun: raw } : null);
       } else if (domain === "button" && service === "press") {
-        window.__epAdvancePlan?.();
+        const key = keyForEntityId(entityId);
+        if (key === "optimize_now") {
+          window.__epAdvancePlan?.();
+        } else if (["max_export", "battery_pause", "max_charge", "resume_auto"].includes(key)) {
+          const command = {
+            max_export: "manual_max_export",
+            battery_pause: "manual_battery_hold",
+            max_charge: "manual_max_charge",
+            resume_auto: "battery_charge",
+          }[key];
+          window.__epSetEntityByKey("control_command", command);
+          window.__epSetEntityByKey("automatic_control", key === "resume_auto" ? "on" : "off");
+          if (key === "resume_auto") window.__epAdvancePlan?.();
+        }
       }
       return undefined;
     }
@@ -358,14 +398,23 @@
     window.confirm = () => true;
     window.__epEntryPoint = ENTRYPOINT;
     window.__epUnknownWsTypes = unknownWsTypes;
+    window.__epServiceCalls = serviceCalls;
+    window.__epWsCalls = wsCalls;
+    window.__epResetActionLogs = () => {
+      serviceCalls.length = 0;
+      wsCalls.length = 0;
+    };
     window.__epHass = makeHass(initialStates);
     window.__epErrors = [];
     window.addEventListener("error", (event) => window.__epErrors.push(String(event.error || event.message)));
     window.addEventListener("unhandledrejection", (event) => window.__epErrors.push(String(event.reason)));
 
-    const modulePath = ENTRYPOINT === "v041"
-      ? "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v041.js?browser-harness=1"
-      : "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v040.js?browser-harness=1";
+    const modulePath = {
+      v040: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v040.js?browser-harness=1",
+      v041: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v041.js?browser-harness=1",
+      v042: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v042.js?browser-harness=1",
+      v043: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v043.js?browser-harness=1",
+    }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
 
@@ -419,6 +468,16 @@
       window.__epHass = makeHass(window.__epHass.states, nextLanguage);
       panel.hass = window.__epHass;
     };
+    window.__epRenderOnNextPointerDown = () => {
+      panel.shadowRoot.addEventListener(
+        "pointerdown",
+        () => {
+          window.__epPointerDownMain = panel.shadowRoot.querySelector("main");
+          setTimeout(() => { panel.narrow = !panel.narrow; }, 0);
+        },
+        { capture: true, once: true }
+      );
+    };
 
     panel.hass = window.__epHass;
 
@@ -434,7 +493,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (ENTRYPOINT !== "v041" || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

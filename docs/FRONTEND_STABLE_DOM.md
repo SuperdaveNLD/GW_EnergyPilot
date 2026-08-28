@@ -3,7 +3,7 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.41 Beta**. It supersedes the normal telemetry/render behavior documented for v0.38-v0.40 while preserving those older modules for backwards-compatible historical entrypoints.
+This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.43 Beta**. v0.43 retains the v0.41 stable-DOM runtime and v0.42 settings layer, and adds touch-hover presentation ownership while preserving older modules as historical entrypoints.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,6 +17,9 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
+  -> gw-energy-pilot-v043.js?v=0.43-touch1
+  -> gw-energy-pilot-v042.js?v=0.43-touch1
+  -> gw-energy-pilot-v041-emhass-settings.js?v=0.42-emhass1
   -> gw-energy-pilot-v041.js?v=0.41-stable1
   -> gw-energy-pilot-v039.js?v=0.41-stable1
   -> gw-energy-pilot-v038.js?v=0.41-stable1
@@ -24,7 +27,7 @@ Home Assistant PANEL_MODULE
   -> gw-energy-pilot-v038-strategy.js?v=0.41-stable1
 ```
 
-The v0.41 entrypoint also imports the modified plan data/core modules with `0.41-stable1` cache keys. A new top-level file alone is insufficient when modified nested modules retain a v0.40 URL.
+The v0.41 runtime imports its modified plan data/core modules with `0.41-stable1` cache keys. The v0.43 layer changes no nested runtime module; its fresh top-level and v0.42 import keys are sufficient to activate the new presentation rule after upgrade.
 
 ## Render ownership
 
@@ -54,6 +57,8 @@ The active v0.41 normal telemetry path never writes `scrollTop` or `scrollLeft`,
 
 Legacy v0.38 interaction and scroll-restoration functions remain available for historical entrypoints, but `__epV041StableRuntime` bypasses them before installation or use.
 
+On coarse-pointer/touch devices, native `:hover` never owns selected presentation. The v0.43 release layer restores inactive hover styles for Optimize now, EMHASS strategy, Battery Strategy, manual battery quick actions and the layout menu. Existing `.active` and `aria-pressed="true"` state remains authoritative. This rule is presentation-only: v0.43 adds no touch/pointer listeners, pointer capture or event cancellation.
+
 ## Motion contract
 
 EnergyPilot-owned content has no CSS animations, CSS transitions, moving flow particles, animated pseudo-elements or modal backdrop filters. The policy is applied after complete renders and after scoped strategy, graph and modal updates.
@@ -64,7 +69,7 @@ A normal telemetry burst must preserve `main`, Dashboard layout-button, Automati
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.41 by `tests/browser/test_frontend_stability_v041.py`.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.43 by `tests/browser/test_frontend_stability_v043.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders.
 
 ## Contributor rules
 

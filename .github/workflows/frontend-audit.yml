@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/frontend-stability-v041
+      - fix/mobile-touch-controls-v042
   pull_request:
     paths:
       - "custom_components/gw_energypilot/frontend/**"

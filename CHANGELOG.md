@@ -2,6 +2,23 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.43] - 2026-08-28
+
+### Fixed
+
+- Prevented sticky native `:hover` on coarse-pointer/touch devices from making Optimize now, EMHASS Profit/Cost/Self-consumption, Battery Strategy, quick-action/max-export and layout-menu controls look active after the actual selection had moved elsewhere.
+- Restored each affected inactive control's base presentation inside a touch-only media query, so `.active` and `aria-pressed="true"` remain the only selected-state owners.
+
+### Changed
+
+- Added `gw-energy-pilot-v043.js` as a frontend-only release layer over the unchanged v0.42 entrypoint, with a fresh cache key and v0.43 dashboard/footer version presentation.
+- Extended the deterministic browser harness with repeated real taps, action-call evidence, exactly-one-selection assertions, menu cycles, concurrent telemetry and a deliberate structural render during a press.
+
+### Safety and compatibility
+
+- Does not intercept touch/pointer events, capture pointers, cancel native scrolling or change click/service/WebSocket handlers.
+- No backend API, GoodWe register or Modbus path, EMS mode/write order, Automatic Control decision, EMHASS optimization/configuration ownership, entity identity, config-entry data or persistent state change.
+
 ## [0.41] - 2026-08-27
 
 ### Fixed

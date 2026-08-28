@@ -12,15 +12,17 @@ class FrontendV040RenderSettleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.source = (FRONTEND / "gw-energy-pilot-v040.js").read_text(encoding="utf-8")
 
-    def test_v040_remains_a_valid_historical_entrypoint_under_v041(self) -> None:
+    def test_v040_remains_a_valid_historical_entrypoint_under_v043(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        release = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
+        release = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
+        v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
         settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
         v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.42")
-        self.assertIn("gw-energy-pilot-v042.js?v=0.42-release1", init)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.42-emhass1"', release)
+        self.assertEqual(manifest["version"], "0.43")
+        self.assertIn("gw-energy-pilot-v043.js?v=0.43-touch1", init)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.43-touch1"', release)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.42-emhass1"', v042)
         self.assertIn('import "./gw-energy-pilot-v041.js?v=0.41-stable1"', settings)
         self.assertIn('import "./gw-energy-pilot-v039.js?v=0.41-stable1"', v041)
         self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
