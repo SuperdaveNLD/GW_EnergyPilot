@@ -22,16 +22,16 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.41 Beta
+v0.44 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41)
+## Frontend stability contract (v0.41+, active v0.44)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry or optional-card topology.
-- The active v0.41 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v0.44 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -317,29 +317,35 @@ See `docs/ACCOUNTING.md`.
 Do not assume `orchestrator.py` alone is active:
 
 ```text
-orchestrator_v033
-  -> orchestrator_v031
-       -> orchestrator_v026
-            -> orchestrator_v013
-                 -> orchestrator_v012
-                      -> orchestrator
+orchestrator_v044
+  -> orchestrator_v033
+       -> orchestrator_v031
+            -> orchestrator_v026
+                 -> orchestrator_v013
+                      -> orchestrator_v012
+                           -> orchestrator
 ```
 
 Inspect all active subclasses before changing orchestration behavior.
+
+v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup when native orchestration is enabled. Transient failures retry after 15, 30 and 60 seconds. Any successful optimization after setup cancels the remaining startup sequence; the normal periodic schedule remains authoritative after exhaustion.
 
 ## Active frontend chain
 
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v039.js
-  -> gw-energy-pilot-v038.js
-       -> gw-energy-pilot-v038-runtime.js
-  -> gw-energy-pilot-v034.js (clean functional base)
-       -> gw-energy-pilot-v038-i18n.js
+gw-energy-pilot-v044.js
+  -> gw-energy-pilot-v043.js
+       -> gw-energy-pilot-v042.js
+            -> gw-energy-pilot-v041-emhass-settings.js
+                 -> gw-energy-pilot-v041.js
+                      -> gw-energy-pilot-v039.js
+                           -> gw-energy-pilot-v038.js
+                                -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.39 is a release/version wrapper only. The v0.38 layer owns rebuilt strategy controls, relevant-state rendering, interaction/scroll stability, physical live-flow direction, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into the release wrapper.
+v0.44 owns only the bounded Optimize-now listener replacement and release presentation. v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, v0.41 owns stable-DOM telemetry/plan refresh, and the v0.38/v0.39 layers retain rebuilt strategy controls, physical live-flow direction, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

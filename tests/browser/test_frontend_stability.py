@@ -17,7 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044"}
 
 
 @dataclass(frozen=True)
@@ -339,7 +339,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT == "v043"
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -886,6 +886,186 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
+    """Prove that v0.44 Optimize now never rebuilds the interaction DOM."""
+    enabled = EXPECTED_ENTRYPOINT == "v044"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "single_call": False,
+        "no_full_render": False,
+        "main_stable": False,
+        "optimize_stable": False,
+        "layout_stable": False,
+        "automatic_stable": False,
+        "strategy_stable": False,
+        "bottom_anchor_stable": False,
+        "button_position_stable": False,
+        "scroll_working": False,
+        "button_idle": False,
+        "marker": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        button = shadow(page, ".ep-optimize-now")
+        button.evaluate(
+            "node => node.scrollIntoView({block: 'center', inline: 'nearest'})"
+        )
+        page.wait_for_timeout(180)
+        initial = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const scroller = window.__epScroller;
+              const optimizeId = panel._entityId('optimize_now');
+              const optimize = root.querySelector('.ep-optimize-now');
+              const rect = optimize?.getBoundingClientRect();
+              const maximum = scroller.scrollHeight - scroller.clientHeight;
+              window.__epOptimizeIdentity = {
+                main: root.querySelector('main'),
+                optimize,
+                layout: root.querySelector('.ep-layout-button'),
+                automatic: root.querySelector('#auto-toggle'),
+                strategy: root.querySelector('[data-ep-v038-profile="mad_steve"]'),
+              };
+              window.__epOptimizeRenderCount = 0;
+              const originalRender = panel._render;
+              panel._render = function v044OptimizeRenderProbe(...args) {
+                window.__epOptimizeRenderCount += 1;
+                return originalRender.apply(this, args);
+              };
+              return {
+                revision: Number(
+                  window.__epHass.states[optimizeId]?.attributes?.plan_revision || 0
+                ),
+                calls: window.__epServiceCalls.filter(
+                  call => call.domain === 'button' && call.service === 'press' &&
+                    call.data?.entity_id === optimizeId
+                ).length,
+                maximum,
+                scrollTop: scroller.scrollTop,
+                bottomDistance: maximum - scroller.scrollTop,
+                buttonTop: rect?.top ?? null,
+              };
+            }
+            """
+        )
+
+        activate(page, profile, ".ep-optimize-now")
+        page.wait_for_function(
+            """
+            previousRevision => {
+              const panel = window.__epPanel;
+              const optimizeId = panel._entityId('optimize_now');
+              const revision = Number(
+                window.__epHass.states[optimizeId]?.attributes?.plan_revision || 0
+              );
+              const chartRevision = Number(
+                panel.__epV027BatteryPlanData?.payload?.plan_revision || 0
+              );
+              const button = panel.shadowRoot.querySelector('.ep-optimize-now');
+              return Boolean(
+                revision === previousRevision + 1 &&
+                chartRevision === revision &&
+                !panel.__epV027BatteryPlanPromise &&
+                button?.getAttribute('aria-busy') === 'false' &&
+                !button.disabled
+              );
+            }
+            """,
+            arg=initial["revision"],
+            timeout=15_000,
+        )
+        page.wait_for_timeout(350)
+        measured = page.evaluate(
+            """
+            async initial => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const scroller = window.__epScroller;
+              const optimizeId = panel._entityId('optimize_now');
+              const optimize = root.querySelector('.ep-optimize-now');
+              const rect = optimize?.getBoundingClientRect();
+              const maximum = scroller.scrollHeight - scroller.clientHeight;
+              const afterOptimize = scroller.scrollTop;
+              const downSpace = maximum - afterOptimize;
+              const distance = Math.max(320, Math.round(scroller.clientHeight * 0.45));
+              const target = downSpace >= 250
+                ? Math.min(maximum, afterOptimize + distance)
+                : Math.max(0, afterOptimize - Math.min(distance, afterOptimize));
+              const calls = window.__epServiceCalls.filter(
+                call => call.domain === 'button' && call.service === 'press' &&
+                  call.data?.entity_id === optimizeId
+              ).length;
+              const beforeProbe = {
+                calls,
+                renderCount: window.__epOptimizeRenderCount,
+                mainStable: window.__epOptimizeIdentity.main === root.querySelector('main'),
+                optimizeStable: window.__epOptimizeIdentity.optimize === optimize,
+                layoutStable:
+                  window.__epOptimizeIdentity.layout === root.querySelector('.ep-layout-button'),
+                automaticStable:
+                  window.__epOptimizeIdentity.automatic === root.querySelector('#auto-toggle'),
+                strategyStable:
+                  window.__epOptimizeIdentity.strategy === root.querySelector(
+                    '[data-ep-v038-profile="mad_steve"]'
+                  ),
+                bottomAnchorDelta:
+                  (maximum - afterOptimize) - initial.bottomDistance,
+                scrollTopDelta: afterOptimize - initial.scrollTop,
+                scrollRangeDelta: maximum - initial.maximum,
+                buttonTopDelta:
+                  rect && initial.buttonTop !== null ? rect.top - initial.buttonTop : null,
+                probeDistance: Math.abs(target - afterOptimize),
+                target,
+                buttonBusy: optimize?.getAttribute('aria-busy'),
+                buttonDisabled: Boolean(optimize?.disabled),
+                marker: optimize?.dataset?.epV044StableOptimize || '',
+              };
+              scroller.scrollTop = target;
+              await new Promise((resolve) => setTimeout(resolve, 180));
+              return { ...beforeProbe, scrollAfterProbe: scroller.scrollTop };
+            }
+            """,
+            initial,
+        )
+        result.update(
+            {
+                "single_call": measured["calls"] == initial["calls"] + 1,
+                "no_full_render": measured["renderCount"] == 0,
+                "main_stable": measured["mainStable"],
+                "optimize_stable": measured["optimizeStable"],
+                "layout_stable": measured["layoutStable"],
+                "automatic_stable": measured["automaticStable"],
+                "strategy_stable": measured["strategyStable"],
+                "bottom_anchor_stable": abs(measured["bottomAnchorDelta"]) <= 5,
+                "button_position_stable": (
+                    measured["buttonTopDelta"] is not None
+                    and abs(measured["buttonTopDelta"]) <= 5
+                    and abs(
+                        measured["scrollTopDelta"] - measured["scrollRangeDelta"]
+                    )
+                    <= 5
+                ),
+                "scroll_working": (
+                    measured["probeDistance"] >= 200
+                    and abs(measured["scrollAfterProbe"] - measured["target"]) <= 5
+                ),
+                "button_idle": (
+                    measured["buttonBusy"] == "false"
+                    and measured["buttonDisabled"] is False
+                ),
+                "marker": measured["marker"] == "1",
+            }
+        )
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_plan_refresh(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "ready": False,
@@ -1182,6 +1362,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     )
 
     touch_controls = exercise_touch_controls(page, profile)
+    optimize_stability = exercise_optimize_stability(page, profile)
     menu = open_and_close_menu(page)
     automatic = exercise_automatic_control(page)
     strategy = exercise_strategy(page)
@@ -1198,6 +1379,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "telemetry_identity": telemetry_identity,
         "motion": motion,
         "touch_controls": touch_controls,
+        "optimize_stability": optimize_stability,
         "menu": menu,
         "automatic": automatic,
         "strategy": strategy,
@@ -1217,6 +1399,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     identity = result["telemetry_identity"]
     motion = result["motion"]
     touch_controls = result["touch_controls"]
+    optimize_stability = result["optimize_stability"]
     menu = result["menu"]
     automatic = result["automatic"]
     strategy = result["strategy"]
@@ -1242,7 +1425,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: scroll moved backwards during telemetry")
     if abs(motion["final"] - motion["target"]) > 5:
         failures.append(f"{name}: scrolling did not reach its target during telemetry")
-    if profile.touch and EXPECTED_ENTRYPOINT == "v043":
+    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -1252,6 +1435,17 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
+    if EXPECTED_ENTRYPOINT == "v044":
+        required_optimize = (
+            "ran", "single_call", "no_full_render", "main_stable",
+            "optimize_stable", "layout_stable", "automatic_stable",
+            "strategy_stable", "bottom_anchor_stable", "button_position_stable",
+            "scroll_working", "button_idle", "marker",
+        )
+        if not all(optimize_stability[key] is True for key in required_optimize):
+            failures.append(f"{name}: Optimize now rebuilt or moved interaction DOM")
+        if optimize_stability["error"]:
+            failures.append(f"{name}: Optimize now stability interaction error")
     if menu["open"] is not True or menu["close"] is not True:
         failures.append(f"{name}: dashboard menu did not reliably open and close")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and menu["motion_disabled"] is not True:

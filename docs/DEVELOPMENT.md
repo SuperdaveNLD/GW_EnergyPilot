@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.39 runtime structure
+## Current v0.44 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, runtime wiring, v0.39 panel entrypoint
+__init__.py             config-entry setup, APIs, v0.44 runtime/panel entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -33,6 +33,7 @@ orchestrator_v013.py    G20 load semantics + persistent last_success/optimizatio
 orchestrator_v026.py    canonical dashboard price-series cache/read path
 orchestrator_v031.py    Battery Saver policy + canonical runtime contract + min-SOC/final-SOC ownership + fresh-output validation
 orchestrator_v033.py    persistent official-plan refresh + deterministic plan_revision
+orchestrator_v044.py    bounded non-blocking post-restart optimization recovery
 plan_runtime.py         validated /api/v1/plan mirror + Store lifecycle/current-value lookup
 battery_plan.py         pure plan normalization/timestep/validity helpers
 battery_saver.py        four Battery Saver profiles + nine owned EMHASS policy fields
@@ -58,12 +59,13 @@ tests/                  hardware-independent regressions
 ## Active orchestrator chain
 
 ```text
-orchestrator_v033.py
-    -> orchestrator_v031.py
-        -> orchestrator_v026.py
-            -> orchestrator_v013.py
-                -> orchestrator_v012.py
-                    -> orchestrator.py
+orchestrator_v044.py
+    -> orchestrator_v033.py
+        -> orchestrator_v031.py
+            -> orchestrator_v026.py
+                -> orchestrator_v013.py
+                    -> orchestrator_v012.py
+                        -> orchestrator.py
 ```
 
 All layers are active runtime code. Check subclasses before changing a base method.
@@ -73,6 +75,7 @@ Ownership by active layer:
 - v026: read-only dashboard/optimizer price-series caching;
 - v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
+- v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup.
 
 Do not add release inheritance merely to change a label or constant when an existing bounded module can own the behavior.
 
@@ -117,16 +120,19 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v039.js
-    -> gw-energy-pilot-v038.js
-        -> gw-energy-pilot-v038-runtime.js
-  -> gw-energy-pilot-v034.js (clean functional base)
-        -> gw-energy-pilot-v038-i18n.js
+gw-energy-pilot-v044.js
+    -> gw-energy-pilot-v043.js
+        -> gw-energy-pilot-v042.js
+            -> gw-energy-pilot-v041-emhass-settings.js
+                -> gw-energy-pilot-v041.js
+                    -> gw-energy-pilot-v039.js
+                        -> gw-energy-pilot-v038.js
+                            -> gw-energy-pilot-v038-runtime.js
 ```
 
-The v0.39 wrapper owns only release badge/footer presentation and cache separation. The v0.38 modules own the current rebuilt strategy model/actions, relevant-state render filtering, interaction/mobile-scroll stability, physical live-flow direction, presentation-only hover continuity and Dutch Controller localization. The v0.34 clean base still supplies established dashboard feature behavior, including the canonical Battery · Plan · Price path.
+v0.44 is a bounded compatibility exception: it replaces only the inherited Optimize listener that requested a full render after the asynchronous service call. v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, v0.41 owns ordinary telemetry patching and targeted plan refresh, and v0.38/v0.39 retain strategy, flow and localization behavior. The v0.34 clean base still supplies established dashboard features, including the canonical Battery · Plan · Price path.
 
-**Do not add another behavioral release monkey-patch layer by default.** Keep release wrappers version-only; functional frontend changes belong in bounded modules with executable browser-level regression coverage.
+**Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
 ## Automatic-control contract
 

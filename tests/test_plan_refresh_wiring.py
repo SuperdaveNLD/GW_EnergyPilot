@@ -9,7 +9,11 @@ INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 class PlanRefreshWiringTests(unittest.TestCase):
     def test_successful_optimization_publishes_plan_revision(self) -> None:
         source = (INTEGRATION / "orchestrator_v033.py").read_text(encoding="utf-8")
+        active = (INTEGRATION / "orchestrator_v044.py").read_text(encoding="utf-8")
+        init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
+        self.assertIn("from .orchestrator_v044 import GWEnergyPilotOrchestrator", init_source)
+        self.assertIn("from .orchestrator_v033 import", active)
         self.assertIn("self.plan_revision = 0", source)
         self.assertIn("self.plan_revision += 1", source)
         self.assertIn("await plan_runtime.async_refresh", source)

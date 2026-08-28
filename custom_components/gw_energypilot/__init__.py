@@ -28,7 +28,7 @@ from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
-from .orchestrator_v033 import GWEnergyPilotOrchestrator
+from .orchestrator_v044 import GWEnergyPilotOrchestrator
 from .plan_runtime import GWEnergyPilotPlanRuntime
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
@@ -44,7 +44,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v043.js?v=0.43-touch1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v044.js?v=0.44-optimize-stable1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 

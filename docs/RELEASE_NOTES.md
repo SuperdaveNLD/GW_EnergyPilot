@@ -15,9 +15,10 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.44** | 2026-08-28 | **Beta** | Keeps Optimize now and the surrounding dashboard DOM stable for the complete solve/publish transaction, and adds one non-blocking post-restart optimization recovery sequence with bounded 15/30/60-second retry back-off. |
 | **0.43** | 2026-08-28 | **Beta** | Fixes sticky touch-hover presentation across Optimize now, EMHASS and Battery Strategy selectors, quick actions/max export and the layout menu, with repeated iPhone/iPad WebKit tap regressions that verify both visible selection and executed actions. |
+| **0.42** | 2026-08-28 | **Beta** | Reorganizes EMHASS settings into a clearer overview with explicit EnergyPilot-versus-EMHASS ownership and current/required synchronization values, without changing backend configuration semantics. |
 | **0.41** | 2026-08-27 | **Beta** | Replaces normal telemetry full renders with stable in-place DOM updates, targeted plan/strategy refreshes, native touch scrolling and a no-motion dashboard validated in Chromium and WebKit desktop/iPad/iPhone profiles. |
-
 | **0.40** | 2026-08-26 | **Beta** | Stabilizes the remaining dashboard, menu and card-window controls across telemetry-driven full renders by suppressing transition restart for one painted frame without delaying telemetry or reusing stale button nodes. |
 | **0.39** | 2026-08-26 | **Beta** | Stabilizes Battery Strategy hover during full renders and completes Dutch customer-facing Controller localization without changing GoodWe, EMS or EMHASS behavior. |
 | **0.38** | 2026-08-26 | **Beta** | Rebuilds dashboard controls around language-independent mode keys/delegated actions and makes live-flow direction a single explicit physical mapping, replacing the v0.37 stale-button-node stabilization path. |
@@ -60,6 +61,16 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.44 — Stable Optimize action and restart recovery
+
+v0.44 removes the last action-specific complete dashboard render from **Optimize now**. The active wrapper replaces only the inherited listener, calls the existing Home Assistant button entity once and updates busy/idle presentation plus orchestrator diagnostics in place. A successful optimization still advances `plan_revision` and refreshes only the canonical Battery · Plan · Price card.
+
+When native orchestration is enabled, EnergyPilot now schedules one background plan-recovery attempt 60 seconds after setup. Home Assistant-running state, GoodWe telemetry, EMHASS health and output-validity gates remain authoritative. Transient failures retry after 15, 30 and 60 seconds, while any newer successful optimization cancels the remaining sequence. Config-entry setup never waits for these attempts.
+
+The release matrix covers desktop Chromium, iPad WebKit touch and iPhone WebKit touch and requires one Optimize action, zero complete renders, stable persistent controls, native scroll anchoring and working scroll after the targeted plan refresh.
+
+See `docs/RELEASE_NOTES_V044.md`, `docs/CHANGELOG_V044.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
 # v0.43 — Reliable touch-control selection
 

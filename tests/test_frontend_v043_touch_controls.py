@@ -13,10 +13,15 @@ class FrontendV043TouchControlsTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_active_entrypoint_cache_key_includes_touch_fix(self) -> None:
+    def test_v044_active_entrypoint_retains_v043_touch_fix(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        v044 = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v043.js?v=0.43-touch1", init_source)
+        self.assertIn("gw-energy-pilot-v044.js?v=0.44-optimize-stable1", init_source)
+        self.assertIn(
+            'import "./gw-energy-pilot-v043.js?v=0.44-optimize-stable1"',
+            v044,
+        )
         self.assertIn('import "./gw-energy-pilot-v042.js?v=0.43-touch1"', self.source)
         self.assertIn('const VERSION = "0.43"', self.source)
 

@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.41 · Beta**
+**v0.44 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,9 +19,11 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V044.md` — v0.44 stable Optimize action and post-restart optimization recovery;
+- `docs/RELEASE_NOTES_V043.md` — v0.43 reliable mobile touch-control presentation;
+- `docs/RELEASE_NOTES_V042.md` — v0.42 clearer EMHASS settings overview;
 - `docs/RELEASE_NOTES_V041.md` — v0.41 stable DOM, native scrolling and no-motion dashboard;
 - `docs/FRONTEND_STABLE_DOM.md` — structural-render, telemetry-patch, interaction and browser-regression contract;
-
 - `docs/RELEASE_NOTES_V040.md` — v0.40 stable dashboard/menu controls across full renders;
 - `docs/RELEASE_NOTES_V039.md` — v0.39 stable strategy hover and complete Dutch Controller copy;
 - `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt controls and canonical live-flow direction;
@@ -39,6 +41,19 @@ Release documentation:
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
+
+## v0.44 highlights
+
+- **Optimize now** keeps `main`, the touched Optimize button, layout, Automatic Control and Battery Strategy DOM nodes connected for the complete solve/publish transaction.
+- Busy/idle state, orchestrator diagnostics and the canonical Battery · Plan · Price refresh are patched in place; the inherited action-specific full dashboard render is no longer requested.
+- With native orchestration enabled, EnergyPilot makes one background recovery attempt 60 seconds after restart and retries transient startup dependency failures after 15, 30 and 60 seconds.
+- A successful manual, event-driven or scheduled optimization after setup cancels the remaining startup recovery sequence, preventing duplicate solves.
+- No GoodWe register, Modbus, EMS mode/write order, Automatic Control decision, entity identity or persistent Store contract changes.
+
+## v0.43 highlights
+
+- Touch/coarse-pointer devices no longer show stale `:hover` as a second selected Optimize, EMHASS strategy, Battery Strategy, manual quick-action or layout-menu control.
+- Repeated desktop Chromium, iPad WebKit and iPhone WebKit regressions verify both the visible selected state and the executed Home Assistant action.
 
 ## v0.41 highlights
 
