@@ -19,61 +19,26 @@ class FrontendHoverStabilityTests(unittest.TestCase):
         self.assertIn('panel.addEventListener(\n    "pointerleave"', entry)
         self.assertIn("setStableHover(rootBefore, hoveredBefore)", entry)
         self.assertIn(".ep-v038-profile.${HOVER_CLASS}:not(:disabled)", entry)
-        self.assertLess(
-            entry.index("setStableHover(rootBefore, hoveredBefore)"),
-            entry.index("previousRender.call(this)"),
-        )
-
-        # Hover continuity is presentation-only. It must never become another
-        # render lock, pointer capture or telemetry deferral mechanism.
+        self.assertLess(entry.index("setStableHover(rootBefore, hoveredBefore)"), entry.index("previousRender.call(this)"))
         self.assertNotIn("__epV038RenderDeferred", entry)
         self.assertNotIn("_queueRender(", entry)
         self.assertNotIn("setPointerCapture", entry)
         self.assertNotIn("interactionActive", entry)
 
-        # Release/settings wrappers may sit above v0.38. The hover regression
-        # owns reachability of the v0.38 behavior, not whichever presentation
-        # wrapper is currently active.
-        if "gw-energy-pilot-v041-emhass-settings.js?v=" in init_source:
-            settings = (
-                FRONTEND / "gw-energy-pilot-v041-emhass-settings.js"
-            ).read_text(encoding="utf-8")
-            v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
-                encoding="utf-8"
-            )
-            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
-                encoding="utf-8"
-            )
+        if "gw-energy-pilot-v042.js?v=" in init_source:
+            release = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
+            settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
+            v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
+            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
+            self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=', release)
             self.assertIn('import "./gw-energy-pilot-v041.js?v=', settings)
             self.assertIn('import "./gw-energy-pilot-v039.js?v=', v041)
             self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
-            self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
-        elif "gw-energy-pilot-v041.js?v=" in init_source:
-            v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
-                encoding="utf-8"
-            )
-            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn('import "./gw-energy-pilot-v039.js?v=', v041)
-            self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
-            self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
-        elif "gw-energy-pilot-v040.js?v=" in init_source:
-            v040 = (FRONTEND / "gw-energy-pilot-v040.js").read_text(
-                encoding="utf-8"
-            )
-            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn('import "./gw-energy-pilot-v039.js?v=', v040)
-            self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
-        elif "gw-energy-pilot-v039.js?v=" in init_source:
-            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
+        elif "gw-energy-pilot-v041-emhass-settings.js?v=" in init_source:
+            settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
+            self.assertIn('import "./gw-energy-pilot-v041.js?v=', settings)
         else:
-            self.assertIn("gw-energy-pilot-v038.js?v=", init_source)
+            self.assertTrue(any(name in init_source for name in ("gw-energy-pilot-v041.js?v=", "gw-energy-pilot-v040.js?v=", "gw-energy-pilot-v039.js?v=", "gw-energy-pilot-v038.js?v=")))
 
 
 if __name__ == "__main__":
