@@ -28,7 +28,7 @@ from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .optimization_log_api import async_register_optimization_log_api
-from .orchestrator_v033 import GWEnergyPilotOrchestrator
+from .orchestrator_v043 import GWEnergyPilotOrchestrator
 from .plan_runtime import GWEnergyPilotPlanRuntime
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
