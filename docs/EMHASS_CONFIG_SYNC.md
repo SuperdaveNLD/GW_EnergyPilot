@@ -27,6 +27,21 @@ The required EMHASS runtime contract is:
 
 `continual_publish = true` is required because EnergyPilot performs full optimizations on its own schedule/events, while EMHASS must advance and republish the saved plan at each `optimization_time_step`. EnergyPilot deliberately does not add a second periodic publish loop.
 
+## Settings-page presentation
+
+The EMHASS settings page groups the editable EnergyPilot options into connection/planning, output mapping and price settings. A status summary at the top shows whether the live EMHASS configuration can be read, whether required values are synchronized and whether the configured output entities are complete.
+
+The **EMHASS configuration check** is deliberately separate from the editable EnergyPilot fields. It uses the existing `managed_values` returned by `gw_energypilot/emhass_sync/get` and shows, for each EnergyPilot-owned EMHASS config value:
+
+- a friendly setting name plus the canonical EMHASS key;
+- the value EnergyPilot requires;
+- the value actually read from EMHASS `config.json`;
+- an explicit `In sync` or `Differs` status.
+
+This separation is intentional. Options such as the EMHASS base URL, EnergyPilot scheduling, output entity names and runtime price integration are stored in the Home Assistant EnergyPilot config entry and do not all have a one-to-one field in EMHASS `config.json`. The UI therefore labels those values as EnergyPilot settings instead of falsely presenting them as EMHASS-stored values.
+
+The existing **Synchronize required config** and **Restore recommended defaults** actions are reused; the presentation layer does not create a second write path or a duplicate EMHASS configuration API.
+
 ## Inverter topology is EMHASS-owned
 
 `inverter_is_hybrid` describes the installation topology used by EMHASS and is **not** an EnergyPilot-required value. EnergyPilot preserves the configured value exactly as supplied by EMHASS.
