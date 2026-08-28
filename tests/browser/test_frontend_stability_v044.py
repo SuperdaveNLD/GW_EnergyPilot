@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import test_frontend_stability_v041  # noqa: F401 - installs the structural test hook
 import test_frontend_stability as stability
 
 
