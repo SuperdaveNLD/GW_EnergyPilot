@@ -15,7 +15,10 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
 
     def test_active_panel_loads_enhanced_emhass_settings_entrypoint(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v041-emhass-settings.js?v=0.41-emhass1", init_source)
+        release = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
+        self.assertIn("gw-energy-pilot-v042.js?v=0.42-release1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.42-emhass1"', release)
+        self.assertIn('const VERSION = "0.42"', release)
         self.assertIn('import "./gw-energy-pilot-v041.js?v=0.41-stable1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
