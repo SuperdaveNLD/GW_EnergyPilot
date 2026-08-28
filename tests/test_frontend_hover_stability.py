@@ -25,7 +25,18 @@ class FrontendHoverStabilityTests(unittest.TestCase):
         self.assertNotIn("setPointerCapture", entry)
         self.assertNotIn("interactionActive", entry)
 
-        if "gw-energy-pilot-v042.js?v=" in init_source:
+        if "gw-energy-pilot-v043.js?v=" in init_source:
+            v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
+            v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
+            settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
+            v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
+            v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
+            self.assertIn('import "./gw-energy-pilot-v042.js?v=', v043)
+            self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=', v042)
+            self.assertIn('import "./gw-energy-pilot-v041.js?v=', settings)
+            self.assertIn('import "./gw-energy-pilot-v039.js?v=', v041)
+            self.assertIn('import "./gw-energy-pilot-v038.js?v=', v039)
+        elif "gw-energy-pilot-v042.js?v=" in init_source:
             release = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
             settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
             v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
