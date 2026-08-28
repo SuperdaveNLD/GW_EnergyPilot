@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.43** | 2026-08-28 | **Beta** | Fixes sticky touch-hover presentation across Optimize now, EMHASS and Battery Strategy selectors, quick actions/max export and the layout menu, with repeated iPhone/iPad WebKit tap regressions that verify both visible selection and executed actions. |
 | **0.41** | 2026-08-27 | **Beta** | Replaces normal telemetry full renders with stable in-place DOM updates, targeted plan/strategy refreshes, native touch scrolling and a no-motion dashboard validated in Chromium and WebKit desktop/iPad/iPhone profiles. |
 
 | **0.40** | 2026-08-26 | **Beta** | Stabilizes the remaining dashboard, menu and card-window controls across telemetry-driven full renders by suppressing transition restart for one painted frame without delaying telemetry or reusing stale button nodes. |
@@ -59,6 +60,14 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.43 — Reliable touch-control selection
+
+v0.43 prevents iPhone/iPad sticky `:hover` from visually impersonating a second active selection. On touch/coarse-pointer devices, inactive Optimize now, EMHASS strategy, Battery Strategy, manual battery quick-action/max-export and layout-menu controls retain their base presentation after a tap. Actual selection remains owned by `.active` and `aria-pressed="true"` application state.
+
+The change is a top-level frontend presentation layer over the unchanged v0.42 runtime. It does not intercept pointer events or change service/WebSocket actions. The release matrix repeatedly taps every affected control group on iPhone and iPad WebKit profiles, verifies exactly one visible selected state and confirms that each corresponding action is recorded, including across telemetry and a deliberate structural render.
+
+See `docs/RELEASE_NOTES_V043.md`, `docs/CHANGELOG_V043.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
 # v0.41 — Stable DOM and native mobile scrolling
 

@@ -17,6 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043"}
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,51 @@ def browser_type(playwright: object, name: str) -> BrowserType:
 def shadow(page: Page, selector: str):
     """Return a locator that pierces the panel's open ShadowRoot."""
     return page.locator("gw-energypilot-panel").locator(selector)
+
+
+def wait_render_idle(page: Page) -> None:
+    """Wait until full-render work and two follow-up paint frames have settled."""
+    page.wait_for_function(
+        "() => Boolean(window.__epPanel && !window.__epPanel._renderQueued)",
+        timeout=5_000,
+    )
+    page.evaluate(
+        """
+        () => new Promise((resolve) => requestAnimationFrame(
+          () => requestAnimationFrame(resolve)
+        ))
+        """
+    )
+    page.wait_for_function(
+        "() => !window.__epPanel._renderQueued",
+        timeout=5_000,
+    )
+
+
+def activate(page: Page, profile: Profile, selector: str) -> None:
+    """Use a real touch sequence for touch profiles and a mouse click otherwise."""
+    wait_render_idle(page)
+    last_error: PlaywrightError | None = None
+    for _attempt in range(3):
+        control = shadow(page, selector)
+        try:
+            control.scroll_into_view_if_needed(timeout=5_000)
+            break
+        except PlaywrightError as err:
+            if "not attached" not in str(err).lower():
+                raise
+            last_error = err
+            wait_render_idle(page)
+    else:
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(f"Control did not become available: {selector}")
+
+    control = shadow(page, selector)
+    if profile.touch:
+        control.tap(timeout=5_000)
+    else:
+        control.click(timeout=5_000)
 
 
 def animation_summary(page: Page) -> dict[str, int]:
@@ -220,10 +266,621 @@ def exercise_strategy(page: Page) -> dict[str, object]:
             """,
             timeout=10_000,
         )
+        page.wait_for_function(
+            """
+            () => Boolean(
+              !window.__epPanel.__epV038BatterySaver?.busy &&
+              !window.__epPanel.__epV038BatterySaver?.loading
+            )
+            """,
+            timeout=10_000,
+        )
         result["changed"] = True
         result["message"] = page.evaluate(
             "window.__epPanel.shadowRoot.querySelector('.ep-v038-message')?.textContent || ''"
         )
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
+def control_style(page: Page, selector: str) -> dict[str, str]:
+    return page.evaluate(
+        """
+        selector => {
+          const node = window.__epPanel.shadowRoot.querySelector(selector);
+          if (!node) return {};
+          const style = getComputedStyle(node);
+          return {
+            backgroundColor: style.backgroundColor,
+            backgroundImage: style.backgroundImage,
+            borderColor: style.borderColor,
+            boxShadow: style.boxShadow,
+            color: style.color,
+            transform: style.transform,
+          };
+        }
+        """,
+        selector,
+    )
+
+
+def wait_service_count(page: Page, entity_id: str, expected: int) -> None:
+    page.wait_for_function(
+        """
+        ([entityId, expected]) => window.__epServiceCalls.filter(
+          call => call.data?.entity_id === entityId
+        ).length === expected
+        """,
+        arg=[entity_id, expected],
+        timeout=10_000,
+    )
+
+
+def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]:
+    return page.evaluate(
+        """
+        ([selector, key]) => {
+          const buttons = [...window.__epPanel.shadowRoot.querySelectorAll(selector)];
+          const active = buttons.filter(button => button.classList.contains('active'));
+          const pressed = buttons.filter(button => button.getAttribute('aria-pressed') === 'true');
+          return {
+            count: buttons.length,
+            active: active.length,
+            pressed: pressed.length,
+            activeKey: active[0]?.dataset?.[key] || null,
+            pressedKey: pressed[0]?.dataset?.[key] || null,
+          };
+        }
+        """,
+        [selector, key],
+    )
+
+
+def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
+    """Exercise repeated real taps and verify semantic, visual and action state."""
+    enabled = profile.touch and EXPECTED_ENTRYPOINT == "v043"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "touch_media": False,
+        "optimize": False,
+        "emhass": False,
+        "battery": False,
+        "quick_actions": False,
+        "menu_cycles": False,
+        "hover_reset": False,
+        "render_during_press": False,
+        "post_structure": False,
+        "telemetry_complete": False,
+        "calls": {},
+        "stage": "disabled",
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        result["stage"] = "ready"
+        page.wait_for_function(
+            """
+            () => Boolean(
+              !window.__epPanel.shadowRoot.querySelector('.ep-optimize-now')?.disabled &&
+              !window.__epPanel.shadowRoot.querySelector('[data-costfun="cost"]')?.disabled &&
+              !window.__epPanel.shadowRoot.querySelector('[data-action="max_export"]')?.disabled &&
+              !window.__epPanel.shadowRoot.querySelector('[data-ep-v038-profile="gold_rush"]')?.disabled
+            )
+            """,
+            timeout=10_000,
+        )
+        page.evaluate(
+            """
+            () => {
+              window.__epResetActionLogs();
+              window.__epTouchTelemetry = window.__epTelemetryBurst(120, 5);
+            }
+            """
+        )
+        result["touch_media"] = page.evaluate(
+            "matchMedia('(hover: none)').matches || matchMedia('(pointer: coarse)').matches"
+        )
+
+        initial_styles = {
+            "optimize": control_style(page, ".ep-optimize-now"),
+            "emhass": control_style(page, '[data-costfun="cost"]'),
+            "battery": control_style(page, '[data-ep-v038-profile="gold_rush"]'),
+            "quick": control_style(page, '[data-action="max_export"]'),
+        }
+
+        optimize_id = page.evaluate("window.__epPanel._entityId('optimize_now')")
+        result["stage"] = "optimize"
+        revision_before = page.evaluate(
+            "window.__epHass.states[window.__epPanel._entityId('optimize_now')].attributes.plan_revision"
+        )
+        for index in range(3):
+            if index == 2:
+                page.evaluate("window.__epRenderOnNextPointerDown()")
+            activate(page, profile, ".ep-optimize-now")
+            wait_service_count(page, optimize_id, index + 1)
+            page.wait_for_function(
+                "() => !window.__epPanel.shadowRoot.querySelector('.ep-optimize-now')?.disabled",
+                timeout=10_000,
+            )
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPointerDownMain &&
+              window.__epPointerDownMain !== window.__epPanel.shadowRoot.querySelector('main')
+            )
+            """,
+            timeout=10_000,
+        )
+        revision_after = page.evaluate(
+            "window.__epHass.states[window.__epPanel._entityId('optimize_now')].attributes.plan_revision"
+        )
+        optimize_calls = page.evaluate(
+            """
+            entityId => window.__epServiceCalls.filter(
+              call => call.domain === 'button' && call.service === 'press' &&
+                call.data?.entity_id === entityId
+            ).length
+            """,
+            optimize_id,
+        )
+        result["optimize"] = optimize_calls == 3 and revision_after >= revision_before + 3
+        result["render_during_press"] = optimize_calls == 3
+        page.wait_for_timeout(80)
+        hover_states = {
+            "optimize": control_style(page, ".ep-optimize-now") == initial_styles["optimize"]
+        }
+
+        costfun_id = page.evaluate(
+            "window.__epPanel._entityId('emhass_cost_function')"
+        )
+        result["stage"] = "emhass"
+        costfun_expected = [
+            ("cost", "Cost"),
+            ("self-consumption", "Self-consumption"),
+            ("profit", "Profit"),
+            ("cost", "Cost"),
+        ]
+        emhass_snapshots: list[dict[str, object]] = []
+        for index, (raw, _option) in enumerate(costfun_expected):
+            activate(page, profile, f'[data-costfun="{raw}"]')
+            wait_service_count(page, costfun_id, index + 1)
+            page.wait_for_function(
+                """
+                raw => {
+                  const root = window.__epPanel.shadowRoot;
+                  const active = root.querySelectorAll('.ep-v016-costfun-button.active');
+                  const pressed = root.querySelectorAll('.ep-v016-costfun-button[aria-pressed="true"]');
+                  return active.length === 1 && pressed.length === 1 &&
+                    active[0].dataset.costfun === raw && pressed[0].dataset.costfun === raw;
+                }
+                """,
+                arg=raw,
+                timeout=10_000,
+            )
+            emhass_snapshots.append(
+                selection_snapshot(page, ".ep-v016-costfun-button", "costfun")
+            )
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const entityId = panel._entityId('emhass_cost_function');
+              window.__epSetEntity(entityId, 'Profit', { emhass_costfun: 'profit' });
+              panel._queueRender();
+            }
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '[data-costfun="profit"]'
+            )?.getAttribute('aria-pressed') === 'true'
+            """,
+            timeout=10_000,
+        )
+        page.wait_for_timeout(80)
+        hover_states["emhass"] = (
+            control_style(page, '[data-costfun="cost"]') == initial_styles["emhass"]
+        )
+        emhass_options = page.evaluate(
+            """
+            entityId => window.__epServiceCalls.filter(
+              call => call.domain === 'select' && call.service === 'select_option' &&
+                call.data?.entity_id === entityId
+            ).map(call => call.data.option)
+            """,
+            costfun_id,
+        )
+        result["emhass"] = (
+            emhass_options == [option for _raw, option in costfun_expected]
+            and all(
+                snapshot["active"] == 1
+                and snapshot["pressed"] == 1
+                and snapshot["activeKey"] == raw
+                and snapshot["pressedKey"] == raw
+                for snapshot, (raw, _option) in zip(
+                    emhass_snapshots, costfun_expected, strict=True
+                )
+            )
+        )
+
+        battery_modes = ["gold_rush", "mad_steve", "balanced", "gold_rush"]
+        result["stage"] = "battery"
+        battery_snapshots: list[dict[str, object]] = []
+        for index, mode in enumerate(battery_modes):
+            activate(page, profile, f'[data-ep-v038-profile="{mode}"]')
+            page.wait_for_function(
+                """
+                expected => window.__epWsCalls.filter(
+                  call => call.type === 'gw_energypilot/battery_saver/set'
+                ).length === expected
+                """,
+                arg=index + 1,
+                timeout=10_000,
+            )
+            page.wait_for_function(
+                """
+                mode => {
+                  const root = window.__epPanel.shadowRoot;
+                  const pressed = root.querySelectorAll(
+                    '.ep-v038-profile[aria-pressed="true"]'
+                  );
+                  return pressed.length === 1 &&
+                    pressed[0].dataset.epV038Profile === mode &&
+                    root.querySelectorAll('.ep-v038-badge').length === 1;
+                }
+                """,
+                arg=mode,
+                timeout=10_000,
+            )
+            page.wait_for_function(
+                """
+                () => Boolean(
+                  !window.__epPanel.__epV038BatterySaver?.busy &&
+                  !window.__epPanel.__epV038BatterySaver?.loading &&
+                  !window.__epPanel.shadowRoot.querySelector(
+                    '.ep-v038-profile'
+                  )?.disabled
+                )
+                """,
+                timeout=10_000,
+            )
+            battery_snapshots.append(
+                page.evaluate(
+                    """
+                    () => {
+                      const root = window.__epPanel.shadowRoot;
+                      const pressed = [...root.querySelectorAll(
+                        '.ep-v038-profile[aria-pressed="true"]'
+                      )];
+                      return {
+                        pressed: pressed.length,
+                        key: pressed[0]?.dataset.epV038Profile || null,
+                        badges: root.querySelectorAll('.ep-v038-badge').length,
+                      };
+                    }
+                    """
+                )
+            )
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const cache = panel.__epV038BatterySaver;
+              cache.data = { ...cache.data, managed: true, mode: 'balanced' };
+              cache.pendingMode = null;
+              cache.busy = false;
+              cache.loading = false;
+              panel.__epV041RefreshStrategy();
+            }
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '[data-ep-v038-profile="balanced"]'
+            )?.getAttribute('aria-pressed') === 'true'
+            """,
+            timeout=10_000,
+        )
+        page.wait_for_timeout(80)
+        hover_states["battery"] = (
+            control_style(page, '[data-ep-v038-profile="gold_rush"]')
+            == initial_styles["battery"]
+        )
+        battery_call_modes = page.evaluate(
+            """
+            () => window.__epWsCalls.filter(
+              call => call.type === 'gw_energypilot/battery_saver/set'
+            ).map(call => call.mode)
+            """
+        )
+        result["battery"] = (
+            battery_call_modes == battery_modes
+            and all(
+                snapshot["pressed"] == 1
+                and snapshot["key"] == mode
+                and snapshot["badges"] == 1
+                for snapshot, mode in zip(
+                    battery_snapshots, battery_modes, strict=True
+                )
+            )
+        )
+
+        quick_keys = [
+            "max_export",
+            "battery_pause",
+            "max_charge",
+            "resume_auto",
+            "max_export",
+        ]
+        result["stage"] = "quick-actions"
+        quick_snapshots: list[dict[str, object]] = []
+        quick_ids = {
+            key: page.evaluate(f"window.__epPanel._entityId('{key}')")
+            for key in set(quick_keys)
+        }
+        quick_before = page.evaluate(
+            """
+            ids => window.__epServiceCalls.filter(
+              call => ids.includes(call.data?.entity_id)
+            ).length
+            """,
+            list(quick_ids.values()),
+        )
+        for index, key in enumerate(quick_keys):
+            activate(page, profile, f'[data-action="{key}"]')
+            page.wait_for_function(
+                """
+                ([ids, expected]) => window.__epServiceCalls.filter(
+                  call => ids.includes(call.data?.entity_id)
+                ).length === expected
+                """,
+                arg=[list(quick_ids.values()), quick_before + index + 1],
+                timeout=10_000,
+            )
+            page.wait_for_function(
+                """
+                key => {
+                  const root = window.__epPanel.shadowRoot;
+                  const active = root.querySelectorAll('.ep-battery-action.active');
+                  return active.length === 1 && active[0].dataset.action === key;
+                }
+                """,
+                arg=key,
+                timeout=10_000,
+            )
+            quick_snapshots.append(
+                page.evaluate(
+                    """
+                    () => {
+                      const active = [...window.__epPanel.shadowRoot.querySelectorAll(
+                        '.ep-battery-action.active'
+                      )];
+                      return {
+                        active: active.length,
+                        key: active[0]?.dataset.action || null,
+                      };
+                    }
+                    """
+                )
+            )
+        page.evaluate(
+            """
+            () => {
+              window.__epSetEntityByKey('control_command', 'manual_battery_hold');
+              window.__epSetEntityByKey('automatic_control', 'off');
+              window.__epPanel._queueRender();
+            }
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '[data-action="battery_pause"]'
+            )?.classList.contains('active')
+            """,
+            timeout=10_000,
+        )
+        page.wait_for_timeout(80)
+        hover_states["quick"] = (
+            control_style(page, '[data-action="max_export"]')
+            == initial_styles["quick"]
+        )
+        quick_call_keys = page.evaluate(
+            """
+            ids => window.__epServiceCalls.filter(
+              call => Object.values(ids).includes(call.data?.entity_id)
+            ).map(call => Object.entries(ids).find(([, entityId]) =>
+              entityId === call.data.entity_id
+            )?.[0] || null)
+            """,
+            quick_ids,
+        )
+        result["quick_actions"] = (
+            quick_call_keys == quick_keys
+            and all(
+                snapshot["active"] == 1 and snapshot["key"] == key
+                for snapshot, key in zip(quick_snapshots, quick_keys, strict=True)
+            )
+        )
+
+        menu_ok = True
+        result["stage"] = "menu"
+        for _index in range(3):
+            activate(page, profile, ".ep-layout-button")
+            page.wait_for_function(
+                "() => window.__epPanel.shadowRoot.querySelectorAll('.ep-layout-menu').length === 1",
+                timeout=10_000,
+            )
+            activate(page, profile, ".ep-menu-close")
+            page.wait_for_function(
+                "() => window.__epPanel.shadowRoot.querySelectorAll('.ep-layout-menu').length === 0",
+                timeout=10_000,
+            )
+            menu_ok = menu_ok and page.evaluate(
+                "window.__epPanel.shadowRoot.querySelectorAll('.ep-layout-menu').length === 0"
+            )
+        result["menu_cycles"] = menu_ok
+
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              window.__epTouchStructureMain = panel.shadowRoot.querySelector('main');
+              panel.narrow = !panel.narrow;
+            }
+            """
+        )
+        result["stage"] = "post-structure"
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epTouchStructureMain !==
+                window.__epPanel.shadowRoot.querySelector('main') &&
+              !window.__epPanel.shadowRoot.querySelector('.ep-optimize-now')?.disabled &&
+              !window.__epPanel.shadowRoot.querySelector('[data-costfun="self-consumption"]')?.disabled &&
+              !window.__epPanel.shadowRoot.querySelector('[data-ep-v038-profile="mad_steve"]')?.disabled &&
+              !window.__epPanel.shadowRoot.querySelector('[data-action="resume_auto"]')?.disabled
+            )
+            """,
+            timeout=10_000,
+        )
+        page.wait_for_timeout(120)
+        post_before = {
+            "optimize": page.evaluate(
+                """
+                entityId => window.__epServiceCalls.filter(
+                  call => call.data?.entity_id === entityId
+                ).length
+                """,
+                optimize_id,
+            ),
+            "emhass": page.evaluate(
+                """
+                entityId => window.__epServiceCalls.filter(
+                  call => call.data?.entity_id === entityId
+                ).length
+                """,
+                costfun_id,
+            ),
+            "battery": page.evaluate(
+                """
+                () => window.__epWsCalls.filter(
+                  call => call.type === 'gw_energypilot/battery_saver/set'
+                ).length
+                """
+            ),
+            "quick": page.evaluate(
+                """
+                ids => window.__epServiceCalls.filter(
+                  call => ids.includes(call.data?.entity_id)
+                ).length
+                """,
+                list(quick_ids.values()),
+            ),
+        }
+        activate(page, profile, ".ep-optimize-now")
+        wait_service_count(page, optimize_id, post_before["optimize"] + 1)
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-optimize-now')?.disabled",
+            timeout=10_000,
+        )
+        activate(page, profile, '[data-costfun="self-consumption"]')
+        wait_service_count(page, costfun_id, post_before["emhass"] + 1)
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.shadowRoot.querySelector(
+                '[data-costfun="self-consumption"]'
+              )?.getAttribute('aria-pressed') === 'true' &&
+              !window.__epPanel.shadowRoot.querySelector(
+                '[data-costfun="self-consumption"]'
+              )?.disabled
+            )
+            """,
+            timeout=10_000,
+        )
+        activate(page, profile, '[data-ep-v038-profile="mad_steve"]')
+        page.wait_for_function(
+            """
+            expected => window.__epWsCalls.filter(
+              call => call.type === 'gw_energypilot/battery_saver/set'
+            ).length === expected
+            """,
+            arg=post_before["battery"] + 1,
+            timeout=10_000,
+        )
+        page.wait_for_function(
+            """
+            () => Boolean(
+              !window.__epPanel.__epV038BatterySaver?.busy &&
+              !window.__epPanel.__epV038BatterySaver?.loading &&
+              !window.__epPanel.shadowRoot.querySelector(
+                '[data-ep-v038-profile="mad_steve"]'
+              )?.disabled
+            )
+            """,
+            timeout=10_000,
+        )
+        activate(page, profile, '[data-action="resume_auto"]')
+        page.wait_for_function(
+            """
+            ([ids, expected]) => window.__epServiceCalls.filter(
+              call => ids.includes(call.data?.entity_id)
+            ).length === expected
+            """,
+            arg=[list(quick_ids.values()), post_before["quick"] + 1],
+            timeout=10_000,
+        )
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.shadowRoot.querySelector(
+                '[data-action="resume_auto"]'
+              )?.classList.contains('active')
+            )
+            """,
+            timeout=10_000,
+        )
+        activate(page, profile, ".ep-layout-button")
+        page.wait_for_function(
+            "() => Boolean(window.__epPanel.shadowRoot.querySelector('.ep-layout-menu'))",
+            timeout=10_000,
+        )
+        activate(page, profile, ".ep-menu-close")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-layout-menu')",
+            timeout=10_000,
+        )
+        result["post_structure"] = True
+
+        page.evaluate("async () => await window.__epTouchTelemetry")
+        page.wait_for_timeout(180)
+        page.wait_for_function(
+            """
+            () => Boolean(
+              !window.__epPanel.__epV038BatterySaver?.busy &&
+              !window.__epPanel.__epV038BatterySaver?.loading &&
+              !window.__epPanel.__epV027BatteryPlanPromise &&
+              !window.__epPanel.shadowRoot.querySelector('.ep-optimize-now')?.disabled
+            )
+            """,
+            timeout=15_000,
+        )
+        result["telemetry_complete"] = True
+        result["hover_reset"] = all(hover_states.values())
+        result["calls"] = {
+            "optimize": optimize_calls,
+            "emhass": emhass_options,
+            "battery": battery_call_modes,
+            "quick": quick_call_keys,
+            "hover": hover_states,
+        }
+        result["stage"] = "complete"
     except PlaywrightError as err:
         result["error"] = str(err)
     return result
@@ -237,6 +894,9 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
         "main_stable": False,
         "layout_control_stable": False,
         "auto_control_stable": False,
+        "optimize_control_stable": False,
+        "costfun_control_stable": False,
+        "max_export_control_stable": False,
         "strategy_control_stable": False,
         "error": None,
     }
@@ -260,6 +920,9 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
                 main: root.querySelector('main'),
                 layout: root.querySelector('.ep-layout-button'),
                 auto: root.querySelector('#auto-toggle'),
+                optimize: root.querySelector('.ep-optimize-now'),
+                costfun: root.querySelector('[data-costfun="profit"]'),
+                maxExport: root.querySelector('[data-action="max_export"]'),
                 strategy: root.querySelector('[data-ep-v038-profile="mad_steve"]'),
                 card: root.querySelector('.ep-v027-battery-plan-card'),
               };
@@ -306,6 +969,12 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
                       window.__epPlanIdentity.layout === root.querySelector('.ep-layout-button'),
                     auto_control_stable:
                       window.__epPlanIdentity.auto === root.querySelector('#auto-toggle'),
+                    optimize_control_stable:
+                      window.__epPlanIdentity.optimize === root.querySelector('.ep-optimize-now'),
+                    costfun_control_stable:
+                      window.__epPlanIdentity.costfun === root.querySelector('[data-costfun="profit"]'),
+                    max_export_control_stable:
+                      window.__epPlanIdentity.maxExport === root.querySelector('[data-action="max_export"]'),
                     strategy_control_stable:
                       window.__epPlanIdentity.strategy === root.querySelector(
                         '[data-ep-v038-profile="mad_steve"]'
@@ -432,6 +1101,9 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
             main: root.querySelector('main'),
             layout: root.querySelector('.ep-layout-button'),
             auto: root.querySelector('#auto-toggle'),
+            optimize: root.querySelector('.ep-optimize-now'),
+            costfun: root.querySelector('[data-costfun="profit"]'),
+            maxExport: root.querySelector('[data-action="max_export"]'),
             strategy: root.querySelector('[data-ep-v038-profile="mad_steve"]'),
           };
           const max = scroller.scrollHeight - scroller.clientHeight;
@@ -463,6 +1135,12 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
             main: window.__epTelemetryIdentity.main === root.querySelector('main'),
             layout: window.__epTelemetryIdentity.layout === root.querySelector('.ep-layout-button'),
             auto: window.__epTelemetryIdentity.auto === root.querySelector('#auto-toggle'),
+            optimize:
+              window.__epTelemetryIdentity.optimize === root.querySelector('.ep-optimize-now'),
+            costfun:
+              window.__epTelemetryIdentity.costfun === root.querySelector('[data-costfun="profit"]'),
+            max_export:
+              window.__epTelemetryIdentity.maxExport === root.querySelector('[data-action="max_export"]'),
             strategy: window.__epTelemetryIdentity.strategy === root.querySelector(
               '[data-ep-v038-profile="mad_steve"]'
             ),
@@ -503,6 +1181,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         """
     )
 
+    touch_controls = exercise_touch_controls(page, profile)
     menu = open_and_close_menu(page)
     automatic = exercise_automatic_control(page)
     strategy = exercise_strategy(page)
@@ -518,6 +1197,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "idle_delta": idle_after - idle_before,
         "telemetry_identity": telemetry_identity,
         "motion": motion,
+        "touch_controls": touch_controls,
         "menu": menu,
         "automatic": automatic,
         "strategy": strategy,
@@ -536,6 +1216,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     initial = result["initial"]
     identity = result["telemetry_identity"]
     motion = result["motion"]
+    touch_controls = result["touch_controls"]
     menu = result["menu"]
     automatic = result["automatic"]
     strategy = result["strategy"]
@@ -546,8 +1227,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
 
     if EXPECTED_ENTRYPOINT and initial["entrypoint"] != EXPECTED_ENTRYPOINT:
         failures.append(f"{name}: loaded {initial['entrypoint']} instead of {EXPECTED_ENTRYPOINT}")
-    if EXPECTED_ENTRYPOINT == "v041" and initial["stableMarker"] != "1":
-        failures.append(f"{name}: v0.41 stable-DOM marker is missing")
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and initial["stableMarker"] != "1":
+        failures.append(f"{name}: stable-DOM marker is missing")
     if initial["max"] < 500:
         failures.append(f"{name}: harness is not sufficiently scrollable")
     if initial["cards"] < 8 or initial["buttons"] < 20:
@@ -561,10 +1242,20 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: scroll moved backwards during telemetry")
     if abs(motion["final"] - motion["target"]) > 5:
         failures.append(f"{name}: scrolling did not reach its target during telemetry")
+    if profile.touch and EXPECTED_ENTRYPOINT == "v043":
+        required_touch = (
+            "ran", "touch_media", "optimize", "emhass", "battery",
+            "quick_actions", "menu_cycles", "hover_reset",
+            "render_during_press", "post_structure", "telemetry_complete",
+        )
+        if not all(touch_controls[key] is True for key in required_touch):
+            failures.append(f"{name}: repeated touch-control regression failed")
+        if touch_controls["error"]:
+            failures.append(f"{name}: touch-control interaction error")
     if menu["open"] is not True or menu["close"] is not True:
         failures.append(f"{name}: dashboard menu did not reliably open and close")
-    if EXPECTED_ENTRYPOINT == "v041" and menu["motion_disabled"] is not True:
-        failures.append(f"{name}: v0.41 motion control is not locked off")
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and menu["motion_disabled"] is not True:
+        failures.append(f"{name}: stable-DOM motion control is not locked off")
     if menu["error"]:
         failures.append(f"{name}: dashboard menu interaction error")
     if not all(
@@ -582,7 +1273,9 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         plan[key] is True
         for key in (
             "ready", "data_changed", "card_changed", "main_stable",
-            "layout_control_stable", "auto_control_stable", "strategy_control_stable",
+            "layout_control_stable", "auto_control_stable",
+            "optimize_control_stable", "costfun_control_stable",
+            "max_export_control_stable", "strategy_control_stable",
         )
     ):
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
@@ -600,11 +1293,11 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: controls failed after a structural layout render")
     if structural["error"]:
         failures.append(f"{name}: post-structure menu interaction error")
-    if EXPECTED_ENTRYPOINT == "v041" and (
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and (
         animation["animations"] != 0 or animation["transitions"] != 0
     ):
         failures.append(
-            f"{name}: v0.41 still has {animation['animations']} animations and "
+            f"{name}: stable-DOM frontend still has {animation['animations']} animations and "
             f"{animation['transitions']} transitions"
         )
     if result["errors"] or page_errors:

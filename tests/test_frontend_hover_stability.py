@@ -25,11 +25,13 @@ class FrontendHoverStabilityTests(unittest.TestCase):
         self.assertNotIn("setPointerCapture", entry)
         self.assertNotIn("interactionActive", entry)
 
-        if "gw-energy-pilot-v042.js?v=" in init_source:
+        if "gw-energy-pilot-v043.js?v=" in init_source:
+            active = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
             release = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
             settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
             v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
             v039 = (FRONTEND / "gw-energy-pilot-v039.js").read_text(encoding="utf-8")
+            self.assertIn('import "./gw-energy-pilot-v042.js?v=', active)
             self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=', release)
             self.assertIn('import "./gw-energy-pilot-v041.js?v=', settings)
             self.assertIn('import "./gw-energy-pilot-v039.js?v=', v041)
@@ -38,7 +40,7 @@ class FrontendHoverStabilityTests(unittest.TestCase):
             settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
             self.assertIn('import "./gw-energy-pilot-v041.js?v=', settings)
         else:
-            self.assertTrue(any(name in init_source for name in ("gw-energy-pilot-v041.js?v=", "gw-energy-pilot-v040.js?v=", "gw-energy-pilot-v039.js?v=", "gw-energy-pilot-v038.js?v=")))
+            self.assertTrue(any(name in init_source for name in ("gw-energy-pilot-v042.js?v=", "gw-energy-pilot-v041.js?v=", "gw-energy-pilot-v040.js?v=", "gw-energy-pilot-v039.js?v=", "gw-energy-pilot-v038.js?v=")))
 
 
 if __name__ == "__main__":
