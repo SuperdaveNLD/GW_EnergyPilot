@@ -120,8 +120,13 @@ def _validate_frontend(errors: list[str]) -> None:
             )
 
 
+def _release_doc_suffix(version: str) -> str:
+    """Return the compact numeric suffix used by dedicated release docs."""
+    return version.replace(".", "")
+
+
 def _validate_release_docs(errors: list[str]) -> None:
-    """Require every changelog version to have a release-notes status row."""
+    """Require central history plus explicit docs for the current release."""
     if not CHANGELOG.is_file():
         errors.append("Missing CHANGELOG.md")
         return
@@ -135,11 +140,6 @@ def _validate_release_docs(errors: list[str]) -> None:
     release_text = RELEASE_NOTES.read_text(encoding="utf-8")
     changelog_versions = CHANGELOG_VERSION_RE.findall(changelog_text)
 
-    if manifest_version and manifest_version not in changelog_versions:
-        errors.append(
-            f"Manifest version {manifest_version} is missing from CHANGELOG.md"
-        )
-
     for version in changelog_versions:
         marker = f"| **{version}** |"
         if marker not in release_text:
@@ -147,23 +147,43 @@ def _validate_release_docs(errors: list[str]) -> None:
                 f"CHANGELOG version {version} is missing from docs/RELEASE_NOTES.md"
             )
 
-    if manifest_version:
-        current_marker = f"| **{manifest_version}** |"
-        current_line = next(
-            (line for line in release_text.splitlines() if line.startswith(current_marker)),
-            None,
+    if not manifest_version:
+        return
+
+    suffix = _release_doc_suffix(manifest_version)
+    dedicated_changelog = ROOT / "docs" / f"CHANGELOG_V{suffix}.md"
+    dedicated_release = ROOT / "docs" / f"RELEASE_NOTES_V{suffix}.md"
+    central_marker = f"| **{manifest_version}** |"
+    central_line = next(
+        (line for line in release_text.splitlines() if line.startswith(central_marker)),
+        None,
+    )
+
+    if manifest_version not in changelog_versions and not dedicated_changelog.is_file():
+        errors.append(
+            f"Manifest version {manifest_version} is missing from CHANGELOG.md and "
+            f"docs/CHANGELOG_V{suffix}.md"
         )
-        if current_line is None:
+
+    if central_line is None:
+        if not dedicated_release.is_file():
             errors.append(
-                f"Current version {manifest_version} has no release-notes status row"
+                f"Current version {manifest_version} has neither a release-notes status row "
+                f"nor docs/RELEASE_NOTES_V{suffix}.md"
             )
-        elif not any(
-            status in current_line
-            for status in ("**Beta**", "**Validated", "**Historical**")
-        ):
-            errors.append(
-                f"Current version {manifest_version} release-notes row has no explicit status"
-            )
+        else:
+            dedicated_text = dedicated_release.read_text(encoding="utf-8")
+            if not any(status in dedicated_text for status in ("Beta", "Validated", "Historical")):
+                errors.append(
+                    f"Dedicated release notes for {manifest_version} have no explicit status"
+                )
+    elif not any(
+        status in central_line
+        for status in ("**Beta**", "**Validated", "**Historical**")
+    ):
+        errors.append(
+            f"Current version {manifest_version} release-notes row has no explicit status"
+        )
 
 
 def main() -> int:
