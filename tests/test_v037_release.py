@@ -21,9 +21,10 @@ class V039ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        # v0.39 remains a tested behavior layer even when a later release
-        # wrapper owns the active panel/version presentation. Later releases
-        # may refresh nested cache keys without changing the v0.39 contract.
+        # v0.39 remains a tested behavior layer even when a later release or
+        # presentation wrapper owns the active panel/version presentation.
+        # Later releases may refresh nested cache keys without changing the
+        # v0.39 contract.
         version = manifest["version"]
         if version == "0.39":
             self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
@@ -47,7 +48,17 @@ class V039ReleaseTests(unittest.TestCase):
                 v038,
             )
         elif version == "0.41":
-            self.assertIn("gw-energy-pilot-v041.js?v=0.41-stable1", init_source)
+            settings = (
+                FRONTEND / "gw-energy-pilot-v041-emhass-settings.js"
+            ).read_text(encoding="utf-8")
+            self.assertIn(
+                "gw-energy-pilot-v041-emhass-settings.js?v=0.41-emhass1",
+                init_source,
+            )
+            self.assertIn(
+                'import "./gw-energy-pilot-v041.js?v=0.41-stable1"',
+                settings,
+            )
             v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
                 encoding="utf-8"
             )

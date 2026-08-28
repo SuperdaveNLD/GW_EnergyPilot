@@ -9,8 +9,112 @@ stability.HARNESS = "/tests/browser/frontend_harness.html?entry=v041"
 stability.EXPECTED_ENTRYPOINT = "v041"
 
 
+def exercise_emhass_settings(page):
+    """Load the active settings wrapper and validate its responsive EMHASS view."""
+    return page.evaluate(
+        """
+        async () => {
+          await import('/custom_components/gw_energypilot/frontend/gw-energy-pilot-v041-emhass-settings.js?browser-settings=1');
+          const panel = window.__epPanel;
+          panel.__epV016SettingsOpen = true;
+          panel.__epV016SettingsTab = 'emhass';
+          panel.__epV016SettingsData = {
+            entry_id: 'test_entry',
+            entries: [{ entry_id: 'test_entry', title: 'GW15K-ETA-G20', state: 'loaded' }],
+            sections: {
+              emhass: {
+                title: 'EMHASS',
+                short_title: 'EMHASS',
+                description: 'Connection, orchestration, outputs and runtime price integration.',
+                fields: [
+                  { key: 'emhass_url', label: 'EMHASS URL', type: 'text', value: 'http://emhass:5000', readonly: false },
+                  { key: 'emhass_optimization_interval', label: 'Optimization interval', type: 'number', value: 60, unit: 'min', readonly: false },
+                  { key: 'p_batt_entity', label: 'P_batt output entity', type: 'text', value: 'sensor.p_batt_forecast', readonly: false },
+                  { key: 'p_grid_entity', label: 'P_grid output entity', type: 'text', value: 'sensor.p_grid_forecast', readonly: false },
+                  { key: 'optim_status_entity', label: 'Optimization status entity', type: 'text', value: 'sensor.optim_status', readonly: false },
+                  { key: 'optim_required_state', label: 'Required optimization state', type: 'text', value: 'Optimal', readonly: false },
+                  { key: 'use_nordpool_prices', label: 'Use Nord Pool runtime prices', type: 'boolean', value: true, readonly: false },
+                  { key: 'buy_price_adder', label: 'Import price adder', type: 'number', value: 0.02, unit: 'EUR/kWh', readonly: false },
+                ],
+              },
+            },
+          };
+          panel.__epV028Sync = {
+            entryId: 'test_entry',
+            loading: false,
+            applying: false,
+            error: null,
+            data: {
+              entry_id: 'test_entry',
+              available: true,
+              synchronized: false,
+              recommended_options: {},
+              changes: [{
+                key: 'sensor_power_battery',
+                current: 'sensor.old_battery_power',
+                required: 'sensor.gw_energypilot_battery_power',
+              }],
+              warnings: [],
+              managed_values: [
+                {
+                  key: 'sensor_power_battery',
+                  current: 'sensor.old_battery_power',
+                  required: 'sensor.gw_energypilot_battery_power',
+                  synchronized: false,
+                },
+                {
+                  key: 'sensor_power_load_no_var_loads',
+                  current: 'sensor.gw_energypilot_total_load_power',
+                  required: 'sensor.gw_energypilot_total_load_power',
+                  synchronized: true,
+                },
+                {
+                  key: 'continual_publish',
+                  current: true,
+                  required: true,
+                  synchronized: true,
+                },
+              ],
+            },
+          };
+          panel._queueRender();
+          await new Promise((resolve) => setTimeout(resolve, 120));
+          const root = panel.shadowRoot;
+          const summary = root.querySelector('.ep-v041-emhass-summary');
+          const groups = root.querySelectorAll('.ep-v041-emhass-group');
+          const rows = root.querySelectorAll('.ep-v041-emhass-sync-row');
+          const control = root.querySelector('.ep-v041-emhass-control');
+          const stored = control?.textContent || '';
+          const syncButton = root.querySelector('.ep-v041-emhass-sync-action');
+          const viewportContained = window.__epScroller.scrollWidth <= window.__epScroller.clientWidth + 2;
+          const result = {
+            summary: Boolean(summary),
+            groups: groups.length,
+            rows: rows.length,
+            storedMismatch: stored.includes('sensor.old_battery_power'),
+            synchronizedValue: stored.includes('sensor.gw_energypilot_total_load_power'),
+            syncButton: Boolean(syncButton),
+            viewportContained,
+          };
+          if (
+            !result.summary || result.groups < 3 || result.rows < 4 ||
+            !result.storedMismatch || !result.synchronizedValue ||
+            !result.syncButton || !result.viewportContained
+          ) {
+            throw new Error(`EMHASS settings layout regression: ${JSON.stringify(result)}`);
+          }
+          panel.__epV016SettingsOpen = false;
+          panel.__epV016Draft = {};
+          panel._queueRender();
+          await new Promise((resolve) => setTimeout(resolve, 120));
+          return result;
+        }
+        """
+    )
+
+
 def exercise_structural_rerender(page):
-    """Wait for the deliberate main-node replacement before testing controls."""
+    """Exercise the EMHASS settings wrapper, then test a structural dashboard render."""
     result = {
         "cards": 0,
         "main_rebuilt": False,
@@ -19,6 +123,16 @@ def exercise_structural_rerender(page):
         "error": None,
     }
     try:
+        exercise_emhass_settings(page)
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.shadowRoot.querySelector('main[data-ep-v041-stable-dom="1"]') &&
+              window.__epPanel.shadowRoot.querySelectorAll('[data-ep-card]').length >= 8
+            )
+            """,
+            timeout=10_000,
+        )
         page.evaluate(
             """
             () => {

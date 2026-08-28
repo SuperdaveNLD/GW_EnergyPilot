@@ -15,9 +15,19 @@ class FrontendV040RenderSettleTests(unittest.TestCase):
     def test_v040_remains_a_valid_historical_entrypoint_under_v041(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        settings = (
+            FRONTEND / "gw-energy-pilot-v041-emhass-settings.js"
+        ).read_text(encoding="utf-8")
         v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
         self.assertEqual(manifest["version"], "0.41")
-        self.assertIn('gw-energy-pilot-v041.js?v=0.41-stable1', init)
+        self.assertIn(
+            "gw-energy-pilot-v041-emhass-settings.js?v=0.41-emhass1",
+            init,
+        )
+        self.assertIn(
+            'import "./gw-energy-pilot-v041.js?v=0.41-stable1"',
+            settings,
+        )
         self.assertIn(
             'import "./gw-energy-pilot-v039.js?v=0.41-stable1"',
             v041,
