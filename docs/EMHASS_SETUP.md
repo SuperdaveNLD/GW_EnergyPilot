@@ -282,7 +282,7 @@ If runtime pricing is enabled but no compatible source exists, EnergyPilot repor
 
 ## 12. First optimization
 
-Wait until Home Assistant startup has finished and EnergyPilot telemetry is available. Then press **Optimize now**.
+For a manual-only configuration, wait until Home Assistant startup has finished and EnergyPilot telemetry is available. Then press **Optimize now**.
 
 Successful flow:
 
@@ -302,7 +302,7 @@ fresh numeric outputs + expected optimization state
 ready
 ```
 
-EnergyPilot intentionally does not create an EMHASS plan during Home Assistant startup.
+EnergyPilot never blocks Home Assistant startup on an EMHASS solve. When native orchestration is enabled, v0.44 schedules one background recovery attempt 60 seconds after EnergyPilot setup. The normal Home Assistant-running, GoodWe-telemetry, EMHASS-health and finite-output gates still apply. A transient failure retries after 15, 30 and 60 seconds; any successful manual, event-driven or scheduled optimization after setup cancels the remaining startup sequence. After the bounded retries are exhausted, the normal periodic schedule remains active.
 
 ## 13. Enable Automatic Control
 
@@ -379,7 +379,7 @@ Strategy change                    fresh optimize after save
 Tomorrow prices available          immediate when enabled
 EV charging stops                  immediate fresh optimization when configured
 SOC limit changes                  debounced after final change
-Home Assistant startup             no optimization
+Post-restart recovery              after 60 s; transient retry 15/30/60 s
 ```
 
 There is no v0.22 30-second mode-11 grid-neutral feedback scheduler when Smart Meter control is enabled.

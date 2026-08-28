@@ -2,6 +2,25 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [0.44] - 2026-08-28
+
+### Fixed
+
+- Replaced the inherited Optimize-now listener that requested a complete dashboard render after the solve/publish service returned. v0.44 calls the same Home Assistant button entity exactly once and patches busy/idle state, orchestrator diagnostics and errors in place.
+- Added a real first post-restart optimization callback for native orchestration. The previous candidate contained retry behavior but never scheduled its initial invocation through the active `orchestrator_v012 -> v033` chain.
+
+### Changed
+
+- Added `gw-energy-pilot-v044.js` over the complete v0.43 chain. A targeted Battery · Plan · Price refresh may still replace the canonical graph card, but `main`, Optimize now, layout, Automatic Control and Battery Strategy remain connected throughout the transaction.
+- Added `orchestrator_v044.py`, which schedules one non-blocking recovery attempt after 60 seconds and retries transient Home Assistant/GoodWe/EMHASS startup dependency failures after 15, 30 and 60 seconds.
+- Skip the remaining startup recovery sequence when any manual, scheduled or event-driven EnergyPilot optimization has already succeeded after setup. Exhausted retries fall back to the unchanged periodic schedule.
+- Extended the deterministic desktop Chromium, iPad WebKit and iPhone WebKit matrix with exact Optimize service-count, zero-full-render, stable-node, native-scroll-anchor and post-optimization scroll assertions.
+
+### Safety and compatibility
+
+- No GoodWe register, Modbus read/write, EMS mode/setpoint/write order, Automatic Control decision, Battery Saver/EMHASS objective, entity ID, unique ID, config-entry data or persistent Store contract change.
+- Home Assistant config-entry setup remains non-blocking; the delayed optimization uses the existing readiness, telemetry, health, finite-output, optimization-lock, plan-mirror and `plan_revision` contracts.
+
 ## [0.43] - 2026-08-28
 
 ### Fixed

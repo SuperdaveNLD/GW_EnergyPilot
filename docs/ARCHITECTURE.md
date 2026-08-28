@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.38 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.44 Beta**.
 
 ## High-level flow
 
@@ -16,7 +16,7 @@ GWEnergyPilotCoordinator
     |----------------------> Home Assistant telemetry/entities
     |----------------------> GWEnergyPilotAccounting
     |----------------------> GWEnergyPilotController (controller_v033)
-    `----------------------> GWEnergyPilotOrchestrator (orchestrator_v033)
+    `----------------------> GWEnergyPilotOrchestrator (orchestrator_v044)
                                   |
                                   +--> EnergyPilot Battery Saver policy
                                   +--> EMHASS optimize/publish
@@ -58,7 +58,7 @@ No Home Assistant Store is a second configuration database or optimizer.
 - `GWModbusClient`;
 - `GWEnergyPilotCoordinator`;
 - `GWEnergyPilotController` from `controller_v033.py`;
-- `GWEnergyPilotOrchestrator` from `orchestrator_v033.py`;
+- `GWEnergyPilotOrchestrator` from `orchestrator_v044.py`;
 - `GWEnergyPilotPlanRuntime`;
 - `GWEnergyPilotAccounting`;
 - `GWEnergyPilotDebugRuntime`.
@@ -221,12 +221,13 @@ See `docs/EMHASS_PLAN_RUNTIME.md` for the detailed lifecycle and validation cont
 The active orchestrator chain is:
 
 ```text
-orchestrator_v033.GWEnergyPilotOrchestrator
-    -> orchestrator_v031.GWEnergyPilotOrchestrator
-        -> orchestrator_v026.GWEnergyPilotOrchestrator
-            -> orchestrator_v013.GWEnergyPilotOrchestrator
-                -> orchestrator_v012.GWEnergyPilotOrchestrator
-                    -> orchestrator.GWEnergyPilotOrchestrator
+orchestrator_v044.GWEnergyPilotOrchestrator
+    -> orchestrator_v033.GWEnergyPilotOrchestrator
+        -> orchestrator_v031.GWEnergyPilotOrchestrator
+            -> orchestrator_v026.GWEnergyPilotOrchestrator
+                -> orchestrator_v013.GWEnergyPilotOrchestrator
+                    -> orchestrator_v012.GWEnergyPilotOrchestrator
+                        -> orchestrator.GWEnergyPilotOrchestrator
 ```
 
 Responsibilities are layered deliberately:
@@ -235,6 +236,7 @@ Responsibilities are layered deliberately:
 - v026: canonical timestamped price-series support for dashboard/optimizer use;
 - v031: Battery Saver policy ownership, canonical EMHASS runtime-contract application, GoodWe minimum-SOC synchronization before owned solves and runtime final-SOC clamping;
 - v033: refresh the persistent canonical plan after a successful optimize/publish cycle and increment `plan_revision` in a `finally` block after the refresh attempt.
+- v044: schedule one non-blocking first post-restart optimization after 60 seconds, retry transient dependency failures after 15/30/60 seconds, and skip the sequence after any newer successful optimization.
 
 The EnergyPilot-required runtime contract is defined once in `emhass_sync.py` and reused by both explicit **Synchronize required config** and automatic pre-solve preparation:
 

@@ -79,7 +79,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         browser_test = (BROWSER / "test_frontend_stability.py").read_text(
             encoding="utf-8"
         )
-        wrapper = (BROWSER / "test_frontend_stability_v043.py").read_text(
+        wrapper = (BROWSER / "test_frontend_stability_v044.py").read_text(
             encoding="utf-8"
         )
         harness = (BROWSER / "frontend_harness.html").read_text(
@@ -94,11 +94,12 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("telemetry_identity", browser_test)
         self.assertIn("exercise_plan_refresh", browser_test)
         self.assertIn("animation[\"animations\"] != 0", browser_test)
-        self.assertIn("frontend_harness.html?entry=v043", wrapper)
-        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v043"', wrapper)
-        self.assertIn('"v043"].includes(requestedEntry)', harness)
+        self.assertIn("frontend_harness.html?entry=v044", wrapper)
+        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v044"', wrapper)
+        self.assertIn('"v043", "v044"].includes(requestedEntry)', harness)
         self.assertIn("exercise_touch_controls", browser_test)
-        self.assertIn("test_frontend_stability_v043.py", workflow)
+        self.assertIn("exercise_optimize_stability", browser_test)
+        self.assertIn("test_frontend_stability_v044.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)
         self.assertFalse((BROWSER / "frontend_harness_v041.html").exists())
