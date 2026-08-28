@@ -15,28 +15,16 @@ class FrontendV040RenderSettleTests(unittest.TestCase):
     def test_v040_remains_a_valid_historical_entrypoint_under_v041(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        settings = (
-            FRONTEND / "gw-energy-pilot-v041-emhass-settings.js"
-        ).read_text(encoding="utf-8")
+        release = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
+        settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
         v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.41")
-        self.assertIn(
-            "gw-energy-pilot-v041-emhass-settings.js?v=0.41-emhass1",
-            init,
-        )
-        self.assertIn(
-            'import "./gw-energy-pilot-v041.js?v=0.41-stable1"',
-            settings,
-        )
-        self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=0.41-stable1"',
-            v041,
-        )
+        self.assertEqual(manifest["version"], "0.42")
+        self.assertIn("gw-energy-pilot-v042.js?v=0.42-release1", init)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.42-emhass1"', release)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.41-stable1"', settings)
+        self.assertIn('import "./gw-energy-pilot-v039.js?v=0.41-stable1"', v041)
         self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
-        self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=0.40-mobile-scroll1"',
-            self.source,
-        )
+        self.assertIn('import "./gw-energy-pilot-v039.js?v=0.40-mobile-scroll1"', self.source)
         self.assertIn('const VERSION = "0.40"', self.source)
 
     def test_v040_suppresses_only_transition_restart_during_render_settle(self) -> None:
@@ -62,29 +50,16 @@ class FrontendV040RenderSettleTests(unittest.TestCase):
         self.assertIn("panel.__epV040RenderGeneration !== generation", self.source)
         self.assertGreaterEqual(self.source.count("globalThis.requestAnimationFrame"), 3)
         self.assertIn("globalThis.setTimeout?.(finish, 34)", self.source)
-        self.assertLess(
-            self.source.index("this.classList.add(SETTLE_CLASS)"),
-            self.source.index("previousRender.apply(this, args)"),
-        )
-        self.assertGreater(
-            self.source.index("scheduleSettleEnd(this, generation)"),
-            self.source.index("previousRender.apply(this, args)"),
-        )
+        self.assertLess(self.source.index("this.classList.add(SETTLE_CLASS)"), self.source.index("previousRender.apply(this, args)"))
+        self.assertGreater(self.source.index("scheduleSettleEnd(this, generation)"), self.source.index("previousRender.apply(this, args)"))
 
     def test_v040_does_not_restore_removed_hover_locks_or_stale_node_reuse(self) -> None:
-        for forbidden in (
-            "setPointerCapture",
-            "__epV035HoverActive",
-            "captureStableButtons",
-            "renderedButton.replaceWith",
-        ):
+        for forbidden in ("setPointerCapture", "__epV035HoverActive", "captureStableButtons", "renderedButton.replaceWith"):
             self.assertNotIn(forbidden, self.source)
 
     def test_v040_scope_covers_known_recreated_menu_and_window_controls(self) -> None:
         menu = (FRONTEND / "gw-energy-pilot-v008.js").read_text(encoding="utf-8")
-        windows = (FRONTEND / "gw-energy-pilot-v031-window-controls.js").read_text(
-            encoding="utf-8"
-        )
+        windows = (FRONTEND / "gw-energy-pilot-v031-window-controls.js").read_text(encoding="utf-8")
         base = (FRONTEND / "gw-energy-pilot.js").read_text(encoding="utf-8")
         self.assertIn(".ep-layout-button", menu)
         self.assertIn(".ep-menu-row input", menu)
