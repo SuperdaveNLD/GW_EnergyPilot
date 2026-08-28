@@ -70,10 +70,45 @@ def shadow(page: Page, selector: str):
     return page.locator("gw-energypilot-panel").locator(selector)
 
 
+def wait_render_idle(page: Page) -> None:
+    """Wait until full-render work and two follow-up paint frames have settled."""
+    page.wait_for_function(
+        "() => Boolean(window.__epPanel && !window.__epPanel._renderQueued)",
+        timeout=5_000,
+    )
+    page.evaluate(
+        """
+        () => new Promise((resolve) => requestAnimationFrame(
+          () => requestAnimationFrame(resolve)
+        ))
+        """
+    )
+    page.wait_for_function(
+        "() => !window.__epPanel._renderQueued",
+        timeout=5_000,
+    )
+
+
 def activate(page: Page, profile: Profile, selector: str) -> None:
     """Use a real touch sequence for touch profiles and a mouse click otherwise."""
+    wait_render_idle(page)
+    last_error: PlaywrightError | None = None
+    for _attempt in range(3):
+        control = shadow(page, selector)
+        try:
+            control.scroll_into_view_if_needed(timeout=5_000)
+            break
+        except PlaywrightError as err:
+            if "not attached" not in str(err).lower():
+                raise
+            last_error = err
+            wait_render_idle(page)
+    else:
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(f"Control did not become available: {selector}")
+
     control = shadow(page, selector)
-    control.scroll_into_view_if_needed(timeout=5_000)
     if profile.touch:
         control.tap(timeout=5_000)
     else:
