@@ -24,10 +24,10 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
         self._startup_retry_index = 0
 
     async def async_setup(self) -> None:
-        """Capture restored runtime state before the inherited scheduler starts."""
-        self._startup_success_baseline = self.last_success
+        """Capture restored runtime state after the inherited scheduler setup."""
         self._startup_retry_index = 0
         await super().async_setup()
+        self._startup_success_baseline = self.last_success
 
     def _startup_already_refreshed(self) -> bool:
         """Return whether another optimization already succeeded after setup."""
