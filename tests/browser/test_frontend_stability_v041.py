@@ -95,11 +95,60 @@ def exercise_emhass_settings(page):
             synchronizedValue: stored.includes('sensor.gw_energypilot_total_load_power'),
             syncButton: Boolean(syncButton),
             viewportContained,
+            customMode: false,
+            customInputs: 0,
+            customSaved: false,
+            customTypography: false,
           };
+          const customButton = root.querySelector('.ep-v031-bs-mode[data-bs-mode="custom"]');
+          customButton?.click();
+          for (let attempt = 0; attempt < 40; attempt += 1) {
+            if (root.querySelector('[data-bs-custom-form]') && !panel.__epV031BSBusy) break;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          const customForm = root.querySelector('[data-bs-custom-form]');
+          const requested = {
+            battery_soc_deficit_cost: 0.011111,
+            battery_soc_surplus_cost: 0.012222,
+            battery_stress_cost: 0.013333,
+            weight_battery_charge: 0.014444,
+            weight_battery_discharge: 0.015555,
+          };
+          for (const [key, value] of Object.entries(requested)) {
+            const input = customForm?.querySelector(`[data-bs-custom-value="${key}"]`);
+            if (input) input.value = String(value);
+          }
+          customForm?.requestSubmit();
+          for (let attempt = 0; attempt < 50; attempt += 1) {
+            if (!panel.__epV031BSBusy && window.__epWsCalls.some(
+              call => call.type === 'gw_energypilot/battery_saver/custom_set'
+            )) break;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          const customCall = [...window.__epWsCalls].reverse().find(
+            call => call.type === 'gw_energypilot/battery_saver/custom_set'
+          );
+          const currentCustom = root.querySelector('[data-bs-custom-form]');
+          const modeTitle = root.querySelector('.ep-v031-bs-mode strong');
+          const modeCopy = root.querySelector('.ep-v031-bs-mode p');
+          result.customMode = Boolean(
+            root.querySelector('.ep-v031-bs-mode[data-bs-mode="custom"].active')
+          );
+          result.customInputs = currentCustom?.querySelectorAll(
+            '[data-bs-custom-value]'
+          ).length || 0;
+          result.customSaved = JSON.stringify(customCall?.values) === JSON.stringify(requested);
+          result.customTypography = Boolean(
+            parseFloat(getComputedStyle(modeTitle).fontSize) >= 12 &&
+            parseFloat(getComputedStyle(modeCopy).fontSize) >= 10
+          );
+          result.viewportContained =
+            window.__epScroller.scrollWidth <= window.__epScroller.clientWidth + 2;
           if (
             !result.summary || result.groups < 3 || result.rows < 4 ||
             !result.storedMismatch || !result.synchronizedValue ||
-            !result.syncButton || !result.viewportContained
+            !result.syncButton || !result.viewportContained || !result.customMode ||
+            result.customInputs !== 5 || !result.customSaved || !result.customTypography
           ) {
             throw new Error(`EMHASS settings layout regression: ${JSON.stringify(result)}`);
           }

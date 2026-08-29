@@ -32,16 +32,23 @@ BATTERY_SAVER_CONFIG_KEYS: tuple[str, ...] = (
     "weight_battery_discharge",
 )
 
+CUSTOM_BATTERY_COST_KEYS: tuple[str, ...] = (
+    "battery_soc_deficit_cost",
+    "battery_soc_surplus_cost",
+    "battery_stress_cost",
+    "weight_battery_charge",
+    "weight_battery_discharge",
+)
+
 MINIMUM_STRESS_SAFE_EMHASS_VERSION = (0, 18, 1)
 DEFAULT_PRICE_REFERENCE = 0.20
-# Field validation on the primary installation first showed that ~0.005
-# currency/kWh per direction removed several low-value quarter-hour reversals
-# without suppressing high-value 12-15 kW dispatch. A follow-up comparison at
-# ~0.007 per direction reduced the remaining low-value churn while still
-# preserving full-power evening operation. At the observed price reference of
-# ~0.31, 2.25% reproduces ~0.007 without hard-coding EUR and remains
-# proportional in other currencies.
-ANTI_CHURN_COST_FACTOR = 0.0225
+# Mad-Steve deliberately retains the established aggressive transaction floor.
+# The other managed profiles use the field-tuned floor that removed low-value
+# one-slot reversals while preserving valuable full-power dispatch. Keeping the
+# conservative profiles at least as selective as Gold Rush preserves the public
+# strategy ordering without changing installation-owned efficiency values.
+MAD_STEVE_ANTI_CHURN_COST_FACTOR = 0.0225
+MANAGED_ANTI_CHURN_COST_FACTOR = 0.06
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +64,7 @@ class BatterySaverPreset:
     surplus_threshold: float
     surplus_cost_factor: float
     stress_cost_factor: float
+    anti_churn_cost_factor: float
     stress_segments: int = 10
 
 
@@ -65,53 +73,57 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_MAD_STEVE,
         label="Mad-Steve",
         short_description=(
-            "Maximum economic freedom up to 100% SOC with anti-churn protection and no extra SOC or power-stress penalty."
+            "Maximum economic freedom up to 100% SOC, with the lightest hourly cost above the 95% red-zone threshold."
         ),
         maximum_soc=1.00,
         deficit_threshold=0.05,
         deficit_cost_factor=0.0,
-        surplus_threshold=1.00,
-        surplus_cost_factor=0.0,
+        surplus_threshold=0.95,
+        surplus_cost_factor=0.05,
         stress_cost_factor=0.0,
+        anti_churn_cost_factor=MAD_STEVE_ANTI_CHURN_COST_FACTOR,
     ),
     MODE_GOLD_RUSH: BatterySaverPreset(
         key=MODE_GOLD_RUSH,
         label="Gold Rush",
         short_description=(
-            "Profit first with a 96% hard maximum, anti-churn protection and light power stress."
+            "Profit first up to 100% SOC, with a priced red zone above 95% and light power stress."
         ),
-        maximum_soc=0.96,
+        maximum_soc=1.00,
         deficit_threshold=0.05,
         deficit_cost_factor=0.0,
-        surplus_threshold=0.96,
-        surplus_cost_factor=0.05,
-        stress_cost_factor=0.03,
+        surplus_threshold=0.95,
+        surplus_cost_factor=0.10,
+        stress_cost_factor=0.01,
+        anti_churn_cost_factor=MANAGED_ANTI_CHURN_COST_FACTOR,
     ),
     MODE_BALANCED: BatterySaverPreset(
         key=MODE_BALANCED,
         label="Balanced",
         short_description=(
-            "Balances trading value and battery preservation with a 95% hard maximum and moderate power stress."
+            "Balances trading value and preservation up to 100% SOC, with moderate red-zone and power stress."
         ),
-        maximum_soc=0.95,
+        maximum_soc=1.00,
         deficit_threshold=0.10,
         deficit_cost_factor=0.05,
         surplus_threshold=0.95,
-        surplus_cost_factor=0.10,
+        surplus_cost_factor=0.25,
         stress_cost_factor=0.08,
+        anti_churn_cost_factor=MANAGED_ANTI_CHURN_COST_FACTOR,
     ),
     MODE_BATTERY_SAVER: BatterySaverPreset(
         key=MODE_BATTERY_SAVER,
         label="Battery Saver",
         short_description=(
-            "Uses a 90% hard maximum and the strongest low-SOC and high-power preservation penalties."
+            "Keeps 100% available for exceptional value, with the strongest red-zone, low-SOC and power penalties."
         ),
-        maximum_soc=0.90,
+        maximum_soc=1.00,
         deficit_threshold=0.15,
         deficit_cost_factor=0.10,
-        surplus_threshold=0.90,
-        surplus_cost_factor=0.25,
+        surplus_threshold=0.95,
+        surplus_cost_factor=0.50,
         stress_cost_factor=0.20,
+        anti_churn_cost_factor=MANAGED_ANTI_CHURN_COST_FACTOR,
     ),
 }
 
@@ -135,7 +147,9 @@ def battery_saver_mode_payloads() -> list[dict[str, Any]]:
             "maximum_soc_pct": round(preset.maximum_soc * 100),
             "deficit_threshold_pct": round(preset.deficit_threshold * 100),
             "surplus_threshold_pct": round(preset.surplus_threshold * 100),
-            "anti_churn_cost_factor_pct": round(ANTI_CHURN_COST_FACTOR * 100, 2),
+            "anti_churn_cost_factor_pct": round(
+                preset.anti_churn_cost_factor * 100, 2
+            ),
             "recommended": preset.key == MODE_BALANCED,
         }
         for preset in PRESETS.values()
@@ -148,6 +162,27 @@ def _finite_number(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def custom_battery_cost_updates(values: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate dashboard custom costs and preserve EMHASS value shapes.
+
+    EnergyPilot exposes one editor only for the supported single-battery model.
+    EMHASS stores the throughput weights as one-item lists and the remaining
+    costs as scalars, so the API must retain those established shapes.
+    """
+    missing = [key for key in CUSTOM_BATTERY_COST_KEYS if key not in values]
+    if missing:
+        raise ValueError(f"Missing custom battery cost: {', '.join(missing)}")
+
+    normalized: dict[str, Any] = {}
+    for key in CUSTOM_BATTERY_COST_KEYS:
+        value = _finite_number(values[key])
+        if value is None or value < 0:
+            raise ValueError(f"Custom battery cost '{key}' must be finite and non-negative")
+        value = round(value, 6)
+        normalized[key] = [value] if key.startswith("weight_battery_") else value
+    return normalized
 
 
 def _numeric_values(values: Iterable[Any]) -> list[float]:
@@ -217,7 +252,7 @@ def build_battery_saver_profile(
     normalized = normalize_battery_saver_mode(mode)
     preset = PRESETS[normalized]
     reference = battery_saver_price_reference([price_reference], {})
-    anti_churn_weight = round(reference * ANTI_CHURN_COST_FACTOR, 6)
+    anti_churn_weight = round(reference * preset.anti_churn_cost_factor, 6)
     return {
         "mode": preset.key,
         "label": preset.label,

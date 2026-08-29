@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -53,6 +53,13 @@
     ];
 
     let batterySaverMode = "balanced";
+    let customBatteryValues = {
+      battery_soc_deficit_cost: 0.002,
+      battery_soc_surplus_cost: 0.002,
+      battery_stress_cost: 0.001,
+      weight_battery_charge: [0.001],
+      weight_battery_discharge: [0.001],
+    };
     let planRevision = 1;
 
     const stateValues = {
@@ -263,22 +270,27 @@
         ["gold_rush", "Gold Rush"],
         ["balanced", "Balanced"],
         ["battery_saver", "Battery Saver"],
-      ].map(([key, label]) => ({ key, label, description: `${label} test profile` }));
+      ].map(([key, label], index) => ({
+        key,
+        label,
+        description: `${label} test profile`,
+        deficit_threshold_pct: [5, 5, 10, 15][index],
+        surplus_threshold_pct: [95, 95, 95, 95][index],
+        maximum_soc_pct: [100, 100, 100, 100][index],
+        recommended: key === "balanced",
+      }));
       return {
         entry_id: ENTRY_ID,
-        managed: true,
-        mode: batterySaverMode,
+        managed: batterySaverMode !== "custom",
+        mode: batterySaverMode === "custom" ? null : batterySaverMode,
         modes,
         current_emhass_values: {
           battery_minimum_state_of_charge: 0.05,
           battery_maximum_state_of_charge: 0.95,
-          battery_soc_deficit_cost: 0.002,
-          battery_soc_surplus_cost: 0.002,
-          battery_stress_cost: 0.001,
-          weight_battery_charge: 0.001,
-          weight_battery_discharge: 0.001,
+          ...customBatteryValues,
         },
         emhass_version: "0.18.1",
+        battery_count: 1,
       };
     }
 
@@ -405,6 +417,18 @@
       if (type === "gw_energypilot/battery_saver/set") {
         await actionDelay();
         batterySaverMode = String(message.mode || batterySaverMode);
+        window.__epAdvancePlan?.();
+        return batterySaverPayload();
+      }
+      if (type === "gw_energypilot/battery_saver/custom_set") {
+        await actionDelay();
+        batterySaverMode = "custom";
+        customBatteryValues = {
+          ...customBatteryValues,
+          ...message.values,
+          weight_battery_charge: [Number(message.values.weight_battery_charge)],
+          weight_battery_discharge: [Number(message.values.weight_battery_discharge)],
+        };
         window.__epAdvancePlan?.();
         return batterySaverPayload();
       }
@@ -540,6 +564,7 @@
       v044: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v044.js?browser-harness=1",
       v045: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v045.js?browser-harness=1",
       v046: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v046.js?browser-harness=1",
+      v047: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v047.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -672,7 +697,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

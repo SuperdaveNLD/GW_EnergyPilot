@@ -30,10 +30,13 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.stable = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
             encoding="utf-8"
         )
+        self.settings_battery = (
+            FRONTEND / "gw-energy-pilot-v031-battery-saver.js"
+        ).read_text(encoding="utf-8")
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
         self.assertIn("gw-energy-pilot-v038-runtime.js?v=", self.entry)
-        self.assertIn('gw-energy-pilot-v034.js?v=0.46-external-pv1', self.runtime)
+        self.assertIn('gw-energy-pilot-v034.js?v=0.47-custom-battery1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
         self.assertNotIn("gw-energy-pilot-v0363-control-stability.js", combined)
@@ -63,6 +66,31 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("panel.__epV041RefreshStrategy", self.strategy)
         self.assertIn("requestStrategyRefresh(panel)", self.strategy)
         self.assertIn("updateStrategyVisualState(panel, true)", self.strategy)
+
+    def test_custom_costs_are_editable_in_dashboard_and_settings(self) -> None:
+        for source in (self.strategy, self.settings_battery):
+            with self.subTest(source=source[:40]):
+                self.assertIn("gw_energypilot/battery_saver/custom_set", source)
+                self.assertIn("battery_soc_deficit_cost", source)
+                self.assertIn("battery_soc_surplus_cost", source)
+                self.assertIn("battery_stress_cost", source)
+                self.assertIn("weight_battery_charge", source)
+                self.assertIn("weight_battery_discharge", source)
+                self.assertIn('type="number"', source)
+                self.assertIn('min="0"', source)
+                self.assertIn('step="0.000001"', source)
+
+        self.assertIn('form[data-ep-v038-custom-form]', self.strategy)
+        self.assertIn("shareBatterySaverData", self.strategy)
+        self.assertIn('const CUSTOM_MODE = "custom"', self.settings_battery)
+        self.assertIn("data-bs-custom-form", self.settings_battery)
+        self.assertIn("shareBatterySaverData", self.settings_battery)
+
+    def test_battery_strategy_typography_no_longer_uses_six_or_seven_px_copy(self) -> None:
+        self.assertNotIn("font-size:6px", self.styles)
+        self.assertNotIn("font-size:7px", self.styles)
+        self.assertNotIn("font-size:6px", self.settings_battery)
+        self.assertNotIn("font-size:7px", self.settings_battery)
 
     def test_manual_controls_compact_without_replacing_control_nodes(self) -> None:
         self.assertIn('pad.className = `ep-v021-manual-pad', self.manual)

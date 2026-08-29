@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v042.js?v=0.46-external-pv1";
+import "./gw-energy-pilot-v042.js?v=0.47-custom-battery1";
 
 const VERSION = "0.43";
 const PANEL_NAME = "gw-energypilot-panel";

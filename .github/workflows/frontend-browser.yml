@@ -5,7 +5,7 @@ on:
     branches:
       - fix/frontend-stability-v041
       - fix/mobile-touch-controls-v042
-      - codex/release-v0.46
+      - codex/release-v0.47
   pull_request:
     paths:
       - "custom_components/gw_energypilot/frontend/**"
@@ -38,7 +38,7 @@ jobs:
           python -m playwright install --with-deps chromium webkit
 
       - name: Run desktop, iPad and iPhone touch-control diagnostics
-        run: python tests/browser/test_frontend_stability_v046.py
+        run: python tests/browser/test_frontend_stability_v047.py
 
       - name: Upload browser results
         if: always()

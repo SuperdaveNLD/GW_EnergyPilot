@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.46 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.47 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 

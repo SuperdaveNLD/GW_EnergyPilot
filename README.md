@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.46 · Beta**
+**v0.47 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V047.md` — v0.47 editable Custom battery costs and profile tuning;
 - `docs/RELEASE_NOTES_V046.md` — v0.46 grouped external-PV controls and master switch;
 - `docs/RELEASE_NOTES_V045.md` — consolidated v0.45 PV, SOC, live-flow and Optimize release;
 - `docs/RELEASE_NOTES_V044.md` — v0.44 stable Optimize action and post-restart optimization recovery;
@@ -44,6 +45,17 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v0.47 highlights
+
+- **Custom / Aangepast** is a first-class Battery Saver choice in both the dashboard and Settings → EMHASS.
+- Administrators can edit the five supported raw EMHASS battery cost values in one validated transaction and immediately rebuild the plan; a failed write or first optimization restores the previous Battery Saver configuration.
+- Gold Rush, Balanced and Battery Saver use a 6% × dynamic-price-reference anti-churn floor per direction. Mad-Steve retains its deliberately aggressive 2.25% floor.
+- Gold Rush power stress is reduced to 1% × dynamic price reference after field comparison, while Balanced and Battery Saver retain 8% and 20%.
+- All managed profiles can reach 100% SOC. A shared soft red zone above 95% applies profile-specific high-SOC dwell costs instead of hard-capping usable capacity.
+- Battery Strategy and Battery Saver settings typography is larger across desktop and touch layouts without changing the stable-DOM/native-scroll contract.
+- The complete active frontend graph uses the fresh `0.47-custom-battery1` cache key.
+- No GoodWe register/write, EMS/Automatic Control decision, entity identity, Store, plan-resilience or accounting contract changes.
 
 ## v0.46 highlights
 
@@ -328,9 +340,11 @@ The old direct **Battery minimum SOC limits** dashboard panel is not exposed as 
 
 Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes a GoodWe mode directly. The public profiles are **Mad-Steve**, **Gold Rush**, **Balanced** and **Battery Saver**.
 
-Managed profiles use a common price-relative charge/discharge anti-churn cost and profile-specific hard maximum SOC/power-stress behavior. Current hard maxima are **100% / 96% / 95% / 90%** for Mad-Steve / Gold Rush / Balanced / Battery Saver respectively. Minimum SOC remains the GoodWe-synchronized hard floor.
+Choose **Custom / Aangepast** to keep direct ownership of the active EMHASS battery policy. The dashboard and **Settings → EMHASS → Battery Saver** expose the same five editable raw cost values: low-SOC cost, high-SOC cost, battery power stress, charge cost and discharge cost. **Save and optimize** writes the complete intended EMHASS configuration without replacing unrelated settings and immediately builds a fresh plan. Custom editing currently requires one EMHASS battery model; Minimum and Maximum SOC continue to use their existing synchronized Home Assistant number entities.
 
-The common anti-churn factor is **2.25% × price reference per direction**. At the field-test price reference around `0.31`, that is approximately `0.007` per charged or discharged kWh.
+Managed profiles use price-relative charge/discharge anti-churn costs and profile-specific SOC/power-stress behavior. All four profiles can reach **100%**. The range above **95%** is a soft red zone with an hourly high-SOC dwell cost, so EMHASS only uses it when the expected value is high enough and avoids remaining full unnecessarily. Minimum SOC remains the GoodWe-synchronized hard floor.
+
+Mad-Steve retains **2.25% × price reference per direction** for maximum trading freedom. Gold Rush, Balanced and Battery Saver use the field-tuned **6% × price reference per direction** anti-churn floor. Gold Rush also uses a lighter **1% × price reference** power-stress cost; Balanced and Battery Saver retain their existing 8% and 20% stress factors.
 
 See `docs/BATTERY_SAVER.md` for exact profile factors and ownership.
 

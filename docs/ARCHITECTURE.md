@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.46 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.47 Beta**.
 
 ## High-level flow
 
@@ -285,30 +285,32 @@ Balanced
 Battery Saver
 ```
 
-When a profile is explicitly managed, its EMHASS hard maximum SOC is part of the profile transaction:
+When a profile is explicitly managed, its EMHASS hard maximum SOC is part of the profile transaction. Every current profile can reach the complete 100% range:
 
 ```text
 Mad-Steve     100%
-Gold Rush      96%
-Balanced       95%
-Battery Saver  90%
+Gold Rush     100%
+Balanced      100%
+Battery Saver 100%
 ```
 
 The verified GoodWe-synchronized minimum SOC remains a separate hard lower boundary.
+
+All profiles use `battery_soc_surplus_threshold = 0.95`. Above that shared soft red-zone boundary, EMHASS charges a virtual cost for every kWh and every hour spent there. The price-relative surplus factors are 5% / 10% / 25% / 50% for Mad-Steve / Gold Rush / Balanced / Battery Saver, so 100% remains available for high-value opportunities without becoming the default dwell state.
 
 v0.34 distinguishes two economic mechanisms:
 
 1. **battery throughput / anti-churn cost** — linear EMHASS `weight_battery_charge` and `weight_battery_discharge` costs;
 2. **battery power stress** — EMHASS `battery_stress_cost`, which current EMHASS models as a quadratic/PWL cost versus instantaneous battery power.
 
-All four EnergyPilot profiles apply the same anti-churn floor:
+Mad-Steve deliberately retains the established aggressive anti-churn floor:
 
 ```text
 weight_battery_charge    = 2.25% × dynamic price reference
 weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-At the field-test price reference around `0.31`, this is approximately `0.007` currency/kWh per direction. Profile differentiation remains through hard maximum SOC and the profile-specific deficit/surplus/power-stress policy.
+Gold Rush, Balanced and Battery Saver apply a 6% floor per direction. The captured Gold Rush comparison showed this removes the low-value 765 W, 857 W and 426 W reversals while retaining full 15 kW dispatch. Gold Rush additionally uses a lower 1% battery power-stress factor; Balanced and Battery Saver retain 8% and 20% respectively. Battery efficiency and inverter topology remain installation-owned.
 
 Battery Saver owns exactly nine EMHASS fields after the user explicitly selects a managed mode:
 
@@ -325,6 +327,8 @@ weight_battery_discharge
 ```
 
 Existing unmanaged/custom values are preserved. Multi-battery Battery Saver ownership is rejected instead of broadcasting scalar policy values across heterogeneous batteries. Failed first-apply optimization transactions restore the previous option and all owned EMHASS fields.
+
+The administrator-only Custom editor in the dashboard and EMHASS settings shares one `gw_energypilot/battery_saver/custom_set` transaction. It accepts the five visible non-negative economic cost values, preserves scalar versus one-item-list EMHASS shapes, writes the complete merged EMHASS configuration, runs one optimization and rolls back the previous Battery Saver-owned configuration on failure. The existing Minimum/Maximum SOC number entities retain their separate ownership and optimization behavior.
 
 See `docs/BATTERY_SAVER.md`.
 
@@ -370,21 +374,22 @@ The frontend keeps one canonical Battery · Plan · Price card. A mismatch betwe
 Active top-level module:
 
 ```text
-gw-energy-pilot-v046.js
-    -> gw-energy-pilot-v045.js
-        -> gw-energy-pilot-v044.js
-            -> gw-energy-pilot-v043.js
-                -> gw-energy-pilot-v042.js
-                    -> gw-energy-pilot-v041-emhass-settings.js
-                        -> gw-energy-pilot-v041.js
-                            -> gw-energy-pilot-v039.js
-                                -> gw-energy-pilot-v038.js
-                                    -> gw-energy-pilot-v038-runtime.js
-                                        -> gw-energy-pilot-v034.js
-                                            -> existing v0.34 feature chain
+gw-energy-pilot-v047.js
+  -> gw-energy-pilot-v046.js
+       -> gw-energy-pilot-v045.js
+            -> gw-energy-pilot-v044.js
+                 -> gw-energy-pilot-v043.js
+                      -> gw-energy-pilot-v042.js
+                           -> gw-energy-pilot-v041-emhass-settings.js
+                                -> gw-energy-pilot-v041.js
+                                     -> gw-energy-pilot-v039.js
+                                          -> gw-energy-pilot-v038.js
+                                               -> gw-energy-pilot-v038-runtime.js
+                                                    -> gw-energy-pilot-v034.js
+                                                         -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45/v0.46 add only release presentation and cache boundaries.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.47 add only release presentation and cache boundaries.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 
