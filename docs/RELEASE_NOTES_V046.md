@@ -4,6 +4,8 @@ v0.46 refines the display-only external PV setup introduced in v0.45.
 
 It also carries the final static live-flow presentation refinement: arrowheads are integrated into the connector pipes, directional brightness reinforces the physical direction, and low/medium/high strength uses restrained 3/4/5-pixel steps. Idle and unavailable states remain deliberately quiet and motion-free.
 
+The Controller card is more compact under automatic ownership. While **Automatic Control** is on, the twelve-mode manual EMS grid and power slider remain mounted but are semantically hidden behind a concise ownership summary. Turning Automatic Control off reveals and enables those same DOM nodes, including when the dashboard initially loaded in automatic mode. Missing manual entities remain visible as a compact unavailable state.
+
 ## External PV master switch
 
 The dashboard **PV** settings page now has a separate **Include external PV** switch. It is independent from **Include internal GoodWe PV**.

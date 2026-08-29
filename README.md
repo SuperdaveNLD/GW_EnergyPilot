@@ -61,6 +61,7 @@ Release documentation:
 - Battery Strategy SOC sliders keep the user's selected value and percentage during Chrome focus loss and telemetry, until Home Assistant confirms the saved value.
 - Battery · Plan · Price now overlays actual GoodWe SOC with validated single-battery EMHASS `SOC_opt` forecast on a separate 0–100% axis.
 - Live power connectors use static physical-direction arrows, relative low/medium/high thickness and explicit idle/unavailable states without reintroducing motion.
+- The twelve-mode manual EMS pad collapses to a compact ownership summary while Automatic Control is on and reveals the same live controls when manual ownership becomes available.
 - **Optimize now** is one safe-area-aware floating action that remains reachable while scrolling and when the optional EMHASS card is hidden or Settings is open.
 - The complete active frontend graph uses one fresh v0.45 cache key so these changes and the PV/SOC-slider work load together after upgrade.
 - Issues #84 and #87 are intentionally not part of v0.45.
