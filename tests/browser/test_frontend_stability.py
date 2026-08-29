@@ -878,22 +878,40 @@ def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, obje
             """
         )
         wait_render_idle(page)
-        structural = page.evaluate(
+        page.evaluate(
             """
-            async () => {
+            () => {
               const panel = window.__epPanel;
-              const beforeMain = panel.shadowRoot.querySelector('main');
-              const beforeRenders = window.__epIssue84RenderCount;
+              window.__epIssue84StructuralMain = panel.shadowRoot.querySelector('main');
+              window.__epIssue84StructuralRenders = window.__epIssue84RenderCount;
               const nextPanel = JSON.parse(JSON.stringify(panel.panel));
               nextPanel.config = {
                 ...(nextPanel.config || {}),
                 issue84StructuralProbe: 'changed',
               };
               panel.panel = nextPanel;
-              await new Promise((resolve) => setTimeout(resolve, 120));
+            }
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epIssue84RenderCount > window.__epIssue84StructuralRenders &&
+              window.__epPanel.shadowRoot.querySelector('main') !==
+                window.__epIssue84StructuralMain
+            """,
+            timeout=5_000,
+        )
+        wait_render_idle(page)
+        structural = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
               return {
-                renders: window.__epIssue84RenderCount - beforeRenders,
-                rebuilt: beforeMain !== panel.shadowRoot.querySelector('main'),
+                renders:
+                  window.__epIssue84RenderCount - window.__epIssue84StructuralRenders,
+                rebuilt:
+                  window.__epIssue84StructuralMain !==
+                    panel.shadowRoot.querySelector('main'),
               };
             }
             """
