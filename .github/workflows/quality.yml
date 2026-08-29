@@ -29,6 +29,7 @@ jobs:
 
       - name: Validate active frontend JavaScript
         run: |
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v046.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v045.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v044.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v043.js

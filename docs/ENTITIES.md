@@ -61,7 +61,7 @@ The read-only PV insight feature adds one aggregate entity with stable unique-ID
 {config_entry_id}_pv_generation_power
 ```
 
-The entity uses device class `power`, unit `W` and state class `MEASUREMENT`. By default it mirrors the existing canonical GoodWe `pv_total_power`. When the operator selects external PV sources on the dashboard **PV** settings page, it adds each currently valid non-negative W/kW/MW/mW reading.
+The entity uses device class `power`, unit `W` and state class `MEASUREMENT`. By default it mirrors the existing canonical GoodWe `pv_total_power`. When **Include external PV** is enabled, it adds each currently valid selected non-negative W/kW/MW/mW reading. Disabling external PV preserves the selections but excludes them from the entity.
 
 Attributes expose the internal contribution, external contribution, configured/available source counts and a per-source breakdown. The aggregate is `display_only`: it is not a controller input, EMHASS input, persistent energy counter or grid-accounting source. Selected external entities retain their own identity and Recorder history; EnergyPilot does not create a duplicate entity per source.
 

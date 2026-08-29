@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 
@@ -18,6 +19,22 @@ _POWER_UNIT_FACTORS = {
     "megawatt": 1_000_000.0,
     "megawatts": 1_000_000.0,
 }
+
+
+def external_sources_enabled(
+    options: Mapping[str, Any],
+    *,
+    enable_key: str,
+    entity_keys: Iterable[str],
+    default: bool = False,
+) -> bool:
+    """Resolve the v0.46 master switch without disabling v0.45 sources."""
+    if enable_key in options:
+        return bool(options[enable_key])
+    return bool(
+        default
+        or any(str(options.get(key, "")).strip() for key in entity_keys)
+    )
 
 
 def normalize_generation_power_w(value: Any, unit: Any) -> float | None:

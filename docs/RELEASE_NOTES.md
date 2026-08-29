@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.46** | 2026-08-29 | **Beta** | Adds an independent external-PV master switch and groups the four entity selectors in one enabled/disabled panel while preserving existing v0.45 configurations. |
 | **0.45** | 2026-08-29 | **Beta** | Consolidates PV insight and SOC-slider stability with #83 floating Optimize, #85 actual/forecast SOC and #86 static accessible live flow under one active frontend cache graph; #84 and #87 are excluded. |
 | **0.44** | 2026-08-28 | **Beta** | Keeps Optimize now and the surrounding dashboard DOM stable for the complete solve/publish transaction, and adds one non-blocking post-restart optimization recovery sequence with bounded 15/30/60-second retry back-off. |
 | **0.43** | 2026-08-28 | **Beta** | Fixes sticky touch-hover presentation across Optimize now, EMHASS and Battery Strategy selectors, quick actions/max export and the layout menu, with repeated iPhone/iPad WebKit tap regressions that verify both visible selection and executed actions. |
@@ -62,6 +63,14 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.46 — Grouped external-PV controls
+
+v0.46 adds a separate **Include external PV** switch. The four external entity selectors now share one visual panel and are disabled/dimmed while the switch is off. Enabling the switch activates all fields immediately; disabling it preserves their values but excludes the sources from the read-only PV total.
+
+Fresh installations default to external PV off. Existing v0.45 configurations with an external entity remain enabled on upgrade until the new switch is explicitly saved.
+
+See `docs/RELEASE_NOTES_V046.md`, `docs/CHANGELOG_V046.md` and `docs/PV_INSIGHT.md`.
 
 # v0.45 — Consolidated PV, SOC, live-flow and Optimize release
 

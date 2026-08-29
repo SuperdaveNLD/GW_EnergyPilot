@@ -30,6 +30,7 @@ from .const import (
     CONF_EMHASS_URL,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
     CONF_EV_MODE_ENTITY,
@@ -51,6 +52,7 @@ from .const import (
     DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     DEFAULT_EMHASS_SOC_FINAL,
     DEFAULT_EMHASS_URL,
+    DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
     DEFAULT_EV_DEADBAND,
     DEFAULT_MAX_POWER,
@@ -70,6 +72,7 @@ from .const import (
     EXTERNAL_PV_ENTITY_KEYS,
     NAME,
 )
+from .pv_insight import external_sources_enabled
 
 SECTION_ENERGYPILOT = "energypilot"
 SECTION_EMHASS = "emhass"
@@ -103,7 +106,11 @@ EMHASS_KEYS = {
     CONF_SELL_PRICE_DEDUCTION,
 }
 OPTIONAL_ENTITY_KEYS = {CONF_EV_MODE_ENTITY, CONF_EV_POWER_ENTITY}
-PV_KEYS = {CONF_ENABLE_INTERNAL_PV, *EXTERNAL_PV_ENTITY_KEYS}
+PV_KEYS = {
+    CONF_ENABLE_INTERNAL_PV,
+    CONF_ENABLE_EXTERNAL_PV,
+    *EXTERNAL_PV_ENTITY_KEYS,
+}
 
 PV_ENTITY_ID = vol.All(
     str,
@@ -115,6 +122,10 @@ PV_SCHEMA = vol.Schema(
         vol.Required(
             CONF_ENABLE_INTERNAL_PV,
             default=DEFAULT_ENABLE_INTERNAL_PV,
+        ): bool,
+        vol.Required(
+            CONF_ENABLE_EXTERNAL_PV,
+            default=DEFAULT_ENABLE_EXTERNAL_PV,
         ): bool,
         **{vol.Optional(key): PV_ENTITY_ID for key in EXTERNAL_PV_ENTITY_KEYS},
     },
@@ -335,6 +346,16 @@ PV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
             "total. This is display-only and does not affect EMS control."
         ),
     },
+    {
+        "key": CONF_ENABLE_EXTERNAL_PV,
+        "label": "Include external PV",
+        "type": "boolean",
+        "default": DEFAULT_ENABLE_EXTERNAL_PV,
+        "description": (
+            "Include the configured external Home Assistant PV sources in the "
+            "dashboard PV total. This is display-only."
+        ),
+    },
     *(
         {
             "key": key,
@@ -367,6 +388,19 @@ def _fields_from_specs(
 def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Return all settings required by the dedicated frontend pages."""
     options = _options_for_form(dict(entry.options))
+    # v0.45 stored external entity IDs without a separate master switch. Keep
+    # those existing installations enabled until the operator explicitly saves
+    # the new v0.46 switch; fresh configurations remain disabled by default.
+    pv_options = dict(options)
+    pv_options.setdefault(
+        CONF_ENABLE_EXTERNAL_PV,
+        external_sources_enabled(
+            options,
+            enable_key=CONF_ENABLE_EXTERNAL_PV,
+            entity_keys=EXTERNAL_PV_ENTITY_KEYS,
+            default=DEFAULT_ENABLE_EXTERNAL_PV,
+        ),
+    )
     goodwe_fields = [
         {
             "key": "hardware_target",
@@ -451,7 +485,7 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
                     "Choose which internal and external PV power sources are shown "
                     "in EnergyPilot. These values are never used for control."
                 ),
-                "fields": _fields_from_specs(options, PV_FIELD_SPECS),
+                "fields": _fields_from_specs(pv_options, PV_FIELD_SPECS),
             },
         },
     }
@@ -585,7 +619,8 @@ async def websocket_update_settings(
         cleaned_values = {
             key: value
             for key, value in values.items()
-            if key == CONF_ENABLE_INTERNAL_PV or value not in (None, "")
+            if key in {CONF_ENABLE_INTERNAL_PV, CONF_ENABLE_EXTERNAL_PV}
+            or value not in (None, "")
         }
         try:
             validated = PV_SCHEMA(cleaned_values)

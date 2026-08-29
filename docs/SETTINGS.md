@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.45 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.46 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -77,11 +77,12 @@ Changing `costfun` does not change the GoodWe actuator strategy.
 The PV section owns display-only PV source selection:
 
 - include/exclude the existing canonical internal GoodWe `pv_total_power` value;
+- independently enable/disable all external PV insight;
 - select up to four external Home Assistant instantaneous power entities;
 - normalize supported `W`, `kW`, `MW` and `mW` readings to watts;
 - expose one combined PV power sensor and dashboard source breakdown.
 
-Internal GoodWe PV remains enabled by default for backwards-compatible dashboard behavior. External values must be non-negative generation values. Invalid or unavailable sources are omitted from the live sum and remain visible as unavailable in the source breakdown.
+Internal GoodWe PV remains enabled by default for backwards-compatible dashboard behavior. The four external selectors share one panel and are editable only while **Include external PV** is on. Turning it off preserves their values but removes them from the live total. External values must be non-negative generation values.
 
 These settings do not change EMHASS input, optimizer topology, Automatic Control, GoodWe EMS writes or grid accounting. See `docs/PV_INSIGHT.md`.
 

@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=0.45-integrated1";
+import "./gw-energy-pilot-v039.js?v=0.46-external-pv1";
 import {
   FLOW_THRESHOLD_W,
   flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=0.45-integrated1";
+} from "./gw-energy-pilot-v038-model.js?v=0.46-external-pv1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=0.45-integrated1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.45-integrated1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.45-integrated1";
+} from "./gw-energy-pilot-v038-i18n.js?v=0.46-external-pv1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.46-external-pv1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.46-external-pv1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";

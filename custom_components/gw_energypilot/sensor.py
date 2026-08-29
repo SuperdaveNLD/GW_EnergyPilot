@@ -28,13 +28,19 @@ from . import GWConfigEntry
 from .accounting_sensor import GWGridDailyEnergySensor
 from .const import (
     CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
+    DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
     EXTERNAL_PV_ENTITY_KEYS,
     MODE_NAMES,
 )
 from .entity import GWEnergyPilotEntity
-from .pv_insight import normalize_generation_power_w, sum_generation_power_w
+from .pv_insight import (
+    external_sources_enabled,
+    normalize_generation_power_w,
+    sum_generation_power_w,
+)
 
 
 POWER = {
@@ -289,6 +295,12 @@ class GWPVGenerationPowerSensor(GWEnergyPilotEntity, SensorEntity):
                 DEFAULT_ENABLE_INTERNAL_PV,
             )
         )
+        self._external_enabled = external_sources_enabled(
+            entry.options,
+            enable_key=CONF_ENABLE_EXTERNAL_PV,
+            entity_keys=EXTERNAL_PV_ENTITY_KEYS,
+            default=DEFAULT_ENABLE_EXTERNAL_PV,
+        )
         external_entity_ids: list[str] = []
         for key in EXTERNAL_PV_ENTITY_KEYS:
             entity_id = str(entry.options.get(key, "")).strip()
@@ -302,7 +314,7 @@ class GWPVGenerationPowerSensor(GWEnergyPilotEntity, SensorEntity):
         tracked_entity_ids = tuple(
             entity_id
             for entity_id in self._external_entity_ids
-            if entity_id != self.entity_id
+            if self._external_enabled and entity_id != self.entity_id
         )
         if tracked_entity_ids:
             self.async_on_remove(
@@ -340,7 +352,10 @@ class GWPVGenerationPowerSensor(GWEnergyPilotEntity, SensorEntity):
             )
 
         hass = getattr(self, "hass", None)
-        for index, entity_id in enumerate(self._external_entity_ids, start=1):
+        external_entity_ids = (
+            self._external_entity_ids if self._external_enabled else ()
+        )
+        for index, entity_id in enumerate(external_entity_ids, start=1):
             state = (
                 hass.states.get(entity_id)
                 if hass is not None and entity_id != self.entity_id
@@ -391,6 +406,7 @@ class GWPVGenerationPowerSensor(GWEnergyPilotEntity, SensorEntity):
         ]
         return {
             "internal_enabled": self._internal_enabled,
+            "external_enabled": self._external_enabled,
             "internal_power_w": internal["power_w"] if internal else None,
             "external_power_w": (
                 sum_generation_power_w(external_powers)

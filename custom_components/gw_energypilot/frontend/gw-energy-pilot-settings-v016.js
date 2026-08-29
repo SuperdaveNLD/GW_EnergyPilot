@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v015.js?v=0.45-integrated1";
+import "./gw-energy-pilot-v015.js?v=0.46-external-pv1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -14,6 +14,9 @@ const PV_COPY = Object.freeze({
     internalLabel: "Include internal GoodWe PV",
     internalDescription:
       "Include the existing canonical GoodWe PV total in the dashboard PV total.",
+    externalToggleLabel: "Include external PV",
+    externalToggleDescription:
+      "Enable the four external Home Assistant PV source fields below.",
     externalLabel: "External PV source",
     externalDescription:
       "Choose a Home Assistant power entity with non-negative PV generation in W, kW or MW.",
@@ -27,6 +30,9 @@ const PV_COPY = Object.freeze({
     internalLabel: "Interne GoodWe-PV meenemen",
     internalDescription:
       "Neem het bestaande canonieke GoodWe PV-totaal op in het PV-totaal van het dashboard.",
+    externalToggleLabel: "Externe PV meenemen",
+    externalToggleDescription:
+      "Activeer de vier externe Home Assistant PV-bronvelden hieronder.",
     externalLabel: "Externe PV-bron",
     externalDescription:
       "Kies een Home Assistant-vermogensentiteit met niet-negatieve PV-opwek in W, kW of MW.",
@@ -221,6 +227,43 @@ function ensureStyles(root) {
       grid-template-columns: repeat(2,minmax(0,1fr));
       gap: 12px;
     }
+    .ep-v016-pv-fields {
+      display: grid;
+      gap: 12px;
+    }
+    .ep-v016-external-group {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid rgba(79,162,211,.13);
+      border-radius: 13px;
+      background: rgba(7,29,51,.44);
+    }
+    .ep-v016-external-group.is-enabled {
+      border-color: rgba(45,221,239,.22);
+      background: rgba(7,32,55,.58);
+    }
+    .ep-v016-external-group > .ep-v016-field.boolean {
+      padding: 0 0 13px;
+      border: 0;
+      border-bottom: 1px solid rgba(91,174,224,.11);
+      border-radius: 0;
+      background: transparent;
+    }
+    .ep-v016-external-inputs {
+      display: grid;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      gap: 11px 14px;
+      padding-top: 13px;
+    }
+    .ep-v016-external-inputs .ep-v016-field {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+    .ep-v016-external-group.is-disabled .ep-v016-external-inputs {
+      opacity: .42;
+    }
     .ep-v016-field {
       min-width: 0;
       padding: 13px 14px;
@@ -273,6 +316,12 @@ function ensureStyles(root) {
     .ep-v016-input:focus {
       border-color: rgba(45,221,239,.42);
       box-shadow: 0 0 0 2px rgba(45,221,239,.05);
+    }
+    .ep-v016-input:disabled {
+      color: #668196;
+      border-color: rgba(93,176,229,.08);
+      background: rgba(4,18,33,.58);
+      cursor: not-allowed;
     }
     .ep-v016-readonly {
       display: flex;
@@ -368,6 +417,7 @@ function ensureStyles(root) {
       .ep-v016-settings-head h2 { font-size: 20px; }
       .ep-v016-settings-content { padding: 17px 14px 24px; }
       .ep-v016-fields { grid-template-columns: 1fr; }
+      .ep-v016-external-inputs { grid-template-columns: 1fr; }
       .ep-v016-actions { flex-wrap: wrap; }
       .ep-v016-message { width: 100%; margin-bottom: 5px; }
     }
@@ -475,6 +525,13 @@ function pvFieldPresentation(panel, sectionId, field) {
       description: copy.internalDescription,
     };
   }
+  if (field.key === "enable_external_pv") {
+    return {
+      ...field,
+      label: copy.externalToggleLabel,
+      description: copy.externalToggleDescription,
+    };
+  }
   const match = String(field.key || "").match(/external_pv_entity_(\d+)/);
   if (!match) return field;
   return {
@@ -505,6 +562,8 @@ function powerEntityOptions(panel) {
 function fieldHtml(panel, sectionId, field) {
   field = pvFieldPresentation(panel, sectionId, field);
   const value = fieldValue(panel, sectionId, field);
+  const disabled = field.disabled ? " disabled" : "";
+  const fieldClass = `ep-v016-field${field.disabled ? " is-disabled" : ""}`;
   const unit = field.unit ? `<span>${panel._escape(field.unit)}</span>` : "<span></span>";
   const description = field.description
     ? `<div class="ep-v016-field-description">${panel._escape(field.description)}</div>`
@@ -512,7 +571,7 @@ function fieldHtml(panel, sectionId, field) {
   const label = `<div class="ep-v016-field-label"><span>${panel._escape(field.label)}</span>${unit}</div>`;
 
   if (field.readonly) {
-    return `<div class="ep-v016-field">${label}<div class="ep-v016-readonly">${panel._escape(value ?? "")}</div>${description}</div>`;
+    return `<div class="${fieldClass}">${label}<div class="ep-v016-readonly">${panel._escape(value ?? "")}</div>${description}</div>`;
   }
   if (field.type === "boolean") {
     return `<label class="ep-v016-field boolean"><div>${label}${description}</div><input class="ep-v016-switch" type="checkbox" data-setting-key="${panel._escape(field.key)}" ${value ? "checked" : ""}></label>`;
@@ -521,13 +580,48 @@ function fieldHtml(panel, sectionId, field) {
     const min = field.min === undefined ? "" : ` min="${field.min}"`;
     const max = field.max === undefined ? "" : ` max="${field.max}"`;
     const step = field.step === undefined ? "" : ` step="${field.step}"`;
-    return `<label class="ep-v016-field">${label}<input class="ep-v016-input" type="number" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}"${min}${max}${step}>${description}</label>`;
+    return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="number" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}"${min}${max}${step}${disabled}>${description}</label>`;
   }
   if (field.type === "entity") {
     const listId = `ep-v016-${field.key}-entities`;
-    return `<label class="ep-v016-field">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" list="${panel._escape(listId)}" placeholder="sensor…" autocomplete="off"><datalist id="${panel._escape(listId)}">${powerEntityOptions(panel)}</datalist>${description}</label>`;
+    return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" list="${panel._escape(listId)}" placeholder="sensor…" autocomplete="off"${disabled}><datalist id="${panel._escape(listId)}">${powerEntityOptions(panel)}</datalist>${description}</label>`;
   }
-  return `<label class="ep-v016-field">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" autocomplete="off">${description}</label>`;
+  return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" autocomplete="off"${disabled}>${description}</label>`;
+}
+
+function pvFieldsHtml(panel, sectionId, fields) {
+  const internal = fields.find((field) => field.key === "enable_internal_pv");
+  const externalToggle = fields.find((field) => field.key === "enable_external_pv");
+  const externalFields = fields.filter((field) =>
+    /^external_pv_entity_\d+$/.test(String(field.key || ""))
+  );
+  if (!internal || !externalToggle) {
+    return fields.map((field) => fieldHtml(panel, sectionId, field)).join("");
+  }
+  const externalEnabled = Boolean(fieldValue(panel, sectionId, externalToggle));
+  const groupedFields = externalFields
+    .map((field) => fieldHtml(panel, sectionId, { ...field, disabled: !externalEnabled }))
+    .join("");
+  return `
+    ${fieldHtml(panel, sectionId, internal)}
+    <section class="ep-v016-external-group ${externalEnabled ? "is-enabled" : "is-disabled"}" data-pv-external-group aria-disabled="${externalEnabled ? "false" : "true"}">
+      ${fieldHtml(panel, sectionId, externalToggle)}
+      <div class="ep-v016-external-inputs">${groupedFields}</div>
+    </section>`;
+}
+
+function syncExternalPvFields(form) {
+  const toggle = form?.querySelector('[data-setting-key="enable_external_pv"]');
+  const group = form?.querySelector("[data-pv-external-group]");
+  if (!toggle || !group) return;
+  const enabled = Boolean(toggle.checked);
+  group.classList.toggle("is-enabled", enabled);
+  group.classList.toggle("is-disabled", !enabled);
+  group.setAttribute("aria-disabled", enabled ? "false" : "true");
+  group.querySelectorAll('[data-setting-key^="external_pv_entity_"]').forEach((input) => {
+    input.disabled = !enabled;
+    input.closest(".ep-v016-field")?.classList.toggle("is-disabled", !enabled);
+  });
 }
 
 function collectValues(form) {
@@ -622,7 +716,11 @@ function renderSettingsPage(panel, root) {
       : tabId === "pv"
       ? `<div class="ep-v016-pv-note"><strong>PV:</strong> ${panel._escape(pvCopy(panel).note)}</div>`
       : "";
-    const fields = (section.fields || []).map((field) => fieldHtml(panel, tabId, field)).join("");
+    const sectionFields = section.fields || [];
+    const fields = tabId === "pv"
+      ? pvFieldsHtml(panel, tabId, sectionFields)
+      : sectionFields.map((field) => fieldHtml(panel, tabId, field)).join("");
+    const fieldsClass = tabId === "pv" ? "ep-v016-pv-fields" : "ep-v016-fields";
     const message = panel.__epV016Message
       ? `<span class="ep-v016-message ${panel._escape(panel.__epV016Message.tone || "")}">${panel._escape(panel.__epV016Message.text)}</span>`
       : `<span class="ep-v016-message">Changes are stored in the existing Home Assistant config entry.</span>`;
@@ -634,7 +732,7 @@ function renderSettingsPage(panel, root) {
       </div>
       ${note}
       <form class="ep-v016-form" data-section="${tabId}">
-        <div class="ep-v016-fields">${fields}</div>
+        <div class="${fieldsClass}">${fields}</div>
         <div class="ep-v016-actions">
           ${message}
           <button type="button" class="ep-v016-action" data-discard ${panel.__epV016Saving ? "disabled" : ""}>Discard changes</button>
@@ -676,6 +774,7 @@ function renderSettingsPage(panel, root) {
 
   const form = shell.querySelector(".ep-v016-form");
   if (form) {
+    syncExternalPvFields(form);
     form.querySelectorAll("[data-setting-key]").forEach((input) => {
       const remember = () => {
         panel.__epV016Draft = panel.__epV016Draft || {};
@@ -685,6 +784,9 @@ function renderSettingsPage(panel, root) {
         panel.__epV016Message = null;
       };
       input.addEventListener(input.type === "checkbox" ? "change" : "input", remember);
+      if (input.dataset.settingKey === "enable_external_pv") {
+        input.addEventListener("change", () => syncExternalPvFields(form));
+      }
     });
     form.querySelector("[data-discard]")?.addEventListener("click", () => {
       if (panel.__epV016Draft) delete panel.__epV016Draft[tabId];

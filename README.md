@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.45 · Beta**
+**v0.46 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V046.md` — v0.46 grouped external-PV controls and master switch;
 - `docs/RELEASE_NOTES_V045.md` — consolidated v0.45 PV, SOC, live-flow and Optimize release;
 - `docs/RELEASE_NOTES_V044.md` — v0.44 stable Optimize action and post-restart optimization recovery;
 - `docs/RELEASE_NOTES_V043.md` — v0.43 reliable mobile touch-control presentation;
@@ -43,6 +44,14 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v0.46 highlights
+
+- **Include external PV** independently enables or disables external PV insight without affecting internal GoodWe PV.
+- The four external entity selectors are grouped in one panel, dimmed and locked while off, and immediately active while on.
+- Selected external entities are preserved while disabled and are simply excluded from the combined display total.
+- Existing v0.45 installations with a configured external source remain active after upgrade; fresh installations default to external PV off.
+- No control, EMHASS, GoodWe register, accounting or entity-identity behavior changes.
 
 ## v0.45 highlights
 

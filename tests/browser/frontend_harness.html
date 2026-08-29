@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -315,6 +315,13 @@
                 value: true,
                 readonly: false,
               },
+              {
+                key: "enable_external_pv",
+                label: "Include external PV",
+                type: "boolean",
+                value: true,
+                readonly: false,
+              },
               ...[1, 2, 3, 4].map((index) => ({
                 key: `external_pv_entity_${index}`,
                 label: `External PV source ${index}`,
@@ -508,6 +515,7 @@
       v043: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v043.js?browser-harness=1",
       v044: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v044.js?browser-harness=1",
       v045: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v045.js?browser-harness=1",
+      v046: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v046.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -640,7 +648,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

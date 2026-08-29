@@ -3,7 +3,7 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.45 Beta**. v0.45 retains the v0.41 stable-DOM runtime, v0.42 settings layer, v0.43 touch-hover ownership and v0.44 stable Optimize action, while adding display-only PV topology, SOC charting, static directional flows, SOC-slider draft stability and a floating Optimize presentation under one active-graph cache boundary.
+This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.46 Beta**. v0.46 retains the full v0.45 stable behavior and adds the grouped external-PV master-switch presentation through the existing settings owner.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,19 +17,20 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v045.js?v=0.45-integrated1
-  -> gw-energy-pilot-v044.js?v=0.45-integrated1
-  -> gw-energy-pilot-v043.js?v=0.45-integrated1
-  -> gw-energy-pilot-v042.js?v=0.45-integrated1
-  -> gw-energy-pilot-v041-emhass-settings.js?v=0.45-integrated1
-  -> gw-energy-pilot-v041.js?v=0.45-integrated1
-  -> gw-energy-pilot-v039.js?v=0.45-integrated1
-  -> gw-energy-pilot-v038.js?v=0.45-integrated1
-  -> gw-energy-pilot-v038-runtime.js?v=0.45-integrated1
-  -> gw-energy-pilot-v038-strategy.js?v=0.45-integrated1
+  -> gw-energy-pilot-v046.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v045.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v044.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v043.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v042.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v041-emhass-settings.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v041.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v039.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v038.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v038-runtime.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v038-strategy.js?v=0.46-external-pv1
 ```
 
-Every local import reachable from the v0.45 entrypoint uses `0.45-integrated1`. This intentionally reloads the complete active dependency graph after upgrade, including modified base/settings/stable-DOM/strategy/plan modules. The behavioral ownership of historical layers remains unchanged.
+Every local import reachable from the v0.46 entrypoint uses `0.46-external-pv1`. This reloads the modified settings module after upgrade while preserving the behavioral ownership of historical layers.
 
 ## Render ownership
 
@@ -77,7 +78,7 @@ A normal telemetry burst must preserve `main`, Dashboard layout-button, Automati
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.45 by `tests/browser/test_frontend_stability_v045.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles additionally require combined PV topology/settings, both bounded SOC series, static export/import/charge/discharge/idle/unavailable flows, a stationary unfocused SOC slider draft, one viewport-safe Optimize action that remains reachable in Settings, zero complete Optimize renders, stable persistent-control identity, native scroll anchoring and working scroll after the plan-card refresh.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.46 by `tests/browser/test_frontend_stability_v046.py`. All three profiles require one external-PV group, four fields, off-state disabling/dimming, on-state activation and value preservation, plus every inherited v0.45 stable-DOM, touch, SOC, flow, Optimize and scrolling assertion.
 
 ## Contributor rules
 

@@ -17,7 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046"}
 
 
 @dataclass(frozen=True)
@@ -529,7 +529,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -1078,7 +1078,7 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045"}
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -1648,7 +1648,12 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
         "ran": False,
         "tab_present": False,
         "internal_checked": False,
+        "external_checked": False,
         "external_fields": 0,
+        "fields_grouped": False,
+        "disabled_when_off": False,
+        "enabled_when_on": False,
+        "value_preserved": False,
         "entity_search_contains_source": False,
         "closed": False,
         "error": None,
@@ -1667,16 +1672,35 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
         )
         state = page.evaluate(
             """
-            () => {
+            async () => {
               const root = window.__epPanel.shadowRoot;
               const form = root.querySelector('.ep-v016-form[data-section="pv"]');
+              const externalToggle = form?.querySelector(
+                '[data-setting-key="enable_external_pv"]'
+              );
+              const fields = [...(form?.querySelectorAll(
+                '[data-setting-key^="external_pv_entity_"]'
+              ) || [])];
+              const group = form?.querySelector('[data-pv-external-group]');
+              const initialValue = fields[0]?.value;
+              externalToggle.click();
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              const disabledWhenOff = fields.every((field) => field.disabled) &&
+                group?.classList.contains('is-disabled');
+              externalToggle.click();
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              const enabledWhenOn = fields.every((field) => !field.disabled) &&
+                group?.classList.contains('is-enabled');
               return {
                 internalChecked: Boolean(
                   form?.querySelector('[data-setting-key="enable_internal_pv"]')?.checked
                 ),
-                externalFields: form?.querySelectorAll(
-                  '[data-setting-key^="external_pv_entity_"]'
-                ).length || 0,
+                externalChecked: Boolean(externalToggle?.checked),
+                externalFields: fields.length,
+                fieldsGrouped: Boolean(group) && fields.every((field) => group.contains(field)),
+                disabledWhenOff,
+                enabledWhenOn,
+                valuePreserved: fields[0]?.value === initialValue,
                 entitySearchContainsSource: [...(form?.querySelectorAll('datalist option') || [])]
                   .some((option) => option.value === 'sensor.external_roof_pv'),
               };
@@ -1684,8 +1708,14 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
             """
         )
         result["internal_checked"] = state["internalChecked"]
+        result["external_checked"] = state["externalChecked"]
         result["external_fields"] = state["externalFields"]
+        result["fields_grouped"] = state["fieldsGrouped"]
+        result["disabled_when_off"] = state["disabledWhenOff"]
+        result["enabled_when_on"] = state["enabledWhenOn"]
+        result["value_preserved"] = state["valuePreserved"]
         result["entity_search_contains_source"] = state["entitySearchContainsSource"]
+        activate(page, profile, '[data-discard]')
         activate(page, profile, ".ep-v016-back")
         page.wait_for_function(
             "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
@@ -1865,8 +1895,14 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
 
     if EXPECTED_ENTRYPOINT and initial["entrypoint"] != EXPECTED_ENTRYPOINT:
         failures.append(f"{name}: loaded {initial['entrypoint']} instead of {EXPECTED_ENTRYPOINT}")
-    if EXPECTED_ENTRYPOINT == "v045" and initial["releaseVersion"] != "v0.45 BETA":
-        failures.append(f"{name}: release badge is {initial['releaseVersion']!r} instead of v0.45 BETA")
+    expected_badge = {
+        "v045": "v0.45 BETA",
+        "v046": "v0.46 BETA",
+    }.get(EXPECTED_ENTRYPOINT)
+    if expected_badge and initial["releaseVersion"] != expected_badge:
+        failures.append(
+            f"{name}: release badge is {initial['releaseVersion']!r} instead of {expected_badge}"
+        )
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and initial["stableMarker"] != "1":
         failures.append(f"{name}: stable-DOM marker is missing")
     if initial["max"] < 500:
@@ -1955,14 +1991,16 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         if not all(
             pv_settings[key] is True
             for key in (
-                "ran", "tab_present", "internal_checked",
+                "ran", "tab_present", "internal_checked", "external_checked",
+                "fields_grouped", "disabled_when_off", "enabled_when_on",
+                "value_preserved",
                 "entity_search_contains_source", "closed",
             )
         ) or pv_settings["external_fields"] != 4:
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045"}:
+    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -1972,7 +2010,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT in {"v044", "v045"}:
+    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -2037,7 +2075,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: deliberate narrow-layout structural render failed")
     if structural["menu_open"] is not True or structural["menu_close"] is not True:
         failures.append(f"{name}: controls failed after a structural layout render")
-    if EXPECTED_ENTRYPOINT == "v045" and not all(
+    if EXPECTED_ENTRYPOINT in {"v045", "v046"} and not all(
         structural.get(key) is True
         for key in ("settings_open", "optimize_in_settings", "settings_close")
     ):

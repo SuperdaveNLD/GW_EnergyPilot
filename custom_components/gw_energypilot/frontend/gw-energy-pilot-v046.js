@@ -1,6 +1,6 @@
-import "./gw-energy-pilot-v044.js?v=0.46-external-pv1";
+import "./gw-energy-pilot-v045.js?v=0.46-external-pv1";
 
-const VERSION = "0.45";
+const VERSION = "0.46";
 const PANEL_NAME = "gw-energypilot-panel";
 
 function patchReleaseVersion(panel) {
@@ -17,9 +17,9 @@ function patchReleaseVersion(panel) {
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 
-if (PanelClass && !PanelClass.prototype.__epV045Installed) {
+if (PanelClass && !PanelClass.prototype.__epV046Installed) {
   const previousRender = PanelClass.prototype._render;
-  PanelClass.prototype._render = function energyPilotV045ReleaseRender(...args) {
+  PanelClass.prototype._render = function energyPilotV046ReleaseRender(...args) {
     const result = previousRender.apply(this, args);
     patchReleaseVersion(this);
     return result;
@@ -40,5 +40,5 @@ if (PanelClass && !PanelClass.prototype.__epV045Installed) {
     });
   }
 
-  PanelClass.prototype.__epV045Installed = true;
+  PanelClass.prototype.__epV046Installed = true;
 }
