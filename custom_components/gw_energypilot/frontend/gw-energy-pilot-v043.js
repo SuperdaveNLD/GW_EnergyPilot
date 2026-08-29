@@ -34,11 +34,6 @@ const TOUCH_HOVER_CSS = `
     :host .ep-battery-action[data-action="max_export"]:hover:not(:disabled):not(.active) {
       color: #79e6fb !important;
     }
-    :host .ep-battery-action[data-action="resume_auto"]:hover:not(:disabled):not(.active) {
-      border-color: rgba(37, 235, 171, .34) !important;
-      color: #a2f7d3 !important;
-      background: rgba(9, 67, 65, .44) !important;
-    }
     :host .ep-v016-costfun-button:hover:not(:disabled):not(.active) {
       border-color: rgba(67, 204, 238, .20) !important;
       background: rgba(7, 45, 69, .50) !important;

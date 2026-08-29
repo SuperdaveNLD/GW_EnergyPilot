@@ -76,10 +76,13 @@ class FrontendControlStabilityTests(unittest.TestCase):
 
     def test_manual_controls_read_live_ownership_after_initial_lock(self) -> None:
         self.assertIn(
-            'const automaticActive = panel._stateByKey?.("automatic_control")?.state === "on";',
+            'const liveAutomaticOn =\n        panel._stateByKey?.("automatic_control")?.state === "on";',
             self.manual,
         )
-        self.assertIn("if (slider.disabled) return;", self.manual)
+        self.assertIn(
+            "if (slider.disabled || liveAutomaticOn || !liveControlsReady || panel.__epV021ManualBusy) return;",
+            self.manual,
+        )
         self.assertNotIn("if (slider && !locked)", self.manual)
         self.assertIn(
             'modeButton.setAttribute("aria-disabled", modeButton.disabled ? "true" : "false")',

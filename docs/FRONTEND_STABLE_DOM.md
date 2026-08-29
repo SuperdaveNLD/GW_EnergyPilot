@@ -52,6 +52,14 @@ native `hidden` state and a compact ownership summary remains visible. When
 manual control becomes available, those same mode-button and slider nodes are
 revealed and enabled; they are not removed, replaced or reconstructed.
 
+Home Assistant also assigns `narrow`, `route` and `panel` during host updates. The stable-DOM layer ignores repeated normalized `narrow` values and semantically identical plain-JSON `panel` values, including a newly allocated clone of unchanged panel configuration. A real narrow-layout or nested panel-config change still delegates to the inherited setter and requests a complete structural render. This keeps a pressed control connected between `pointerdown` and its native `click` without intercepting or synthesizing touch events.
+
+### Battery quick actions
+
+The four Battery quick actions keep their existing button nodes while an action is pending and when Home Assistant publishes ownership and command state in separate events. The v0.41 live patch derives one selection with explicit precedence: Automatic Control ON selects only AUTO; otherwise an exact manual `control_command` selects Max export, Pause or Max charge; an unrelated or unavailable command selects none. `.active` and `aria-pressed` are patched together. Inactive AUTO uses the same neutral surface as the other inactive actions, so color no longer implies a second selection.
+
+The persistent EMHASS cost-function selector follows the same rule: service completion and later entity publication patch its existing buttons, label and accessibility state without rebuilding `main`. Its explicit busy state remains authoritative across intervening telemetry patches, so a second strategy/optimization request cannot start while the first service call is still running. Manual EMS controls read Automatic Control ownership at event time rather than retaining the ownership value from the structural render; pending, enabled and message feedback is patched in place. This matters when Automatic Control changes through a normal stable-DOM state event after those controls were created.
+
 ### Battery Strategy refresh
 
 Loading, pending, success/error and Custom-SOC feedback rerender only `.ep-v038-strategy`. Stable backend mode keys, not translated labels, remain the control identity.
@@ -84,7 +92,7 @@ A normal telemetry burst must preserve `main`, Dashboard layout-button, Automati
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.46 by `tests/browser/test_frontend_stability_v046.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles require one external-PV group with four fields, off-state disabling/dimming, on-state activation and value preservation; compact manual controls under automatic ownership; stable manual-node identity across ownership changes; a working manual mode after release of automatic ownership; and every inherited stable-DOM, SOC, static-flow, Optimize, native-scroll and targeted-plan-refresh assertion.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.46 by `tests/browser/test_frontend_stability_v046.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also require one external-PV group with four fields and correct switch/value preservation; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; combined PV and bounded SOC telemetry; all static flow states; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after the plan-card refresh.
 
 ## Contributor rules
 

@@ -18,6 +18,19 @@ const MOTION_STYLE_ID = "ep-v041-no-motion";
 const GLOBAL_MOTION_STYLE_ID = "ep-v041-global-no-motion";
 const LIVE_PATCH_DELAY_MS = 40;
 const PLAN_PATCH_DELAY_MS = 220;
+const BATTERY_QUICK_ACTION_COMMANDS = Object.freeze({
+  max_export: "manual_max_export",
+  battery_pause: "manual_battery_hold",
+  max_charge: "manual_max_charge",
+});
+const EMHASS_COST_FUNCTIONS = Object.freeze({
+  profit: Object.freeze({ label: "Profit", legacyKey: "emhass_costfun_profit" }),
+  cost: Object.freeze({ label: "Cost", legacyKey: "emhass_costfun_cost" }),
+  "self-consumption": Object.freeze({
+    label: "Self-consumption",
+    legacyKey: "emhass_costfun_self_consumption",
+  }),
+});
 
 const COPY = Object.freeze({
   en: Object.freeze({
@@ -147,6 +160,14 @@ const NO_MOTION_CSS = `
   }
   :host .ep-v041-motion-disabled input {
     cursor: not-allowed !important;
+  }
+  :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:not(.active),
+  :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:hover:not(:disabled):not(.active) {
+    border-color: rgba(82, 175, 233, .18) !important;
+    background: rgba(6, 31, 55, .48) !important;
+    color: #a9c4d8 !important;
+    box-shadow: none !important;
+    transform: none !important;
   }
   :host .ep-flow-link::after,
   :host .ep-flow-arrows,
@@ -704,7 +725,9 @@ function patchController(panel, root, automaticOn) {
     if (state) state.textContent = automaticOn ? t.locked : controlsReady ? t.manualReady : t.entitiesMissing;
     for (const modeButton of manual.querySelectorAll(".ep-v021-mode-button")) {
       const active = Number(modeButton.dataset.mode) === mode;
+      const pending = Number(modeButton.dataset.mode) === panel.__epV021ManualBusy;
       modeButton.classList.toggle("active", active);
+      modeButton.classList.toggle("pending", pending);
       modeButton.disabled = automaticOn || !controlsReady || busy;
       modeButton.setAttribute("aria-disabled", modeButton.disabled ? "true" : "false");
     }
@@ -727,11 +750,16 @@ function patchController(panel, root, automaticOn) {
     }
     const note = manual.querySelector("[data-manual-note]");
     if (note) {
-      if (automaticOn) {
+      const message = panel.__epV021ManualMessage;
+      note.classList.remove("ok", "error");
+      if (message?.tone) note.classList.add(message.tone);
+      if (message?.text) {
+        note.textContent = message.text;
+      } else if (automaticOn) {
         note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong> ${panel._escape(t.automaticOwnerDetail)}`;
       } else if (!controlsReady) {
         note.innerHTML = `<strong>${panel._escape(t.manualUnavailable)}</strong> ${panel._escape(t.manualUnavailableDetail)}`;
-      } else if (!panel.__epV021ManualMessage?.text) {
+      } else {
         const actualSetpoint = finite(panel, "ems_setpoint");
         note.innerHTML = `<strong>${panel._escape(t.live)}:</strong> ${panel._escape(modeName)} · ${panel._escape(Number.isFinite(actualSetpoint) ? `${Math.round(actualSetpoint)} W` : "—")}. ${panel._escape(t.hoverHint)}`;
       }
@@ -741,9 +769,75 @@ function patchController(panel, root, automaticOn) {
   localizeV038Controller(panel, root);
 }
 
+function patchBatteryQuickActions(panel, root, automaticOn) {
+  const selectedAction = automaticOn
+    ? "resume_auto"
+    : Object.entries(BATTERY_QUICK_ACTION_COMMANDS).find(
+      ([, command]) => panel._textByKey?.("control_command", "") === command
+    )?.[0] || null;
+
+  for (const button of root.querySelectorAll(".ep-battery-action[data-action]")) {
+    const active = button.dataset.action === selectedAction;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+
+function activeCostFunctionRaw(panel) {
+  const state = panel._stateByKey?.("emhass_cost_function");
+  if (!state || ["unknown", "unavailable"].includes(state.state)) return null;
+  const attribute = state.attributes?.emhass_costfun;
+  if (attribute && EMHASS_COST_FUNCTIONS[attribute]) return String(attribute);
+  const option = normalize(state.state);
+  return Object.entries(EMHASS_COST_FUNCTIONS).find(
+    ([, definition]) => normalize(definition.label) === option
+  )?.[0] || null;
+}
+
+function patchCostFunctionSelector(panel, root) {
+  const wrap = root.querySelector(".ep-v016-costfun");
+  if (!wrap) return;
+  const activeRaw = activeCostFunctionRaw(panel);
+  const activeDefinition = activeRaw ? EMHASS_COST_FUNCTIONS[activeRaw] : null;
+  const busyRaw = panel.__epV016CostfunBusy || null;
+  const busyDefinition = busyRaw ? EMHASS_COST_FUNCTIONS[busyRaw] : null;
+  wrap.setAttribute("aria-busy", busyRaw ? "true" : "false");
+  const activeLabel = wrap.querySelector(".ep-v016-costfun-active");
+  if (activeLabel) {
+    activeLabel.classList.toggle("pending", Boolean(busyRaw) || !activeDefinition);
+    activeLabel.textContent = busyRaw
+      ? `Applying · ${busyDefinition?.label || busyRaw}…`
+      : activeDefinition
+        ? `Active · ${activeDefinition.label}`
+        : "Reading active strategy…";
+  }
+
+  const selectEntityId = panel._entityId?.("emhass_cost_function");
+  for (const button of wrap.querySelectorAll(".ep-v016-costfun-button[data-costfun]")) {
+    const raw = button.dataset.costfun;
+    const definition = EMHASS_COST_FUNCTIONS[raw];
+    if (!definition) continue;
+    const active = raw === activeRaw;
+    const available = Boolean(
+      selectEntityId || panel._entityId?.(definition.legacyKey)
+    );
+    const label = button.dataset.costfunLabel || definition.label;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+    button.disabled = Boolean(busyRaw) || !available;
+    button.textContent = busyRaw === raw
+      ? "Applying…"
+      : `${active ? "✓ " : ""}${label}`;
+    button.title = active
+      ? `${label} is the active EMHASS cost function`
+      : `Set EMHASS costfun to ${raw} and run a fresh optimization`;
+  }
+}
+
 function patchEmhass(panel, root) {
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
+  patchCostFunctionSelector(panel, root);
   const t = copy(panel);
   const pBattState = externalState(
     panel,
@@ -1095,6 +1189,7 @@ function patchLiveDom(panel) {
   patchMetric(batteryCard, ["Current", "Stroom"], panel._formatState(panel._stateByKey?.("battery_current")));
   patchMetric(batteryCard, ["Max cell temp", "Maximale celtemperatuur"], panel._formatState(panel._stateByKey?.("battery_max_cell_temperature")));
 
+  patchBatteryQuickActions(panel, root, automaticOn);
   patchController(panel, root, automaticOn);
   patchEmhass(panel, root);
   patchStrategy(panel, root);
@@ -1202,10 +1297,71 @@ function schedulePlanRefresh(panel) {
   }, PLAN_PATCH_DELAY_MS);
 }
 
+function plainJsonEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => plainJsonEqual(value, right[index]));
+  }
+
+  const leftPrototype = Object.getPrototypeOf(left);
+  const rightPrototype = Object.getPrototypeOf(right);
+  if (
+    ![Object.prototype, null].includes(leftPrototype) ||
+    ![Object.prototype, null].includes(rightPrototype)
+  ) {
+    return false;
+  }
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length && leftKeys.every(
+    (key) => Object.prototype.hasOwnProperty.call(right, key) &&
+      plainJsonEqual(left[key], right[key])
+  );
+}
+
+function installStableHostProperty(
+  PanelClass,
+  propertyName,
+  normalize,
+  equal = Object.is
+) {
+  const descriptor = Object.getOwnPropertyDescriptor(PanelClass.prototype, propertyName);
+  if (!descriptor?.set) return;
+
+  Object.defineProperty(PanelClass.prototype, propertyName, {
+    configurable: descriptor.configurable,
+    enumerable: descriptor.enumerable,
+    get() {
+      return descriptor.get ? descriptor.get.call(this) : this[`_${propertyName}`];
+    },
+    set(value) {
+      const next = normalize(value);
+      const current = descriptor.get
+        ? descriptor.get.call(this)
+        : this[`_${propertyName}`];
+      if (equal(current, next)) return;
+      descriptor.set.call(this, next);
+    },
+  });
+}
+
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 
 if (PanelClass && !PanelClass.prototype.__epV041Installed) {
+  // Home Assistant assigns hass, narrow, route and panel during host updates.
+  // The inherited narrow/panel setters queue a complete ShadowRoot render even
+  // when their values are unchanged. Keep those assignments idempotent so a
+  // pressed control remains connected until native click; real layout/config
+  // changes still delegate to the inherited structural-render path.
+  installStableHostProperty(PanelClass, "narrow", Boolean);
+  installStableHostProperty(PanelClass, "panel", (value) => value, plainJsonEqual);
+
   const previousRender = PanelClass.prototype._render;
   PanelClass.prototype._render = function energyPilotV041StructuralRender(...args) {
     // v0.41 keeps the interaction node alive for normal telemetry. The legacy
@@ -1216,6 +1372,10 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     const result = previousRender.apply(this, args);
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
+    this.__epV041RefreshLiveDom = () => {
+      ensureNoMotionStyle(this.shadowRoot);
+      patchLiveDom(this);
+    };
     this.__epV041RefreshBatteryPlan = () => {
       refreshBatteryPlanCard(this);
       ensureNoMotionStyle(this.shadowRoot);
