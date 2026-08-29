@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -315,6 +315,13 @@
                 value: true,
                 readonly: false,
               },
+              {
+                key: "enable_external_pv",
+                label: "Include external PV",
+                type: "boolean",
+                value: true,
+                readonly: false,
+              },
               ...[1, 2, 3, 4].map((index) => ({
                 key: `external_pv_entity_${index}`,
                 label: `External PV source ${index}`,
@@ -448,12 +455,28 @@
       } else if (domain === "number" && service === "set_value" && entityId) {
         window.__epSetEntity(entityId, data.value);
       } else if (domain === "select" && service === "select_option" && entityId) {
+        const costfunId = entityIdForKey("emhass_cost_function");
+        const serviceDelay = entityId === costfunId
+          ? Number(window.__epCostfunServiceDelayMs || 0)
+          : 0;
+        if (serviceDelay > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, serviceDelay));
+        }
         const raw = {
           Profit: "profit",
           Cost: "cost",
           "Self-consumption": "self-consumption",
         }[data.option];
-        window.__epSetEntity(entityId, data.option, raw ? { emhass_costfun: raw } : null);
+        const publishSelect = () => window.__epSetEntity(
+          entityId,
+          data.option,
+          raw ? { emhass_costfun: raw } : null
+        );
+        const publishDelay = entityId === costfunId
+          ? Number(window.__epCostfunPublishDelayMs || 0)
+          : 0;
+        if (publishDelay > 0) window.setTimeout(publishSelect, publishDelay);
+        else publishSelect();
       } else if (domain === "button" && service === "press") {
         const key = keyForEntityId(entityId);
         if (key === "optimize_now") {
@@ -465,9 +488,17 @@
             max_charge: "manual_max_charge",
             resume_auto: "battery_charge",
           }[key];
-          window.__epSetEntityByKey("control_command", command);
-          window.__epSetEntityByKey("automatic_control", key === "resume_auto" ? "on" : "off");
-          if (key === "resume_auto") window.__epAdvancePlan?.();
+          const publishQuickAction = () => {
+            window.__epSetEntityByKey("control_command", command);
+            window.__epSetEntityByKey(
+              "automatic_control",
+              key === "resume_auto" ? "on" : "off"
+            );
+            if (key === "resume_auto") window.__epAdvancePlan?.();
+          };
+          const publishDelay = Number(window.__epQuickActionPublishDelayMs || 0);
+          if (publishDelay > 0) window.setTimeout(publishQuickAction, publishDelay);
+          else publishQuickAction();
         }
       }
       return undefined;
@@ -508,6 +539,7 @@
       v043: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v043.js?browser-harness=1",
       v044: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v044.js?browser-harness=1",
       v045: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v045.js?browser-harness=1",
+      v046: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v046.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -640,7 +672,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

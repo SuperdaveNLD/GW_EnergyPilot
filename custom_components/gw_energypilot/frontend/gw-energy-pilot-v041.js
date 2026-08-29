@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=0.45-integrated1";
+import "./gw-energy-pilot-v039.js?v=0.46-external-pv1";
 import {
   FLOW_THRESHOLD_W,
   flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=0.45-integrated1";
+} from "./gw-energy-pilot-v038-model.js?v=0.46-external-pv1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=0.45-integrated1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.45-integrated1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.45-integrated1";
+} from "./gw-energy-pilot-v038-i18n.js?v=0.46-external-pv1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.46-external-pv1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.46-external-pv1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -18,6 +18,19 @@ const MOTION_STYLE_ID = "ep-v041-no-motion";
 const GLOBAL_MOTION_STYLE_ID = "ep-v041-global-no-motion";
 const LIVE_PATCH_DELAY_MS = 40;
 const PLAN_PATCH_DELAY_MS = 220;
+const BATTERY_QUICK_ACTION_COMMANDS = Object.freeze({
+  max_export: "manual_max_export",
+  battery_pause: "manual_battery_hold",
+  max_charge: "manual_max_charge",
+});
+const EMHASS_COST_FUNCTIONS = Object.freeze({
+  profit: Object.freeze({ label: "Profit", legacyKey: "emhass_costfun_profit" }),
+  cost: Object.freeze({ label: "Cost", legacyKey: "emhass_costfun_cost" }),
+  "self-consumption": Object.freeze({
+    label: "Self-consumption",
+    legacyKey: "emhass_costfun_self_consumption",
+  }),
+});
 
 const COPY = Object.freeze({
   en: Object.freeze({
@@ -40,6 +53,12 @@ const COPY = Object.freeze({
     locked: "LOCKED · AUTOMATIC",
     manualReady: "MANUAL READY",
     entitiesMissing: "ENTITIES MISSING",
+    automaticOwner: "Automatic Control owns the inverter.",
+    automaticOwnerDetail: "Manual controls are hidden; the active mode continues to follow live Modbus read-back.",
+    manualUnavailable: "Manual controls are unavailable.",
+    manualUnavailableDetail: "The required Home Assistant entities are missing.",
+    live: "Live",
+    hoverHint: "Hover a mode for its meaning.",
     today: "Today",
     yesterday: "Yesterday",
     motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
@@ -79,6 +98,12 @@ const COPY = Object.freeze({
     locked: "VERGRENDELD · AUTOMATISCH",
     manualReady: "HANDMATIG GEREED",
     entitiesMissing: "ENTITEITEN ONTBREKEN",
+    automaticOwner: "Automatische regeling bestuurt de omvormer.",
+    automaticOwnerDetail: "Handmatige bediening is verborgen; de actieve modus volgt de live Modbus-teruglezing.",
+    manualUnavailable: "Handmatige bediening is niet beschikbaar.",
+    manualUnavailableDetail: "De vereiste Home Assistant-entiteiten ontbreken.",
+    live: "Live",
+    hoverHint: "Beweeg over een modus voor uitleg.",
     today: "Vandaag",
     yesterday: "Gisteren",
     motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
@@ -136,6 +161,14 @@ const NO_MOTION_CSS = `
   :host .ep-v041-motion-disabled input {
     cursor: not-allowed !important;
   }
+  :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:not(.active),
+  :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:hover:not(:disabled):not(.active) {
+    border-color: rgba(82, 175, 233, .18) !important;
+    background: rgba(6, 31, 55, .48) !important;
+    color: #a9c4d8 !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
   :host .ep-flow-link::after,
   :host .ep-flow-arrows,
   :host .ep-flow-live span,
@@ -144,21 +177,22 @@ const NO_MOTION_CSS = `
     display: none !important;
   }
   :host .ep-flow-link[data-ep-v041-flow-status] {
-    --ep-v041-pipe-size: 3px;
-    --ep-v041-pipe-opacity: .72;
+    --ep-v041-pipe-size: 4px;
+    --ep-v041-pipe-opacity: .86;
     opacity: 1;
+    overflow: visible;
   }
   :host .ep-flow-link[data-ep-v041-flow-intensity="low"] {
-    --ep-v041-pipe-size: 2px;
-    --ep-v041-pipe-opacity: .58;
+    --ep-v041-pipe-size: 3px;
+    --ep-v041-pipe-opacity: .72;
   }
   :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] {
     --ep-v041-pipe-size: 4px;
-    --ep-v041-pipe-opacity: .74;
+    --ep-v041-pipe-opacity: .86;
   }
   :host .ep-flow-link[data-ep-v041-flow-intensity="high"] {
-    --ep-v041-pipe-size: 6px;
-    --ep-v041-pipe-opacity: .92;
+    --ep-v041-pipe-size: 5px;
+    --ep-v041-pipe-opacity: 1;
   }
   :host .ep-flow-link[data-ep-v041-flow-status="idle"],
   :host .ep-flow-link[data-ep-v041-flow-status="unknown"] {
@@ -166,10 +200,10 @@ const NO_MOTION_CSS = `
     color: #71879a;
   }
   :host .ep-flow-link[data-ep-v041-flow-status="idle"] {
-    --ep-v041-pipe-opacity: .48;
+    --ep-v041-pipe-opacity: .34;
   }
   :host .ep-flow-link[data-ep-v041-flow-status="unknown"] {
-    --ep-v041-pipe-opacity: .64;
+    --ep-v041-pipe-opacity: .52;
   }
   :host .ep-flow-link[data-ep-v041-flow-status] .ep-flow-track {
     inset: auto 0;
@@ -178,7 +212,8 @@ const NO_MOTION_CSS = `
     height: var(--ep-v041-pipe-size);
     transform: translateY(-50%);
     background: currentColor;
-    box-shadow: none;
+    border-radius: 999px;
+    box-shadow: 0 0 0 1px rgba(3, 17, 32, .82), 0 0 7px currentColor;
     opacity: var(--ep-v041-pipe-opacity);
   }
   :host .ep-link-house[data-ep-v041-flow-status] .ep-flow-track,
@@ -188,6 +223,28 @@ const NO_MOTION_CSS = `
     width: var(--ep-v041-pipe-size);
     height: auto;
     transform: translateX(-50%);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="right"] .ep-flow-track {
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.35), #000 58%, #000);
+    mask-image: linear-gradient(to right, rgba(0,0,0,.35), #000 58%, #000);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="left"] .ep-flow-track {
+    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.35), #000 58%, #000);
+    mask-image: linear-gradient(to left, rgba(0,0,0,.35), #000 58%, #000);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="down"] .ep-flow-track {
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.35), #000 58%, #000);
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,.35), #000 58%, #000);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="up"] .ep-flow-track {
+    -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,.35), #000 58%, #000);
+    mask-image: linear-gradient(to top, rgba(0,0,0,.35), #000 58%, #000);
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-flow-track,
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-flow-track {
+    -webkit-mask-image: none;
+    mask-image: none;
+    box-shadow: 0 0 0 1px rgba(3, 17, 32, .72);
   }
   :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-flow-track {
     background: repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px);
@@ -203,21 +260,34 @@ const NO_MOTION_CSS = `
     top: 50%;
     z-index: 7;
     display: none;
-    min-width: 17px;
-    min-height: 17px;
-    padding: 0 2px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    border: 1px solid currentColor;
-    border-radius: 999px;
-    background: #071a2e;
+    border: 0;
+    background: currentColor;
     color: currentColor;
-    font-size: 14px;
-    font-weight: 900;
-    line-height: 1;
+    font-size: 0;
+    line-height: 0;
     transform: translate(-50%, -50%);
     pointer-events: none;
+  }
+  :host .ep-v041-flow-arrow {
+    width: 22px;
+    height: 12px;
+    -webkit-clip-path: polygon(0 34%, 66% 34%, 66% 0, 100% 50%, 66% 100%, 66% 66%, 0 66%);
+    clip-path: polygon(0 34%, 66% 34%, 66% 0, 100% 50%, 66% 100%, 66% 66%, 0 66%);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="left"] .ep-v041-flow-arrow {
+    transform: translate(-50%, -50%) rotate(180deg);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="down"] .ep-v041-flow-arrow {
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="up"] .ep-v041-flow-arrow {
+    transform: translate(-50%, -50%) rotate(-90deg);
   }
   :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-arrow,
   :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state,
@@ -225,22 +295,40 @@ const NO_MOTION_CSS = `
     display: flex;
   }
   :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] .ep-v041-flow-arrow {
-    min-width: 19px;
-    min-height: 19px;
-    font-size: 16px;
+    width: 24px;
+    height: 13px;
   }
   :host .ep-flow-link[data-ep-v041-flow-intensity="high"] .ep-v041-flow-arrow {
-    min-width: 21px;
-    min-height: 21px;
-    font-size: 18px;
+    width: 26px;
+    height: 14px;
   }
   :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state {
-    border-style: solid;
-    font-size: 15px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    opacity: .72;
   }
   :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-v041-flow-state {
-    border-style: dashed;
+    width: 18px;
+    height: 18px;
+    border: 1px dashed currentColor;
+    border-radius: 5px;
+    background: #071a2e;
     font-size: 11px;
+    line-height: 1;
+  }
+  :host .ep-flow-hub {
+    box-shadow: 0 0 0 1px rgba(25, 217, 255, .20), 0 0 20px rgba(25, 217, 255, .12) !important;
+  }
+  :host .ep-flow-hub::before {
+    inset: -3px !important;
+    border-color: rgba(24, 220, 255, .30) !important;
+    box-shadow: none !important;
+    opacity: .68;
+  }
+  :host .ep-v034-flow-tight .ep-v041-flow-arrow {
+    width: 18px;
+    height: 10px;
   }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
@@ -619,15 +707,29 @@ function patchController(panel, root, automaticOn) {
 
   const manual = card.querySelector(".ep-v021-manual-pad");
   if (manual) {
+    button?.setAttribute("aria-controls", manual.id);
     const controlsReady = Boolean(panel._entityId?.("manual_mode") && panel._entityId?.("manual_power"));
     const busy = Boolean(panel.__epV021ManualBusy);
-    manual.classList.toggle("locked", automaticOn || !controlsReady);
+    const compact = automaticOn || !controlsReady;
+    const wasCompact = manual.classList.contains("compact");
+    if (compact && !wasCompact && manual.contains(root.activeElement)) {
+      button?.focus({ preventScroll: true });
+    }
+    manual.classList.toggle("locked", compact);
+    manual.classList.toggle("compact", compact);
+    const modeGrid = manual.querySelector(".ep-v021-mode-grid");
+    const powerRow = manual.querySelector(".ep-v021-power-row");
+    if (modeGrid) modeGrid.hidden = compact;
+    if (powerRow) powerRow.hidden = compact;
     const state = manual.querySelector(".ep-v021-manual-state");
     if (state) state.textContent = automaticOn ? t.locked : controlsReady ? t.manualReady : t.entitiesMissing;
     for (const modeButton of manual.querySelectorAll(".ep-v021-mode-button")) {
       const active = Number(modeButton.dataset.mode) === mode;
+      const pending = Number(modeButton.dataset.mode) === panel.__epV021ManualBusy;
       modeButton.classList.toggle("active", active);
+      modeButton.classList.toggle("pending", pending);
       modeButton.disabled = automaticOn || !controlsReady || busy;
+      modeButton.setAttribute("aria-disabled", modeButton.disabled ? "true" : "false");
     }
     const slider = manual.querySelector(".ep-v021-power-slider");
     const powerState = panel._stateByKey?.("manual_power");
@@ -646,14 +748,102 @@ function patchController(panel, root, automaticOn) {
     if (powerLabel && Number.isFinite(power) && !panel.__epV021ManualPowerDirty) {
       powerLabel.textContent = `${Math.round(power)} W`;
     }
+    const note = manual.querySelector("[data-manual-note]");
+    if (note) {
+      // Automatic ownership supersedes feedback from an earlier manual command.
+      // Drop that stale message so releasing ownership starts from current live
+      // read-back instead of presenting a command that is no longer active.
+      if (automaticOn && panel.__epV021ManualMessage) {
+        panel.__epV021ManualMessage = null;
+      }
+      const message = panel.__epV021ManualMessage;
+      note.classList.remove("ok", "error");
+      if (message?.tone) note.classList.add(message.tone);
+      if (automaticOn) {
+        note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong> ${panel._escape(t.automaticOwnerDetail)}`;
+      } else if (message?.text) {
+        note.textContent = message.text;
+      } else if (!controlsReady) {
+        note.innerHTML = `<strong>${panel._escape(t.manualUnavailable)}</strong> ${panel._escape(t.manualUnavailableDetail)}`;
+      } else {
+        const actualSetpoint = finite(panel, "ems_setpoint");
+        note.innerHTML = `<strong>${panel._escape(t.live)}:</strong> ${panel._escape(modeName)} · ${panel._escape(Number.isFinite(actualSetpoint) ? `${Math.round(actualSetpoint)} W` : "—")}. ${panel._escape(t.hoverHint)}`;
+      }
+    }
   }
 
   localizeV038Controller(panel, root);
 }
 
+function patchBatteryQuickActions(panel, root, automaticOn) {
+  const selectedAction = automaticOn
+    ? "resume_auto"
+    : Object.entries(BATTERY_QUICK_ACTION_COMMANDS).find(
+      ([, command]) => panel._textByKey?.("control_command", "") === command
+    )?.[0] || null;
+
+  for (const button of root.querySelectorAll(".ep-battery-action[data-action]")) {
+    const active = button.dataset.action === selectedAction;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+
+function activeCostFunctionRaw(panel) {
+  const state = panel._stateByKey?.("emhass_cost_function");
+  if (!state || ["unknown", "unavailable"].includes(state.state)) return null;
+  const attribute = state.attributes?.emhass_costfun;
+  if (attribute && EMHASS_COST_FUNCTIONS[attribute]) return String(attribute);
+  const option = normalize(state.state);
+  return Object.entries(EMHASS_COST_FUNCTIONS).find(
+    ([, definition]) => normalize(definition.label) === option
+  )?.[0] || null;
+}
+
+function patchCostFunctionSelector(panel, root) {
+  const wrap = root.querySelector(".ep-v016-costfun");
+  if (!wrap) return;
+  const activeRaw = activeCostFunctionRaw(panel);
+  const activeDefinition = activeRaw ? EMHASS_COST_FUNCTIONS[activeRaw] : null;
+  const busyRaw = panel.__epV016CostfunBusy || null;
+  const busyDefinition = busyRaw ? EMHASS_COST_FUNCTIONS[busyRaw] : null;
+  wrap.setAttribute("aria-busy", busyRaw ? "true" : "false");
+  const activeLabel = wrap.querySelector(".ep-v016-costfun-active");
+  if (activeLabel) {
+    activeLabel.classList.toggle("pending", Boolean(busyRaw) || !activeDefinition);
+    activeLabel.textContent = busyRaw
+      ? `Applying · ${busyDefinition?.label || busyRaw}…`
+      : activeDefinition
+        ? `Active · ${activeDefinition.label}`
+        : "Reading active strategy…";
+  }
+
+  const selectEntityId = panel._entityId?.("emhass_cost_function");
+  for (const button of wrap.querySelectorAll(".ep-v016-costfun-button[data-costfun]")) {
+    const raw = button.dataset.costfun;
+    const definition = EMHASS_COST_FUNCTIONS[raw];
+    if (!definition) continue;
+    const active = raw === activeRaw;
+    const available = Boolean(
+      selectEntityId || panel._entityId?.(definition.legacyKey)
+    );
+    const label = button.dataset.costfunLabel || definition.label;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+    button.disabled = Boolean(busyRaw) || !available;
+    button.textContent = busyRaw === raw
+      ? "Applying…"
+      : `${active ? "✓ " : ""}${label}`;
+    button.title = active
+      ? `${label} is the active EMHASS cost function`
+      : `Set EMHASS costfun to ${raw} and run a fresh optimization`;
+  }
+}
+
 function patchEmhass(panel, root) {
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
+  patchCostFunctionSelector(panel, root);
   const t = copy(panel);
   const pBattState = externalState(
     panel,
@@ -1005,6 +1195,7 @@ function patchLiveDom(panel) {
   patchMetric(batteryCard, ["Current", "Stroom"], panel._formatState(panel._stateByKey?.("battery_current")));
   patchMetric(batteryCard, ["Max cell temp", "Maximale celtemperatuur"], panel._formatState(panel._stateByKey?.("battery_max_cell_temperature")));
 
+  patchBatteryQuickActions(panel, root, automaticOn);
   patchController(panel, root, automaticOn);
   patchEmhass(panel, root);
   patchStrategy(panel, root);
@@ -1112,10 +1303,71 @@ function schedulePlanRefresh(panel) {
   }, PLAN_PATCH_DELAY_MS);
 }
 
+function plainJsonEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => plainJsonEqual(value, right[index]));
+  }
+
+  const leftPrototype = Object.getPrototypeOf(left);
+  const rightPrototype = Object.getPrototypeOf(right);
+  if (
+    ![Object.prototype, null].includes(leftPrototype) ||
+    ![Object.prototype, null].includes(rightPrototype)
+  ) {
+    return false;
+  }
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length && leftKeys.every(
+    (key) => Object.prototype.hasOwnProperty.call(right, key) &&
+      plainJsonEqual(left[key], right[key])
+  );
+}
+
+function installStableHostProperty(
+  PanelClass,
+  propertyName,
+  normalize,
+  equal = Object.is
+) {
+  const descriptor = Object.getOwnPropertyDescriptor(PanelClass.prototype, propertyName);
+  if (!descriptor?.set) return;
+
+  Object.defineProperty(PanelClass.prototype, propertyName, {
+    configurable: descriptor.configurable,
+    enumerable: descriptor.enumerable,
+    get() {
+      return descriptor.get ? descriptor.get.call(this) : this[`_${propertyName}`];
+    },
+    set(value) {
+      const next = normalize(value);
+      const current = descriptor.get
+        ? descriptor.get.call(this)
+        : this[`_${propertyName}`];
+      if (equal(current, next)) return;
+      descriptor.set.call(this, next);
+    },
+  });
+}
+
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 
 if (PanelClass && !PanelClass.prototype.__epV041Installed) {
+  // Home Assistant assigns hass, narrow, route and panel during host updates.
+  // The inherited narrow/panel setters queue a complete ShadowRoot render even
+  // when their values are unchanged. Keep those assignments idempotent so a
+  // pressed control remains connected until native click; real layout/config
+  // changes still delegate to the inherited structural-render path.
+  installStableHostProperty(PanelClass, "narrow", Boolean);
+  installStableHostProperty(PanelClass, "panel", (value) => value, plainJsonEqual);
+
   const previousRender = PanelClass.prototype._render;
   PanelClass.prototype._render = function energyPilotV041StructuralRender(...args) {
     // v0.41 keeps the interaction node alive for normal telemetry. The legacy
@@ -1126,6 +1378,10 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     const result = previousRender.apply(this, args);
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
+    this.__epV041RefreshLiveDom = () => {
+      ensureNoMotionStyle(this.shadowRoot);
+      patchLiveDom(this);
+    };
     this.__epV041RefreshBatteryPlan = () => {
       refreshBatteryPlanCard(this);
       ensureNoMotionStyle(this.shadowRoot);

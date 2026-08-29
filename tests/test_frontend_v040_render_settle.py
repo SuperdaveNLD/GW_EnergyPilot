@@ -12,26 +12,28 @@ class FrontendV040RenderSettleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.source = (FRONTEND / "gw-energy-pilot-v040.js").read_text(encoding="utf-8")
 
-    def test_v040_remains_a_valid_historical_entrypoint_under_v045(self) -> None:
+    def test_v040_remains_a_valid_historical_entrypoint_under_v046(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
         init = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
         settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
         v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.45")
-        self.assertIn("gw-energy-pilot-v045.js?v=0.45-integrated1", init)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-integrated1"', v045)
+        self.assertEqual(manifest["version"], "0.46")
+        self.assertIn("gw-energy-pilot-v046.js?v=0.46-external-pv1", init)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.46-external-pv1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.46-external-pv1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.45-integrated1"',
+            'import "./gw-energy-pilot-v043.js?v=0.46-external-pv1"',
             release,
         )
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.45-integrated1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.45-integrated1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.45-integrated1"', settings)
-        self.assertIn('import "./gw-energy-pilot-v039.js?v=0.45-integrated1"', v041)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.46-external-pv1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.46-external-pv1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.46-external-pv1"', settings)
+        self.assertIn('import "./gw-energy-pilot-v039.js?v=0.46-external-pv1"', v041)
         self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
         self.assertIn('import "./gw-energy-pilot-v039.js?v=0.40-mobile-scroll1"', self.source)
         self.assertIn('const VERSION = "0.40"', self.source)

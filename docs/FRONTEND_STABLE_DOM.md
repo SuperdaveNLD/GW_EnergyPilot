@@ -3,7 +3,7 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.45 Beta**. v0.45 retains the v0.41 stable-DOM runtime, v0.42 settings layer, v0.43 touch-hover ownership and v0.44 stable Optimize action, while adding display-only PV topology, SOC charting, static directional flows, SOC-slider draft stability and a floating Optimize presentation under one active-graph cache boundary.
+This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.46 Beta**. v0.46 retains the full v0.45 stable behavior and adds the grouped external-PV master-switch presentation through the existing settings owner.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,19 +17,20 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v045.js?v=0.45-integrated1
-  -> gw-energy-pilot-v044.js?v=0.45-integrated1
-  -> gw-energy-pilot-v043.js?v=0.45-integrated1
-  -> gw-energy-pilot-v042.js?v=0.45-integrated1
-  -> gw-energy-pilot-v041-emhass-settings.js?v=0.45-integrated1
-  -> gw-energy-pilot-v041.js?v=0.45-integrated1
-  -> gw-energy-pilot-v039.js?v=0.45-integrated1
-  -> gw-energy-pilot-v038.js?v=0.45-integrated1
-  -> gw-energy-pilot-v038-runtime.js?v=0.45-integrated1
-  -> gw-energy-pilot-v038-strategy.js?v=0.45-integrated1
+  -> gw-energy-pilot-v046.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v045.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v044.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v043.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v042.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v041-emhass-settings.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v041.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v039.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v038.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v038-runtime.js?v=0.46-external-pv1
+  -> gw-energy-pilot-v038-strategy.js?v=0.46-external-pv1
 ```
 
-Every local import reachable from the v0.45 entrypoint uses `0.45-integrated1`. This intentionally reloads the complete active dependency graph after upgrade, including modified base/settings/stable-DOM/strategy/plan modules. The behavioral ownership of historical layers remains unchanged.
+Every local import reachable from the v0.46 entrypoint uses `0.46-external-pv1`. This reloads the modified settings module after upgrade while preserving the behavioral ownership of historical layers.
 
 ## Render ownership
 
@@ -44,6 +45,20 @@ A complete render is allowed for Home Assistant language/locale, user/admin cont
 ### Normal telemetry patch
 
 When context and structure signatures are unchanged, the `hass` setter does not queue the inherited complete render. It batches a live patch and mutates existing power/SOC/energy text, configured PV-source values, status classes, controller/EMHASS metrics, sliders, meter widths, diagnostics, static flow semantics and thermal values. The existing `main`, cards and controls remain connected.
+
+Automatic Control ownership changes patch the existing manual EMS pad in place.
+While automatic ownership is active, the manual mode grid and power row use the
+native `hidden` state and a compact ownership summary remains visible. When
+manual control becomes available, those same mode-button and slider nodes are
+revealed and enabled; they are not removed, replaced or reconstructed.
+
+Home Assistant also assigns `narrow`, `route` and `panel` during host updates. The stable-DOM layer ignores repeated normalized `narrow` values and semantically identical plain-JSON `panel` values, including a newly allocated clone of unchanged panel configuration. A real narrow-layout or nested panel-config change still delegates to the inherited setter and requests a complete structural render. This keeps a pressed control connected between `pointerdown` and its native `click` without intercepting or synthesizing touch events.
+
+### Battery quick actions
+
+The four Battery quick actions keep their existing button nodes while an action is pending and when Home Assistant publishes ownership and command state in separate events. The v0.41 live patch derives one selection with explicit precedence: Automatic Control ON selects only AUTO; otherwise an exact manual `control_command` selects Max export, Pause or Max charge; an unrelated or unavailable command selects none. `.active` and `aria-pressed` are patched together. Inactive AUTO uses the same neutral surface as the other inactive actions, so color no longer implies a second selection.
+
+The persistent EMHASS cost-function selector follows the same rule: service completion and later entity publication patch its existing buttons, label and accessibility state without rebuilding `main`. Its explicit busy state remains authoritative across intervening telemetry patches, so a second strategy/optimization request cannot start while the first service call is still running. Manual EMS controls read Automatic Control ownership at event time rather than retaining the ownership value from the structural render; pending, enabled and message feedback is patched in place. This matters when Automatic Control changes through a normal stable-DOM state event after those controls were created.
 
 ### Battery Strategy refresh
 
@@ -69,15 +84,15 @@ On coarse-pointer/touch devices, native `:hover` never owns selected presentatio
 
 EnergyPilot-owned content has no CSS animations, CSS transitions, moving flow particles, animated pseudo-elements or modal backdrop filters. The policy is applied after complete renders and after scoped strategy, graph and modal updates.
 
-The live-flow alternative is deliberately static. Existing connector nodes receive a fixed pipeline, one physical-direction arrow for active power, a dot for finite near-zero idle power or a dashed line/question mark for unavailable power. Low/medium/high line thickness is relative to the strongest finite active connector in the same telemetry snapshot. Arrow/state children are created once per structural render and patched in place; they never pulse, move or transition. Each connector exposes a localized `role="img"` accessible name.
+The live-flow alternative is deliberately static. Existing connector nodes receive a fixed pipeline with an integrated arrowhead and directional brightness for active power, a quiet dot for finite near-zero idle power or a dashed line/question mark for unavailable power. Low/medium/high line thickness uses restrained 3/4/5-pixel steps relative to the strongest finite active connector in the same telemetry snapshot. Arrow/state children are created once per structural render and patched in place; they never pulse, move or transition. Each connector exposes a localized `role="img"` accessible name.
 
 ## Required invariants
 
-A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. A plan refresh may replace the graph card, but none of those four persistent nodes.
+A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. An Automatic Control ON/OFF cycle must additionally preserve the manual pad, mode-grid, mode-button, power-row and slider nodes while changing their semantic visibility and disabled state. A plan refresh may replace the graph card, but none of those persistent nodes.
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.45 by `tests/browser/test_frontend_stability_v045.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles additionally require combined PV topology/settings, both bounded SOC series, static export/import/charge/discharge/idle/unavailable flows, a stationary unfocused SOC slider draft, one viewport-safe Optimize action that remains reachable in Settings, zero complete Optimize renders, stable persistent-control identity, native scroll anchoring and working scroll after the plan-card refresh.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.46 by `tests/browser/test_frontend_stability_v046.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also require one external-PV group with four fields and correct switch/value preservation; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; combined PV and bounded SOC telemetry; all static flow states; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after the plan-card refresh.
 
 ## Contributor rules
 

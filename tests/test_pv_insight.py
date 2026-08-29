@@ -46,6 +46,37 @@ class PVInsightTests(unittest.TestCase):
         self.assertEqual(total([1250.0, None, 750.25]), 2000.25)
         self.assertIsNone(total([None, None]))
 
+    def test_external_master_switch_preserves_v045_configurations(self) -> None:
+        enabled = PV_INSIGHT.external_sources_enabled
+        keys = ("external_pv_entity_1", "external_pv_entity_2")
+        self.assertFalse(
+            enabled({}, enable_key="enable_external_pv", entity_keys=keys)
+        )
+        self.assertTrue(
+            enabled(
+                {"external_pv_entity_1": "sensor.roof_pv"},
+                enable_key="enable_external_pv",
+                entity_keys=keys,
+            )
+        )
+        self.assertFalse(
+            enabled(
+                {
+                    "enable_external_pv": False,
+                    "external_pv_entity_1": "sensor.roof_pv",
+                },
+                enable_key="enable_external_pv",
+                entity_keys=keys,
+            )
+        )
+        self.assertTrue(
+            enabled(
+                {"enable_external_pv": True},
+                enable_key="enable_external_pv",
+                entity_keys=keys,
+            )
+        )
+
     def test_configuration_is_bounded_and_display_only(self) -> None:
         constants = (INTEGRATION / "const.py").read_text(encoding="utf-8")
         settings = (INTEGRATION / "settings_api.py").read_text(encoding="utf-8")
@@ -57,6 +88,7 @@ class PVInsightTests(unittest.TestCase):
         for index in range(1, 5):
             self.assertIn(f'external_pv_entity_{index}', constants)
         self.assertNotIn('external_pv_entity_5', constants)
+        self.assertIn('CONF_ENABLE_EXTERNAL_PV = "enable_external_pv"', constants)
         self.assertIn('SECTION_PV = "pv"', settings)
         self.assertIn('"purpose": "display_only"', sensor)
         self.assertIn(
@@ -64,6 +96,8 @@ class PVInsightTests(unittest.TestCase):
             settings_frontend,
         )
         self.assertIn('field.type === "entity"', settings_frontend)
+        self.assertIn('data-pv-external-group', settings_frontend)
+        self.assertIn('syncExternalPvFields(form)', settings_frontend)
 
     def test_dashboard_uses_combined_pv_for_live_flow_without_scroll_writes(self) -> None:
         dashboard = (FRONTEND / "gw-energy-pilot.js").read_text(encoding="utf-8")

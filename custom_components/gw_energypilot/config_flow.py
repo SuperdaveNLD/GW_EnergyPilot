@@ -23,6 +23,7 @@ from .const import (
     CONF_EMHASS_URL,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
     CONF_EV_MODE_ENTITY,
@@ -415,7 +416,11 @@ class GWOptionsFlow(OptionsFlowWithReload):
             # PV insight is managed from the dedicated dashboard PV tab. Keep
             # those options when the standard Home Assistant options form saves
             # unrelated controller and EMHASS settings.
-            for key in (CONF_ENABLE_INTERNAL_PV, *EXTERNAL_PV_ENTITY_KEYS):
+            for key in (
+                CONF_ENABLE_INTERNAL_PV,
+                CONF_ENABLE_EXTERNAL_PV,
+                *EXTERNAL_PV_ENTITY_KEYS,
+            ):
                 if key in self.config_entry.options:
                     stored_options[key] = self.config_entry.options[key]
             return self.async_create_entry(data=stored_options)

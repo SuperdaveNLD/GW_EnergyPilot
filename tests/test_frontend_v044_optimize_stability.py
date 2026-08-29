@@ -14,21 +14,23 @@ class FrontendV044OptimizeStabilityTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_v045_retains_v044_over_the_complete_v043_frontend(self) -> None:
+    def test_v046_retains_v044_over_the_complete_frontend(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
+        v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.45")
+        self.assertEqual(manifest["version"], "0.46")
         self.assertIn(
-            "gw-energy-pilot-v045.js?v=0.45-integrated1",
+            "gw-energy-pilot-v046.js?v=0.46-external-pv1",
             init_source,
         )
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-integrated1"', v045)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.46-external-pv1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.46-external-pv1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.45-integrated1"',
+            'import "./gw-energy-pilot-v043.js?v=0.46-external-pv1"',
             self.source,
         )
         self.assertIn('const VERSION = "0.44"', self.source)

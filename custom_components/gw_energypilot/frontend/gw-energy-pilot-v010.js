@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v009.js?v=0.45-integrated1";
+import "./gw-energy-pilot-v009.js?v=0.46-external-pv1";
 
 const VERSION = "0.10";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -257,6 +257,17 @@ function ensureStyles(root) {
   root.appendChild(style);
 }
 
+function requestStableLiveRefresh(panel) {
+  if (
+    panel.__epV041StableRuntime &&
+    typeof panel.__epV041RefreshLiveDom === "function"
+  ) {
+    panel.__epV041RefreshLiveDom();
+    return;
+  }
+  panel._queueRender();
+}
+
 async function pressNativeButton(panel, buttonElement, entityId, busyText) {
   if (!entityId || buttonElement.disabled) return;
   const original = buttonElement.textContent;
@@ -270,7 +281,7 @@ async function pressNativeButton(panel, buttonElement, entityId, busyText) {
   } finally {
     buttonElement.disabled = false;
     buttonElement.textContent = original;
-    panel._queueRender();
+    requestStableLiveRefresh(panel);
   }
 }
 
@@ -369,13 +380,14 @@ function installBatteryQuickActions(panel, root) {
 
   for (const definition of definitions) {
     const entityId = panel._entityId(definition.key);
-    const active = definition.key === "resume_auto"
-      ? automaticOn
+    const active = automaticOn
+      ? definition.key === "resume_auto"
       : currentCommand === definition.command;
     const button = document.createElement("button");
     button.type = "button";
     button.className = `ep-battery-action${active ? " active" : ""}`;
     button.dataset.action = definition.key;
+    button.setAttribute("aria-pressed", active ? "true" : "false");
     button.title = definition.title;
     button.disabled = !entityId;
     button.textContent = definition.label;

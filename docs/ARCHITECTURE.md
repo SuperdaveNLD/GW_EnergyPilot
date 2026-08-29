@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.45 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.46 Beta**.
 
 ## High-level flow
 
@@ -370,20 +370,21 @@ The frontend keeps one canonical Battery · Plan · Price card. A mismatch betwe
 Active top-level module:
 
 ```text
-gw-energy-pilot-v045.js
-    -> gw-energy-pilot-v044.js
-        -> gw-energy-pilot-v043.js
-            -> gw-energy-pilot-v042.js
-                -> gw-energy-pilot-v041-emhass-settings.js
-                    -> gw-energy-pilot-v041.js
-                        -> gw-energy-pilot-v039.js
-                            -> gw-energy-pilot-v038.js
-                                -> gw-energy-pilot-v038-runtime.js
-                                    -> gw-energy-pilot-v034.js
-                                        -> existing v0.34 feature chain
+gw-energy-pilot-v046.js
+    -> gw-energy-pilot-v045.js
+        -> gw-energy-pilot-v044.js
+            -> gw-energy-pilot-v043.js
+                -> gw-energy-pilot-v042.js
+                    -> gw-energy-pilot-v041-emhass-settings.js
+                        -> gw-energy-pilot-v041.js
+                            -> gw-energy-pilot-v039.js
+                                -> gw-energy-pilot-v038.js
+                                    -> gw-energy-pilot-v038-runtime.js
+                                        -> gw-energy-pilot-v034.js
+                                            -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45 adds only release presentation and the integrated cache boundary.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45/v0.46 add only release presentation and cache boundaries.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 

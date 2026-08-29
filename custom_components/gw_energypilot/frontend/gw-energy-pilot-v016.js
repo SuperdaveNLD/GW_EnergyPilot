@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v015.js?v=0.45-integrated1";
+import "./gw-energy-pilot-v015.js?v=0.46-external-pv1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -137,17 +137,28 @@ function activeRawValue(panel) {
   return STRATEGIES.find((item) => item.option === state.state)?.raw || null;
 }
 
-async function chooseStrategy(panel, wrap, definition, activeRaw) {
+function requestStableLiveRefresh(panel) {
+  if (
+    panel.__epV041StableRuntime &&
+    typeof panel.__epV041RefreshLiveDom === "function"
+  ) {
+    panel.__epV041RefreshLiveDom();
+    return;
+  }
+  panel._queueRender();
+}
+
+async function chooseStrategy(panel, definition) {
+  if (panel.__epV016CostfunBusy) return;
+  const activeRaw = activeRawValue(panel);
   if (definition.raw === activeRaw) return;
 
   const selectEntityId = panel._entityId("emhass_cost_function");
   const fallbackEntityId = panel._entityId(definition.legacyKey);
   if (!selectEntityId && !fallbackEntityId) return;
 
-  const buttons = [...wrap.querySelectorAll(".ep-v016-costfun-button")];
-  buttons.forEach((button) => { button.disabled = true; });
-  const clicked = wrap.querySelector(`[data-costfun="${definition.raw}"]`);
-  if (clicked) clicked.textContent = "Applying…";
+  panel.__epV016CostfunBusy = definition.raw;
+  requestStableLiveRefresh(panel);
 
   try {
     if (selectEntityId) {
@@ -164,7 +175,8 @@ async function chooseStrategy(panel, wrap, definition, activeRaw) {
     console.error("GW EnergyPilot: EMHASS strategy change failed", err);
     window.alert(err?.message || String(err));
   } finally {
-    panel._queueRender();
+    panel.__epV016CostfunBusy = null;
+    requestStableLiveRefresh(panel);
   }
 }
 
@@ -175,14 +187,19 @@ function installStrategySelector(panel, root) {
   const activeRaw = activeRawValue(panel);
   const activeDefinition = STRATEGIES.find((item) => item.raw === activeRaw);
   const selectEntityId = panel._entityId("emhass_cost_function");
+  const busyRaw = panel.__epV016CostfunBusy || null;
 
   const wrap = document.createElement("div");
   wrap.className = "ep-v016-costfun";
   wrap.innerHTML = `
     <div class="ep-v016-costfun-head">
       <span class="ep-v016-costfun-title">EMHASS optimization strategy</span>
-      <span class="ep-v016-costfun-active ${activeDefinition ? "" : "pending"}">
-        ${activeDefinition ? `Active · ${panel._escape(activeDefinition.label)}` : "Reading active strategy…"}
+      <span class="ep-v016-costfun-active ${busyRaw || !activeDefinition ? "pending" : ""}">
+        ${busyRaw
+          ? `Applying · ${panel._escape(STRATEGIES.find((item) => item.raw === busyRaw)?.label || busyRaw)}…`
+          : activeDefinition
+            ? `Active · ${panel._escape(activeDefinition.label)}`
+            : "Reading active strategy…"}
       </span>
     </div>
     <div class="ep-v016-costfun-actions"></div>
@@ -190,6 +207,7 @@ function installStrategySelector(panel, root) {
       This is one persistent EMHASS setting, not three independent modes. The highlighted option is the current <strong>costfun</strong> read from EMHASS. Changing it saves the setting and immediately requests a fresh optimization. GoodWe execution remains P_batt-driven in v0.16.
     </div>`;
 
+  wrap.setAttribute("aria-busy", busyRaw ? "true" : "false");
   const actions = wrap.querySelector(".ep-v016-costfun-actions");
   for (const definition of STRATEGIES) {
     const fallbackEntityId = panel._entityId(definition.legacyKey);
@@ -198,15 +216,16 @@ function installStrategySelector(panel, root) {
     button.type = "button";
     button.className = `ep-v016-costfun-button${isActive ? " active" : ""}`;
     button.dataset.costfun = definition.raw;
+    button.dataset.costfunLabel = definition.label;
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
-    button.textContent = `${isActive ? "✓ " : ""}${definition.label}`;
+    button.textContent = busyRaw === definition.raw
+      ? "Applying…"
+      : `${isActive ? "✓ " : ""}${definition.label}`;
     button.title = isActive
       ? `${definition.label} is the active EMHASS cost function`
       : `Set EMHASS costfun to ${definition.raw} and run a fresh optimization`;
-    button.disabled = !selectEntityId && !fallbackEntityId;
-    button.addEventListener("click", () =>
-      chooseStrategy(panel, wrap, definition, activeRaw)
-    );
+    button.disabled = Boolean(busyRaw) || (!selectEntityId && !fallbackEntityId);
+    button.addEventListener("click", () => chooseStrategy(panel, definition));
     actions.appendChild(button);
   }
 

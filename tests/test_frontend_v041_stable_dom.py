@@ -22,10 +22,22 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.plan_core = (
             FRONTEND / "gw-energy-pilot-v027-battery-plan-core.js"
         ).read_text(encoding="utf-8")
+        self.quick_actions = (FRONTEND / "gw-energy-pilot-v010.js").read_text(
+            encoding="utf-8"
+        )
+        self.touch_hover = (FRONTEND / "gw-energy-pilot-v043.js").read_text(
+            encoding="utf-8"
+        )
+        self.costfun = (FRONTEND / "gw-energy-pilot-v016.js").read_text(
+            encoding="utf-8"
+        )
+        self.manual = (FRONTEND / "gw-energy-pilot-v021.js").read_text(
+            encoding="utf-8"
+        )
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=0.45-integrated1"', self.source
+            'import "./gw-energy-pilot-v039.js?v=0.46-external-pv1"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -42,6 +54,40 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertNotIn("shadowRoot.innerHTML", self.source)
         self.assertNotIn("scrollTop =", self.source)
         self.assertNotIn("scrollLeft =", self.source)
+
+    def test_host_properties_ignore_semantically_identical_assignments(self) -> None:
+        self.assertIn("function plainJsonEqual(left, right)", self.source)
+        self.assertIn("equal = Object.is", self.source)
+        self.assertIn(
+            'installStableHostProperty(PanelClass, "narrow", Boolean)', self.source
+        )
+        self.assertIn(
+            'installStableHostProperty(PanelClass, "panel", (value) => value, plainJsonEqual)',
+            self.source,
+        )
+        self.assertIn("issue84StructuralProbe", (
+            BROWSER / "test_frontend_stability.py"
+        ).read_text(encoding="utf-8"))
+
+    def test_battery_quick_actions_use_stable_live_state(self) -> None:
+        self.assertIn("function patchBatteryQuickActions", self.source)
+        self.assertIn("patchBatteryQuickActions(panel, root, automaticOn)", self.source)
+        self.assertIn("this.__epV041RefreshLiveDom", self.source)
+        self.assertIn("requestStableLiveRefresh(panel)", self.quick_actions)
+        self.assertIn('button.setAttribute("aria-pressed"', self.quick_actions)
+        self.assertNotIn(
+            '.ep-battery-action[data-action="resume_auto"]:hover', self.touch_hover
+        )
+
+    def test_other_persistent_selectors_use_stable_live_state(self) -> None:
+        self.assertIn("function patchCostFunctionSelector", self.source)
+        self.assertIn("patchCostFunctionSelector(panel, root)", self.source)
+        self.assertIn("requestStableLiveRefresh(panel)", self.costfun)
+        self.assertIn("const activeRaw = activeRawValue(panel)", self.costfun)
+        self.assertIn("panel.__epV016CostfunBusy", self.costfun)
+        self.assertIn("const busyRaw = panel.__epV016CostfunBusy", self.source)
+        self.assertIn("requestStableLiveRefresh(panel)", self.manual)
+        self.assertIn("const liveAutomaticOn", self.manual)
 
     def test_v038_legacy_guards_are_disabled_only_for_v041(self) -> None:
         self.assertIn("function stableRuntimeActive(panel)", self.runtime)
@@ -79,7 +125,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         browser_test = (BROWSER / "test_frontend_stability.py").read_text(
             encoding="utf-8"
         )
-        wrapper = (BROWSER / "test_frontend_stability_v045.py").read_text(
+        wrapper = (BROWSER / "test_frontend_stability_v046.py").read_text(
             encoding="utf-8"
         )
         harness = (BROWSER / "frontend_harness.html").read_text(
@@ -94,13 +140,14 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("telemetry_identity", browser_test)
         self.assertIn("exercise_plan_refresh", browser_test)
         self.assertIn("animation[\"animations\"] != 0", browser_test)
-        self.assertIn("frontend_harness.html?entry=v045", wrapper)
-        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v045"', wrapper)
-        self.assertIn('"v044", "v045"].includes(requestedEntry)', harness)
+        self.assertIn("frontend_harness.html?entry=v046", wrapper)
+        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v046"', wrapper)
+        self.assertIn('"v045", "v046"].includes(requestedEntry)', harness)
         self.assertIn("exercise_touch_controls", browser_test)
         self.assertIn("exercise_optimize_stability", browser_test)
+        self.assertIn("exercise_host_property_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
-        self.assertIn("test_frontend_stability_v045.py", workflow)
+        self.assertIn("test_frontend_stability_v046.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)
         self.assertFalse((BROWSER / "frontend_harness_v041.html").exists())

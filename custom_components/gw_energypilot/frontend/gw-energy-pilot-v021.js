@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v020.js?v=0.45-integrated1";
+import "./gw-energy-pilot-v020.js?v=0.46-external-pv1";
 
 const VERSION = "0.21";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -115,6 +115,9 @@ function ensureManualModeStyles(root) {
       justify-content: space-between;
       gap: 10px;
       margin-bottom: 10px;
+    }
+    .ep-v021-manual-pad.compact .ep-v021-manual-head {
+      margin-bottom: 0;
     }
     .ep-v021-manual-kicker {
       color: #65dff4;
@@ -291,6 +294,10 @@ function ensureManualModeStyles(root) {
       font-size: 8px;
       line-height: 1.4;
     }
+    .ep-v021-manual-pad.compact .ep-v021-manual-note {
+      min-height: 0;
+      margin-top: 6px;
+    }
     .ep-v021-manual-note strong { color: #a9dfe8; }
     .ep-v021-manual-note.error { color: #ef9b94; }
     .ep-v021-manual-note.ok { color: #69dcae; }
@@ -337,6 +344,17 @@ async function persistManualPower(panel, value) {
   panel.__epV021ManualPowerDirty = false;
 }
 
+function requestStableLiveRefresh(panel) {
+  if (
+    panel.__epV041StableRuntime &&
+    typeof panel.__epV041RefreshLiveDom === "function"
+  ) {
+    panel.__epV041RefreshLiveDom();
+    return;
+  }
+  panel._queueRender();
+}
+
 async function applyManualMode(panel, definition) {
   if (panel.__epV021ManualBusy) return;
   const automaticOn = panel._stateByKey?.("automatic_control")?.state === "on";
@@ -366,7 +384,7 @@ async function applyManualMode(panel, definition) {
     tone: "",
     text: `Applying mode ${definition.mode} · ${definition.name}${ZERO_POWER_MODES.has(definition.mode) ? " · 0 W" : ` · ${Math.round(commandPower)} W`}…`,
   };
-  panel._queueRender();
+  requestStableLiveRefresh(panel);
 
   try {
     if (!ZERO_POWER_MODES.has(definition.mode)) {
@@ -388,7 +406,7 @@ async function applyManualMode(panel, definition) {
     };
   } finally {
     panel.__epV021ManualBusy = null;
-    panel._queueRender();
+    requestStableLiveRefresh(panel);
   }
 }
 
@@ -408,18 +426,21 @@ function installManualModePad(panel, root) {
   const actualSetpoint = finiteNumber(panel._stateByKey?.("ems_setpoint")?.state, null);
   const controlsReady = Boolean(modeEntityId && powerEntityId);
   const locked = automaticOn || !controlsReady;
+  const compact = !controlsReady || automaticOn;
 
   const pad = document.createElement("section");
-  pad.className = `ep-v021-manual-pad${locked ? " locked" : ""}`;
+  pad.id = "ep-v021-manual-pad";
+  pad.className = `ep-v021-manual-pad${locked ? " locked" : ""}${compact ? " compact" : ""}`;
+  pad.setAttribute("aria-labelledby", "ep-v021-manual-title");
   pad.innerHTML = `
     <div class="ep-v021-manual-head">
       <div>
         <div class="ep-v021-manual-kicker">MANUAL EMS TEST</div>
-        <div class="ep-v021-manual-title">GoodWe modes 1–12</div>
+        <div class="ep-v021-manual-title" id="ep-v021-manual-title">GoodWe modes 1–12</div>
       </div>
-      <span class="ep-v021-manual-state">${automaticOn ? "LOCKED · AUTOMATIC" : controlsReady ? "MANUAL READY" : "ENTITIES MISSING"}</span>
+      <span class="ep-v021-manual-state" aria-live="polite">${automaticOn ? "LOCKED · AUTOMATIC" : controlsReady ? "MANUAL READY" : "ENTITIES MISSING"}</span>
     </div>
-    <div class="ep-v021-mode-grid">
+    <div class="ep-v021-mode-grid"${compact ? " hidden" : ""}>
       ${MODE_DEFINITIONS.map((definition) => {
         const active = definition.mode === mode;
         const pending = definition.mode === panel.__epV021ManualBusy;
@@ -430,13 +451,14 @@ function installManualModePad(panel, root) {
           data-mode="${definition.mode}"
           data-tip="${panel._escape(tip)}"
           aria-label="${panel._escape(tip)}"
-          aria-disabled="${locked || Boolean(panel.__epV021ManualBusy) ? "true" : "false"}">
+          aria-disabled="${locked || Boolean(panel.__epV021ManualBusy) ? "true" : "false"}"
+          ${locked || panel.__epV021ManualBusy ? "disabled" : ""}>
           <strong>${definition.mode}</strong>
           <small>${definition.tag}</small>
         </button>`;
       }).join("")}
     </div>
-    <div class="ep-v021-power-row">
+    <div class="ep-v021-power-row"${compact ? " hidden" : ""}>
       <div>
         <div class="ep-v021-power-label">
           <span>Manual setpoint</span>
@@ -459,21 +481,35 @@ function installManualModePad(panel, root) {
         ? panel._escape(panel.__epV021ManualMessage.text)
         : automaticOn
           ? `<strong>Automatic Control owns the inverter.</strong> Controls are locked; active mode ${panel._escape(mode ?? "—")} still follows live read-back.`
-          : `<strong>Live:</strong> mode ${panel._escape(mode ?? "—")}${modeInfo ? ` · ${panel._escape(modeInfo.name)}` : ""} · ${actualSetpoint === null ? "—" : `${Math.round(actualSetpoint)} W`}. Hover a mode for its meaning.`}
+          : !controlsReady
+            ? `<strong>Manual controls are unavailable.</strong> The required Home Assistant entities are missing.`
+            : `<strong>Live:</strong> mode ${panel._escape(mode ?? "—")}${modeInfo ? ` · ${panel._escape(modeInfo.name)}` : ""} · ${actualSetpoint === null ? "—" : `${Math.round(actualSetpoint)} W`}. Hover a mode for its meaning.`}
     </div>`;
 
   card.appendChild(pad);
 
   const slider = pad.querySelector(".ep-v021-power-slider");
   const valueNode = pad.querySelector("[data-manual-power-value]");
-  if (slider && !locked) {
+  if (slider) {
     slider.addEventListener("input", () => {
+      const liveAutomaticOn =
+        panel._stateByKey?.("automatic_control")?.state === "on";
+      const liveControlsReady = Boolean(
+        panel._entityId?.("manual_mode") && panel._entityId?.("manual_power")
+      );
+      if (slider.disabled || liveAutomaticOn || !liveControlsReady || panel.__epV021ManualBusy) return;
       const value = Math.min(model.max, Math.max(0, finiteNumber(slider.value, 0)));
       panel.__epV021ManualPowerDraft = value;
       panel.__epV021ManualPowerDirty = true;
       if (valueNode) valueNode.textContent = `${Math.round(value)} W`;
     });
     slider.addEventListener("change", async () => {
+      const liveAutomaticOn =
+        panel._stateByKey?.("automatic_control")?.state === "on";
+      const liveControlsReady = Boolean(
+        panel._entityId?.("manual_mode") && panel._entityId?.("manual_power")
+      );
+      if (slider.disabled || liveAutomaticOn || !liveControlsReady || panel.__epV021ManualBusy) return;
       const value = Math.min(model.max, Math.max(0, finiteNumber(slider.value, 0)));
       try {
         await persistManualPower(panel, value);
@@ -483,14 +519,19 @@ function installManualModePad(panel, root) {
           tone: "error",
           text: `Manual power update failed: ${err?.message || err}`,
         };
-        panel._queueRender();
+        requestStableLiveRefresh(panel);
       }
     });
   }
 
   pad.querySelectorAll(".ep-v021-mode-button").forEach((button) => {
     button.addEventListener("click", () => {
-      if (automaticOn || !controlsReady || panel.__epV021ManualBusy) return;
+      const liveAutomaticOn =
+        panel._stateByKey?.("automatic_control")?.state === "on";
+      const liveControlsReady = Boolean(
+        panel._entityId?.("manual_mode") && panel._entityId?.("manual_power")
+      );
+      if (button.disabled || liveAutomaticOn || !liveControlsReady || panel.__epV021ManualBusy) return;
       const definition = MODE_DEFINITIONS.find(
         (item) => item.mode === Number(button.dataset.mode)
       );
