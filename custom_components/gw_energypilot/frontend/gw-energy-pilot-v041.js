@@ -750,13 +750,19 @@ function patchController(panel, root, automaticOn) {
     }
     const note = manual.querySelector("[data-manual-note]");
     if (note) {
+      // Automatic ownership supersedes feedback from an earlier manual command.
+      // Drop that stale message so releasing ownership starts from current live
+      // read-back instead of presenting a command that is no longer active.
+      if (automaticOn && panel.__epV021ManualMessage) {
+        panel.__epV021ManualMessage = null;
+      }
       const message = panel.__epV021ManualMessage;
       note.classList.remove("ok", "error");
       if (message?.tone) note.classList.add(message.tone);
-      if (message?.text) {
-        note.textContent = message.text;
-      } else if (automaticOn) {
+      if (automaticOn) {
         note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong> ${panel._escape(t.automaticOwnerDetail)}`;
+      } else if (message?.text) {
+        note.textContent = message.text;
       } else if (!controlsReady) {
         note.innerHTML = `<strong>${panel._escape(t.manualUnavailable)}</strong> ${panel._escape(t.manualUnavailableDetail)}`;
       } else {

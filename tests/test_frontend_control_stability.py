@@ -92,6 +92,14 @@ class FrontendControlStabilityTests(unittest.TestCase):
             'note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong>',
             self.stable,
         )
+        self.assertIn(
+            "if (automaticOn && panel.__epV021ManualMessage)",
+            self.stable,
+        )
+        self.assertLess(
+            self.stable.index("if (automaticOn) {", self.stable.index("const message = panel.__epV021ManualMessage")),
+            self.stable.index("} else if (message?.text)"),
+        )
 
     def test_v038_profile_identity_is_language_independent(self) -> None:
         self.assertIn('label: "Battery Saver"', self.model)
