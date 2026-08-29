@@ -15,18 +15,20 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
 
     def test_active_panel_loads_enhanced_emhass_settings_entrypoint(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v044.js?v=0.44-optimize-stable1", init_source)
+        self.assertIn("gw-energy-pilot-v045.js?v=0.45-integrated1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-integrated1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.44-optimize-stable1"',
+            'import "./gw-energy-pilot-v043.js?v=0.45-integrated1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.43-touch1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.42-emhass1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.41-stable1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.45-integrated1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.45-integrated1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.45-integrated1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:

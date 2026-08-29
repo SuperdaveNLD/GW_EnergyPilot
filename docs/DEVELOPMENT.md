@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.44 runtime structure
+## Current v0.45 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v0.44 runtime/panel entrypoints
+__init__.py             config-entry setup, APIs, v0.45 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -120,17 +120,18 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v044.js
-    -> gw-energy-pilot-v043.js
-        -> gw-energy-pilot-v042.js
-            -> gw-energy-pilot-v041-emhass-settings.js
-                -> gw-energy-pilot-v041.js
-                    -> gw-energy-pilot-v039.js
-                        -> gw-energy-pilot-v038.js
-                            -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v045.js
+    -> gw-energy-pilot-v044.js
+        -> gw-energy-pilot-v043.js
+            -> gw-energy-pilot-v042.js
+                -> gw-energy-pilot-v041-emhass-settings.js
+                    -> gw-energy-pilot-v041.js
+                        -> gw-energy-pilot-v039.js
+                            -> gw-energy-pilot-v038.js
+                                -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.44 is a bounded compatibility exception: it replaces only the inherited Optimize listener that requested a full render after the asynchronous service call. v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, v0.41 owns ordinary telemetry patching and targeted plan refresh, and v0.38/v0.39 retain strategy, flow and localization behavior. The v0.34 clean base still supplies established dashboard features, including the canonical Battery · Plan · Price path.
+v0.45 is a version-only presentation wrapper and one integrated cache boundary over the complete v0.44 chain. Its shared `0.45-integrated1` import key reaches every active dependency so upgraded clients load the PV insight, SOC chart, static-flow presentation, SOC-slider fix and floating Optimize action together. v0.44 owns the bounded Optimize listener and floating action, v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, and v0.41 owns ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS. `gw-energy-pilot-v038-model.js` remains the physical flow-direction source; the v0.27 plan modules own SOC graph rendering. The v0.34 clean base still supplies established dashboard features.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
@@ -391,6 +392,19 @@ compatibility fallback only:
 current Home Assistant battery_scheduled_power / forecasts attributes
 ```
 
+SOC visualization:
+
+```text
+actual: registry-resolved GoodWe battery_soc (%)
+        -> separate Recorder 5-minute means
+
+forecast: official schema-1.x SOC_opt fraction 0..1
+          -> plan_runtime validates and normalizes to value_pct
+          -> battery_soc_plan payload
+```
+
+Do not reuse the power-schedule fallback for SOC. EnergyPilot has no configured EMHASS SOC-output entity, and multi-battery plans have no meaningful bare/fleet `SOC_opt`.
+
 Historical active plan still uses configured `P_batt` Home Assistant history so the displayed past reflects the target that was actually published then.
 
 Price line:
@@ -402,7 +416,7 @@ existing EnergyPilot runtime price-source path
 -> frontend visualization
 ```
 
-The chart API remains schema `4` and includes `plan_revision`. The frontend should force-refresh the one canonical card when the live orchestrator revision differs from the cached payload. `P_batt.last_updated` remains the compatibility fallback for changes outside EnergyPilot. Do not solve refresh bugs by allowing duplicate cards.
+The chart API uses schema `5` and includes `plan_revision`. The frontend should force-refresh the one canonical card when the live orchestrator revision differs from the cached payload. `P_batt.last_updated` remains the compatibility fallback for changes outside EnergyPilot. Do not solve refresh bugs by allowing duplicate cards.
 
 Do not discover Nord Pool independently in the browser. Chart energy summaries are visualization only; persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
 

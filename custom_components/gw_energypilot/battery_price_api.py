@@ -108,6 +108,23 @@ def _battery_plan_payload(
     }
 
 
+def _battery_soc_plan_payload(entry: ConfigEntry) -> dict[str, Any]:
+    """Return validated planned SOC percentages from the official plan mirror."""
+    runtime_data = getattr(entry, "runtime_data", None)
+    plan_runtime = getattr(runtime_data, "plan_runtime", None)
+    points = plan_runtime.points("soc_opt") if plan_runtime is not None else []
+    diagnostics = dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
+    source = diagnostics.get("source") if points else None
+    return {
+        "available": bool(points),
+        "unit": "%",
+        "source": source,
+        "source_column": "SOC_opt" if source == "emhass_api_v1_plan" else None,
+        "source_unit": "fraction_0_1" if source == "emhass_api_v1_plan" else None,
+        "points": points,
+    }
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "gw_energypilot/battery_price/get",
@@ -155,11 +172,12 @@ async def websocket_get_battery_price(
         msg["id"],
         {
             "entry_id": entry.entry_id,
-            "chart_schema_version": 4,
+            "chart_schema_version": 5,
             "plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0),
             **price_payload,
             "battery_energy": _battery_energy_payload(runtime_data),
             "battery_plan": _battery_plan_payload(hass, entry),
+            "battery_soc_plan": _battery_soc_plan_payload(entry),
         },
     )
 

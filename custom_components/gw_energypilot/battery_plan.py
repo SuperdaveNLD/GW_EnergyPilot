@@ -130,19 +130,26 @@ def normalize_emhass_forecasts(
 def normalize_emhass_api_plan(
     payload: Mapping[str, Any] | None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Normalize the official ``GET /api/v1/plan`` P_batt/P_grid horizon.
+    """Normalize the official ``GET /api/v1/plan`` battery/grid horizon.
 
-    EMHASS schema 1.x defines ``timestamp``, ``P_batt`` and ``P_grid`` as the
-    canonical plan columns. Unknown/missing rows are ignored rather than
-    guessed from unrelated numeric columns.
+    EMHASS schema 1.x defines ``timestamp``, ``P_batt``, ``P_grid`` and
+    ``SOC_opt`` as canonical plan columns. ``SOC_opt`` is a fraction in the
+    persisted plan, unlike the percentage published to Home Assistant, so it
+    is accepted only inside the documented 0..1 range and normalized here.
+    Unknown/missing rows are ignored rather than guessed from unrelated
+    numeric columns.
     """
     if not isinstance(payload, Mapping) or payload.get("status") != "ok":
-        return {"p_batt": [], "p_grid": []}
+        return {"p_batt": [], "p_grid": [], "soc_opt": []}
     rows = payload.get("plan")
     if not isinstance(rows, list):
-        return {"p_batt": [], "p_grid": []}
+        return {"p_batt": [], "p_grid": [], "soc_opt": []}
 
-    result: dict[str, list[dict[str, Any]]] = {"p_batt": [], "p_grid": []}
+    result: dict[str, list[dict[str, Any]]] = {
+        "p_batt": [],
+        "p_grid": [],
+        "soc_opt": [],
+    }
     for result_key, column in (("p_batt", "P_batt"), ("p_grid", "P_grid")):
         by_timestamp: dict[float, dict[str, Any]] = {}
         for row in rows:
@@ -158,6 +165,25 @@ def normalize_emhass_api_plan(
                 "value_w": round(value, 3),
             }
         result[result_key] = [by_timestamp[key] for key in sorted(by_timestamp)]
+
+    by_timestamp: dict[float, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        parsed_timestamp = normalized_timestamp(row.get("timestamp"))
+        fraction = finite_number(row.get("SOC_opt"))
+        if (
+            parsed_timestamp is None
+            or fraction is None
+            or not 0.0 <= fraction <= 1.0
+        ):
+            continue
+        start, sort_key = parsed_timestamp
+        by_timestamp[sort_key] = {
+            "start": start,
+            "value_pct": round(fraction * 100.0, 3),
+        }
+    result["soc_opt"] = [by_timestamp[key] for key in sorted(by_timestamp)]
     return result
 
 
@@ -171,7 +197,7 @@ def infer_plan_step_seconds(*point_sets: list[dict[str, Any]]) -> int | None:
             if parsed is not None:
                 timestamps.append(parsed[1])
         timestamps.sort()
-        for previous, current in zip(timestamps, timestamps[1:], strict=False):
+        for previous, current in zip(timestamps, timestamps[1:]):
             delta = current - previous
             if delta > 0:
                 deltas.append(delta)

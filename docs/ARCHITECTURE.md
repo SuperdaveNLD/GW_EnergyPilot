@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.44 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.45 Beta**.
 
 ## High-level flow
 
@@ -36,6 +36,16 @@ GWEnergyPilotCoordinator
 ```
 
 EMHASS remains an external prerequisite and remains the canonical owner of the optimization plan. The EnergyPilot plan Store is only a resilience mirror.
+
+Read-only PV insight is a separate presentation path:
+
+```text
+coordinator pv_total_power + up to four configured HA power entities
+    -> pv_generation_power sensor
+    -> dashboard PV total/source breakdown/live-flow value
+```
+
+That aggregate does not feed the controller, orchestrator, EMHASS or accounting. External entity changes update the aggregate independently; internal GoodWe PV continues to follow coordinator updates. See `docs/PV_INSIGHT.md`.
 
 Persistent EnergyPilot-owned data is split by purpose:
 
@@ -185,7 +195,7 @@ Canonical refresh source:
 GET <EMHASS base URL>/api/v1/plan
 ```
 
-EnergyPilot accepts the supported versioned EMHASS schema, normalizes timestamped `P_batt` and `P_grid` points, infers the plan timestep and calculates:
+EnergyPilot accepts the supported versioned EMHASS schema, normalizes timestamped `P_batt` and `P_grid` points plus optional single-battery `SOC_opt`, infers the plan timestep and calculates:
 
 ```text
 valid_until = final P_batt timestamp + inferred timestep
@@ -202,6 +212,7 @@ valid_until
 configured P_batt/P_grid entity IDs
 P_batt horizon
 P_grid horizon
+optional SOC_opt horizon normalized from fraction to percent
 ```
 
 The Store key is:
@@ -343,14 +354,14 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes read-only chart data. The payload remains schema `4`, includes `plan_revision`, and uses future-plan source order:
+`battery_price_api.py` exposes read-only chart data. The payload uses schema `5`, includes `plan_revision`, and uses future-plan source order:
 
 ```text
 1. persistent validated official EMHASS plan mirror
 2. existing Home Assistant battery_scheduled_power / forecasts compatibility path
 ```
 
-Actual bars remain Recorder history from the existing GoodWe battery-power entity. Native GoodWe day counters remain the headline charged/discharged energy values.
+Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. Forecast SOC uses only exact, validated `SOC_opt` from the official plan mirror; no output-entity fallback or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
 
 The frontend keeps one canonical Battery · Plan · Price card. A mismatch between the live orchestrator `plan_revision` and the cached API payload forces an immediate refresh; `P_batt.last_updated` remains a compatibility fallback for plan changes outside EnergyPilot. The card is replaced/rebuilt rather than duplicated.
 
@@ -359,17 +370,24 @@ The frontend keeps one canonical Battery · Plan · Price card. A mismatch betwe
 Active top-level module:
 
 ```text
-gw-energy-pilot-v038.js
-    -> gw-energy-pilot-v038-runtime.js
-        -> gw-energy-pilot-v034.js
-            -> existing v0.34 feature chain
+gw-energy-pilot-v045.js
+    -> gw-energy-pilot-v044.js
+        -> gw-energy-pilot-v043.js
+            -> gw-energy-pilot-v042.js
+                -> gw-energy-pilot-v041-emhass-settings.js
+                    -> gw-energy-pilot-v041.js
+                        -> gw-energy-pilot-v039.js
+                            -> gw-energy-pilot-v038.js
+                                -> gw-energy-pilot-v038-runtime.js
+                                    -> gw-energy-pilot-v034.js
+                                        -> existing v0.34 feature chain
 ```
 
-v0.38 deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45 adds only release presentation and the integrated cache boundary.
 
-The v0.38 frontend is split by responsibility: `gw-energy-pilot-v038-model.js` owns pure localization/profile/physical-flow models, `gw-energy-pilot-v038-strategy.js` owns key-based delegated Battery Strategy actions and active state, `gw-energy-pilot-v038-styles.js` owns final control/particle presentation, and `gw-energy-pilot-v038-runtime.js` owns relevant-state rendering, interaction completion, scroll stability and applying physical flow motion to the live DOM.
+The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 
-Visible/translated text is never a control identity. Canonical profile keys plus `aria-pressed` define action and selected state. Live-flow direction is likewise single-owner through explicit physical motion instead of accumulated animation reversals. See `docs/FRONTEND_CONTROL_REBUILD.md`.
+Visible/translated text is never a control identity. Canonical profile keys plus `aria-pressed` define action and selected state. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; current presentation is static and patched in place. See `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
 Historical frontend layering remains technical debt below the v0.34 base. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
 

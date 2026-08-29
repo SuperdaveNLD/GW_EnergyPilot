@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=0.41-stable1";
+import "./gw-energy-pilot-v039.js?v=0.45-integrated1";
 import {
   FLOW_THRESHOLD_W,
-  flowMotionMap,
+  flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=0.38-model3";
+} from "./gw-energy-pilot-v038-model.js?v=0.45-integrated1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=0.38-i18n1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.41-stable1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.41-stable1";
+} from "./gw-energy-pilot-v038-i18n.js?v=0.45-integrated1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.45-integrated1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.45-integrated1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -43,6 +43,21 @@ const COPY = Object.freeze({
     today: "Today",
     yesterday: "Yesterday",
     motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
+    flowUnknown: "power unavailable",
+    flowIdle: "idle below 50 W",
+    flowLow: "low relative flow",
+    flowMedium: "medium relative flow",
+    flowHigh: "high relative flow",
+    pvToSystem: "PV to system",
+    gridToSystem: "Grid to system",
+    systemToGrid: "System to grid",
+    systemToHouse: "System to house",
+    batteryToSystem: "Battery to system",
+    systemToBattery: "System to battery",
+    pvSources: "PV sources",
+    noPvSources: "No sources configured",
+    internalPvTelemetry: "Internal GoodWe telemetry",
+    externalPvEntity: "External PV entity",
   }),
   nl: Object.freeze({
     autoActive: "AUTO ACTIEF",
@@ -67,6 +82,21 @@ const COPY = Object.freeze({
     today: "Vandaag",
     yesterday: "Gisteren",
     motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
+    flowUnknown: "vermogen niet beschikbaar",
+    flowIdle: "inactief onder 50 W",
+    flowLow: "lage relatieve stroom",
+    flowMedium: "gemiddelde relatieve stroom",
+    flowHigh: "hoge relatieve stroom",
+    pvToSystem: "PV naar systeem",
+    gridToSystem: "Net naar systeem",
+    systemToGrid: "Systeem naar net",
+    systemToHouse: "Systeem naar woning",
+    batteryToSystem: "Batterij naar systeem",
+    systemToBattery: "Systeem naar batterij",
+    pvSources: "PV-bronnen",
+    noPvSources: "Geen bronnen geconfigureerd",
+    internalPvTelemetry: "Interne GoodWe-telemetrie",
+    externalPvEntity: "Externe PV-entiteit",
   }),
 });
 
@@ -112,6 +142,105 @@ const NO_MOTION_CSS = `
   :host .ep-flow-hub::after,
   :host .ep-v011-particles span {
     display: none !important;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status] {
+    --ep-v041-pipe-size: 3px;
+    --ep-v041-pipe-opacity: .72;
+    opacity: 1;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="low"] {
+    --ep-v041-pipe-size: 2px;
+    --ep-v041-pipe-opacity: .58;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] {
+    --ep-v041-pipe-size: 4px;
+    --ep-v041-pipe-opacity: .74;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] {
+    --ep-v041-pipe-size: 6px;
+    --ep-v041-pipe-opacity: .92;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"],
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] {
+    --ep-v041-pipe-size: 2px;
+    color: #71879a;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"] {
+    --ep-v041-pipe-opacity: .48;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] {
+    --ep-v041-pipe-opacity: .64;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status] .ep-flow-track {
+    inset: auto 0;
+    top: 50%;
+    width: auto;
+    height: var(--ep-v041-pipe-size);
+    transform: translateY(-50%);
+    background: currentColor;
+    box-shadow: none;
+    opacity: var(--ep-v041-pipe-opacity);
+  }
+  :host .ep-link-house[data-ep-v041-flow-status] .ep-flow-track,
+  :host .ep-link-battery[data-ep-v041-flow-status] .ep-flow-track {
+    inset: 0 auto;
+    left: 50%;
+    width: var(--ep-v041-pipe-size);
+    height: auto;
+    transform: translateX(-50%);
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-flow-track {
+    background: repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px);
+  }
+  :host .ep-link-house[data-ep-v041-flow-status="unknown"] .ep-flow-track,
+  :host .ep-link-battery[data-ep-v041-flow-status="unknown"] .ep-flow-track {
+    background: repeating-linear-gradient(180deg,currentColor 0 5px,transparent 5px 9px);
+  }
+  :host .ep-v041-flow-arrow,
+  :host .ep-v041-flow-state {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 7;
+    display: none;
+    min-width: 17px;
+    min-height: 17px;
+    padding: 0 2px;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: #071a2e;
+    color: currentColor;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-arrow,
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state,
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-v041-flow-state {
+    display: flex;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] .ep-v041-flow-arrow {
+    min-width: 19px;
+    min-height: 19px;
+    font-size: 16px;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] .ep-v041-flow-arrow {
+    min-width: 21px;
+    min-height: 21px;
+    font-size: 18px;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state {
+    border-style: solid;
+    font-size: 15px;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-v041-flow-state {
+    border-style: dashed;
+    font-size: 11px;
   }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
@@ -160,6 +289,49 @@ function copy(panel) {
 function finite(panel, key) {
   const value = panel._numberByKey?.(key, null);
   return Number.isFinite(value) ? value : null;
+}
+
+function pvGenerationSnapshot(panel) {
+  const state = panel._stateByKey?.("pv_generation_power");
+  if (!state) {
+    return {
+      state: null,
+      power: finite(panel, "pv_total_power"),
+      sources: [],
+      configuredExternal: 0,
+      internalEnabled: true,
+    };
+  }
+  const attrs = state.attributes || {};
+  return {
+    state,
+    power: finiteValue(state.state),
+    sources: Array.isArray(attrs.sources) ? attrs.sources : [],
+    configuredExternal: Number(attrs.configured_external_sources || 0),
+    internalEnabled: attrs.internal_enabled !== false,
+  };
+}
+
+function patchPvSourceMetrics(panel, solar, snapshot) {
+  if (!solar) return;
+  const t = copy(panel);
+  for (const metric of solar.querySelectorAll("[data-pv-source-index]")) {
+    const index = Number(metric.dataset.pvSourceIndex);
+    const source = snapshot.sources[index];
+    if (!source) continue;
+    setText(metric, ".metric-label", source.name || `PV ${index + 1}`);
+    setText(metric, ".metric-value", panel._formatPower(finiteValue(source.power_w)));
+    setText(
+      metric,
+      ".metric-sub",
+      source.kind === "internal"
+        ? t.internalPvTelemetry
+        : source.entity_id || t.externalPvEntity
+    );
+  }
+  const empty = solar.querySelector("[data-pv-empty]");
+  setText(empty, ".metric-label", t.pvSources);
+  setText(empty, ".metric-sub", t.noPvSources);
 }
 
 function finiteValue(value) {
@@ -238,7 +410,8 @@ function patchMetric(card, labels, value, sub = undefined) {
 }
 
 function patchBalanceRows(card, panel, load, inverter, acActive) {
-  const pv = finite(panel, "pv_total_power");
+  const pvSnapshot = pvGenerationSnapshot(panel);
+  const pv = pvSnapshot.power;
   const grid = finite(panel, "meter_total_power_fast");
   const battery = finite(panel, "battery_power");
   const balance =
@@ -303,9 +476,80 @@ function formatDecimal(value, decimals = 4) {
   return number === null ? "—" : number.toFixed(decimals);
 }
 
+const FLOW_ARROWS = Object.freeze({
+  right: "→",
+  left: "←",
+  up: "↑",
+  down: "↓",
+});
+
+function ensureStaticFlowNodes(link) {
+  let arrow = link.querySelector(".ep-v041-flow-arrow");
+  if (!arrow) {
+    arrow = document.createElement("span");
+    arrow.className = "ep-v041-flow-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    link.appendChild(arrow);
+  }
+  let state = link.querySelector(".ep-v041-flow-state");
+  if (!state) {
+    state = document.createElement("span");
+    state.className = "ep-v041-flow-state";
+    state.setAttribute("aria-hidden", "true");
+    link.appendChild(state);
+  }
+  return { arrow, state };
+}
+
+function flowDirectionText(panel, key, direction) {
+  const t = copy(panel);
+  if (key === "pv") return t.pvToSystem;
+  if (key === "house") return t.systemToHouse;
+  if (key === "grid") return direction === "left" ? t.gridToSystem : t.systemToGrid;
+  return direction === "up" ? t.batteryToSystem : t.systemToBattery;
+}
+
+function flowSourceText(panel, key) {
+  return {
+    pv: "PV",
+    grid: language(panel) === "nl" ? "Net" : "Grid",
+    house: language(panel) === "nl" ? "Woning" : "House",
+    battery: language(panel) === "nl" ? "Batterij" : "Battery",
+  }[key];
+}
+
+function patchStaticFlowLink(panel, link, key, presentation) {
+  const { arrow, state } = ensureStaticFlowNodes(link);
+  const t = copy(panel);
+  link.dataset.epV038Motion = presentation.direction;
+  link.dataset.epV041FlowStatus = presentation.status;
+  link.dataset.epV041FlowIntensity = presentation.intensity;
+  arrow.textContent = FLOW_ARROWS[presentation.direction] || "";
+  state.textContent = presentation.status === "unknown" ? "?" : "•";
+
+  let label;
+  if (presentation.status === "unknown") {
+    label = `${flowSourceText(panel, key)} · ${t.flowUnknown}`;
+  } else if (presentation.status === "idle") {
+    label = `${flowSourceText(panel, key)} · ${t.flowIdle}`;
+  } else {
+    const intensity = {
+      low: t.flowLow,
+      medium: t.flowMedium,
+      high: t.flowHigh,
+    }[presentation.intensity];
+    label =
+      `${flowDirectionText(panel, key, presentation.direction)} · ` +
+      `${panel._formatPower(Math.abs(presentation.power))} · ${intensity}`;
+  }
+  link.setAttribute("role", "img");
+  link.setAttribute("aria-label", label);
+  link.title = label;
+}
+
 function patchFlow(panel, root, pv, load, grid, battery, soc) {
   const house = resolveHousePower(load, pv, grid, battery);
-  const motion = flowMotionMap({ pv, house, grid, battery }, FLOW_THRESHOLD_W);
+  const visual = flowVisualMap({ pv, house, grid, battery }, FLOW_THRESHOLD_W);
   const t = copy(panel);
   const gridMode = gridPresentation(panel, grid);
   const batteryMode = batteryPresentation(panel, battery);
@@ -343,7 +587,7 @@ function patchFlow(panel, root, pv, load, grid, battery, soc) {
     if (!link) continue;
     link.classList.remove("idle", "inbound", "outbound");
     link.classList.add(semantic[key]);
-    link.dataset.epV038Motion = motion[key];
+    patchStaticFlowLink(panel, link, key, visual[key]);
   }
 }
 
@@ -457,9 +701,17 @@ function patchEmhass(panel, root) {
     const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
     const value = finite(panel, key);
     if (!Number.isFinite(value)) continue;
-    if (root.activeElement !== input) input.value = String(value);
+    const draft = finiteValue(input.dataset.epSocDraft);
+    const acknowledged = Number.isFinite(draft) && value === draft;
+    if (acknowledged) delete input.dataset.epSocDraft;
+    const displayValue = Number.isFinite(draft) && !acknowledged
+      ? draft
+      : root.activeElement === input
+        ? finiteValue(input.value) ?? value
+        : value;
+    input.value = String(displayValue);
     const label = card.querySelector(`[data-soc-value="${kind}"]`);
-    if (label) label.textContent = `${Math.round(value)}%`;
+    if (label) label.textContent = `${Math.round(displayValue)}%`;
   }
 }
 
@@ -471,9 +723,17 @@ function patchStrategy(panel, root) {
     const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
     const value = finite(panel, key);
     if (!Number.isFinite(value)) continue;
-    if (root.activeElement !== input) input.value = String(value);
+    const draft = finiteValue(input.dataset.epSocDraft);
+    const acknowledged = Number.isFinite(draft) && value === draft;
+    if (acknowledged) delete input.dataset.epSocDraft;
+    const displayValue = Number.isFinite(draft) && !acknowledged
+      ? draft
+      : root.activeElement === input
+        ? finiteValue(input.value) ?? value
+        : value;
+    input.value = String(displayValue);
     const label = strategy.querySelector(`[data-ep-v038-soc-value="${kind}"]`);
-    if (label) label.textContent = `${Math.round(value)}%`;
+    if (label) label.textContent = `${Math.round(displayValue)}%`;
   }
 }
 
@@ -687,7 +947,8 @@ function patchLiveDom(panel) {
   const main = root?.querySelector("main");
   if (!main) return;
   main.dataset.epV041StableDom = "1";
-  const pv = finite(panel, "pv_total_power");
+  const pvSnapshot = pvGenerationSnapshot(panel);
+  const pv = pvSnapshot.power;
   const load = finite(panel, "total_load_power");
   const grid = finite(panel, "meter_total_power_fast");
   const battery = finite(panel, "battery_power");
@@ -703,10 +964,14 @@ function patchLiveDom(panel) {
 
   const solar = root.querySelector(".energy-card.solar");
   setText(solar, ".hero-value", panel._formatPower(pv));
-  patchMetric(solar, ["PV1"], panel._formatPower(finite(panel, "pv1_power")));
-  patchMetric(solar, ["PV2"], panel._formatPower(finite(panel, "pv2_power")));
-  patchMetric(solar, ["PV3"], panel._formatPower(finite(panel, "pv3_power")));
-  patchMetric(solar, ["PV4"], panel._formatPower(finite(panel, "pv4_power")));
+  if (pvSnapshot.configuredExternal > 0 || !pvSnapshot.internalEnabled) {
+    patchPvSourceMetrics(panel, solar, pvSnapshot);
+  } else {
+    patchMetric(solar, ["PV1"], panel._formatPower(finite(panel, "pv1_power")));
+    patchMetric(solar, ["PV2"], panel._formatPower(finite(panel, "pv2_power")));
+    patchMetric(solar, ["PV3"], panel._formatPower(finite(panel, "pv3_power")));
+    patchMetric(solar, ["PV4"], panel._formatPower(finite(panel, "pv4_power")));
+  }
 
   const home = root.querySelector(".energy-card.home");
   setText(home, ".hero-value", panel._formatPower(load));
@@ -796,12 +1061,22 @@ function structureSignature(panel) {
   const pv4 = finite(panel, "pv4_power");
   const entityMap = Object.entries(panel._entityMap || {})
     .sort(([left], [right]) => left.localeCompare(right));
+  const pvSnapshot = pvGenerationSnapshot(panel);
+  const pvSourceTopology = pvSnapshot.sources.map((source) => ({
+    sourceKey: source?.source_key || "",
+    kind: source?.kind || "",
+    name: source?.name || "",
+    entityId: source?.entity_id || "",
+  }));
   return JSON.stringify({
     registryLoaded: Boolean(panel._registryLoaded),
     entityMap,
     pBattState: Boolean(pBattState),
     pBattNumeric: Number.isFinite(pBatt),
     pv4Visible: Number.isFinite(pv4) && Math.abs(pv4) > 20,
+    pvInternalEnabled: pvSnapshot.internalEnabled,
+    pvConfiguredExternal: pvSnapshot.configuredExternal,
+    pvSourceTopology,
   });
 }
 

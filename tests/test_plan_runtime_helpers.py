@@ -30,11 +30,13 @@ class PersistentPlanHelperTests(unittest.TestCase):
                     "timestamp": "2026-08-25T04:00:00Z",
                     "P_batt": -4200,
                     "P_grid": 1800,
+                    "SOC_opt": 0.563,
                 },
                 {
                     "timestamp": "2026-08-25T04:15:00Z",
                     "P_batt": 2500,
                     "P_grid": -1200,
+                    "SOC_opt": 0.5,
                 },
             ],
         }
@@ -42,6 +44,8 @@ class PersistentPlanHelperTests(unittest.TestCase):
         result = module.normalize_emhass_api_plan(payload)
         self.assertEqual(result["p_batt"][0]["value_w"], -4200.0)
         self.assertEqual(result["p_grid"][1]["value_w"], -1200.0)
+        self.assertEqual(result["soc_opt"][0]["value_pct"], 56.3)
+        self.assertEqual(result["soc_opt"][1]["value_pct"], 50.0)
         self.assertEqual(result["p_batt"][0]["start"], "2026-08-25T04:00:00+00:00")
 
     def test_api_plan_does_not_guess_missing_battery_column(self):
@@ -55,6 +59,43 @@ class PersistentPlanHelperTests(unittest.TestCase):
         )
         self.assertEqual(result["p_batt"], [])
         self.assertEqual(result["p_grid"][0]["value_w"], 5000.0)
+
+    def test_soc_opt_accepts_only_documented_fraction_range(self):
+        rows = [
+            {"timestamp": "2026-08-25T04:00:00Z", "P_batt": 0, "SOC_opt": 0},
+            {"timestamp": "2026-08-25T04:15:00Z", "P_batt": 0, "SOC_opt": 1},
+            {"timestamp": "2026-08-25T04:30:00Z", "P_batt": 0, "SOC_opt": -0.01},
+            {"timestamp": "2026-08-25T04:45:00Z", "P_batt": 0, "SOC_opt": 1.01},
+            {"timestamp": "2026-08-25T05:00:00Z", "P_batt": 0, "SOC_opt": 56},
+            {"timestamp": "2026-08-25T05:15:00Z", "P_batt": 0, "SOC_opt": "nan"},
+        ]
+
+        result = module.normalize_emhass_api_plan({"status": "ok", "plan": rows})
+
+        self.assertEqual(
+            result["soc_opt"],
+            [
+                {"start": "2026-08-25T04:00:00+00:00", "value_pct": 0.0},
+                {"start": "2026-08-25T04:15:00+00:00", "value_pct": 100.0},
+            ],
+        )
+
+    def test_soc_opt_does_not_guess_custom_or_multi_battery_columns(self):
+        result = module.normalize_emhass_api_plan(
+            {
+                "status": "ok",
+                "plan": [
+                    {
+                        "timestamp": "2026-08-25T04:00:00Z",
+                        "P_batt": 0,
+                        "SOC_opt_0": 0.5,
+                        "soc_batt_forecast": 50,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(result["soc_opt"], [])
 
     def test_infers_fifteen_minute_step(self):
         points = [

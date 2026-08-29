@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. v0.28 remains **Beta** while the corrected Hybrid buy/sell mapping, the resizable Battery plan/actual/price visualization and the compact support presentation receive broader field exposure.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.45 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -25,7 +25,7 @@ gw_energypilot/optimization_log/get
 gw_energypilot/battery_price/get
 ```
 
-The active v0.28 frontend is `gw-energy-pilot-v028.js`. It layers the complete v0.27 Battery plan/actual/price and compact Support presentation underneath a small Hybrid-strategy clarification layer.
+The active frontend chain is documented in `docs/FRONTEND_STABLE_DOM.md`. The settings shell remains owned by `gw-energy-pilot-settings-v016.js`; later release layers extend presentation without creating a second configuration database.
 
 ## EP page
 
@@ -71,6 +71,19 @@ self-consumption
 ```
 
 Changing `costfun` does not change the GoodWe actuator strategy.
+
+## PV page
+
+The PV section owns display-only PV source selection:
+
+- include/exclude the existing canonical internal GoodWe `pv_total_power` value;
+- select up to four external Home Assistant instantaneous power entities;
+- normalize supported `W`, `kW`, `MW` and `mW` readings to watts;
+- expose one combined PV power sensor and dashboard source breakdown.
+
+Internal GoodWe PV remains enabled by default for backwards-compatible dashboard behavior. External values must be non-negative generation values. Invalid or unavailable sources are omitted from the live sum and remain visible as unavailable in the source breakdown.
+
+These settings do not change EMHASS input, optimizer topology, Automatic Control, GoodWe EMS writes or grid accounting. See `docs/PV_INSIGHT.md`.
 
 ## Minimum and maximum SOC
 
@@ -239,7 +252,7 @@ Connection changes must not create a second EnergyPilot device. Existing entity 
 ## Security and reload behavior
 
 - Dashboard configuration write APIs require a Home Assistant administrator.
-- EP/EMHASS setting changes normally reload the existing entry where the settings API requires it.
+- EP/EMHASS/PV setting changes normally reload the existing entry where the settings API requires it.
 - GoodWe connection changes validate first, then reload.
 - Automatic strategy changes can be applied without a full reload and re-evaluate the active plan when Automatic Control is on.
 - Minimum-SOC synchronization is an explicit NumberEntity transaction and does not reload the integration.

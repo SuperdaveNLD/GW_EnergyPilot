@@ -37,6 +37,23 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activePlanChanged(panel, data)", source)
         self.assertIn("loadChartData(panel, true)", source)
 
+    def test_soc_chart_uses_explicit_percent_contracts(self) -> None:
+        data = (FRONTEND / "gw-energy-pilot-v027-battery-plan-data.js").read_text(
+            encoding="utf-8"
+        )
+        view = (FRONTEND / "gw-energy-pilot-v027-battery-plan-view.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('_entityId?.("battery_soc")', data)
+        self.assertIn("normalizeSocStatisticRows", data)
+        self.assertIn("normalizeSocPlanPoints", data)
+        self.assertIn("p.value_pct", data)
+        self.assertNotIn("p.pct <= 1)", data)
+        self.assertIn('data-series="actual-soc"', view)
+        self.assertIn('data-series="forecast-soc"', view)
+        self.assertIn('t(panel, "socAxis")', view)
+
     def test_v034_flow_direction_neutralizes_legacy_reversal_specificity(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
@@ -164,11 +181,11 @@ class FrontendDashboardCardTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            'gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1',
+            'gw-energy-pilot-v031-battery-saver.js?v=0.45-integrated1',
             release_v034,
         )
         self.assertIn(
-            'gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1',
+            'gw-energy-pilot-v027-battery-plan-core.js?v=0.45-integrated1',
             release_v034,
         )
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)

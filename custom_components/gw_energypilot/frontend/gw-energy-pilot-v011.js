@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v010.js?v=0.10-auto-price3";
+import "./gw-energy-pilot-v010.js?v=0.45-integrated1";
 
 const VERSION = "0.11";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -227,15 +227,21 @@ function installSocSliders(panel, root) {
     const slider = wrap.querySelector(`[data-soc-slider="${kind}"]`);
     const label = wrap.querySelector(`[data-soc-value="${kind}"]`);
     if (!slider || !ref.entityId) return;
-    slider.addEventListener("input", () => { label.textContent = `${slider.value}%`; });
+    slider.addEventListener("input", () => {
+      slider.dataset.epSocDraft = slider.value;
+      label.textContent = `${slider.value}%`;
+    });
     slider.addEventListener("change", async () => {
+      const requestedValue = Number(slider.value);
+      slider.dataset.epSocDraft = String(requestedValue);
       slider.disabled = true;
       try {
         await panel._hass.callService("number", "set_value", {
           entity_id: ref.entityId,
-          value: Number(slider.value),
+          value: requestedValue,
         });
       } catch (err) {
+        delete slider.dataset.epSocDraft;
         console.error("GW EnergyPilot SOC config update failed", err);
         window.alert(`EMHASS SOC update failed: ${err?.message || err}`);
       } finally {

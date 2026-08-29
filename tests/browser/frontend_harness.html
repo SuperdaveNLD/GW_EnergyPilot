@@ -28,11 +28,11 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
-      "pv_total_power", "total_load_power", "battery_power",
+      "pv_total_power", "pv_generation_power", "total_load_power", "battery_power",
       "meter_total_power_fast", "total_inverter_power", "ac_active_power",
       "pv1_power", "pv2_power", "pv3_power", "pv4_power",
       "battery_soc", "battery_soh", "battery_voltage", "battery_current",
@@ -57,6 +57,7 @@
 
     const stateValues = {
       pv_total_power: 4800,
+      pv_generation_power: 4800,
       total_load_power: 2500,
       battery_power: -1200,
       meter_total_power_fast: 1100,
@@ -140,6 +141,24 @@
         ...(unit ? { unit_of_measurement: unit } : {}),
       };
       if (key === "ems_mode") attributes.mode_name = "Battery charge power";
+      if (key === "pv_generation_power") {
+        Object.assign(attributes, {
+          internal_enabled: true,
+          internal_power_w: 4800,
+          external_power_w: null,
+          configured_external_sources: 0,
+          available_external_sources: 0,
+          purpose: "display_only",
+          sources: [{
+            source_key: "goodwe_internal",
+            kind: "internal",
+            name: "GoodWe PV",
+            entity_id: null,
+            power_w: 4800,
+            available: true,
+          }],
+        });
+      }
       if (key === "emhass_cost_function") {
         Object.assign(attributes, {
           emhass_costfun: "profit",
@@ -229,9 +248,14 @@
     initialStates["sensor.p_batt_forecast"] = makeExternalState("sensor.p_batt_forecast", -1200, "W");
     initialStates["sensor.p_grid_forecast"] = makeExternalState("sensor.p_grid_forecast", 1100, "W");
     initialStates["sensor.optim_status"] = makeExternalState("sensor.optim_status", "Optimal");
-    initialStates["sensor.soc_batt_forecast"] = makeExternalState("sensor.soc_batt_forecast", 0.56);
+    initialStates["sensor.soc_batt_forecast"] = makeExternalState("sensor.soc_batt_forecast", 56, "%");
     initialStates["sensor.p_load_forecast"] = makeExternalState("sensor.p_load_forecast", 2500, "W");
     initialStates["sensor.p_pv_forecast"] = makeExternalState("sensor.p_pv_forecast", 4800, "W");
+    initialStates["sensor.external_roof_pv"] = makeExternalState("sensor.external_roof_pv", 1200, "W");
+    Object.assign(initialStates["sensor.external_roof_pv"].attributes, {
+      friendly_name: "Garage roof PV",
+      device_class: "power",
+    });
 
     function batterySaverPayload() {
       const modes = [
@@ -261,18 +285,52 @@
     function settingsPayload() {
       return {
         entry_id: ENTRY_ID,
-        selected_entry_id: ENTRY_ID,
         entries: [{
           entry_id: ENTRY_ID,
           title: "GW15K-ETA-G20",
-          data: { host: "192.0.2.1", port: 502, slave: 247 },
-          options: {
-            scan_interval: 15,
-            control_strategy: "battery",
-            emhass_minimum_soc: 5,
-            emhass_maximum_soc: 95,
-          },
+          state: "loaded",
         }],
+        sections: {
+          energypilot: {
+            title: "EnergyPilot",
+            short_title: "EP",
+            description: "Controller and telemetry.",
+            fields: [],
+          },
+          emhass: {
+            title: "EMHASS",
+            short_title: "EMHASS",
+            description: "EMHASS settings.",
+            fields: [],
+          },
+          pv: {
+            title: "PV",
+            short_title: "PV",
+            description: "Display-only PV sources.",
+            fields: [
+              {
+                key: "enable_internal_pv",
+                label: "Include internal GoodWe PV",
+                type: "boolean",
+                value: true,
+                readonly: false,
+              },
+              ...[1, 2, 3, 4].map((index) => ({
+                key: `external_pv_entity_${index}`,
+                label: `External PV source ${index}`,
+                type: "entity",
+                value: index === 1 ? "sensor.external_roof_pv" : "",
+                readonly: false,
+              })),
+            ],
+          },
+          goodwe: {
+            title: "GoodWe",
+            short_title: "GOODWE",
+            description: "GoodWe connection.",
+            fields: [],
+          },
+        },
       };
     }
 
@@ -289,9 +347,13 @@
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         value_w: index % 4 === 0 ? -1600 : index % 5 === 0 ? 1100 : 0,
       }));
+      const socPlan = Array.from({ length: 24 }, (_, index) => ({
+        start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
+        value_pct: Math.min(95, 54 + index * 1.25),
+      }));
       const pBattState = window.__epHass?.states?.["sensor.p_batt_forecast"];
       return {
-        schema: 4,
+        chart_schema_version: 5,
         entry_id: ENTRY_ID,
         generated_at: new Date().toISOString(),
         plan_revision: planRevision,
@@ -301,6 +363,14 @@
           entity_id: "sensor.p_batt_forecast",
           last_updated: pBattState?.last_updated || new Date().toISOString(),
           points: plan,
+        },
+        battery_soc_plan: {
+          available: true,
+          unit: "%",
+          source: "emhass_api_v1_plan",
+          source_column: "SOC_opt",
+          source_unit: "fraction_0_1",
+          points: [...socPlan, { start: hour.toISOString(), value_pct: 156 }],
         },
         actual: [],
         historical_plan: [],
@@ -338,7 +408,29 @@
       if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
-      if (type.includes("history") || type.includes("statistic")) return {};
+      if (type === "recorder/statistics_during_period") {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Math.max(0, now.getHours() - 2));
+        const result = {};
+        for (const statisticId of message.statistic_ids || []) {
+          if (statisticId === entityIdForKey("battery_power")) {
+            result[statisticId] = Array.from({ length: 24 }, (_, index) => ({
+              start: new Date(start.getTime() + index * 5 * 60 * 1000).toISOString(),
+              mean: index % 3 === 0 ? -1300 : 850,
+            }));
+          } else if (statisticId === entityIdForKey("battery_soc")) {
+            result[statisticId] = [
+              ...Array.from({ length: 24 }, (_, index) => ({
+                start: new Date(start.getTime() + index * 5 * 60 * 1000).toISOString(),
+                mean: 48 + index * 0.25,
+              })),
+              { start: start.toISOString(), mean: 140 },
+            ];
+          }
+        }
+        return result;
+      }
+      if (type.includes("history")) return {};
       unknownWsTypes.add(type);
       return {};
     }
@@ -415,6 +507,7 @@
       v042: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v042.js?browser-harness=1",
       v043: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v043.js?browser-harness=1",
       v044: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v044.js?browser-harness=1",
+      v045: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v045.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -443,6 +536,46 @@
     };
     window.__epSetEntityByKey = (key, value, attributes = null) =>
       window.__epSetEntity(entityIdForKey(key), value, attributes);
+    window.__epSetExternalPv = (externalPower) => {
+      const internalPower = Number(window.__epHass.states[
+        entityIdForKey("pv_total_power")
+      ]?.state || 0);
+      window.__epSetEntity("sensor.external_roof_pv", externalPower, {
+        friendly_name: "Garage roof PV",
+        device_class: "power",
+        unit_of_measurement: "W",
+      });
+      return window.__epSetEntityByKey(
+        "pv_generation_power",
+        internalPower + externalPower,
+        {
+          internal_enabled: true,
+          internal_power_w: internalPower,
+          external_power_w: externalPower,
+          configured_external_sources: 1,
+          available_external_sources: 1,
+          purpose: "display_only",
+          sources: [
+            {
+              source_key: "goodwe_internal",
+              kind: "internal",
+              name: "GoodWe PV",
+              entity_id: null,
+              power_w: internalPower,
+              available: true,
+            },
+            {
+              source_key: "external_1",
+              kind: "external",
+              name: "Garage roof PV",
+              entity_id: "sensor.external_roof_pv",
+              power_w: externalPower,
+              available: true,
+            },
+          ],
+        }
+      );
+    };
     window.__epAdvancePlan = () => {
       planRevision += 1;
       const optimizeId = entityIdForKey("optimize_now");
@@ -460,7 +593,20 @@
         const battery = index % 2 === 0 ? -1200 - index : 900 + index;
         window.__epSetEntityByKey("battery_power", battery);
         window.__epSetEntityByKey("battery_soc", 54 + (index % 4));
-        window.__epSetEntityByKey("pv_total_power", 4800 + index * 3);
+        const internalPv = 4800 + index * 3;
+        window.__epSetEntityByKey("pv_total_power", internalPv);
+        const aggregateId = entityIdForKey("pv_generation_power");
+        const aggregate = window.__epHass.states[aggregateId];
+        const externalPv = Number(aggregate?.attributes?.external_power_w || 0);
+        const sources = (aggregate?.attributes?.sources || []).map((source) =>
+          source.kind === "internal"
+            ? { ...source, power_w: internalPv, available: true }
+            : source
+        );
+        window.__epSetEntityByKey("pv_generation_power", internalPv + externalPv, {
+          internal_power_w: internalPv,
+          sources,
+        });
         window.__epSetEntityByKey("meter_total_power_fast", index % 3 === 0 ? -650 : 1100);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
@@ -494,7 +640,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

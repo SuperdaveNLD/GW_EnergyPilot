@@ -22,16 +22,16 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.44 Beta
+v0.45 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v0.44)
+## Frontend stability contract (v0.41+, active v0.45)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
-- A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry or optional-card topology.
-- The active v0.44 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
+- The active v0.45 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -335,17 +335,18 @@ v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v044.js
-  -> gw-energy-pilot-v043.js
-       -> gw-energy-pilot-v042.js
-            -> gw-energy-pilot-v041-emhass-settings.js
-                 -> gw-energy-pilot-v041.js
-                      -> gw-energy-pilot-v039.js
-                           -> gw-energy-pilot-v038.js
-                                -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v045.js
+  -> gw-energy-pilot-v044.js
+       -> gw-energy-pilot-v043.js
+            -> gw-energy-pilot-v042.js
+                 -> gw-energy-pilot-v041-emhass-settings.js
+                      -> gw-energy-pilot-v041.js
+                           -> gw-energy-pilot-v039.js
+                                -> gw-energy-pilot-v038.js
+                                     -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.44 owns only the bounded Optimize-now listener replacement and release presentation. v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, v0.41 owns stable-DOM telemetry/plan refresh, and the v0.38/v0.39 layers retain rebuilt strategy controls, physical live-flow direction, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v0.45 owns only release presentation and the full active-graph cache boundary. v0.44 owns the bounded Optimize-now listener plus its safe-area-aware floating presentation, v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, and v0.41 owns stable-DOM telemetry/plan refresh/PV/static-flow presentation. The v0.27 plan modules own SOC chart rendering; the v0.38 model remains the physical live-flow direction source, while the v0.38/v0.39 layers retain rebuilt strategy controls, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

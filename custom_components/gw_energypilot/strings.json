@@ -138,7 +138,8 @@
       "ems_setpoint": {"name": "EMS setpoint"},
       "control_command": {"name": "Control command"},
       "target_power": {"name": "Target power"},
-      "ev_status": {"name": "EV charging status"}
+      "ev_status": {"name": "EV charging status"},
+      "pv_generation_power": {"name": "PV generation power"}
     },
     "switch": {
       "automatic_control": {"name": "Automatic control"}

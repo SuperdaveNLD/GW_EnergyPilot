@@ -138,7 +138,8 @@
       "ems_setpoint": {"name": "EMS-setpoint"},
       "control_command": {"name": "Regelcommando"},
       "target_power": {"name": "Doelvermogen"},
-      "ev_status": {"name": "EV-laadstatus"}
+      "ev_status": {"name": "EV-laadstatus"},
+      "pv_generation_power": {"name": "PV-opwekkingsvermogen"}
     },
     "switch": {
       "automatic_control": {"name": "Automatische regeling"}
