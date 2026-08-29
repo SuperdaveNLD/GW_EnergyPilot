@@ -2,6 +2,31 @@
 
 All notable changes to GW EnergyPilot are documented here.
 
+## [Unreleased]
+
+## [0.45] - 2026-08-29
+
+### Added
+
+- Added a dedicated dashboard **PV** configuration tab with the backwards-compatible internal GoodWe PV toggle and four searchable external Home Assistant power-entity inputs.
+- Added one event-aware `pv_generation_power` sensor that normalizes valid non-negative W/kW/MW/mW sources, exposes a per-source breakdown and drives the dashboard PV total/source presentation.
+- Added `docs/PV_INSIGHT.md` and English/Dutch entity/dashboard copy for the read-only PV insight contract.
+
+### Fixed
+
+- Keep the locally selected Battery Strategy SOC slider value and percentage visible during normal telemetry patches, including after Chrome drops range-input focus, until Home Assistant confirms the saved value.
+
+### Changed
+
+- Added `gw-energy-pilot-v045.js` as the active version-only wrapper and refreshed the complete active frontend dependency graph with the `0.45-pv-soc1` cache key.
+- Extended the desktop Chromium, iPad WebKit and iPhone WebKit matrix with PV-source/settings and stationary SOC-slider acknowledgement regressions.
+
+### Safety and compatibility
+
+- PV insight is presentation-only. It does not change GoodWe registers/read blocks, EMS writes, Automatic Control, EMHASS optimization/topology, persistent plan behavior or grid accounting.
+- Existing installations keep internal GoodWe PV enabled by default, retain all existing entity unique IDs and receive one new deterministic `{config_entry_id}_pv_generation_power` entity.
+- Ordinary PV telemetry patches existing dashboard nodes; only a configured PV-source topology change is structural.
+
 ## [0.44] - 2026-08-28
 
 ### Fixed

@@ -3,7 +3,7 @@ import {
   PROFILE_KEYS,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=0.38-model3";
+} from "./gw-energy-pilot-v038-model.js?v=0.45-pv-soc1";
 
 const TEXT = {
   en: {
@@ -261,13 +261,16 @@ async function updateSoc(panel, input) {
   const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
   const ref = numberModel(panel, key, kind === "min" ? 0 : 100);
   if (!ref.entityId) return;
+  const requestedValue = Number(input.value);
+  input.dataset.epSocDraft = String(requestedValue);
   input.disabled = true;
   try {
     await panel._hass.callService("number", "set_value", {
       entity_id: ref.entityId,
-      value: Number(input.value),
+      value: requestedValue,
     });
   } catch (err) {
+    delete input.dataset.epSocDraft;
     const t = copy(panel);
     window.alert(`${t.socError}: ${err?.message || err}`);
   } finally {
@@ -303,6 +306,7 @@ export function installV038DelegatedControls(panel, root) {
     (event) => {
       const input = eventElement(event, "input[data-ep-v038-soc]");
       if (!input) return;
+      input.dataset.epSocDraft = input.value;
       const label = root.querySelector(
         `[data-ep-v038-soc-value="${input.dataset.epV038Soc}"]`
       );

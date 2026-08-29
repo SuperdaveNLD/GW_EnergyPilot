@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.44 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.45 Beta**.
 
 ## High-level flow
 
@@ -36,6 +36,16 @@ GWEnergyPilotCoordinator
 ```
 
 EMHASS remains an external prerequisite and remains the canonical owner of the optimization plan. The EnergyPilot plan Store is only a resilience mirror.
+
+Read-only PV insight is a separate presentation path:
+
+```text
+coordinator pv_total_power + up to four configured HA power entities
+    -> pv_generation_power sensor
+    -> dashboard PV total/source breakdown/live-flow value
+```
+
+That aggregate does not feed the controller, orchestrator, EMHASS or accounting. External entity changes update the aggregate independently; internal GoodWe PV continues to follow coordinator updates. See `docs/PV_INSIGHT.md`.
 
 Persistent EnergyPilot-owned data is split by purpose:
 

@@ -20,13 +20,21 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_state_change_event
 
 from . import GWConfigEntry
 from .accounting_sensor import GWGridDailyEnergySensor
-from .const import CONF_ENABLE_EV_COORDINATION, MODE_NAMES
+from .const import (
+    CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_INTERNAL_PV,
+    DEFAULT_ENABLE_INTERNAL_PV,
+    EXTERNAL_PV_ENTITY_KEYS,
+    MODE_NAMES,
+)
 from .entity import GWEnergyPilotEntity
+from .pv_insight import normalize_generation_power_w, sum_generation_power_w
 
 
 POWER = {
@@ -229,6 +237,7 @@ async def async_setup_entry(
         GWEMSSetpointSensor(entry),
         GWControlCommandSensor(entry),
         GWTargetPowerSensor(entry),
+        GWPVGenerationPowerSensor(entry),
         GWGridDailyEnergySensor(entry, "import"),
         GWGridDailyEnergySensor(entry, "export"),
     ]
@@ -260,6 +269,139 @@ class GWTelemetrySensor(GWEnergyPilotEntity, SensorEntity):
         if not self.coordinator.data:
             return None
         return self.coordinator.data.values.get(self.entity_description.key)
+
+
+class GWPVGenerationPowerSensor(GWEnergyPilotEntity, SensorEntity):
+    """Combined read-only PV generation from configured display sources."""
+
+    _attr_translation_key = "pv_generation_power"
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, entry: GWConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_pv_generation_power"
+        self._internal_enabled = bool(
+            entry.options.get(
+                CONF_ENABLE_INTERNAL_PV,
+                DEFAULT_ENABLE_INTERNAL_PV,
+            )
+        )
+        external_entity_ids: list[str] = []
+        for key in EXTERNAL_PV_ENTITY_KEYS:
+            entity_id = str(entry.options.get(key, "")).strip()
+            if entity_id and entity_id not in external_entity_ids:
+                external_entity_ids.append(entity_id)
+        self._external_entity_ids = tuple(external_entity_ids)
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to configured external PV sources in addition to GoodWe."""
+        await super().async_added_to_hass()
+        tracked_entity_ids = tuple(
+            entity_id
+            for entity_id in self._external_entity_ids
+            if entity_id != self.entity_id
+        )
+        if tracked_entity_ids:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass,
+                    tracked_entity_ids,
+                    self._async_external_source_changed,
+                )
+            )
+
+    @callback
+    def _async_external_source_changed(self, _event: Event) -> None:
+        """Publish a fresh aggregate when an external source changes."""
+        self.async_write_ha_state()
+
+    def _source_rows(self) -> list[dict[str, Any]]:
+        """Return stable source metadata plus the latest normalized values."""
+        rows: list[dict[str, Any]] = []
+        if self._internal_enabled:
+            raw_internal = (
+                self.coordinator.data.values.get("pv_total_power")
+                if self.coordinator.data
+                else None
+            )
+            internal_power = normalize_generation_power_w(raw_internal, "W")
+            rows.append(
+                {
+                    "source_key": "goodwe_internal",
+                    "kind": "internal",
+                    "name": "GoodWe PV",
+                    "entity_id": None,
+                    "power_w": internal_power,
+                    "available": internal_power is not None,
+                }
+            )
+
+        hass = getattr(self, "hass", None)
+        for index, entity_id in enumerate(self._external_entity_ids, start=1):
+            state = (
+                hass.states.get(entity_id)
+                if hass is not None and entity_id != self.entity_id
+                else None
+            )
+            unit = state.attributes.get("unit_of_measurement") if state else None
+            power = normalize_generation_power_w(state.state if state else None, unit)
+            rows.append(
+                {
+                    "source_key": f"external_{index}",
+                    "kind": "external",
+                    "name": (
+                        str(state.attributes.get("friendly_name") or entity_id)
+                        if state
+                        else entity_id
+                    ),
+                    "entity_id": entity_id,
+                    "power_w": power,
+                    "available": power is not None,
+                }
+            )
+        return rows
+
+    @property
+    def available(self) -> bool:
+        """Remain usable when either GoodWe or an external source is valid."""
+        return any(row["available"] for row in self._source_rows())
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the sum of every currently valid configured PV source."""
+        return sum_generation_power_w([
+            row["power_w"]
+            for row in self._source_rows()
+            if row["available"] and row["power_w"] is not None
+        ])
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose a dashboard-ready breakdown without creating duplicate sensors."""
+        rows = self._source_rows()
+        external = [row for row in rows if row["kind"] == "external"]
+        internal = next((row for row in rows if row["kind"] == "internal"), None)
+        external_powers = [
+            row["power_w"]
+            for row in external
+            if row["available"] and row["power_w"] is not None
+        ]
+        return {
+            "internal_enabled": self._internal_enabled,
+            "internal_power_w": internal["power_w"] if internal else None,
+            "external_power_w": (
+                sum_generation_power_w(external_powers)
+            ),
+            "configured_external_sources": len(external),
+            "available_external_sources": sum(
+                1 for row in external if row["available"]
+            ),
+            "sources": rows,
+            "purpose": "display_only",
+        }
 
 
 class GWEMSModeSensor(GWEnergyPilotEntity, SensorEntity):

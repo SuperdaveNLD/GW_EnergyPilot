@@ -1,5 +1,5 @@
-import "./gw-energy-pilot-v031-battery-saver.js?v=0.34-batterysaver1";
-import "./gw-energy-pilot-v027-battery-plan-core.js?v=0.34-planrefresh1";
+import "./gw-energy-pilot-v031-battery-saver.js?v=0.45-pv-soc1";
+import "./gw-energy-pilot-v027-battery-plan-core.js?v=0.45-pv-soc1";
 
 const VERSION = "0.34";
 const PANEL_NAME = "gw-energypilot-panel";

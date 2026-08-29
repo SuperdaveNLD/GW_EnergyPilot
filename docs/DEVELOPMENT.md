@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.44 runtime structure
+## Current v0.45 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v0.44 runtime/panel entrypoints
+__init__.py             config-entry setup, APIs, v0.45 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -120,17 +120,18 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v044.js
-    -> gw-energy-pilot-v043.js
-        -> gw-energy-pilot-v042.js
-            -> gw-energy-pilot-v041-emhass-settings.js
-                -> gw-energy-pilot-v041.js
-                    -> gw-energy-pilot-v039.js
-                        -> gw-energy-pilot-v038.js
-                            -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v045.js
+    -> gw-energy-pilot-v044.js
+        -> gw-energy-pilot-v043.js
+            -> gw-energy-pilot-v042.js
+                -> gw-energy-pilot-v041-emhass-settings.js
+                    -> gw-energy-pilot-v041.js
+                        -> gw-energy-pilot-v039.js
+                            -> gw-energy-pilot-v038.js
+                                -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.44 is a bounded compatibility exception: it replaces only the inherited Optimize listener that requested a full render after the asynchronous service call. v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, v0.41 owns ordinary telemetry patching and targeted plan refresh, and v0.38/v0.39 retain strategy, flow and localization behavior. The v0.34 clean base still supplies established dashboard features, including the canonical Battery · Plan · Price path.
+v0.45 is a version-only presentation wrapper and cache boundary over the complete v0.44 chain. Its shared `0.45-pv-soc1` import key reaches every active dependency so upgraded clients load the modified base PV structure, PV settings, v0.41 stable-DOM PV/slider patch and v0.38 strategy draft behavior. v0.44 remains the bounded Optimize-listener replacement, v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, v0.41 owns ordinary telemetry patching and targeted plan refresh, and v0.38/v0.39 retain strategy, flow and localization behavior. The v0.34 clean base still supplies established dashboard features, including the canonical Battery · Plan · Price path.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 

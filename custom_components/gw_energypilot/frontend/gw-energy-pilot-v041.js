@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=0.41-stable1";
+import "./gw-energy-pilot-v039.js?v=0.45-pv-soc1";
 import {
   FLOW_THRESHOLD_W,
   flowMotionMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=0.38-model3";
+} from "./gw-energy-pilot-v038-model.js?v=0.45-pv-soc1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=0.38-i18n1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.41-stable1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.41-stable1";
+} from "./gw-energy-pilot-v038-i18n.js?v=0.45-pv-soc1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.45-pv-soc1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.45-pv-soc1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -43,6 +43,10 @@ const COPY = Object.freeze({
     today: "Today",
     yesterday: "Yesterday",
     motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
+    pvSources: "PV sources",
+    noPvSources: "No sources configured",
+    internalPvTelemetry: "Internal GoodWe telemetry",
+    externalPvEntity: "External PV entity",
   }),
   nl: Object.freeze({
     autoActive: "AUTO ACTIEF",
@@ -67,6 +71,10 @@ const COPY = Object.freeze({
     today: "Vandaag",
     yesterday: "Gisteren",
     motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
+    pvSources: "PV-bronnen",
+    noPvSources: "Geen bronnen geconfigureerd",
+    internalPvTelemetry: "Interne GoodWe-telemetrie",
+    externalPvEntity: "Externe PV-entiteit",
   }),
 });
 
@@ -162,6 +170,49 @@ function finite(panel, key) {
   return Number.isFinite(value) ? value : null;
 }
 
+function pvGenerationSnapshot(panel) {
+  const state = panel._stateByKey?.("pv_generation_power");
+  if (!state) {
+    return {
+      state: null,
+      power: finite(panel, "pv_total_power"),
+      sources: [],
+      configuredExternal: 0,
+      internalEnabled: true,
+    };
+  }
+  const attrs = state.attributes || {};
+  return {
+    state,
+    power: finiteValue(state.state),
+    sources: Array.isArray(attrs.sources) ? attrs.sources : [],
+    configuredExternal: Number(attrs.configured_external_sources || 0),
+    internalEnabled: attrs.internal_enabled !== false,
+  };
+}
+
+function patchPvSourceMetrics(panel, solar, snapshot) {
+  if (!solar) return;
+  const t = copy(panel);
+  for (const metric of solar.querySelectorAll("[data-pv-source-index]")) {
+    const index = Number(metric.dataset.pvSourceIndex);
+    const source = snapshot.sources[index];
+    if (!source) continue;
+    setText(metric, ".metric-label", source.name || `PV ${index + 1}`);
+    setText(metric, ".metric-value", panel._formatPower(finiteValue(source.power_w)));
+    setText(
+      metric,
+      ".metric-sub",
+      source.kind === "internal"
+        ? t.internalPvTelemetry
+        : source.entity_id || t.externalPvEntity
+    );
+  }
+  const empty = solar.querySelector("[data-pv-empty]");
+  setText(empty, ".metric-label", t.pvSources);
+  setText(empty, ".metric-sub", t.noPvSources);
+}
+
 function finiteValue(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
@@ -238,7 +289,8 @@ function patchMetric(card, labels, value, sub = undefined) {
 }
 
 function patchBalanceRows(card, panel, load, inverter, acActive) {
-  const pv = finite(panel, "pv_total_power");
+  const pvSnapshot = pvGenerationSnapshot(panel);
+  const pv = pvSnapshot.power;
   const grid = finite(panel, "meter_total_power_fast");
   const battery = finite(panel, "battery_power");
   const balance =
@@ -457,9 +509,17 @@ function patchEmhass(panel, root) {
     const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
     const value = finite(panel, key);
     if (!Number.isFinite(value)) continue;
-    if (root.activeElement !== input) input.value = String(value);
+    const draft = finiteValue(input.dataset.epSocDraft);
+    const acknowledged = Number.isFinite(draft) && value === draft;
+    if (acknowledged) delete input.dataset.epSocDraft;
+    const displayValue = Number.isFinite(draft) && !acknowledged
+      ? draft
+      : root.activeElement === input
+        ? finiteValue(input.value) ?? value
+        : value;
+    input.value = String(displayValue);
     const label = card.querySelector(`[data-soc-value="${kind}"]`);
-    if (label) label.textContent = `${Math.round(value)}%`;
+    if (label) label.textContent = `${Math.round(displayValue)}%`;
   }
 }
 
@@ -471,9 +531,17 @@ function patchStrategy(panel, root) {
     const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
     const value = finite(panel, key);
     if (!Number.isFinite(value)) continue;
-    if (root.activeElement !== input) input.value = String(value);
+    const draft = finiteValue(input.dataset.epSocDraft);
+    const acknowledged = Number.isFinite(draft) && value === draft;
+    if (acknowledged) delete input.dataset.epSocDraft;
+    const displayValue = Number.isFinite(draft) && !acknowledged
+      ? draft
+      : root.activeElement === input
+        ? finiteValue(input.value) ?? value
+        : value;
+    input.value = String(displayValue);
     const label = strategy.querySelector(`[data-ep-v038-soc-value="${kind}"]`);
-    if (label) label.textContent = `${Math.round(value)}%`;
+    if (label) label.textContent = `${Math.round(displayValue)}%`;
   }
 }
 
@@ -687,7 +755,8 @@ function patchLiveDom(panel) {
   const main = root?.querySelector("main");
   if (!main) return;
   main.dataset.epV041StableDom = "1";
-  const pv = finite(panel, "pv_total_power");
+  const pvSnapshot = pvGenerationSnapshot(panel);
+  const pv = pvSnapshot.power;
   const load = finite(panel, "total_load_power");
   const grid = finite(panel, "meter_total_power_fast");
   const battery = finite(panel, "battery_power");
@@ -703,10 +772,14 @@ function patchLiveDom(panel) {
 
   const solar = root.querySelector(".energy-card.solar");
   setText(solar, ".hero-value", panel._formatPower(pv));
-  patchMetric(solar, ["PV1"], panel._formatPower(finite(panel, "pv1_power")));
-  patchMetric(solar, ["PV2"], panel._formatPower(finite(panel, "pv2_power")));
-  patchMetric(solar, ["PV3"], panel._formatPower(finite(panel, "pv3_power")));
-  patchMetric(solar, ["PV4"], panel._formatPower(finite(panel, "pv4_power")));
+  if (pvSnapshot.configuredExternal > 0 || !pvSnapshot.internalEnabled) {
+    patchPvSourceMetrics(panel, solar, pvSnapshot);
+  } else {
+    patchMetric(solar, ["PV1"], panel._formatPower(finite(panel, "pv1_power")));
+    patchMetric(solar, ["PV2"], panel._formatPower(finite(panel, "pv2_power")));
+    patchMetric(solar, ["PV3"], panel._formatPower(finite(panel, "pv3_power")));
+    patchMetric(solar, ["PV4"], panel._formatPower(finite(panel, "pv4_power")));
+  }
 
   const home = root.querySelector(".energy-card.home");
   setText(home, ".hero-value", panel._formatPower(load));
@@ -796,12 +869,22 @@ function structureSignature(panel) {
   const pv4 = finite(panel, "pv4_power");
   const entityMap = Object.entries(panel._entityMap || {})
     .sort(([left], [right]) => left.localeCompare(right));
+  const pvSnapshot = pvGenerationSnapshot(panel);
+  const pvSourceTopology = pvSnapshot.sources.map((source) => ({
+    sourceKey: source?.source_key || "",
+    kind: source?.kind || "",
+    name: source?.name || "",
+    entityId: source?.entity_id || "",
+  }));
   return JSON.stringify({
     registryLoaded: Boolean(panel._registryLoaded),
     entityMap,
     pBattState: Boolean(pBattState),
     pBattNumeric: Number.isFinite(pBatt),
     pv4Visible: Number.isFinite(pv4) && Math.abs(pv4) > 20,
+    pvInternalEnabled: pvSnapshot.internalEnabled,
+    pvConfiguredExternal: pvSnapshot.configuredExternal,
+    pvSourceTopology,
   });
 }
 

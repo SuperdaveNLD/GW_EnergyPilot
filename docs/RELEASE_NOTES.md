@@ -15,6 +15,7 @@ This page is the user-facing release index for GW EnergyPilot.
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.45** | 2026-08-29 | **Beta** | Adds display-only internal/external PV source aggregation and dashboard configuration, fixes stale Battery Strategy SOC slider percentages during telemetry/Chrome focus loss, and refreshes the complete active frontend cache graph. |
 | **0.44** | 2026-08-28 | **Beta** | Keeps Optimize now and the surrounding dashboard DOM stable for the complete solve/publish transaction, and adds one non-blocking post-restart optimization recovery sequence with bounded 15/30/60-second retry back-off. |
 | **0.43** | 2026-08-28 | **Beta** | Fixes sticky touch-hover presentation across Optimize now, EMHASS and Battery Strategy selectors, quick actions/max export and the layout menu, with repeated iPhone/iPad WebKit tap regressions that verify both visible selection and executed actions. |
 | **0.42** | 2026-08-28 | **Beta** | Reorganizes EMHASS settings into a clearer overview with explicit EnergyPilot-versus-EMHASS ownership and current/required synchronization values, without changing backend configuration semantics. |
@@ -61,6 +62,16 @@ This page is the user-facing release index for GW EnergyPilot.
 | **0.03** | 2026-08-22 | **Historical** | English setup/options UI and static-IP guidance. |
 | **0.02** | 2026-08-22 | **Historical** | Native GoodWe ETA telemetry over direct Modbus TCP. |
 | **0.01** | 2026-08-22 | **Historical** | Initial HACS integration with EMS modes 1–12, manual control and EMHASS mapping. |
+
+# v0.45 — PV insight and stable SOC sliders
+
+v0.45 adds a dedicated PV settings page and the `pv_generation_power` sensor. The sensor combines the canonical internal GoodWe PV total with up to four configured Home Assistant power entities, normalizes supported power units, filters invalid sources and exposes a per-source breakdown. The dashboard uses it for PV presentation and live-flow display only; controller, EMS, EMHASS, plan and accounting inputs are unchanged.
+
+Battery Strategy minimum/maximum SOC sliders now retain an explicit local draft. Normal telemetry patches and Chrome focus loss cannot replace the range position or percentage label with stale Home Assistant state. The draft remains visible until matching backend acknowledgement and is released on failure.
+
+The new v0.45 wrapper preserves the complete v0.44 Optimize/restart behavior and refreshes every import in the active frontend graph with one release cache key. The release matrix covers the new PV topology/settings and slider behavior alongside the inherited Chromium/WebKit stable-DOM, touch, Optimize, plan and scrolling contracts.
+
+See `docs/RELEASE_NOTES_V045.md`, `docs/CHANGELOG_V045.md`, `docs/PV_INSIGHT.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
 # v0.44 — Stable Optimize action and restart recovery
 

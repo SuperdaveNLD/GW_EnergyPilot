@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.44 · Beta**
+**v0.45 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V045.md` — v0.45 PV insight and stable SOC sliders;
 - `docs/RELEASE_NOTES_V044.md` — v0.44 stable Optimize action and post-restart optimization recovery;
 - `docs/RELEASE_NOTES_V043.md` — v0.43 reliable mobile touch-control presentation;
 - `docs/RELEASE_NOTES_V042.md` — v0.42 clearer EMHASS settings overview;
@@ -40,7 +41,16 @@ Release documentation:
 - `docs/RUNTIME_STATE.md` — persistent runtime evidence;
 - `docs/BATTERY_PRICE_CHART.md` — Battery & Price graph/data ownership;
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
-- `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract.
+- `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
+- `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v0.45 highlights
+
+- A dedicated **PV** settings page can combine canonical internal GoodWe PV with up to four external Home Assistant power entities for dashboard insight.
+- The new `pv_generation_power` sensor and PV-card breakdown update from both coordinator telemetry and external entity changes, with supported power-unit normalization and invalid-source filtering.
+- The combined PV value is display-only: Automatic Control, EMS, EMHASS, plans and grid accounting continue using their established canonical inputs.
+- Battery Strategy SOC sliders keep the user's selected value and percentage during Chrome focus loss and telemetry, until Home Assistant confirms the saved value.
+- The complete active frontend graph uses a fresh v0.45 cache key so existing clients receive the deep settings/stable-DOM/strategy changes after upgrade.
 
 ## v0.44 highlights
 
@@ -127,6 +137,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - synchronized normal on-grid minimum SOC between EMHASS and GoodWe `45356`;
 - low-level Beta SOC API retained for diagnostics/backwards-compatible tooling;
 - built-in EnergyPilot dashboard and support diagnostics.
+- display-only aggregation of internal GoodWe PV and up to four external Home Assistant PV power entities.
 
 ## Requirements
 
@@ -157,10 +168,11 @@ Use only one continuously polling/controlling direct GoodWe integration where pr
 7. Keep Automatic Control OFF during first validation.
 8. Verify PV, Home, Grid, Battery and EMS read-back values.
 9. Configure EMHASS output/status entities and runtime pricing if used.
-10. Verify the EMHASS topology settings (`set_use_pv`, `inverter_is_hybrid`) match the model you intentionally want EMHASS to optimize; EnergyPilot preserves these settings.
-11. Press Optimize now and verify fresh numeric `P_batt`, `P_grid` and optimization status.
-12. Select the intended Automatic Control strategy under dashboard gear → GOODWE.
-13. Enable Automatic Control only after telemetry/control semantics are confirmed.
+10. Optionally configure external display-only PV sources under dashboard gear → PV.
+11. Verify the EMHASS topology settings (`set_use_pv`, `inverter_is_hybrid`) match the model you intentionally want EMHASS to optimize; EnergyPilot preserves these settings.
+12. Press Optimize now and verify fresh numeric `P_batt`, `P_grid` and optimization status.
+13. Select the intended Automatic Control strategy under dashboard gear → GOODWE.
+14. Enable Automatic Control only after telemetry/control semantics are confirmed.
 
 ## EMHASS configuration ownership
 

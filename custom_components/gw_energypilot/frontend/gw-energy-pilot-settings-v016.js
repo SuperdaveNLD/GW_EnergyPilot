@@ -1,8 +1,46 @@
-import "./gw-energy-pilot-v015.js?v=0.15-costfun1";
+import "./gw-energy-pilot-v015.js?v=0.45-pv-soc1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
-const SECTION_ORDER = ["energypilot", "emhass", "goodwe"];
+const SECTION_ORDER = ["energypilot", "emhass", "pv", "goodwe"];
+
+const PV_COPY = Object.freeze({
+  en: Object.freeze({
+    title: "PV sources",
+    description:
+      "Choose which internal and external PV power sources EnergyPilot shows. These values are display-only.",
+    note:
+      "PV insight only: configured power is shown in the dashboard and is never used by EMS control or EMHASS.",
+    internalLabel: "Include internal GoodWe PV",
+    internalDescription:
+      "Include the existing canonical GoodWe PV total in the dashboard PV total.",
+    externalLabel: "External PV source",
+    externalDescription:
+      "Choose a Home Assistant power entity with non-negative PV generation in W, kW or MW.",
+  }),
+  nl: Object.freeze({
+    title: "PV-bronnen",
+    description:
+      "Kies welke interne en externe PV-vermogens EnergyPilot toont. Deze waarden zijn uitsluitend voor inzicht.",
+    note:
+      "Alleen PV-inzicht: de ingestelde vermogens worden in het dashboard getoond en nooit gebruikt door EMS-regeling of EMHASS.",
+    internalLabel: "Interne GoodWe-PV meenemen",
+    internalDescription:
+      "Neem het bestaande canonieke GoodWe PV-totaal op in het PV-totaal van het dashboard.",
+    externalLabel: "Externe PV-bron",
+    externalDescription:
+      "Kies een Home Assistant-vermogensentiteit met niet-negatieve PV-opwek in W, kW of MW.",
+  }),
+});
+
+function settingsLanguage(panel) {
+  const raw = panel?._hass?.locale?.language || panel?._hass?.language || "en";
+  return String(raw).toLowerCase().split(/[-_]/)[0] === "nl" ? "nl" : "en";
+}
+
+function pvCopy(panel) {
+  return PV_COPY[settingsLanguage(panel)];
+}
 
 function gearIcon() {
   return `
@@ -163,7 +201,8 @@ function ensureStyles(root) {
       line-height: 1.55;
     }
     .ep-v016-goodwe-note,
-    .ep-v016-emhass-note {
+    .ep-v016-emhass-note,
+    .ep-v016-pv-note {
       margin: 0 0 16px;
       padding: 10px 12px;
       border: 1px solid rgba(67,196,224,.13);
@@ -174,7 +213,8 @@ function ensureStyles(root) {
       line-height: 1.5;
     }
     .ep-v016-goodwe-note strong,
-    .ep-v016-emhass-note strong { color: #ccecf6; }
+    .ep-v016-emhass-note strong,
+    .ep-v016-pv-note strong { color: #ccecf6; }
 
     .ep-v016-fields {
       display: grid;
@@ -425,7 +465,45 @@ function fieldValue(panel, sectionId, field) {
     : field.value;
 }
 
+function pvFieldPresentation(panel, sectionId, field) {
+  if (sectionId !== "pv") return field;
+  const copy = pvCopy(panel);
+  if (field.key === "enable_internal_pv") {
+    return {
+      ...field,
+      label: copy.internalLabel,
+      description: copy.internalDescription,
+    };
+  }
+  const match = String(field.key || "").match(/external_pv_entity_(\d+)/);
+  if (!match) return field;
+  return {
+    ...field,
+    label: `${copy.externalLabel} ${match[1]}`,
+    description: copy.externalDescription,
+  };
+}
+
+function powerEntityOptions(panel) {
+  const aggregateId = panel._entityId?.("pv_generation_power");
+  const supportedUnits = new Set(["W", "kW", "MW", "mW"]);
+  return Object.entries(panel?._hass?.states || {})
+    .filter(([entityId, state]) => {
+      if (entityId === aggregateId) return false;
+      const attrs = state?.attributes || {};
+      if (attrs.purpose === "display_only" && Array.isArray(attrs.sources)) return false;
+      return attrs.device_class === "power" || supportedUnits.has(attrs.unit_of_measurement);
+    })
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([entityId, state]) => {
+      const friendly = state?.attributes?.friendly_name || entityId;
+      return `<option value="${panel._escape(entityId)}" label="${panel._escape(friendly)}"></option>`;
+    })
+    .join("");
+}
+
 function fieldHtml(panel, sectionId, field) {
+  field = pvFieldPresentation(panel, sectionId, field);
   const value = fieldValue(panel, sectionId, field);
   const unit = field.unit ? `<span>${panel._escape(field.unit)}</span>` : "<span></span>";
   const description = field.description
@@ -444,6 +522,10 @@ function fieldHtml(panel, sectionId, field) {
     const max = field.max === undefined ? "" : ` max="${field.max}"`;
     const step = field.step === undefined ? "" : ` step="${field.step}"`;
     return `<label class="ep-v016-field">${label}<input class="ep-v016-input" type="number" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}"${min}${max}${step}>${description}</label>`;
+  }
+  if (field.type === "entity") {
+    const listId = `ep-v016-${field.key}-entities`;
+    return `<label class="ep-v016-field">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" list="${panel._escape(listId)}" placeholder="sensor…" autocomplete="off"><datalist id="${panel._escape(listId)}">${powerEntityOptions(panel)}</datalist>${description}</label>`;
   }
   return `<label class="ep-v016-field">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" autocomplete="off">${description}</label>`;
 }
@@ -531,10 +613,14 @@ function renderSettingsPage(panel, root) {
   } else if (!section) {
     content = `<div class="ep-v016-loading">Configuration is not available yet.</div>`;
   } else {
+    const sectionTitle = tabId === "pv" ? pvCopy(panel).title : section.title;
+    const sectionDescription = tabId === "pv" ? pvCopy(panel).description : section.description;
     const note = tabId === "goodwe"
       ? `<div class="ep-v016-goodwe-note"><strong>Connection safety:</strong> host, port and unit ID are tested against the inverter before they are saved. A successful change reloads the integration.</div>`
       : tabId === "emhass"
       ? `<div class="ep-v016-emhass-note"><strong>EMHASS:</strong> this page owns EnergyPilot's EMHASS connection, scheduling, output mapping and price-source settings. Live SOC and cost-function controls remain available on the dashboard while they are migrated into this configuration area.</div>`
+      : tabId === "pv"
+      ? `<div class="ep-v016-pv-note"><strong>PV:</strong> ${panel._escape(pvCopy(panel).note)}</div>`
       : "";
     const fields = (section.fields || []).map((field) => fieldHtml(panel, tabId, field)).join("");
     const message = panel.__epV016Message
@@ -543,8 +629,8 @@ function renderSettingsPage(panel, root) {
 
     content = `
       <div class="ep-v016-section-head">
-        <h3>${panel._escape(section.title)}</h3>
-        <p>${panel._escape(section.description || "")}</p>
+        <h3>${panel._escape(sectionTitle)}</h3>
+        <p>${panel._escape(sectionDescription || "")}</p>
       </div>
       ${note}
       <form class="ep-v016-form" data-section="${tabId}">

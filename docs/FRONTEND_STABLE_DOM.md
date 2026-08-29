@@ -3,7 +3,7 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.44 Beta**. v0.44 retains the v0.41 stable-DOM runtime, v0.42 settings layer and v0.43 touch-hover ownership, and removes the last action-specific full render from Optimize now while preserving older modules as historical entrypoints.
+This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.45 Beta**. v0.45 retains the v0.41 stable-DOM runtime, v0.42 settings layer, v0.43 touch-hover ownership and v0.44 stable Optimize action, while adding display-only PV topology and SOC-slider draft stability under one fresh active-graph cache boundary.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,18 +17,19 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v044.js?v=0.44-optimize-stable1
-  -> gw-energy-pilot-v043.js?v=0.44-optimize-stable1
-  -> gw-energy-pilot-v042.js?v=0.43-touch1
-  -> gw-energy-pilot-v041-emhass-settings.js?v=0.42-emhass1
-  -> gw-energy-pilot-v041.js?v=0.41-stable1
-  -> gw-energy-pilot-v039.js?v=0.41-stable1
-  -> gw-energy-pilot-v038.js?v=0.41-stable1
-  -> gw-energy-pilot-v038-runtime.js?v=0.41-stable1
-  -> gw-energy-pilot-v038-strategy.js?v=0.41-stable1
+  -> gw-energy-pilot-v045.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v044.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v043.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v042.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v041-emhass-settings.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v041.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v039.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v038.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v038-runtime.js?v=0.45-pv-soc1
+  -> gw-energy-pilot-v038-strategy.js?v=0.45-pv-soc1
 ```
 
-The v0.41 runtime imports its modified plan data/core modules with `0.41-stable1` cache keys. The v0.44 top-level key activates the bounded Optimize action replacement while its fresh v0.43 import retains the complete v0.43 touch-presentation chain after upgrade.
+Every local import reachable from the v0.45 entrypoint uses `0.45-pv-soc1`. This intentionally reloads the complete active dependency graph after upgrade, including modified base/settings/stable-DOM/strategy modules. The behavioral ownership of historical layers remains unchanged.
 
 ## Render ownership
 
@@ -38,11 +39,11 @@ The inherited complete renderer is allowed when the panel is first created or en
 
 ### Context/structure render
 
-A complete render is allowed for Home Assistant language/locale, user/admin context, theme/dark-mode context, entity-registry mapping, optional-card topology or explicit narrow/layout structural changes.
+A complete render is allowed for Home Assistant language/locale, user/admin context, theme/dark-mode context, entity-registry mapping, optional-card topology, configured PV-source topology or explicit narrow/layout structural changes.
 
 ### Normal telemetry patch
 
-When context and structure signatures are unchanged, the `hass` setter does not queue the inherited complete render. It batches a live patch and mutates existing power/SOC/energy text, status classes, controller/EMHASS metrics, sliders, meter widths, diagnostics, static flow semantics and thermal values. The existing `main`, cards and controls remain connected.
+When context and structure signatures are unchanged, the `hass` setter does not queue the inherited complete render. It batches a live patch and mutates existing power/SOC/energy text, configured PV-source values, status classes, controller/EMHASS metrics, sliders, meter widths, diagnostics, static flow semantics and thermal values. The existing `main`, cards and controls remain connected.
 
 ### Battery Strategy refresh
 
@@ -74,7 +75,7 @@ A normal telemetry burst must preserve `main`, Dashboard layout-button, Automati
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.44 by `tests/browser/test_frontend_stability_v044.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles additionally require exactly one Optimize service call, zero complete renders, stable persistent-control identity, native scroll anchoring and working scroll after the plan-card refresh.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.45 by `tests/browser/test_frontend_stability_v045.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles additionally require combined PV topology/settings, a stationary unfocused SOC slider draft through telemetry, matching backend acknowledgement, exactly one Optimize service call, zero complete renders, stable persistent-control identity, native scroll anchoring and working scroll after the plan-card refresh.
 
 ## Contributor rules
 

@@ -10,6 +10,7 @@ from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry, OperationNotAllowed
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 
 from .config_flow import (
     CONF_EMHASS_SOC_FINAL_PCT,
@@ -29,6 +30,7 @@ from .const import (
     CONF_EMHASS_URL,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
@@ -49,6 +51,7 @@ from .const import (
     DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     DEFAULT_EMHASS_SOC_FINAL,
     DEFAULT_EMHASS_URL,
+    DEFAULT_ENABLE_INTERNAL_PV,
     DEFAULT_EV_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_NORDPOOL_AREA,
@@ -64,12 +67,14 @@ from .const import (
     DEFAULT_SLAVE,
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
+    EXTERNAL_PV_ENTITY_KEYS,
     NAME,
 )
 
 SECTION_ENERGYPILOT = "energypilot"
 SECTION_EMHASS = "emhass"
 SECTION_GOODWE = "goodwe"
+SECTION_PV = "pv"
 
 ENERGYPILOT_KEYS = {
     CONF_MAX_POWER_KW,
@@ -98,6 +103,23 @@ EMHASS_KEYS = {
     CONF_SELL_PRICE_DEDUCTION,
 }
 OPTIONAL_ENTITY_KEYS = {CONF_EV_MODE_ENTITY, CONF_EV_POWER_ENTITY}
+PV_KEYS = {CONF_ENABLE_INTERNAL_PV, *EXTERNAL_PV_ENTITY_KEYS}
+
+PV_ENTITY_ID = vol.All(
+    str,
+    str.strip,
+    vol.Match(r"^[a-z0-9_]+\.[a-z0-9_]+$"),
+)
+PV_SCHEMA = vol.Schema(
+    {
+        vol.Required(
+            CONF_ENABLE_INTERNAL_PV,
+            default=DEFAULT_ENABLE_INTERNAL_PV,
+        ): bool,
+        **{vol.Optional(key): PV_ENTITY_ID for key in EXTERNAL_PV_ENTITY_KEYS},
+    },
+    extra=vol.PREVENT_EXTRA,
+)
 
 GOODWE_SCHEMA = vol.Schema(
     {
@@ -302,6 +324,32 @@ EMHASS_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     },
 )
 
+PV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "key": CONF_ENABLE_INTERNAL_PV,
+        "label": "Include internal GoodWe PV",
+        "type": "boolean",
+        "default": DEFAULT_ENABLE_INTERNAL_PV,
+        "description": (
+            "Include the existing canonical GoodWe PV total in the dashboard PV "
+            "total. This is display-only and does not affect EMS control."
+        ),
+    },
+    *(
+        {
+            "key": key,
+            "label": f"External PV source {index}",
+            "type": "entity",
+            "default": "",
+            "description": (
+                "Optional Home Assistant power entity with non-negative PV "
+                "generation in W, kW or MW."
+            ),
+        }
+        for index, key in enumerate(EXTERNAL_PV_ENTITY_KEYS, start=1)
+    ),
+)
+
 
 def _fields_from_specs(
     options: dict[str, Any], specs: tuple[dict[str, Any], ...]
@@ -396,6 +444,15 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
                 ),
                 "fields": goodwe_fields,
             },
+            SECTION_PV: {
+                "title": "PV",
+                "short_title": "PV",
+                "description": (
+                    "Choose which internal and external PV power sources are shown "
+                    "in EnergyPilot. These values are never used for control."
+                ),
+                "fields": _fields_from_specs(options, PV_FIELD_SPECS),
+            },
         },
     }
 
@@ -447,7 +504,7 @@ async def websocket_get_settings(
         vol.Required("type"): "gw_energypilot/settings/update",
         vol.Required("entry_id"): str,
         vol.Required("section"): vol.In(
-            [SECTION_ENERGYPILOT, SECTION_EMHASS, SECTION_GOODWE]
+            [SECTION_ENERGYPILOT, SECTION_EMHASS, SECTION_GOODWE, SECTION_PV]
         ),
         vol.Required("values"): dict,
     }
@@ -516,6 +573,57 @@ async def websocket_update_settings(
             unique_id=unique_id,
             title=f"{NAME} ({host})",
         )
+    elif section == SECTION_PV:
+        unknown = set(values) - PV_KEYS
+        if unknown:
+            connection.send_error(
+                msg["id"],
+                "invalid_settings",
+                f"Unsupported PV settings: {', '.join(sorted(unknown))}",
+            )
+            return
+        cleaned_values = {
+            key: value
+            for key, value in values.items()
+            if key == CONF_ENABLE_INTERNAL_PV or value not in (None, "")
+        }
+        try:
+            validated = PV_SCHEMA(cleaned_values)
+        except (vol.Invalid, TypeError, ValueError) as err:
+            connection.send_error(msg["id"], "invalid_settings", str(err))
+            return
+        external_entities = [
+            validated[key]
+            for key in EXTERNAL_PV_ENTITY_KEYS
+            if key in validated
+        ]
+        if len(external_entities) != len(set(external_entities)):
+            connection.send_error(
+                msg["id"],
+                "invalid_settings",
+                "Each external PV entity may only be configured once",
+            )
+            return
+        registry = er.async_get(hass)
+        for entity_id in external_entities:
+            registry_entry = registry.async_get(entity_id)
+            if (
+                registry_entry is not None
+                and registry_entry.platform == DOMAIN
+                and registry_entry.unique_id.endswith("_pv_generation_power")
+            ):
+                connection.send_error(
+                    msg["id"],
+                    "invalid_settings",
+                    "A combined EnergyPilot PV sensor cannot be used as a PV source",
+                )
+                return
+
+        stored_options = dict(entry.options)
+        for key in PV_KEYS:
+            stored_options.pop(key, None)
+        stored_options.update(validated)
+        hass.config_entries.async_update_entry(entry, options=stored_options)
     else:
         allowed = (
             ENERGYPILOT_KEYS if section == SECTION_ENERGYPILOT else EMHASS_KEYS
@@ -534,6 +642,8 @@ async def websocket_update_settings(
         # form schema. Remove it before validation and restore it after converting
         # the regular form values back to config-entry options.
         form_values.pop(CONF_BATTERY_SAVER_MODE, None)
+        for key in PV_KEYS:
+            form_values.pop(key, None)
         form_values.update(values)
         for key in OPTIONAL_ENTITY_KEYS:
             if form_values.get(key) in (None, ""):
@@ -553,6 +663,9 @@ async def websocket_update_settings(
             stored_options[CONF_BATTERY_SAVER_MODE] = entry.options[
                 CONF_BATTERY_SAVER_MODE
             ]
+        for key in PV_KEYS:
+            if key in entry.options:
+                stored_options[key] = entry.options[key]
         hass.config_entries.async_update_entry(entry, options=stored_options)
 
     require_restart = await _async_reload_entry(hass, entry)

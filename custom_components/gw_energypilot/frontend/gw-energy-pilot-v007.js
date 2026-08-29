@@ -1,4 +1,4 @@
-import "./gw-energy-pilot.js?v=0.05";
+import "./gw-energy-pilot.js?v=0.45-pv-soc1";
 
 const VERSION = "0.07";
 const PANEL_NAME = "gw-energypilot-panel";

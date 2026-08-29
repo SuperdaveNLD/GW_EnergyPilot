@@ -17,7 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045"}
 
 
 @dataclass(frozen=True)
@@ -284,6 +284,72 @@ def exercise_strategy(page: Page) -> dict[str, object]:
     return result
 
 
+def exercise_soc_slider_draft(page: Page) -> dict[str, object]:
+    result: dict[str, object] = {
+        "present": False,
+        "slider_kept_draft": False,
+        "label_kept_draft": False,
+        "acknowledged": False,
+        "error": None,
+    }
+    try:
+        page.evaluate(
+            """
+            () => {
+              const cache = window.__epPanel.__epV038BatterySaver;
+              if (cache?.data) cache.data.managed = false;
+              window.__epPanel.__epV041RefreshStrategy?.();
+            }
+            """
+        )
+        page.wait_for_function(
+            "() => Boolean(window.__epPanel.shadowRoot.querySelector('input[data-ep-v038-soc=\"min\"]'))",
+            timeout=10_000,
+        )
+        measured = page.evaluate(
+            """
+            async () => {
+              const root = window.__epPanel.shadowRoot;
+              const slider = root.querySelector('input[data-ep-v038-soc="min"]');
+              const label = root.querySelector('[data-ep-v038-soc-value="min"]');
+              slider.focus();
+              slider.value = "37";
+              slider.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+
+              // Chrome can drop focus when the range input becomes stationary or
+              // is briefly disabled for persistence. A telemetry patch must still
+              // show the user's draft instead of the older entity state.
+              slider.blur();
+              await window.__epTelemetryBurst(8, 4);
+              await new Promise((resolve) => setTimeout(resolve, 80));
+              const stationary = {
+                slider: slider.value,
+                label: label?.textContent?.trim() || "",
+              };
+
+              slider.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+              await new Promise((resolve) => setTimeout(resolve, 120));
+              const entityId = window.__epPanel._entityId("emhass_minimum_soc");
+              const currentSlider = root.querySelector('input[data-ep-v038-soc="min"]');
+              return {
+                stationary,
+                actual: window.__epHass.states[entityId]?.state,
+                draft: currentSlider?.dataset.epSocDraft || "",
+              };
+            }
+            """
+        )
+        result["present"] = True
+        result["slider_kept_draft"] = measured["stationary"]["slider"] == "37"
+        result["label_kept_draft"] = measured["stationary"]["label"] == "37%"
+        result["acknowledged"] = (
+            str(measured["actual"]) == "37" and measured["draft"] == ""
+        )
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def control_style(page: Page, selector: str) -> dict[str, str]:
     return page.evaluate(
         """
@@ -339,7 +405,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -887,8 +953,8 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
-    """Prove that v0.44 Optimize now never rebuilds the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT == "v044"
+    """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -1257,6 +1323,156 @@ def exercise_structural_rerender(page: Page) -> dict[str, object]:
     return result
 
 
+def exercise_pv_insight(page: Page) -> dict[str, object]:
+    result: dict[str, object] = {
+        "ran": False,
+        "topology_rendered": False,
+        "source_count": 0,
+        "total_matches": False,
+        "flow_matches": False,
+        "telemetry_main_stable": False,
+        "external_value_matches": False,
+        "scroll_delta": None,
+        "error": None,
+    }
+    try:
+        page.evaluate(
+            """
+            () => {
+              window.__epPvBeforeTopologyMain =
+                window.__epPanel.shadowRoot.querySelector('main');
+              window.__epSetExternalPv(1200);
+            }
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot
+              .querySelectorAll('.energy-card.solar [data-pv-source-index]').length === 2
+            """,
+            timeout=10_000,
+        )
+        page.wait_for_timeout(180)
+        topology = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const aggregate = window.__epHass.states[
+                panel._entityId('pv_generation_power')
+              ];
+              const expected = panel._formatPower(Number(aggregate.state));
+              const main = root.querySelector('main');
+              window.__epPvTelemetryMain = main;
+              const scroller = window.__epScroller;
+              scroller.scrollTop = Math.max(
+                0,
+                Math.round((scroller.scrollHeight - scroller.clientHeight) * 0.36)
+              );
+              window.__epPvScrollBefore = scroller.scrollTop;
+              return {
+                topologyRendered: window.__epPvBeforeTopologyMain !== main,
+                sourceCount: root.querySelectorAll(
+                  '.energy-card.solar [data-pv-source-index]'
+                ).length,
+                totalMatches:
+                  root.querySelector('.energy-card.solar .hero-value')?.textContent === expected,
+                flowMatches:
+                  root.querySelector('.ep-flow-solar .ep-flow-node-value')?.textContent === expected,
+              };
+            }
+            """
+        )
+        page.evaluate("window.__epSetExternalPv(1700)")
+        page.wait_for_timeout(260)
+        telemetry = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const external = root.querySelector(
+                '.energy-card.solar [data-pv-source-index="1"] .metric-value'
+              );
+              return {
+                mainStable: window.__epPvTelemetryMain === root.querySelector('main'),
+                externalMatches: external?.textContent === panel._formatPower(1700),
+                scrollDelta: window.__epScroller.scrollTop - window.__epPvScrollBefore,
+              };
+            }
+            """
+        )
+        result.update(
+            {
+                "ran": True,
+                "topology_rendered": topology["topologyRendered"],
+                "source_count": topology["sourceCount"],
+                "total_matches": topology["totalMatches"],
+                "flow_matches": topology["flowMatches"],
+                "telemetry_main_stable": telemetry["mainStable"],
+                "external_value_matches": telemetry["externalMatches"],
+                "scroll_delta": telemetry["scrollDelta"],
+            }
+        )
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
+def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
+    result: dict[str, object] = {
+        "ran": False,
+        "tab_present": False,
+        "internal_checked": False,
+        "external_fields": 0,
+        "entity_search_contains_source": False,
+        "closed": False,
+        "error": None,
+    }
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        page.wait_for_selector(
+            "gw-energypilot-panel >> [data-settings-tab=\"pv\"]",
+            timeout=10_000,
+        )
+        result["tab_present"] = True
+        activate(page, profile, '[data-settings-tab="pv"]')
+        page.wait_for_selector(
+            "gw-energypilot-panel >> .ep-v016-form[data-section=\"pv\"]",
+            timeout=10_000,
+        )
+        state = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const form = root.querySelector('.ep-v016-form[data-section="pv"]');
+              return {
+                internalChecked: Boolean(
+                  form?.querySelector('[data-setting-key="enable_internal_pv"]')?.checked
+                ),
+                externalFields: form?.querySelectorAll(
+                  '[data-setting-key^="external_pv_entity_"]'
+                ).length || 0,
+                entitySearchContainsSource: [...(form?.querySelectorAll('datalist option') || [])]
+                  .some((option) => option.value === 'sensor.external_roof_pv'),
+              };
+            }
+            """
+        )
+        result["internal_checked"] = state["internalChecked"]
+        result["external_fields"] = state["externalFields"]
+        result["entity_search_contains_source"] = state["entitySearchContainsSource"]
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        result["closed"] = True
+        result["ran"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
@@ -1361,10 +1577,13 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         """
     )
 
+    pv_insight = exercise_pv_insight(page)
+    pv_settings = exercise_pv_settings(page, profile)
     touch_controls = exercise_touch_controls(page, profile)
     optimize_stability = exercise_optimize_stability(page, profile)
     menu = open_and_close_menu(page)
     automatic = exercise_automatic_control(page)
+    soc_slider = exercise_soc_slider_draft(page)
     strategy = exercise_strategy(page)
     plan = exercise_plan_refresh(page)
     language_result = exercise_language(page)
@@ -1378,10 +1597,13 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "idle_delta": idle_after - idle_before,
         "telemetry_identity": telemetry_identity,
         "motion": motion,
+        "pv_insight": pv_insight,
+        "pv_settings": pv_settings,
         "touch_controls": touch_controls,
         "optimize_stability": optimize_stability,
         "menu": menu,
         "automatic": automatic,
+        "soc_slider": soc_slider,
         "strategy": strategy,
         "plan": plan,
         "language": language_result,
@@ -1398,10 +1620,13 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     initial = result["initial"]
     identity = result["telemetry_identity"]
     motion = result["motion"]
+    pv_insight = result["pv_insight"]
+    pv_settings = result["pv_settings"]
     touch_controls = result["touch_controls"]
     optimize_stability = result["optimize_stability"]
     menu = result["menu"]
     automatic = result["automatic"]
+    soc_slider = result["soc_slider"]
     strategy = result["strategy"]
     plan = result["plan"]
     language_result = result["language"]
@@ -1425,7 +1650,30 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: scroll moved backwards during telemetry")
     if abs(motion["final"] - motion["target"]) > 5:
         failures.append(f"{name}: scrolling did not reach its target during telemetry")
-    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044"}:
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS:
+        if not all(
+            pv_insight[key] is True
+            for key in (
+                "ran", "topology_rendered", "total_matches", "flow_matches",
+                "telemetry_main_stable", "external_value_matches",
+            )
+        ) or pv_insight["source_count"] != 2:
+            failures.append(f"{name}: combined PV topology/live patch regression failed")
+        if abs(pv_insight["scroll_delta"] or 0) > 2:
+            failures.append(f"{name}: PV telemetry moved scroll position")
+        if pv_insight["error"]:
+            failures.append(f"{name}: PV insight interaction error")
+        if not all(
+            pv_settings[key] is True
+            for key in (
+                "ran", "tab_present", "internal_checked",
+                "entity_search_contains_source", "closed",
+            )
+        ) or pv_settings["external_fields"] != 4:
+            failures.append(f"{name}: PV settings tab/entity-search regression failed")
+        if pv_settings["error"]:
+            failures.append(f"{name}: PV settings interaction error")
+    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -1435,7 +1683,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT == "v044":
+    if EXPECTED_ENTRYPOINT in {"v044", "v045"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -1459,6 +1707,15 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: Automatic Control did not toggle stably twice")
     if automatic["error"]:
         failures.append(f"{name}: Automatic Control interaction error")
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and not all(
+        soc_slider[key] is True
+        for key in (
+            "present", "slider_kept_draft", "label_kept_draft", "acknowledged",
+        )
+    ):
+        failures.append(f"{name}: SOC slider draft was replaced by stale telemetry")
+    if soc_slider["error"]:
+        failures.append(f"{name}: SOC slider interaction error")
     if strategy["present"] is not True or strategy["changed"] is not True:
         failures.append(f"{name}: Battery Strategy button did not apply")
     if strategy["error"]:

@@ -25,7 +25,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=0.41-stable1"', self.source
+            'import "./gw-energy-pilot-v039.js?v=0.45-pv-soc1"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -79,7 +79,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         browser_test = (BROWSER / "test_frontend_stability.py").read_text(
             encoding="utf-8"
         )
-        wrapper = (BROWSER / "test_frontend_stability_v044.py").read_text(
+        wrapper = (BROWSER / "test_frontend_stability_v045.py").read_text(
             encoding="utf-8"
         )
         harness = (BROWSER / "frontend_harness.html").read_text(
@@ -94,12 +94,13 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("telemetry_identity", browser_test)
         self.assertIn("exercise_plan_refresh", browser_test)
         self.assertIn("animation[\"animations\"] != 0", browser_test)
-        self.assertIn("frontend_harness.html?entry=v044", wrapper)
-        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v044"', wrapper)
-        self.assertIn('"v043", "v044"].includes(requestedEntry)', harness)
+        self.assertIn("frontend_harness.html?entry=v045", wrapper)
+        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v045"', wrapper)
+        self.assertIn('"v044", "v045"].includes(requestedEntry)', harness)
         self.assertIn("exercise_touch_controls", browser_test)
         self.assertIn("exercise_optimize_stability", browser_test)
-        self.assertIn("test_frontend_stability_v044.py", workflow)
+        self.assertIn("exercise_soc_slider_draft", browser_test)
+        self.assertIn("test_frontend_stability_v045.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)
         self.assertFalse((BROWSER / "frontend_harness_v041.html").exists())

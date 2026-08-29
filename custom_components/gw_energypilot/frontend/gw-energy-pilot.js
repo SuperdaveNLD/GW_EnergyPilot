@@ -270,7 +270,22 @@ class GWEnergyPilotPanel extends HTMLElement {
       return;
     }
 
-    const pv = this._numberByKey("pv_total_power");
+    const internalPv = this._numberByKey("pv_total_power");
+    const pvGenerationState = this._stateByKey("pv_generation_power");
+    const pv = pvGenerationState
+      ? this._numberState(pvGenerationState, null)
+      : internalPv;
+    const pvGenerationAttributes = pvGenerationState?.attributes || {};
+    const pvSources = Array.isArray(pvGenerationAttributes.sources)
+      ? pvGenerationAttributes.sources
+      : [];
+    const configuredExternalPv = Number(
+      pvGenerationAttributes.configured_external_sources || 0
+    );
+    const useConfiguredPvBreakdown = Boolean(
+      pvGenerationState &&
+      (configuredExternalPv > 0 || pvGenerationAttributes.internal_enabled === false)
+    );
     const load = this._numberByKey("total_load_power");
     const battery = this._numberByKey("battery_power");
     const grid = this._numberByKey("meter_total_power_fast");
@@ -337,6 +352,34 @@ class GWEnergyPilotPanel extends HTMLElement {
 
     const socClamped = Number.isFinite(soc) ? Math.min(100, Math.max(0, soc)) : 0;
     const pv4Visible = Number.isFinite(pv4) && Math.abs(pv4) > 20;
+    const pvBreakdown = useConfiguredPvBreakdown
+      ? pvSources.length > 0
+        ? pvSources.map((source, index) => {
+            const powerValue = Number(source?.power_w);
+            const power = source?.power_w !== null &&
+              source?.power_w !== undefined &&
+              Number.isFinite(powerValue)
+              ? powerValue
+              : null;
+            const sourceDetail = source?.kind === "internal"
+              ? "Internal GoodWe telemetry"
+              : source?.entity_id || "External PV entity";
+            return `<div class="metric" data-pv-source-index="${index}">
+              <div class="metric-label">${this._escape(source?.name || `PV ${index + 1}`)}</div>
+              <div class="metric-value">${this._escape(this._formatPower(power))}</div>
+              <div class="metric-sub">${this._escape(sourceDetail)}</div>
+            </div>`;
+          }).join("")
+        : `<div class="metric" data-pv-empty>
+            <div class="metric-label">PV sources</div>
+            <div class="metric-value">—</div>
+            <div class="metric-sub">No sources configured</div>
+          </div>`
+      : `
+          ${this._metric("PV1", this._formatPower(pv1))}
+          ${this._metric("PV2", this._formatPower(pv2))}
+          ${this._metric("PV3", this._formatPower(pv3))}
+          ${pv4Visible ? this._metric("PV4", this._formatPower(pv4)) : ""}`;
 
     const statusClass = automaticOn ? "active" : "inactive";
     const statusText = automaticOn ? "AUTO ACTIVE" : "GOODWE AUTO";
@@ -379,10 +422,7 @@ class GWEnergyPilotPanel extends HTMLElement {
             <div class="hero-value">${this._escape(this._formatPower(pv))}</div>
             <div class="hero-sub">Current PV production</div>
             <div class="mini-grid">
-              ${this._metric("PV1", this._formatPower(pv1))}
-              ${this._metric("PV2", this._formatPower(pv2))}
-              ${this._metric("PV3", this._formatPower(pv3))}
-              ${pv4Visible ? this._metric("PV4", this._formatPower(pv4)) : ""}
+              ${pvBreakdown}
             </div>
           </article>
 

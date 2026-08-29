@@ -53,6 +53,20 @@ Important enabled-by-default telemetry includes concepts such as:
 
 A number of raw or diagnostic values are intentionally disabled by default.
 
+## Combined PV insight sensor
+
+The read-only PV insight feature adds one aggregate entity with stable unique-ID suffix:
+
+```text
+{config_entry_id}_pv_generation_power
+```
+
+The entity uses device class `power`, unit `W` and state class `MEASUREMENT`. By default it mirrors the existing canonical GoodWe `pv_total_power`. When the operator selects external PV sources on the dashboard **PV** settings page, it adds each currently valid non-negative W/kW/MW/mW reading.
+
+Attributes expose the internal contribution, external contribution, configured/available source counts and a per-source breakdown. The aggregate is `display_only`: it is not a controller input, EMHASS input, persistent energy counter or grid-accounting source. Selected external entities retain their own identity and Recorder history; EnergyPilot does not create a duplicate entity per source.
+
+See `docs/PV_INSIGHT.md` for validation, availability and dashboard-topology behavior.
+
 ## Power semantics
 
 ### Grid
