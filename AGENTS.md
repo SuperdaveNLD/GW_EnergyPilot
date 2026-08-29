@@ -22,16 +22,16 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.46 Beta
+v0.47 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v0.46)
+## Frontend stability contract (v0.41+, active v0.47)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v0.46 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v0.47 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -214,28 +214,37 @@ Battery Saver
 
 The verified GoodWe-synchronized Minimum SOC remains a separate hard lower boundary. When a Battery Saver profile is explicitly managed, its EMHASS `battery_maximum_state_of_charge` is part of the profile transaction.
 
-Current hard maxima are:
+All managed profiles can use the complete physical EMHASS SOC range:
 
 ```text
 Mad-Steve    100%
-Gold Rush     96%
-Balanced      95%
-Battery Saver 90%
+Gold Rush    100%
+Balanced     100%
+Battery Saver 100%
 ```
+
+The range above 95% is a shared soft red zone. `battery_soc_surplus_cost` is a time-dependent EMHASS dwell penalty in currency/kWh/hour and uses profile factors of 5% / 10% / 25% / 50% × dynamic price reference for Mad-Steve / Gold Rush / Balanced / Battery Saver. This allows 100% only when its value exceeds both the transaction cost and the accumulated cost of staying above 95%.
 
 v0.34 introduced two distinct economic mechanisms that remain active in v0.35:
 
 - `weight_battery_charge` / `weight_battery_discharge`: linear anti-churn cost per battery-throughput kWh;
 - `battery_stress_cost`: current EMHASS quadratic/PWL penalty for high instantaneous battery power.
 
-All four managed profiles use:
+Mad-Steve deliberately retains the more aggressive floor:
 
 ```text
 weight_battery_charge    = 2.25% × dynamic price reference
 weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-This prevents unrestricted micro-arbitrage even in current Mad-Steve. Profile-specific deficit/surplus thresholds and power-stress penalties remain separate from the hard maximum. Gold Rush has both a 96% hard maximum and a 96% surplus threshold by design.
+Gold Rush, Balanced and Battery Saver use the field-tuned floor:
+
+```text
+weight_battery_charge    = 6% × dynamic price reference
+weight_battery_discharge = 6% × dynamic price reference
+```
+
+Gold Rush separately uses `battery_stress_cost = 1% × dynamic price reference`; Balanced remains at 8% and Battery Saver at 20%. The 6% transaction floor removed several marginal one-slot reversals in the captured Gold Rush comparison while preserving full-power dispatch. Applying the same floor to the more conservative profiles keeps the strategy ordering coherent. Profile-specific deficit and power-stress penalties remain separate from the shared 95–100% red-zone policy. Battery charge/discharge efficiency remains installation-owned and is not changed by profile selection.
 
 Battery Saver owns nine EMHASS fields after explicit profile selection:
 
@@ -335,19 +344,20 @@ v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v046.js
-  -> gw-energy-pilot-v045.js
-       -> gw-energy-pilot-v044.js
-            -> gw-energy-pilot-v043.js
-                 -> gw-energy-pilot-v042.js
-                      -> gw-energy-pilot-v041-emhass-settings.js
-                           -> gw-energy-pilot-v041.js
-                                -> gw-energy-pilot-v039.js
-                                     -> gw-energy-pilot-v038.js
-                                          -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v047.js
+  -> gw-energy-pilot-v046.js
+       -> gw-energy-pilot-v045.js
+            -> gw-energy-pilot-v044.js
+                 -> gw-energy-pilot-v043.js
+                      -> gw-energy-pilot-v042.js
+                           -> gw-energy-pilot-v041-emhass-settings.js
+                                -> gw-energy-pilot-v041.js
+                                     -> gw-energy-pilot-v039.js
+                                          -> gw-energy-pilot-v038.js
+                                               -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.46 owns only release presentation and the `0.46-external-pv1` cache boundary. The existing settings module owns the external-PV switch/group interaction. v0.45 retains its integrated release presentation, v0.44 owns the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v0.47 owns only release presentation and the `0.47-custom-battery1` cache boundary. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation; v0.46 retains the external-PV release presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

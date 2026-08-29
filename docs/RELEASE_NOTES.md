@@ -11,10 +11,23 @@ This page is the user-facing release index for GW EnergyPilot.
 - **Validated + beta diagnostics** — release behavior is validated while optional diagnostics still need field correlation.
 - **Historical** — older development milestone retained for release history.
 
+# v0.47 — Editable Custom battery costs and profile tuning
+
+The dashboard and **Settings → EMHASS → Battery Saver** now both include **Custom / Aangepast** as a visible choice. When active, the five displayed EMHASS battery cost values are editable and saved together before EnergyPilot immediately rebuilds the plan. Invalid or negative costs are rejected, unrelated EMHASS settings are preserved and a failed save/optimization restores the previous Battery Saver transaction. The Battery Strategy and settings typography is also larger for improved readability on desktop and touch layouts.
+
+Minimum and Maximum SOC keep using the existing synchronized Home Assistant number entities. Custom cost editing is limited to one EMHASS battery model; multi-battery installations can still select Custom to release managed-profile ownership without rewriting their values.
+
+The preserved standard Gold Rush field plan still contained marginal one-slot charge/discharge reversals. A first 3.5% comparison was insufficient; the validated follow-up therefore sets charge and discharge anti-churn to **6% × dynamic price reference per direction**, while reducing Gold Rush battery power stress from 3% to **1% × dynamic price reference**. At the captured `0.1215` reference, the resulting `0.007290` weights removed the low-value 765 W, 857 W and 426 W reversals while preserving full 15 kW evening dispatch.
+
+Balanced and Battery Saver adopt the same 6% transaction floor so the preservation-oriented profiles cannot accept cycling rejected by Gold Rush; their existing low-SOC and 8%/20% power-stress values remain unchanged. Mad-Steve retains 2.25% for its deliberately aggressive character.
+
+All four managed profiles can now reach 100% SOC. The former profile-specific hard ceilings become one shared soft red zone above 95%. EMHASS applies an hourly cost to every kWh in that zone: 5% / 10% / 25% / 50% × dynamic price reference for Mad-Steve / Gold Rush / Balanced / Battery Saver. A sufficiently valuable opportunity can therefore use the last 5%, while the accumulating dwell cost discourages charging there too early or remaining full unnecessarily. Battery charge/discharge efficiency, inverter topology and all unrelated EMHASS configuration remain unchanged.
+
 ## Version overview
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.47** | 2026-08-29 | **Beta** | Adds administrator-editable Custom EMHASS battery costs, field-tuned anti-churn/power-stress policy and a shared soft 95–100% high-SOC red zone while preserving installation-owned settings and all GoodWe control semantics. |
 | **0.46** | 2026-08-29 | **Beta** | Adds an independent external-PV master switch and groups the four entity selectors in one enabled/disabled panel while preserving existing v0.45 configurations. |
 | **0.45** | 2026-08-29 | **Beta** | Consolidates PV insight and SOC-slider stability with #83 floating Optimize, #85 actual/forecast SOC and #86 static accessible live flow under one active frontend cache graph; #84 and #87 are excluded. |
 | **0.44** | 2026-08-28 | **Beta** | Keeps Optimize now and the surrounding dashboard DOM stable for the complete solve/publish transaction, and adds one non-blocking post-restart optimization recovery sequence with bounded 15/30/60-second retry back-off. |

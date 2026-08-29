@@ -52,6 +52,29 @@ class FakeButton extends FakeElement {
   }
 }
 
+class FakeInput extends FakeElement {
+  constructor(key, value) {
+    super();
+    this.dataset = { epV038CustomValue: key };
+    this.value = String(value);
+  }
+}
+
+class FakeForm extends FakeElement {
+  constructor(inputs) {
+    super();
+    this.inputs = inputs;
+  }
+
+  matches(selector) {
+    return selector === "form[data-ep-v038-custom-form]";
+  }
+
+  querySelectorAll(selector) {
+    return selector === "[data-ep-v038-custom-value]" ? this.inputs : [];
+  }
+}
+
 class FakeRoot {
   constructor(buttons) {
     this.buttons = buttons;
@@ -107,6 +130,16 @@ const panel = {
   _hass: {
     async callWS(request) {
       calls.push(request);
+      if (request.type === "gw_energypilot/battery_saver/custom_set") {
+        return {
+          entry_id: "entry-1",
+          managed: false,
+          mode: null,
+          modes,
+          battery_count: 1,
+          current_emhass_values: request.values,
+        };
+      }
       return {
         entry_id: "entry-1",
         managed: true,
@@ -138,7 +171,7 @@ const { installV038DelegatedControls } = await import(
 );
 installV038DelegatedControls(panel, root);
 installV038DelegatedControls(panel, root);
-assert.equal(root.listeners.size, 3);
+assert.equal(root.listeners.size, 4);
 
 let prevented = false;
 root.listeners.get("click")({
@@ -184,5 +217,41 @@ root.listeners.get("click")({
 });
 await new Promise((resolve) => setTimeout(resolve, 0));
 assert.equal(calls.length, 2);
+
+panel.__epV041StableRuntime = true;
+panel.__epV038BatterySaver.data = {
+  ...panel.__epV038BatterySaver.data,
+  managed: false,
+  mode: null,
+  battery_count: 1,
+};
+const customInputs = [
+  new FakeInput("battery_soc_deficit_cost", 0.001111),
+  new FakeInput("battery_soc_surplus_cost", 0.002222),
+  new FakeInput("battery_stress_cost", 0.003333),
+  new FakeInput("weight_battery_charge", 0.004444),
+  new FakeInput("weight_battery_discharge", 0.005555),
+];
+const customForm = new FakeForm(customInputs);
+let submitPrevented = false;
+root.listeners.get("submit")({
+  composedPath: () => [customForm],
+  preventDefault: () => {
+    submitPrevented = true;
+  },
+});
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(submitPrevented, true);
+assert.equal(calls.length, 3);
+assert.equal(calls[2].type, "gw_energypilot/battery_saver/custom_set");
+assert.equal(calls[2].entry_id, "entry-1");
+assert.deepEqual(calls[2].values, {
+  battery_soc_deficit_cost: 0.001111,
+  battery_soc_surplus_cost: 0.002222,
+  battery_stress_cost: 0.003333,
+  weight_battery_charge: 0.004444,
+  weight_battery_discharge: 0.005555,
+});
+assert.equal(panel.__epV038BatterySaver.data.managed, false);
 
 console.log("v0.38 delegated profile control tests passed");

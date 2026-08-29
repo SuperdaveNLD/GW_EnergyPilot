@@ -3,7 +3,7 @@ import {
   PROFILE_KEYS,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=0.46-external-pv1";
+} from "./gw-energy-pilot-v038-model.js?v=0.47-custom-battery1";
 
 const TEXT = {
   en: {
@@ -14,10 +14,13 @@ const TEXT = {
     active: "ACTIVE",
     applying: "Applying profile and optimizing…",
     applied: "Profile applied · fresh plan published.",
+    savingCustom: "Saving custom values and optimizing…",
+    savedCustom: "Custom values saved · fresh plan published.",
+    saveCustom: "Save and optimize",
     loading: "Loading battery profiles…",
     customTitle: "Custom battery settings",
     customNote:
-      "SOC sliders use the existing Home Assistant entities. Minimum SOC remains synchronized with the GoodWe on-grid battery floor; each completed change triggers a fresh optimization. Advanced EMHASS battery penalties are shown below for transparency and remain managed in EMHASS.",
+      "SOC sliders use the existing Home Assistant entities. Minimum SOC remains synchronized with the GoodWe on-grid battery floor. Enter non-negative custom EMHASS costs below, then save once to build a fresh plan.",
     minimum: "Minimum SOC",
     maximum: "Maximum SOC",
     deficit: "Low-SOC cost",
@@ -27,6 +30,8 @@ const TEXT = {
     dischargeWeight: "Discharge cost",
     diagnostics: "Low-level controller command is available in Diagnostics.",
     socError: "Battery SOC update failed",
+    customError: "Custom values could not be saved",
+    singleBatteryOnly: "Custom value editing is available for one EMHASS battery.",
   },
   nl: {
     kicker: "LAADSTRATEGIE",
@@ -36,10 +41,13 @@ const TEXT = {
     active: "ACTIEF",
     applying: "Profiel toepassen en optimaliseren…",
     applied: "Profiel toegepast · nieuw plan gepubliceerd.",
+    savingCustom: "Aangepaste waarden opslaan en optimaliseren…",
+    savedCustom: "Aangepaste waarden opgeslagen · nieuw plan gepubliceerd.",
+    saveCustom: "Opslaan en optimaliseren",
     loading: "Batterijprofielen laden…",
     customTitle: "Aangepaste batterijinstellingen",
     customNote:
-      "De SOC-schuifregelaars gebruiken de bestaande Home Assistant-entiteiten. Minimum SOC blijft gekoppeld aan de GoodWe on-grid ondergrens; iedere afgeronde wijziging start een nieuwe optimalisatie. De overige EMHASS-batterijkosten staan hieronder ter controle en blijven in EMHASS beheerd.",
+      "De SOC-schuifregelaars gebruiken de bestaande Home Assistant-entiteiten. Minimum SOC blijft gekoppeld aan de GoodWe on-grid ondergrens. Vul hieronder niet-negatieve aangepaste EMHASS-kosten in en sla ze één keer op om een nieuw plan te maken.",
     minimum: "Minimum SOC",
     maximum: "Maximum SOC",
     deficit: "Kosten lage SOC",
@@ -49,6 +57,8 @@ const TEXT = {
     dischargeWeight: "Ontlaadkosten",
     diagnostics: "Het technische controllercommando staat in Diagnostiek.",
     socError: "Bijwerken van batterij-SOC mislukt",
+    customError: "Aangepaste waarden konden niet worden opgeslagen",
+    singleBatteryOnly: "Aangepaste waarden kunnen voor één EMHASS-batterij worden bewerkt.",
   },
 };
 
@@ -74,6 +84,13 @@ function batterySaverCache(panel) {
   return panel.__epV038BatterySaver;
 }
 
+function shareBatterySaverData(panel, data) {
+  panel.__epV031BSData = data;
+  const cache = batterySaverCache(panel);
+  cache.data = data;
+  return data;
+}
+
 function requestStrategyRefresh(panel) {
   if (
     panel.__epV041StableRuntime &&
@@ -93,9 +110,9 @@ async function loadBatterySaver(panel, force = false) {
   cache.error = null;
   requestStrategyRefresh(panel);
   try {
-    cache.data = await panel._hass.callWS({
+    shareBatterySaverData(panel, await panel._hass.callWS({
       type: "gw_energypilot/battery_saver/get",
-    });
+    }));
   } catch (err) {
     cache.error = err?.message || String(err);
   } finally {
@@ -191,11 +208,11 @@ async function selectProfile(panel, mode) {
   requestStrategyRefresh(panel);
 
   try {
-    cache.data = await panel._hass.callWS({
+    shareBatterySaverData(panel, await panel._hass.callWS({
       type: "gw_energypilot/battery_saver/set",
       entry_id: entryId,
       mode,
-    });
+    }));
     cache.message = t.applied;
     cache.tone = "ok";
   } catch (err) {
@@ -219,17 +236,25 @@ function displayConfigValue(value) {
     : "—";
 }
 
-function customSocHtml(panel, t, data) {
+function inputConfigValue(value) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === null || raw === undefined || raw === "") return "";
+  const number = Number(raw);
+  return Number.isFinite(number) && number >= 0 ? displayConfigValue(number) : "";
+}
+
+function customSocHtml(panel, t, data, busy) {
   const min = numberModel(panel, "emhass_minimum_soc", 0);
   const max = numberModel(panel, "emhass_maximum_soc", 100);
   const values = data?.current_emhass_values || {};
   const fields = [
-    [t.deficit, values.battery_soc_deficit_cost],
-    [t.surplus, values.battery_soc_surplus_cost],
-    [t.stress, values.battery_stress_cost],
-    [t.chargeWeight, values.weight_battery_charge],
-    [t.dischargeWeight, values.weight_battery_discharge],
+    ["battery_soc_deficit_cost", t.deficit, values.battery_soc_deficit_cost],
+    ["battery_soc_surplus_cost", t.surplus, values.battery_soc_surplus_cost],
+    ["battery_stress_cost", t.stress, values.battery_stress_cost],
+    ["weight_battery_charge", t.chargeWeight, values.weight_battery_charge],
+    ["weight_battery_discharge", t.dischargeWeight, values.weight_battery_discharge],
   ];
+  const editable = data?.battery_count === 1;
   return `
     <div class="ep-v038-custom">
       <div class="ep-v038-custom-head">${panel._escape(t.customTitle)}</div>
@@ -243,16 +268,67 @@ function customSocHtml(panel, t, data) {
           <input data-ep-v038-soc="max" type="range" min="0" max="100" step="1" value="${max.value}" ${max.entityId ? "" : "disabled"}>
         </div>
       </div>
-      <div class="ep-v038-custom-values">
-        ${fields
-          .map(
-            ([label, value]) =>
-              `<div class="ep-v038-custom-value"><span>${panel._escape(label)}</span><strong>${panel._escape(displayConfigValue(value))}</strong></div>`
-          )
-          .join("")}
-      </div>
-      <div class="ep-v038-custom-note">${panel._escape(t.customNote)}</div>
+      <form data-ep-v038-custom-form>
+        <div class="ep-v038-custom-values">
+          ${fields
+            .map(
+              ([key, label, value]) => `
+                <label class="ep-v038-custom-value">
+                  <span>${panel._escape(label)}</span>
+                  <input type="number" inputmode="decimal" min="0" step="0.000001" required
+                    data-ep-v038-custom-value="${panel._escape(key)}"
+                    value="${panel._escape(inputConfigValue(value))}"
+                    ${busy || !editable ? "disabled" : ""}>
+                </label>`
+            )
+            .join("")}
+        </div>
+        <div class="ep-v038-custom-actions">
+          <button type="submit" class="ep-v038-custom-save" ${busy || !editable ? "disabled" : ""}>${panel._escape(busy ? t.savingCustom : t.saveCustom)}</button>
+        </div>
+      </form>
+      <div class="ep-v038-custom-note">${panel._escape(editable ? t.customNote : t.singleBatteryOnly)}</div>
     </div>`;
+}
+
+async function saveCustomValues(panel, form) {
+  const cache = batterySaverCache(panel);
+  if (!panel._hass?.callWS || cache.busy || cache.loading || !form) return;
+  const entryId = cache.data?.entry_id;
+  if (!entryId) return;
+
+  const values = {};
+  for (const input of form.querySelectorAll("[data-ep-v038-custom-value]")) {
+    const value = Number(input.value);
+    if (!Number.isFinite(value) || value < 0) {
+      input.reportValidity?.();
+      return;
+    }
+    values[input.dataset.epV038CustomValue] = value;
+  }
+
+  const t = copy(panel);
+  cache.busy = true;
+  cache.message = t.savingCustom;
+  cache.tone = "";
+  cache.error = null;
+  requestStrategyRefresh(panel);
+  try {
+    shareBatterySaverData(panel, await panel._hass.callWS({
+      type: "gw_energypilot/battery_saver/custom_set",
+      entry_id: entryId,
+      values,
+    }));
+    cache.message = t.savedCustom;
+    cache.tone = "ok";
+  } catch (err) {
+    cache.error = `${t.customError}: ${err?.message || String(err)}`;
+    cache.message = "";
+    cache.tone = "error";
+  } finally {
+    cache.busy = false;
+    requestStrategyRefresh(panel);
+  }
 }
 
 async function updateSoc(panel, input) {
@@ -297,6 +373,17 @@ export function installV038DelegatedControls(panel, root) {
       if (!button || button.disabled) return;
       event.preventDefault();
       void selectProfile(panel, button.dataset.epV038Profile);
+    },
+    true
+  );
+
+  root.addEventListener(
+    "submit",
+    (event) => {
+      const form = eventElement(event, "form[data-ep-v038-custom-form]");
+      if (!form) return;
+      event.preventDefault();
+      void saveCustomValues(panel, form);
     },
     true
   );
@@ -362,7 +449,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
         )
         .join("")}
     </div>
-    ${activeMode === CUSTOM_MODE ? customSocHtml(panel, t, cache.data) : ""}
+    ${activeMode === CUSTOM_MODE ? customSocHtml(panel, t, cache.data, cache.busy) : ""}
     <div class="ep-v038-message ${panel._escape(cache.tone || "")}">${panel._escape(cache.error || cache.message || (!cache.data || cache.loading ? t.loading : ""))}</div>
     <div class="ep-v038-diagnostic-note">${panel._escape(t.diagnostics)}</div>`;
   wrap.dataset.epV038Signature = signature;

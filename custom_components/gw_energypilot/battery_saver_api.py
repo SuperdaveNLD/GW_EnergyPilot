@@ -14,9 +14,11 @@ from homeassistant.exceptions import HomeAssistantError
 from .battery_saver import (
     BATTERY_SAVER_CONFIG_KEYS,
     BATTERY_SAVER_MODES,
+    CUSTOM_BATTERY_COST_KEYS,
     MODE_MAD_STEVE,
     battery_saver_costs_are_zero,
     battery_saver_mode_payloads,
+    custom_battery_cost_updates,
     emhass_supports_battery_stress,
     normalize_battery_saver_mode,
     number_of_batteries,
@@ -27,6 +29,9 @@ from .emhass_config import async_get_emhass_config, async_write_emhass_config
 GOODWE_ON_GRID_MINIMUM_SOC_KEY = "battery_discharge_depth_on_grid"
 CUSTOM_MODE = "custom"
 SELECTABLE_MODES: tuple[str, ...] = (*BATTERY_SAVER_MODES, CUSTOM_MODE)
+CUSTOM_BATTERY_COST_SCHEMA = {
+    vol.Required(key): vol.Coerce(float) for key in CUSTOM_BATTERY_COST_KEYS
+}
 
 
 def _resolve_entry(hass: HomeAssistant, entry_id: str | None) -> ConfigEntry | None:
@@ -288,8 +293,103 @@ async def websocket_set_battery_saver(
     connection.send_result(msg["id"], _payload(entry, refreshed_config))
 
 
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "gw_energypilot/battery_saver/custom_set",
+        vol.Required("entry_id"): str,
+        vol.Required("values"): CUSTOM_BATTERY_COST_SCHEMA,
+    }
+)
+@websocket_api.async_response
+async def websocket_set_custom_battery_costs(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Persist validated Custom costs and rebuild the EMHASS plan."""
+    entry = _resolve_entry(hass, msg["entry_id"])
+    if entry is None:
+        connection.send_error(
+            msg["id"], "not_found", "GW EnergyPilot config entry not found"
+        )
+        return
+
+    try:
+        config = await async_get_emhass_config(hass, entry)
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "emhass_unavailable", str(err))
+        return
+
+    if number_of_batteries(config) != 1:
+        connection.send_error(
+            msg["id"],
+            "unsupported_battery_count",
+            "Custom Battery Saver editing supports one EMHASS battery model; the active configuration contains multiple batteries",
+        )
+        return
+
+    try:
+        updates = custom_battery_cost_updates(msg["values"])
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid_custom_values", str(err))
+        return
+
+    runtime = getattr(entry, "runtime_data", None)
+    orchestrator = getattr(runtime, "orchestrator", None)
+    if orchestrator is None:
+        connection.send_error(
+            msg["id"], "not_ready", "EnergyPilot orchestrator is not ready"
+        )
+        return
+
+    emhass_version = getattr(orchestrator, "emhass_version", None)
+    if updates["battery_stress_cost"] > 0 and not emhass_supports_battery_stress(
+        emhass_version
+    ):
+        connection.send_error(
+            msg["id"],
+            "unsupported_emhass_version",
+            "A non-zero battery power-stress cost requires EMHASS 0.18.1 or newer",
+        )
+        return
+
+    old_options = dict(entry.options)
+    previous_profile = getattr(orchestrator, "last_battery_saver_profile", None)
+    previous_effective_soc = getattr(orchestrator, "last_effective_soc_final", None)
+    new_options = dict(old_options)
+    new_options.pop(CONF_BATTERY_SAVER_MODE, None)
+    hass.config_entries.async_update_entry(entry, options=new_options)
+
+    updated_config = dict(config)
+    updated_config.update(updates)
+    try:
+        await async_write_emhass_config(hass, entry, updated_config)
+        await orchestrator.async_optimize(reason="battery_saver_custom_changed")
+    except Exception as err:  # noqa: BLE001 - restore the complete custom transaction
+        hass.config_entries.async_update_entry(entry, options=old_options)
+        orchestrator.last_battery_saver_profile = previous_profile
+        orchestrator.last_effective_soc_final = previous_effective_soc
+        rollback_error = await _async_restore_battery_saver_config(
+            hass, entry, config
+        )
+        message = str(err)
+        if rollback_error:
+            message += f"; Custom Battery Saver rollback also failed: {rollback_error}"
+        connection.send_error(msg["id"], "apply_failed", message)
+        return
+
+    try:
+        refreshed_config = await async_get_emhass_config(hass, entry)
+    except HomeAssistantError:
+        refreshed_config = _successful_config_fallback(updated_config, orchestrator)
+
+    connection.send_result(msg["id"], _payload(entry, refreshed_config))
+
+
 @callback
 def async_register_battery_saver_api(hass: HomeAssistant) -> None:
     """Register Battery Saver WebSocket commands once."""
     websocket_api.async_register_command(hass, websocket_get_battery_saver)
     websocket_api.async_register_command(hass, websocket_set_battery_saver)
+    websocket_api.async_register_command(hass, websocket_set_custom_battery_costs)

@@ -15,22 +15,24 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
 
     def test_active_panel_loads_enhanced_emhass_settings_entrypoint(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        v047 = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v046.js?v=0.46-external-pv1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.46-external-pv1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.46-external-pv1"', v045)
+        self.assertIn("gw-energy-pilot-v047.js?v=0.47-custom-battery1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.47-custom-battery1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.46-external-pv1"',
+            'import "./gw-energy-pilot-v043.js?v=0.47-custom-battery1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.46-external-pv1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.46-external-pv1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.46-external-pv1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.47-custom-battery1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.47-custom-battery1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.47-custom-battery1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:

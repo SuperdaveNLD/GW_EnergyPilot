@@ -4,6 +4,27 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [0.47] - 2026-08-29
+
+### Added
+
+- Added a first-class **Custom / Aangepast** Battery Saver editor to both the dashboard and Settings → EMHASS. Administrators can edit the five non-negative EMHASS battery cost values in one transaction and immediately rebuild the plan; the complete previous Battery Saver configuration is restored if saving or the first optimization fails.
+- Archived the preserved Gold Rush field baseline used to validate the profile tuning.
+
+### Changed
+
+- Increased Battery Strategy and Battery Saver settings typography, including profile descriptions, status text, custom field labels and values, while retaining the stable-DOM and native touch-scroll contracts.
+- Retuned Gold Rush after preserved baseline and follow-up field comparisons: its per-direction anti-churn factor increases from `2.25%` to `6% × dynamic price reference`, while its battery power-stress factor decreases from `3%` to `1% × dynamic price reference`. The 6% run removed the low-value 765 W, 857 W and 426 W short reversals, retained profitable 15 kW dispatch and reduced the comparable modeled objective by `0.026`.
+- Applied the same 6% anti-churn floor to the preservation-oriented Balanced and Battery Saver profiles while retaining their existing low-SOC and 8%/20% power-stress policy. Mad-Steve deliberately remains at 2.25% for maximum economic freedom.
+- Replaced the profile-specific 96%/95%/90% hard upper limits with a 100% hard maximum for every managed profile and a shared soft red zone above 95%. The hourly EMHASS surplus-cost factors are now 5% / 10% / 25% / 50% for Mad-Steve / Gold Rush / Balanced / Battery Saver, allowing a profitable move to 100% while discouraging prolonged high-SOC dwell.
+- Kept `battery_charge_efficiency` and `battery_discharge_efficiency` installation-owned and unchanged by profile selection.
+- Added the presentation-only `gw-energy-pilot-v047.js` wrapper and refreshed the complete active frontend graph with the `0.47-custom-battery1` cache key.
+
+### Safety and compatibility
+
+- Custom editing remains administrator-only and single-battery-only, validates finite non-negative values, preserves EMHASS scalar/list shapes and writes the complete merged configuration.
+- Minimum/Maximum SOC entities, unrelated EMHASS configuration, inverter topology, battery efficiency, GoodWe registers/writes, EMS control, entity identity, Store keys, plan resilience and accounting remain under their existing owners.
+
 ## [0.46] - 2026-08-29
 
 ### Added

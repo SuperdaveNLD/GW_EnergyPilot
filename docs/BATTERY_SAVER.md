@@ -33,16 +33,16 @@ The managed-profile contract is:
 
 This removes the need to maintain one Battery Saver mode and a separate manual EMHASS maximum-SOC setting that can drift away from the intended profile.
 
-The profile hard maxima are:
+All profile hard maxima are 100%. The upper 5% is deliberately modeled as a soft red zone instead of being made unreachable:
 
 | Mode | Hard maximum SOC |
 | --- | ---: |
 | **Mad-Steve** | **100%** |
-| **Gold Rush** | **96%** |
-| **Balanced** | **95%** |
-| **Battery Saver / Eco** | **90%** |
+| **Gold Rush** | **100%** |
+| **Balanced** | **100%** |
+| **Battery Saver / Eco** | **100%** |
 
-The GoodWe minimum is checked against the **effective profile maximum** after the profile is applied. This is important when moving from a lower-cap profile to Mad-Steve: an old lower EMHASS maximum must not reject a mode that intentionally raises the maximum.
+The GoodWe minimum is checked against the **effective profile maximum** after the profile is applied. This also lets a managed profile safely replace a legacy or Custom lower EMHASS maximum with the current 100% boundary.
 
 ## Two different battery costs
 
@@ -50,23 +50,30 @@ Battery Saver separates **whether a battery transaction is worth doing** from **
 
 ### Anti-churn transaction cost
 
-All four managed profiles use the same linear EMHASS charge/discharge weight:
+Mad-Steve deliberately retains the established aggressive linear EMHASS charge/discharge weight:
 
 ```text
 weight_battery_charge    = 2.25% × price reference
 weight_battery_discharge = 2.25% × price reference
 ```
 
-At the field-test price reference of roughly `0.31`, this gives approximately `0.007` currency/kWh per direction.
+Gold Rush, Balanced and Battery Saver use the field-tuned floor:
+
+```text
+weight_battery_charge    = 6% × price reference
+weight_battery_discharge = 6% × price reference
+```
+
+At the captured Gold Rush price reference of `0.1215`, this gives `0.007290` currency/kWh per direction. It removed the low-value 765 W, 857 W and 426 W short reversals while preserving the profitable 15 kW evening dispatch. One 1847 W reversal across a `0.025`/kWh spread remains economically justified by the linear EMHASS model.
 
 The tuning was developed in two steps:
 
-1. approximately `0.005` per direction removed several low-value quarter-hour reversals while preserving high-value evening dispatch;
-2. a follow-up comparison around `0.007` per direction further reduced low-value churn while still allowing full-power battery operation when the price spread justified it.
+1. the shared 2.25% floor removed several low-value quarter-hour reversals while preserving high-value evening dispatch;
+2. a captured standard Gold Rush plan still contained marginal one-slot reversals; 3.5% was insufficient, while 6% removed the low-value reversals and reduced the comparable modeled objective by only `0.026`. Gold Rush power stress moved from 3% to 1% so valuable dispatch can still use high power.
 
 The factor remains price-relative instead of being hard-coded in EUR. This keeps the virtual transaction cost proportional to the price magnitude/currency used by the active EMHASS forecast.
 
-A charge/discharge round trip pays both weights. The common floor is intentional: even Mad-Steve should not reverse the battery for a negligible spread.
+A charge/discharge round trip pays both weights. Mad-Steve remains the deliberately aggressive exception. Balanced and Battery Saver use the proven 6% floor as well, because their preservation-oriented policy should not accept a transaction that profit-first Gold Rush rejects.
 
 ### Battery power-stress cost
 
@@ -74,36 +81,59 @@ A charge/discharge round trip pays both weights. The common floor is intentional
 
 This is why a profile can choose 9–12 kW instead of 15 kW even when the hardware allows 15 kW. If nearby timesteps have similar value, EMHASS can spread the same energy and reduce the stress penalty.
 
+### High-SOC red-zone dwell cost
+
+Every profile uses `battery_soc_surplus_threshold = 0.95`. EMHASS applies `battery_soc_surplus_cost` to every kWh above that threshold for every hour it remains there:
+
+```text
+surplus penalty
+  = surplus cost × timestep hours
+  × max(0, stored energy − energy at 95% SOC)
+```
+
+This is a soft economic boundary, not a hard stop. EMHASS can charge to 100% when the forecast value exceeds the penalty, but charging into the red zone early becomes more expensive than reaching it shortly before the energy is needed.
+
+The hourly cost factors are:
+
+```text
+Mad-Steve       5% × dynamic price reference per kWh/hour
+Gold Rush      10% × dynamic price reference per kWh/hour
+Balanced       25% × dynamic price reference per kWh/hour
+Battery Saver  50% × dynamic price reference per kWh/hour
+```
+
+For a 33.2 kWh battery at the captured `0.1215` price reference, remaining at 100% costs approximately `0.0101`, `0.0202`, `0.0504` or `0.1008` currency per hour respectively. The charge/discharge efficiency settings remain installation-owned and are not used as a substitute for this explicit aging/risk policy.
+
 ## Managed profiles
 
 | Mode | Hard max | Low-SOC threshold | Low-SOC cost | High-SOC threshold | High-SOC cost | Power-stress cost | Anti-churn charge / discharge |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Mad-Steve** | **100%** | 5% | 0% × price ref | 100% | 0% × price ref | 0% × price ref | **2.25% / 2.25% × price ref** |
-| **Gold Rush** | **96%** | 5% | 0% × price ref | 96% | 5% × price ref | 3% × price ref | **2.25% / 2.25% × price ref** |
-| **Balanced** | **95%** | 10% | 5% × price ref | 95% | 10% × price ref | 8% × price ref | **2.25% / 2.25% × price ref** |
-| **Battery Saver / Eco** | **90%** | 15% | 10% × price ref | 90% | 25% × price ref | 20% × price ref | **2.25% / 2.25% × price ref** |
+| **Mad-Steve** | **100%** | 5% | 0% × price ref | 95% | **5% × price ref / kWh/h** | 0% × price ref | **2.25% / 2.25% × price ref** |
+| **Gold Rush** | **100%** | 5% | 0% × price ref | 95% | **10% × price ref / kWh/h** | **1% × price ref** | **6% / 6% × price ref** |
+| **Balanced** | **100%** | 10% | 5% × price ref | 95% | **25% × price ref / kWh/h** | 8% × price ref | **6% / 6% × price ref** |
+| **Battery Saver / Eco** | **100%** | 15% | 10% × price ref | 95% | **50% × price ref / kWh/h** | 20% × price ref | **6% / 6% × price ref** |
 
 All four profiles use `battery_stress_segments = 10`.
 
-The current managed presets intentionally align the high-SOC threshold with the hard profile maximum. The hard maximum is therefore the binding upper boundary. The high-SOC cost fields remain part of the owned profile contract for compatibility and diagnostics, but the optimizer cannot intentionally operate above that profile maximum.
+The hard maximum and high-SOC threshold are intentionally different. The 100% maximum is the physical optimization boundary; the 95% threshold starts the time-dependent economic red zone.
 
 ### Mad-Steve
 
-Maximum economic freedom. Mad-Steve can use the full configured 0–100% EMHASS upper range and has no extra low-SOC, high-SOC or power-stress penalty. It still uses the common anti-churn cost so tiny price differences do not automatically justify needless battery throughput.
+Maximum economic freedom. Mad-Steve can use the full configured 0–100% EMHASS range and has no extra low-SOC or power-stress penalty. Its 5% high-SOC factor is the lightest red-zone price, and its 2.25% anti-churn floor keeps this profile deliberately more aggressive than the other managed modes.
 
 A legacy all-zero EMHASS battery-cost configuration is still more aggressive than managed Mad-Steve because it has no anti-churn weight at all.
 
 ### Gold Rush
 
-Profit remains the priority. Gold Rush uses a 96% hard maximum, no extra low-SOC penalty and only light battery power stress. Large price spreads can still justify 15 kW battery operation or the full shared hybrid-inverter limit.
+Profit remains the priority. Gold Rush can reach 100%, but pays a 10% per-kWh/hour factor above 95%. It has no extra low-SOC penalty, uses the field-tested 6% anti-churn floor and only 1% price-relative battery power stress. Large price spreads can still justify 15 kW operation and the complete red-zone capacity, while the dwell penalty discourages filling that last 5% too early.
 
 ### Balanced
 
-The recommended general-purpose profile. Balanced uses a 95% hard maximum and moderate low-SOC/power-stress penalties. It is intended to preserve most of the economic value of Gold Rush while reducing low-value high-power cycling.
+The recommended general-purpose profile. Balanced can reach 100% when warranted, but its 25% red-zone factor and moderate low-SOC/power-stress penalties require more value than Gold Rush before using or dwelling in the last 5%.
 
 ### Battery Saver / Eco
 
-Battery preservation has the highest virtual value. The hard maximum is 90%, the low-SOC zone begins at 15%, and the power-stress penalty is strongest. Full power can still occur when the optimizer finds enough economic value, but it is materially more expensive than in the other profiles.
+Battery preservation has the highest virtual value. It still permits 100% for an exceptional opportunity, but the 50% red-zone factor makes prolonged high-SOC dwell most expensive. The low-SOC zone begins at 15% and the power-stress penalty remains strongest.
 
 ## Why battery power can be below 15 kW
 
@@ -137,6 +167,26 @@ Battery Saver remains opt-in.
 - Non-zero power-stress profiles require EMHASS 0.18.1 or newer when the version is known.
 - A failed first profile+optimization transaction restores the previous EnergyPilot mode and every Battery Saver-owned EMHASS field.
 - Maximum SOC participates in the same apply/rollback transaction as the economic profile values.
+
+## Custom value editor
+
+**Custom / Aangepast** is available in both the dashboard Battery Strategy card and **Settings → EMHASS → Battery Saver**. When Custom is active, an administrator can edit these five raw, non-negative EMHASS cost values:
+
+```text
+battery_soc_deficit_cost
+battery_soc_surplus_cost
+battery_stress_cost
+weight_battery_charge
+weight_battery_discharge
+```
+
+The editor deliberately does not reinterpret the values as profile percentages. It preserves the EMHASS single-battery storage contract: the three penalty costs remain scalars and the charge/discharge weights remain one-item lists.
+
+One **Save and optimize** action reads the current complete EMHASS configuration, merges only these five fields, releases managed-profile ownership, writes `/set-config` and builds a fresh plan. If the write or first optimization fails, EnergyPilot restores the previous mode, runtime profile state and all nine Battery Saver-owned EMHASS fields. Dashboard and settings caches are updated from the same returned payload.
+
+The Custom editor is intentionally disabled for multi-battery configurations because one visible value cannot safely represent heterogeneous batteries. Selecting Custom itself remains available so a multi-battery installation can release EnergyPilot profile ownership without changing its EMHASS values.
+
+Minimum and Maximum SOC retain their dedicated synchronized Home Assistant number-entity paths and are not duplicated by the five-cost transaction.
 
 The EnergyPilot-owned fields are now:
 

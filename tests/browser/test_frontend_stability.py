@@ -17,7 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047"}
 
 
 @dataclass(frozen=True)
@@ -607,6 +607,9 @@ def exercise_soc_slider_draft(page: Page) -> dict[str, object]:
         "slider_kept_draft": False,
         "label_kept_draft": False,
         "acknowledged": False,
+        "custom_values_saved": False,
+        "custom_main_stable": False,
+        "custom_typography_larger": False,
         "error": None,
     }
     try:
@@ -661,6 +664,53 @@ def exercise_soc_slider_draft(page: Page) -> dict[str, object]:
         result["label_kept_draft"] = measured["stationary"]["label"] == "37%"
         result["acknowledged"] = (
             str(measured["actual"]) == "37" and measured["draft"] == ""
+        )
+        custom = page.evaluate(
+            """
+            async () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const main = root.querySelector('main');
+              const form = root.querySelector('[data-ep-v038-custom-form]');
+              const requested = {
+                battery_soc_deficit_cost: 0.001111,
+                battery_soc_surplus_cost: 0.002222,
+                battery_stress_cost: 0.003333,
+                weight_battery_charge: 0.004444,
+                weight_battery_discharge: 0.005555,
+              };
+              for (const [key, value] of Object.entries(requested)) {
+                const input = form?.querySelector(`[data-ep-v038-custom-value="${key}"]`);
+                if (input) input.value = String(value);
+              }
+              const titleSize = parseFloat(getComputedStyle(
+                root.querySelector('.ep-v038-profile strong')
+              ).fontSize);
+              const descriptionSize = parseFloat(getComputedStyle(
+                root.querySelector('.ep-v038-profile small')
+              ).fontSize);
+              form?.dispatchEvent(new Event('submit', { bubbles: true, composed: true, cancelable: true }));
+              await new Promise((resolve) => setTimeout(resolve, 160));
+              const call = [...window.__epWsCalls].reverse().find(
+                item => item.type === 'gw_energypilot/battery_saver/custom_set'
+              );
+              return {
+                requested,
+                submitted: call?.values || null,
+                managed: panel.__epV038BatterySaver?.data?.managed,
+                mainStable: main === root.querySelector('main'),
+                titleSize,
+                descriptionSize,
+              };
+            }
+            """
+        )
+        result["custom_values_saved"] = (
+            custom["submitted"] == custom["requested"] and custom["managed"] is False
+        )
+        result["custom_main_stable"] = custom["mainStable"]
+        result["custom_typography_larger"] = (
+            custom["titleSize"] >= 12 and custom["descriptionSize"] >= 9
         )
     except PlaywrightError as err:
         result["error"] = str(err)
@@ -722,7 +772,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, object]:
     """Emulate Home Assistant host assignments during one physical press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047"}
     result: dict[str, object] = {
         "ran": enabled,
         "no_full_render": False,
@@ -937,7 +987,7 @@ def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, obje
 
 def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, object]:
     """Prove split HA state events patch one unambiguous stable selection."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047"}
     result: dict[str, object] = {
         "ran": enabled,
         "event_ordering": False,
@@ -1141,7 +1191,7 @@ def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Keep EMHASS and manual selectors live without rebuilding the dashboard."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047"}
     result: dict[str, object] = {
         "ran": enabled,
         "costfun_delayed": False,
@@ -1395,7 +1445,7 @@ def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -1955,7 +2005,7 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046"}
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -2792,6 +2842,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     expected_badge = {
         "v045": "v0.45 BETA",
         "v046": "v0.46 BETA",
+        "v047": "v0.47 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -2898,7 +2949,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046"}:
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047"}:
         required_host_press = (
             "ran", "no_full_render", "main_stable", "controls_stable",
             "native_click", "touch_click",
@@ -2928,7 +2979,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: stable selector feedback regression failed")
         if selector_stability["error"]:
             failures.append(f"{name}: stable selector feedback interaction error")
-    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046"}:
+    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -2938,7 +2989,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046"}:
+    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -2975,9 +3026,12 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         soc_slider[key] is True
         for key in (
             "present", "slider_kept_draft", "label_kept_draft", "acknowledged",
+            "custom_values_saved", "custom_main_stable", "custom_typography_larger",
         )
     ):
-        failures.append(f"{name}: SOC slider draft was replaced by stale telemetry")
+        failures.append(
+            f"{name}: custom Battery Strategy editing or SOC draft stability regressed"
+        )
     if soc_slider["error"]:
         failures.append(f"{name}: SOC slider interaction error")
     if strategy["present"] is not True or strategy["changed"] is not True:
@@ -3013,7 +3067,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: deliberate narrow-layout structural render failed")
     if structural["menu_open"] is not True or structural["menu_close"] is not True:
         failures.append(f"{name}: controls failed after a structural layout render")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047"} and not all(
         structural.get(key) is True
         for key in ("settings_open", "optimize_in_settings", "settings_close")
     ):

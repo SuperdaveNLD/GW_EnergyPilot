@@ -66,6 +66,42 @@ class BatterySaverApiContractTests(unittest.TestCase):
         )
         self.assertIn("_async_restore_battery_saver_config(", rollback)
 
+    def test_custom_cost_editor_uses_one_validated_transaction(self) -> None:
+        source = self.source
+        self.assertIn(
+            'vol.Required("type"): "gw_energypilot/battery_saver/custom_set"',
+            source,
+        )
+        self.assertIn('vol.Required("values"): CUSTOM_BATTERY_COST_SCHEMA', source)
+        self.assertIn("updates = custom_battery_cost_updates(msg[\"values\"])", source)
+        self.assertIn("if number_of_batteries(config) != 1:", source)
+        self.assertIn("updated_config = dict(config)", source)
+        self.assertIn("updated_config.update(updates)", source)
+        self.assertIn(
+            'await orchestrator.async_optimize(reason="battery_saver_custom_changed")',
+            source,
+        )
+
+    def test_failed_custom_cost_apply_restores_profile_and_all_owned_fields(self) -> None:
+        source = self.source
+        start = source.index("async def websocket_set_custom_battery_costs(")
+        end = source.index("\n\n@callback", start)
+        custom = source[start:end]
+        failure_start = custom.index("    except Exception as err:")
+        failure_end = custom.index("    try:\n        refreshed_config", failure_start)
+        rollback = custom[failure_start:failure_end]
+
+        self.assertIn(
+            "hass.config_entries.async_update_entry(entry, options=old_options)",
+            rollback,
+        )
+        self.assertIn("orchestrator.last_battery_saver_profile = previous_profile", rollback)
+        self.assertIn(
+            "orchestrator.last_effective_soc_final = previous_effective_soc",
+            rollback,
+        )
+        self.assertIn("_async_restore_battery_saver_config(", rollback)
+
 
 if __name__ == "__main__":
     unittest.main()

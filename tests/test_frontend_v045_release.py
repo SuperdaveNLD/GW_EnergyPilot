@@ -7,30 +7,32 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "0.46-external-pv1"
+CACHE_KEY = "0.47-custom-battery1"
 
 
 class FrontendV045ReleaseTests(unittest.TestCase):
-    def test_v045_remains_in_the_active_v046_chain(self) -> None:
+    def test_v045_remains_in_the_active_v047_chain(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        active = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
+        active = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
+        v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "0.46")
+        self.assertEqual(manifest["version"], "0.47")
         self.assertIn(
-            "gw-energy-pilot-v046.js?v=0.46-external-pv1", init_source
+            "gw-energy-pilot-v047.js?v=0.47-custom-battery1", init_source
         )
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.46-external-pv1"', active)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"', active)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"', v046)
         self.assertIn('const VERSION = "0.45"', release)
         self.assertIn("__epV045Installed", release)
         self.assertIn(
-            'import "./gw-energy-pilot-v044.js?v=0.46-external-pv1"', release
+            'import "./gw-energy-pilot-v044.js?v=0.47-custom-battery1"', release
         )
 
-    def test_v045_subgraph_uses_the_active_v046_cache_key(self) -> None:
+    def test_v045_subgraph_uses_the_active_v047_cache_key(self) -> None:
         statement_pattern = re.compile(r"^import\s+[\s\S]*?;", re.MULTILINE)
         dependency_pattern = re.compile(r'["\'](\./[^"\']+)["\']')
         pending = ["gw-energy-pilot-v045.js"]
