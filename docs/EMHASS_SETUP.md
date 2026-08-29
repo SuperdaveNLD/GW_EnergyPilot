@@ -286,6 +286,11 @@ prod_price_forecast
 
 If runtime pricing is enabled but no compatible source exists, EnergyPilot reports an error rather than silently optimizing with unintended prices.
 
+If the official service exists but temporarily fails or returns no usable prices for today,
+EnergyPilot still tries the `raw_today` / `raw_tomorrow` fallback. When that fallback is
+also unavailable, diagnostics report `official_nordpool_unavailable` and retain the
+official-service failure instead of incorrectly saying that no source is configured.
+
 ## 12. First optimization
 
 For a manual-only configuration, wait until Home Assistant startup has finished and EnergyPilot telemetry is available. Then press **Optimize now**.

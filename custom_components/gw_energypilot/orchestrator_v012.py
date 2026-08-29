@@ -487,7 +487,12 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
             self.last_price_entity = None
             return {}, {}
 
-        load_cost, prod_price = await super()._async_price_forecasts()
+        official_error: HomeAssistantError | None = None
+        try:
+            load_cost, prod_price = await super()._async_price_forecasts()
+        except HomeAssistantError as err:
+            official_error = err
+            load_cost, prod_price = {}, {}
         if load_cost and prod_price:
             self.last_price_source = "official_nordpool"
             self.last_price_entity = None
@@ -502,6 +507,20 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
                 self.last_price_area = entity_id
                 self.last_price_points = len(load_cost)
                 return load_cost, prod_price
+
+        if official_error is not None:
+            self.last_price_source = "official_nordpool_unavailable"
+            self.last_price_entity = entity_id
+            self.last_price_points = 0
+            error = (
+                "Official Nord Pool runtime pricing is enabled and the "
+                "nordpool.get_prices_for_date service was found, but it could "
+                f"not provide usable prices: {official_error}. No usable "
+                "raw_today/raw_tomorrow fallback sensor was available. Check "
+                "the Nord Pool integration and try again."
+            )
+            self._set_status("error_prices", error)
+            raise HomeAssistantError(error) from official_error
 
         self.last_price_source = "missing"
         self.last_price_entity = entity_id
