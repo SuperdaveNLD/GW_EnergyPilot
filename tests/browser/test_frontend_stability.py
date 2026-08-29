@@ -317,8 +317,16 @@ def open_and_close_menu(page: Page) -> dict[str, object]:
 def exercise_automatic_control(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "present": False,
+        "compact_on": False,
         "off_changed": False,
+        "controls_shown_off": False,
+        "off_nodes_stable": False,
         "on_changed": False,
+        "compact_restored_on": False,
+        "on_nodes_stable": False,
+        "manual_mode_worked": False,
+        "focus_rehomed": False,
+        "final_on": False,
         "main_stable": False,
         "error": None,
     }
@@ -327,7 +335,34 @@ def exercise_automatic_control(page: Page) -> dict[str, object]:
         auto.scroll_into_view_if_needed(timeout=5_000)
         result["present"] = auto.count() == 1
         page.evaluate(
-            "window.__epAutoMain = window.__epPanel.shadowRoot.querySelector('main')"
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              window.__epAutoMain = root.querySelector('main');
+              window.__epManualIdentity = {
+                pad: root.querySelector('.ep-v021-manual-pad'),
+                grid: root.querySelector('.ep-v021-mode-grid'),
+                power: root.querySelector('.ep-v021-power-row'),
+                mode: root.querySelector('.ep-v021-mode-button[data-mode="8"]'),
+                slider: root.querySelector('.ep-v021-power-slider'),
+              };
+            }
+            """
+        )
+        result["compact_on"] = page.evaluate(
+            """
+            () => {
+              const identity = window.__epManualIdentity;
+              return Boolean(
+                identity.pad?.classList.contains('compact') &&
+                identity.grid?.hidden && identity.power?.hidden &&
+                identity.mode?.disabled && identity.slider?.disabled &&
+                identity.pad?.querySelector('[data-manual-note]')?.textContent.includes(
+                  'Automatic Control owns the inverter.'
+                )
+              );
+            }
+            """
         )
         automatic_id = page.evaluate(
             "window.__epPanel._entityId('automatic_control')"
@@ -347,17 +382,170 @@ def exercise_automatic_control(page: Page) -> dict[str, object]:
             automatic_id,
         )
         result["off_changed"] = before == "on" and after_off == "off"
+        page.wait_for_function(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              return !root.querySelector('.ep-v021-manual-pad')?.classList.contains('compact') &&
+                !root.querySelector('.ep-v021-mode-grid')?.hidden &&
+                !root.querySelector('.ep-v021-power-row')?.hidden;
+            }
+            """,
+            timeout=5_000,
+        )
+        off_state = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const identity = window.__epManualIdentity;
+              const pad = root.querySelector('.ep-v021-manual-pad');
+              const grid = root.querySelector('.ep-v021-mode-grid');
+              const power = root.querySelector('.ep-v021-power-row');
+              const mode = root.querySelector('.ep-v021-mode-button[data-mode="8"]');
+              const slider = root.querySelector('.ep-v021-power-slider');
+              return {
+                shown: Boolean(
+                  pad && !pad.classList.contains('compact') &&
+                  grid && !grid.hidden && power && !power.hidden &&
+                  mode && !mode.disabled && mode.getAttribute('aria-disabled') === 'false' &&
+                  slider && !slider.disabled &&
+                  pad.querySelector('[data-manual-note]')?.textContent.trim().startsWith('Live:')
+                ),
+                stable: Boolean(
+                  identity.pad === pad && identity.grid === grid &&
+                  identity.power === power && identity.mode === mode &&
+                  identity.slider === slider
+                ),
+              };
+            }
+            """
+        )
+        result["controls_shown_off"] = off_state["shown"]
+        result["off_nodes_stable"] = off_state["stable"]
 
         auto = shadow(page, "#auto-toggle")
         auto.click(timeout=5_000)
         page.wait_for_function(
-            "entityId => window.__epHass.states[entityId]?.state === 'on'",
+            """
+            entityId => {
+              const root = window.__epPanel.shadowRoot;
+              return window.__epHass.states[entityId]?.state === 'on' &&
+                root.querySelector('.ep-v021-manual-pad')?.classList.contains('compact') &&
+                root.querySelector('.ep-v021-mode-grid')?.hidden &&
+                root.querySelector('.ep-v021-power-row')?.hidden;
+            }
+            """,
             arg=automatic_id,
             timeout=5_000,
         )
         result["on_changed"] = True
+        on_state = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const identity = window.__epManualIdentity;
+              const pad = root.querySelector('.ep-v021-manual-pad');
+              const grid = root.querySelector('.ep-v021-mode-grid');
+              const power = root.querySelector('.ep-v021-power-row');
+              const mode = root.querySelector('.ep-v021-mode-button[data-mode="8"]');
+              const slider = root.querySelector('.ep-v021-power-slider');
+              return {
+                compact: Boolean(
+                  pad?.classList.contains('compact') && grid?.hidden &&
+                  power?.hidden && mode?.disabled && slider?.disabled
+                ),
+                stable: Boolean(
+                  identity.pad === pad && identity.grid === grid &&
+                  identity.power === power && identity.mode === mode &&
+                  identity.slider === slider
+                ),
+              };
+            }
+            """
+        )
+        result["compact_restored_on"] = on_state["compact"]
+        result["on_nodes_stable"] = on_state["stable"]
         result["main_stable"] = page.evaluate(
             "window.__epAutoMain === window.__epPanel.shadowRoot.querySelector('main')"
+        )
+
+        auto = shadow(page, "#auto-toggle")
+        auto.click(timeout=5_000)
+        page.wait_for_function(
+            """
+            entityId => {
+              const root = window.__epPanel.shadowRoot;
+              return window.__epHass.states[entityId]?.state === 'off' &&
+                !root.querySelector('.ep-v021-manual-pad')?.classList.contains('compact') &&
+                !root.querySelector('.ep-v021-mode-grid')?.hidden &&
+                !root.querySelector('.ep-v021-power-row')?.hidden;
+            }
+            """,
+            arg=automatic_id,
+            timeout=5_000,
+        )
+        manual_mode_id = page.evaluate(
+            "window.__epPanel._entityId('manual_mode')"
+        )
+        manual_calls_before = page.evaluate(
+            """
+            entityId => window.__epServiceCalls.filter(
+              call => call.domain === 'select' && call.service === 'select_option' &&
+                call.data?.entity_id === entityId
+            ).length
+            """,
+            manual_mode_id,
+        )
+        mode_eight = shadow(page, '.ep-v021-mode-button[data-mode="8"]')
+        mode_eight.click(timeout=5_000)
+        page.wait_for_function(
+            """
+            ([entityId, expected]) => window.__epServiceCalls.filter(
+              call => call.domain === 'select' && call.service === 'select_option' &&
+                call.data?.entity_id === entityId && call.data?.option?.startsWith('8:')
+            ).length === expected
+            """,
+            arg=[manual_mode_id, manual_calls_before + 1],
+            timeout=5_000,
+        )
+        result["manual_mode_worked"] = True
+
+        wait_render_idle(page)
+        mode_eight = shadow(page, '.ep-v021-mode-button[data-mode="8"]')
+        mode_eight.focus(timeout=5_000)
+        page.evaluate(
+            "window.__epSetEntityByKey('automatic_control', 'on')"
+        )
+        page.wait_for_function(
+            """
+            entityId => {
+              const root = window.__epPanel.shadowRoot;
+              return window.__epHass.states[entityId]?.state === 'on' &&
+                root.querySelector('.ep-v021-manual-pad')?.classList.contains('compact') &&
+                root.querySelector('.ep-v021-mode-grid')?.hidden &&
+                root.querySelector('.ep-v021-power-row')?.hidden;
+            }
+            """,
+            arg=automatic_id,
+            timeout=5_000,
+        )
+        result["focus_rehomed"] = page.evaluate(
+            """
+            () => window.__epPanel.shadowRoot.activeElement ===
+              window.__epPanel.shadowRoot.querySelector('#auto-toggle')
+            """
+        )
+        result["final_on"] = page.evaluate(
+            """
+            entityId => {
+              const root = window.__epPanel.shadowRoot;
+              return window.__epHass.states[entityId]?.state === 'on' &&
+                root.querySelector('.ep-v021-manual-pad')?.classList.contains('compact') &&
+                root.querySelector('.ep-v021-mode-grid')?.hidden &&
+                root.querySelector('.ep-v021-power-row')?.hidden;
+            }
+            """,
+            automatic_id,
         )
     except PlaywrightError as err:
         result["error"] = str(err)
@@ -1463,6 +1651,7 @@ def exercise_language(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "localized": False,
         "flow_localized": False,
+        "manual_summary_localized": False,
         "main_stable_during_telemetry": False,
         "idle_delta": None,
         "error": None,
@@ -1478,6 +1667,13 @@ def exercise_language(page: Page) -> dict[str, object]:
             timeout=10_000,
         )
         result["localized"] = True
+        result["manual_summary_localized"] = page.evaluate(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v021-manual-pad [data-manual-note]'
+            )?.textContent.includes('Automatische regeling bestuurt de omvormer.')
+            """
+        )
         telemetry = page.evaluate(
             """
             async () => {
@@ -2040,9 +2236,16 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard menu interaction error")
     if not all(
         automatic[key] is True
-        for key in ("present", "off_changed", "on_changed", "main_stable")
+        for key in (
+            "present", "compact_on", "off_changed", "controls_shown_off",
+            "off_nodes_stable", "on_changed", "compact_restored_on",
+            "on_nodes_stable", "manual_mode_worked", "focus_rehomed",
+            "final_on", "main_stable",
+        )
     ):
-        failures.append(f"{name}: Automatic Control did not toggle stably twice")
+        failures.append(
+            f"{name}: compact manual controls did not toggle or operate stably"
+        )
     if automatic["error"]:
         failures.append(f"{name}: Automatic Control interaction error")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and not all(
@@ -2072,7 +2275,10 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
     if plan["error"]:
         failures.append(f"{name}: battery-plan refresh interaction error")
-    if language_result["localized"] is not True:
+    if (
+        language_result["localized"] is not True
+        or language_result["manual_summary_localized"] is not True
+    ):
         failures.append(f"{name}: Dutch structural render did not localize")
     if language_result["flow_localized"] is not True:
         failures.append(f"{name}: Dutch flow accessibility label did not localize")

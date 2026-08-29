@@ -332,15 +332,22 @@ v0.21+ includes the twelve-mode manual pad in the Controller card.
 
 Automatic Control ON:
 
-- manual buttons/slider are locked;
-- live mode read-back remains highlighted.
+- the manual mode grid and power slider are hidden from view and the
+  accessibility tree;
+- a compact ownership summary remains visible;
+- live mode and setpoint read-back remain available in the Controller metrics.
 
 Automatic Control OFF:
 
-- modes 1–12 can be selected manually;
+- the same stable manual-control nodes become visible and usable;
+- modes 1–12 can be selected manually when the required entities are available;
 - the power slider runs from 0 W to configured maximum control power;
 - modes 1/6/7/8 force 0 W;
 - mode 7 requires extra confirmation.
+
+If the required manual mode or manual power entity is missing, EnergyPilot keeps
+the compact summary visible with an explicit unavailable status instead of
+showing unusable controls.
 
 Manual commands are never remapped by the GoodWe smart-meter strategy setting.
 

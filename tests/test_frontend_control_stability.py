@@ -24,6 +24,12 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.model = (FRONTEND / "gw-energy-pilot-v038-model.js").read_text(
             encoding="utf-8"
         )
+        self.manual = (FRONTEND / "gw-energy-pilot-v021.js").read_text(
+            encoding="utf-8"
+        )
+        self.stable = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
+            encoding="utf-8"
+        )
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
         self.assertIn("gw-energy-pilot-v038-runtime.js?v=", self.entry)
@@ -57,6 +63,32 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("panel.__epV041RefreshStrategy", self.strategy)
         self.assertIn("requestStrategyRefresh(panel)", self.strategy)
         self.assertIn("updateStrategyVisualState(panel, true)", self.strategy)
+
+    def test_manual_controls_compact_without_replacing_control_nodes(self) -> None:
+        self.assertIn('pad.className = `ep-v021-manual-pad', self.manual)
+        self.assertIn('class="ep-v021-mode-grid"${compact ? " hidden" : ""}', self.manual)
+        self.assertIn('class="ep-v021-power-row"${compact ? " hidden" : ""}', self.manual)
+        self.assertIn('manual.classList.toggle("compact", compact)', self.stable)
+        self.assertIn("if (modeGrid) modeGrid.hidden = compact", self.stable)
+        self.assertIn("if (powerRow) powerRow.hidden = compact", self.stable)
+        self.assertNotIn("manual.remove()", self.stable)
+        self.assertNotIn("manual.replaceWith", self.stable)
+
+    def test_manual_controls_read_live_ownership_after_initial_lock(self) -> None:
+        self.assertIn(
+            'const automaticActive = panel._stateByKey?.("automatic_control")?.state === "on";',
+            self.manual,
+        )
+        self.assertIn("if (slider.disabled) return;", self.manual)
+        self.assertNotIn("if (slider && !locked)", self.manual)
+        self.assertIn(
+            'modeButton.setAttribute("aria-disabled", modeButton.disabled ? "true" : "false")',
+            self.stable,
+        )
+        self.assertIn(
+            'note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong>',
+            self.stable,
+        )
 
     def test_v038_profile_identity_is_language_independent(self) -> None:
         self.assertIn('label: "Battery Saver"', self.model)

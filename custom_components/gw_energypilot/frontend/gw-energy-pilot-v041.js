@@ -40,6 +40,12 @@ const COPY = Object.freeze({
     locked: "LOCKED · AUTOMATIC",
     manualReady: "MANUAL READY",
     entitiesMissing: "ENTITIES MISSING",
+    automaticOwner: "Automatic Control owns the inverter.",
+    automaticOwnerDetail: "Manual controls are hidden; the active mode continues to follow live Modbus read-back.",
+    manualUnavailable: "Manual controls are unavailable.",
+    manualUnavailableDetail: "The required Home Assistant entities are missing.",
+    live: "Live",
+    hoverHint: "Hover a mode for its meaning.",
     today: "Today",
     yesterday: "Yesterday",
     motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
@@ -79,6 +85,12 @@ const COPY = Object.freeze({
     locked: "VERGRENDELD · AUTOMATISCH",
     manualReady: "HANDMATIG GEREED",
     entitiesMissing: "ENTITEITEN ONTBREKEN",
+    automaticOwner: "Automatische regeling bestuurt de omvormer.",
+    automaticOwnerDetail: "Handmatige bediening is verborgen; de actieve modus volgt de live Modbus-teruglezing.",
+    manualUnavailable: "Handmatige bediening is niet beschikbaar.",
+    manualUnavailableDetail: "De vereiste Home Assistant-entiteiten ontbreken.",
+    live: "Live",
+    hoverHint: "Beweeg over een modus voor uitleg.",
     today: "Vandaag",
     yesterday: "Gisteren",
     motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
@@ -674,15 +686,27 @@ function patchController(panel, root, automaticOn) {
 
   const manual = card.querySelector(".ep-v021-manual-pad");
   if (manual) {
+    button?.setAttribute("aria-controls", manual.id);
     const controlsReady = Boolean(panel._entityId?.("manual_mode") && panel._entityId?.("manual_power"));
     const busy = Boolean(panel.__epV021ManualBusy);
-    manual.classList.toggle("locked", automaticOn || !controlsReady);
+    const compact = automaticOn || !controlsReady;
+    const wasCompact = manual.classList.contains("compact");
+    if (compact && !wasCompact && manual.contains(root.activeElement)) {
+      button?.focus({ preventScroll: true });
+    }
+    manual.classList.toggle("locked", compact);
+    manual.classList.toggle("compact", compact);
+    const modeGrid = manual.querySelector(".ep-v021-mode-grid");
+    const powerRow = manual.querySelector(".ep-v021-power-row");
+    if (modeGrid) modeGrid.hidden = compact;
+    if (powerRow) powerRow.hidden = compact;
     const state = manual.querySelector(".ep-v021-manual-state");
     if (state) state.textContent = automaticOn ? t.locked : controlsReady ? t.manualReady : t.entitiesMissing;
     for (const modeButton of manual.querySelectorAll(".ep-v021-mode-button")) {
       const active = Number(modeButton.dataset.mode) === mode;
       modeButton.classList.toggle("active", active);
       modeButton.disabled = automaticOn || !controlsReady || busy;
+      modeButton.setAttribute("aria-disabled", modeButton.disabled ? "true" : "false");
     }
     const slider = manual.querySelector(".ep-v021-power-slider");
     const powerState = panel._stateByKey?.("manual_power");
@@ -700,6 +724,17 @@ function patchController(panel, root, automaticOn) {
     const powerLabel = manual.querySelector(".ep-v021-power-label strong");
     if (powerLabel && Number.isFinite(power) && !panel.__epV021ManualPowerDirty) {
       powerLabel.textContent = `${Math.round(power)} W`;
+    }
+    const note = manual.querySelector("[data-manual-note]");
+    if (note) {
+      if (automaticOn) {
+        note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong> ${panel._escape(t.automaticOwnerDetail)}`;
+      } else if (!controlsReady) {
+        note.innerHTML = `<strong>${panel._escape(t.manualUnavailable)}</strong> ${panel._escape(t.manualUnavailableDetail)}`;
+      } else if (!panel.__epV021ManualMessage?.text) {
+        const actualSetpoint = finite(panel, "ems_setpoint");
+        note.innerHTML = `<strong>${panel._escape(t.live)}:</strong> ${panel._escape(modeName)} · ${panel._escape(Number.isFinite(actualSetpoint) ? `${Math.round(actualSetpoint)} W` : "—")}. ${panel._escape(t.hoverHint)}`;
+      }
     }
   }
 

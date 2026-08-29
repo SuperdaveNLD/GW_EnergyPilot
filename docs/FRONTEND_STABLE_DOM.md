@@ -46,6 +46,12 @@ A complete render is allowed for Home Assistant language/locale, user/admin cont
 
 When context and structure signatures are unchanged, the `hass` setter does not queue the inherited complete render. It batches a live patch and mutates existing power/SOC/energy text, configured PV-source values, status classes, controller/EMHASS metrics, sliders, meter widths, diagnostics, static flow semantics and thermal values. The existing `main`, cards and controls remain connected.
 
+Automatic Control ownership changes patch the existing manual EMS pad in place.
+While automatic ownership is active, the manual mode grid and power row use the
+native `hidden` state and a compact ownership summary remains visible. When
+manual control becomes available, those same mode-button and slider nodes are
+revealed and enabled; they are not removed, replaced or reconstructed.
+
 ### Battery Strategy refresh
 
 Loading, pending, success/error and Custom-SOC feedback rerender only `.ep-v038-strategy`. Stable backend mode keys, not translated labels, remain the control identity.
@@ -74,11 +80,11 @@ The live-flow alternative is deliberately static. Existing connector nodes recei
 
 ## Required invariants
 
-A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. A plan refresh may replace the graph card, but none of those four persistent nodes.
+A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. An Automatic Control ON/OFF cycle must additionally preserve the manual pad, mode-grid, mode-button, power-row and slider nodes while changing their semantic visibility and disabled state. A plan refresh may replace the graph card, but none of those persistent nodes.
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.46 by `tests/browser/test_frontend_stability_v046.py`. All three profiles require one external-PV group, four fields, off-state disabling/dimming, on-state activation and value preservation, plus every inherited v0.45 stable-DOM, touch, SOC, flow, Optimize and scrolling assertion.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.46 by `tests/browser/test_frontend_stability_v046.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles require one external-PV group with four fields, off-state disabling/dimming, on-state activation and value preservation; compact manual controls under automatic ownership; stable manual-node identity across ownership changes; a working manual mode after release of automatic ownership; and every inherited stable-DOM, SOC, static-flow, Optimize, native-scroll and targeted-plan-refresh assertion.
 
 ## Contributor rules
 

@@ -58,6 +58,10 @@ const NL = Object.freeze({
     "Automatische regeling bestuurt de omvormer.",
   automaticOwnerDetail:
     "Bediening is vergrendeld; de actieve modus volgt de live Modbus-teruglezing.",
+  manualUnavailable:
+    "Handmatige bediening is niet beschikbaar.",
+  manualUnavailableDetail:
+    "De vereiste Home Assistant-entiteiten ontbreken.",
   live: "Live",
   hoverHint: "Beweeg over een modus voor uitleg.",
   strategy:
@@ -181,14 +185,19 @@ function localizeManualPad(panel, card, t) {
 
   const note = pad.querySelector("[data-manual-note]");
   if (!note) return;
-  const message = panel.__epV021ManualMessage?.text;
-  if (message) {
-    note.textContent = localizeManualMessage("nl", message);
+  if (automaticOn) {
+    note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong> ${panel._escape(t.automaticOwnerDetail)}`;
     return;
   }
 
-  if (automaticOn) {
-    note.innerHTML = `<strong>${panel._escape(t.automaticOwner)}</strong> ${panel._escape(t.automaticOwnerDetail)}`;
+  if (!controlsReady) {
+    note.innerHTML = `<strong>${panel._escape(t.manualUnavailable)}</strong> ${panel._escape(t.manualUnavailableDetail)}`;
+    return;
+  }
+
+  const message = panel.__epV021ManualMessage?.text;
+  if (message) {
+    note.textContent = localizeManualMessage("nl", message);
     return;
   }
 
