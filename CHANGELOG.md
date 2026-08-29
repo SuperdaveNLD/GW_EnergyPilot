@@ -10,17 +10,22 @@ All notable changes to GW EnergyPilot are documented here.
 
 - Added an independent **Include external PV** master switch with backwards-compatible activation for existing v0.45 external-source configurations.
 
+### Fixed
+
+- Keep native dashboard presses connected when Home Assistant repeats `narrow` or assigns a cloned-but-equivalent panel configuration; genuine nested configuration changes still trigger a structural render (#84).
+- Keep Battery quick actions, EMHASS cost-function selection/busy state and manual EMS feedback stable through delayed or split entity publication, including duplicate-tap prevention during an active EMHASS optimization (#84).
+
 ### Changed
 
 - Grouped all four external PV entity fields inside one panel and made their enabled/dimmed state follow the master switch immediately without a full dashboard render.
-- Preserve configured external entity IDs while external PV is disabled; disabled sources are not tracked or added to `pv_generation_power`.
+- Preserved configured external entity IDs while external PV is disabled; disabled sources are not tracked or added to `pv_generation_power`.
 - Refined static live-flow connectors with integrated arrowheads, directional brightness, restrained 3/4/5-pixel intensity steps and quieter idle/unavailable styling while preserving the no-motion contract.
-- Compact the twelve-mode manual EMS pad under automatic ownership while preserving and correctly re-enabling the same controls after Automatic Control is turned off (#87).
+- Compacted the twelve-mode manual EMS pad under automatic ownership while preserving and correctly re-enabling the same controls after Automatic Control is turned off (#87).
 - Added the v0.46 release wrapper, fresh `0.46-external-pv1` active-graph cache key and Chromium/WebKit switch/layout regressions.
 
 ### Safety and compatibility
 
-- External PV remains display-only. No GoodWe register/write, EMS/Automatic Control, EMHASS, plan, entity identity, Store or accounting behavior changes.
+- The v0.46 changes are limited to dashboard presentation, source selection and interaction stability. No GoodWe register/write, EMS/Automatic Control decision, EMHASS objective/topology, plan, entity identity, Store or accounting behavior changes.
 
 ## [0.45] - 2026-08-29
 

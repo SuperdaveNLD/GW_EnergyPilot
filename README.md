@@ -51,7 +51,11 @@ Release documentation:
 - The four external entity selectors are grouped in one panel, dimmed and locked while off, and immediately active while on.
 - Selected external entities are preserved while disabled and are simply excluded from the combined display total.
 - Existing v0.45 installations with a configured external source remain active after upgrade; fresh installations default to external PV off.
-- No control, EMHASS, GoodWe register, accounting or entity-identity behavior changes.
+- Static live-flow connectors use integrated arrowheads, restrained intensity and quiet idle/unavailable states without motion.
+- The twelve-mode manual EMS pad collapses to a compact ownership summary while Automatic Control is on and reveals the same live controls when manual ownership becomes available (#87).
+- Native mobile presses survive equivalent Home Assistant host-property updates; Battery quick actions, EMHASS strategy and manual EMS feedback remain stable through delayed publication, and an active EMHASS request rejects a duplicate tap (#84).
+- The complete active frontend graph uses the fresh `0.46-external-pv1` cache key.
+- No GoodWe register/write, Automatic Control decision, EMHASS objective/topology, accounting or entity-identity behavior changes.
 
 ## v0.45 highlights
 
@@ -61,7 +65,6 @@ Release documentation:
 - Battery Strategy SOC sliders keep the user's selected value and percentage during Chrome focus loss and telemetry, until Home Assistant confirms the saved value.
 - Battery · Plan · Price now overlays actual GoodWe SOC with validated single-battery EMHASS `SOC_opt` forecast on a separate 0–100% axis.
 - Live power connectors use static physical-direction arrows, relative low/medium/high thickness and explicit idle/unavailable states without reintroducing motion.
-- The twelve-mode manual EMS pad collapses to a compact ownership summary while Automatic Control is on and reveals the same live controls when manual ownership becomes available.
 - **Optimize now** is one safe-area-aware floating action that remains reachable while scrolling and when the optional EMHASS card is hidden or Settings is open.
 - The complete active frontend graph uses one fresh v0.45 cache key so these changes and the PV/SOC-slider work load together after upgrade.
 - Issues #84 and #87 are intentionally not part of v0.45.
