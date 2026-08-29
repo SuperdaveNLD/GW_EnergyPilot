@@ -10,6 +10,7 @@
 - Grouped all four external PV entity selectors inside one visual panel.
 - Disabled and dimmed the selectors while external PV is off, and enabled them immediately when the switch is on.
 - Preserved configured external entity IDs while the master switch is off.
+- Refined the inherited static live-flow presentation with integrated arrowheads, directional pipe brightness, restrained 3/4/5-pixel intensity steps and quieter idle/unknown styling.
 - Added `gw-energy-pilot-v046.js` and refreshed the active frontend dependency graph with `0.46-external-pv1`.
 - Extended the real-browser matrix with grouped-panel, master-switch, enabled-state and value-preservation assertions.
 

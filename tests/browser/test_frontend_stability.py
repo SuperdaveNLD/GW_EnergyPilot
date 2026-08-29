@@ -178,6 +178,7 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
               const arrowRect = arrow?.getBoundingClientRect();
               const vertical = key === 'house' || key === 'battery';
               const trackStyle = track ? getComputedStyle(track) : null;
+              const arrowStyle = arrow ? getComputedStyle(arrow) : null;
               return [key, {
                 status: link?.dataset.epV041FlowStatus || '',
                 direction: link?.dataset.epV038Motion || '',
@@ -186,9 +187,13 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
                 label: link?.getAttribute('aria-label') || '',
                 arrow: arrow?.textContent || '',
                 arrowDisplay: arrow ? getComputedStyle(arrow).display : '',
+                arrowBorder: arrowStyle?.borderStyle || '',
+                arrowClipPath: arrowStyle?.clipPath || arrowStyle?.webkitClipPath || '',
+                arrowFontSize: arrowStyle ? parseFloat(arrowStyle.fontSize) : -1,
                 state: state?.textContent || '',
                 stateDisplay: state ? getComputedStyle(state).display : '',
                 thickness: trackStyle ? parseFloat(vertical ? trackStyle.width : trackStyle.height) : 0,
+                trackMask: trackStyle?.maskImage || trackStyle?.webkitMaskImage || '',
                 inside: Boolean(
                   overviewRect && arrowRect &&
                   arrowRect.left >= overviewRect.left - 1 &&
@@ -1929,6 +1934,10 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             or not state["label"]
             or "relative flow" not in state["label"]
             or state["arrowDisplay"] != "flex"
+            or state["arrowBorder"] != "none"
+            or "polygon" not in state["arrowClipPath"]
+            or state["arrowFontSize"] != 0
+            or "gradient" not in state["trackMask"]
             or state["stateDisplay"] != "none"
             or not state["inside"]
         ):

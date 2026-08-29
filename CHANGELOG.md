@@ -14,6 +14,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 - Grouped all four external PV entity fields inside one panel and made their enabled/dimmed state follow the master switch immediately without a full dashboard render.
 - Preserve configured external entity IDs while external PV is disabled; disabled sources are not tracked or added to `pv_generation_power`.
+- Refined static live-flow connectors with integrated arrowheads, directional brightness, restrained 3/4/5-pixel intensity steps and quieter idle/unavailable styling while preserving the no-motion contract.
 - Added the v0.46 release wrapper, fresh `0.46-external-pv1` active-graph cache key and Chromium/WebKit switch/layout regressions.
 
 ### Safety and compatibility

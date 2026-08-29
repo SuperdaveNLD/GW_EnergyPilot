@@ -70,7 +70,7 @@ On coarse-pointer/touch devices, native `:hover` never owns selected presentatio
 
 EnergyPilot-owned content has no CSS animations, CSS transitions, moving flow particles, animated pseudo-elements or modal backdrop filters. The policy is applied after complete renders and after scoped strategy, graph and modal updates.
 
-The live-flow alternative is deliberately static. Existing connector nodes receive a fixed pipeline, one physical-direction arrow for active power, a dot for finite near-zero idle power or a dashed line/question mark for unavailable power. Low/medium/high line thickness is relative to the strongest finite active connector in the same telemetry snapshot. Arrow/state children are created once per structural render and patched in place; they never pulse, move or transition. Each connector exposes a localized `role="img"` accessible name.
+The live-flow alternative is deliberately static. Existing connector nodes receive a fixed pipeline with an integrated arrowhead and directional brightness for active power, a quiet dot for finite near-zero idle power or a dashed line/question mark for unavailable power. Low/medium/high line thickness uses restrained 3/4/5-pixel steps relative to the strongest finite active connector in the same telemetry snapshot. Arrow/state children are created once per structural render and patched in place; they never pulse, move or transition. Each connector exposes a localized `role="img"` accessible name.
 
 ## Required invariants
 
