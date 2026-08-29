@@ -77,7 +77,6 @@ The four Battery quick actions keep their existing button nodes while an action 
 The persistent EMHASS cost-function selector follows the same rule: service completion and later entity publication patch its existing buttons, label and accessibility state without rebuilding `main`. Its explicit busy state remains authoritative across intervening telemetry patches, so a second strategy/optimization request cannot start while the first service call is still running. Manual EMS controls read Automatic Control ownership at event time rather than retaining the ownership value from the structural render; pending, enabled and message feedback is patched in place. This matters when Automatic Control changes through a normal stable-DOM state event after those controls were created.
 
 The persisted latest EMS-setpoint update time is rendered as secondary text inside the existing EMS-setpoint metric. A controller dispatcher update publishes the existing `control_command` entity attributes, and the v0.41 live patch updates only that text node. It does not rebuild the Controller card or treat ordinary telemetry polling as a new setpoint update.
-
 ### Battery Strategy refresh
 
 Loading, pending, success/error and Custom-SOC feedback rerender only `.ep-v038-strategy`. Stable backend mode keys, not translated labels, remain the control identity.

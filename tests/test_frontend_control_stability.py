@@ -119,7 +119,6 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertNotIn("font-size:7px", self.styles)
         self.assertNotIn("font-size:6px", self.settings_battery)
         self.assertNotIn("font-size:7px", self.settings_battery)
-
     def test_manual_controls_compact_without_replacing_control_nodes(self) -> None:
         self.assertIn('pad.className = `ep-v021-manual-pad', self.manual)
         self.assertIn('class="ep-v021-mode-grid"${compact ? " hidden" : ""}', self.manual)
