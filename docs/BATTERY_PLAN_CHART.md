@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.33 Beta**.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.45 Beta**.
 
 ## Purpose
 
@@ -9,6 +9,7 @@ The dashboard shows, on one local-day timeline:
 - actual GoodWe battery charging and discharging;
 - the EMHASS battery-power target that was active historically;
 - the latest validated EMHASS future battery schedule;
+- actual GoodWe battery SOC and the latest validated EMHASS SOC forecast;
 - the direction-neutral market-price series.
 
 The chart is visualization only. It does not own GoodWe control, EMHASS optimization or persistent financial accounting.
@@ -25,6 +26,25 @@ battery_power > 0 W = discharging
 The dashboard requests Recorder 5-minute mean statistics. A solid turquoise/orange bar represents the actual mean battery power in that interval. Near-zero values below the chart display threshold are not drawn as charge/discharge bars.
 
 No duplicate battery-power entity, Modbus definition or poll is added.
+
+## Actual and forecast SOC
+
+Actual SOC uses the existing `battery_soc` entity backed by GoodWe register `37007`. Its canonical Home Assistant entity contract is already percentage (`0..100%`) with measurement state class. The frontend resolves its current entity ID through the integration's stable unique-ID registry mapping and requests Recorder 5-minute means separately from battery power. It does not apply a `0..1` heuristic: a recorded value of `1` means 1%, not 100%.
+
+Forecast SOC comes only from exact `SOC_opt` rows in the validated official EMHASS schema-1.x plan mirror:
+
+```text
+GET /api/v1/plan SOC_opt fraction 0..1
+-> validate finite and inside 0..1
+-> normalize once to value_pct 0..100
+-> battery_soc_plan in battery_price/get
+```
+
+EMHASS stores `SOC_opt` as a fraction in the plan and scales it by 100 only when publishing its separate Home Assistant forecast entity. EnergyPilot does not use that output entity for this chart because its runtime ID can be customized and EnergyPilot has no SOC-output entity option. This also prevents double-scaling.
+
+For `number_of_batteries > 1`, EMHASS intentionally has no meaningful bare/fleet `SOC_opt`; it exposes per-battery `SOC_opt_<k>` values. EnergyPilot does not select a battery or fabricate an aggregate. Planned SOC therefore remains unavailable until an explicit battery-selection contract is designed.
+
+The actual SOC line is solid and the forecast SOC line dashed. Both use a fixed `0..100%` axis independent of the power and price axes. Missing Recorder statistics, a failed SOC-only history request, missing `SOC_opt` or an out-of-range point suppresses only the affected SOC line.
 
 ## Historical active plan
 
@@ -44,9 +64,9 @@ This layer is intentionally the **active historical plan**. It does not rewrite 
 
 Historical plan blocks are drawn as a dashed translucent overlay above the solid actual bars so planned and actual behavior remain distinguishable even when values overlap.
 
-## Current future plan — v0.33 source order
+## Current future plan source order
 
-EMHASS remains the canonical plan owner. v0.33 no longer makes the chart depend only on the current Home Assistant entity attributes for the future horizon.
+EMHASS remains the canonical plan owner. Since v0.33 the chart no longer depends only on the current Home Assistant entity attributes for the future horizon.
 
 Preferred source:
 
@@ -130,11 +150,12 @@ The existing command remains:
 gw_energypilot/battery_price/get
 ```
 
-v0.33 uses chart schema version **`4`** and includes:
+The current command uses chart schema version **`5`** and includes:
 
 - `plan_revision` — the EnergyPilot optimization generation currently owning the mirrored plan;
 - `battery_energy` — current GoodWe charged/discharged day counters;
 - `battery_plan` — configured entity id, current target/source, future points, persistent-plan source, `generated_at`, `valid_until` and restore diagnostics;
+- `battery_soc_plan` — optional normalized `value_pct` points, `%` unit and exact official source-column/unit evidence;
 - timestamped market/effective-price data from the existing EnergyPilot price runtime.
 
 When `force=true`, or no current plan mirror exists, the read-only API may request a bounded refresh from the official EMHASS plan endpoint. It does not run an optimization, write an inverter register or modify controller ownership.
@@ -152,9 +173,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v0.33 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v0.45 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested chart module itself changes. The v0.33 plan-refresh hotfix imports the Battery Plan chart core directly under the fresh `0.33-planrefresh1` module URL, while the panel registration uses the same release cache-bust. This guarantees that the new refresh logic is executed without requiring a browser process restart.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested chart module itself changes. v0.45 activates the v0.44 plan data/core/view cache keys through its fresh v0.45 wrapper import, ensuring the SOC chart logic is evaluated after upgrade without requiring a browser process restart. The older v0.33 plan-refresh cache-busting mechanism remains historical compatibility context.
 
 The optimization revision and `P_batt` freshness checks are independent of ordinary five-minute chart-data cache expiry, so a newly published plan does not intentionally remain stale for that full interval.
 

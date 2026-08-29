@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "0.45-pv-soc1"
+CACHE_KEY = "0.45-integrated1"
 
 
 class FrontendV045ReleaseTests(unittest.TestCase):
@@ -20,12 +20,12 @@ class FrontendV045ReleaseTests(unittest.TestCase):
 
         self.assertEqual(manifest["version"], "0.45")
         self.assertIn(
-            "gw-energy-pilot-v045.js?v=0.45-pv-soc1", init_source
+            "gw-energy-pilot-v045.js?v=0.45-integrated1", init_source
         )
         self.assertIn('const VERSION = "0.45"', release)
         self.assertIn("__epV045Installed", release)
         self.assertIn(
-            'import "./gw-energy-pilot-v044.js?v=0.45-pv-soc1"', release
+            'import "./gw-energy-pilot-v044.js?v=0.45-integrated1"', release
         )
 
     def test_complete_active_module_graph_has_fresh_v045_cache_key(self) -> None:

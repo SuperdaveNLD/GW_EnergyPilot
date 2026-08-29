@@ -148,6 +148,130 @@ def animation_summary(page: Page) -> dict[str, int]:
     )
 
 
+def exercise_static_flow(page: Page) -> dict[str, object]:
+    """Verify static direction, state, intensity, accessibility and DOM identity."""
+    return page.evaluate(
+        """
+        async () => {
+          const panel = window.__epPanel;
+          const root = panel.shadowRoot;
+          const selectors = {
+            pv: '.ep-link-pv',
+            grid: '.ep-link-grid',
+            house: '.ep-link-house',
+            battery: '.ep-link-battery',
+          };
+          const links = Object.fromEntries(
+            Object.entries(selectors).map(([key, selector]) => [key, root.querySelector(selector)])
+          );
+          const arrows = Object.fromEntries(
+            Object.entries(links).map(([key, link]) => [key, link?.querySelector('.ep-v041-flow-arrow')])
+          );
+          const main = root.querySelector('main');
+          const overview = root.querySelector('.ep-flow-overview');
+          const read = () => {
+            const overviewRect = overview?.getBoundingClientRect();
+            return Object.fromEntries(Object.entries(links).map(([key, link]) => {
+              const arrow = link?.querySelector('.ep-v041-flow-arrow');
+              const state = link?.querySelector('.ep-v041-flow-state');
+              const track = link?.querySelector('.ep-flow-track');
+              const arrowRect = arrow?.getBoundingClientRect();
+              const vertical = key === 'house' || key === 'battery';
+              const trackStyle = track ? getComputedStyle(track) : null;
+              return [key, {
+                status: link?.dataset.epV041FlowStatus || '',
+                direction: link?.dataset.epV038Motion || '',
+                intensity: link?.dataset.epV041FlowIntensity || '',
+                role: link?.getAttribute('role') || '',
+                label: link?.getAttribute('aria-label') || '',
+                arrow: arrow?.textContent || '',
+                arrowDisplay: arrow ? getComputedStyle(arrow).display : '',
+                state: state?.textContent || '',
+                stateDisplay: state ? getComputedStyle(state).display : '',
+                thickness: trackStyle ? parseFloat(vertical ? trackStyle.width : trackStyle.height) : 0,
+                inside: Boolean(
+                  overviewRect && arrowRect &&
+                  arrowRect.left >= overviewRect.left - 1 &&
+                  arrowRect.right <= overviewRect.right + 1 &&
+                  arrowRect.top >= overviewRect.top - 1 &&
+                  arrowRect.bottom <= overviewRect.bottom + 1
+                ),
+              }];
+            }));
+          };
+          const settle = () => new Promise((resolve) => setTimeout(resolve, 180));
+
+          for (const [key, value] of [
+            ['pv_total_power', 4800],
+            ['pv_generation_power', 4800],
+            ['total_load_power', 2500],
+            ['meter_total_power_fast', 1100],
+            ['battery_power', -1200],
+          ]) {
+            window.__epSetEntityByKey(key, value);
+          }
+          await settle();
+          const initial = read();
+          window.__epSetEntityByKey('meter_total_power_fast', -650);
+          window.__epSetEntityByKey('battery_power', 900);
+          await settle();
+          const reversed = read();
+
+          for (const key of ['pv_total_power', 'pv_generation_power', 'total_load_power', 'meter_total_power_fast', 'battery_power']) {
+            window.__epSetEntityByKey(key, 'unknown');
+          }
+          await settle();
+          const unknown = read();
+
+          for (const [key, value] of [
+            ['pv_total_power', 49],
+            ['pv_generation_power', 49],
+            ['total_load_power', 49],
+            ['meter_total_power_fast', -49],
+            ['battery_power', 49],
+          ]) {
+            window.__epSetEntityByKey(key, value);
+          }
+          await settle();
+          const idle = read();
+
+          for (const [key, value] of [
+            ['pv_total_power', 4800],
+            ['pv_generation_power', 4800],
+            ['total_load_power', 2500],
+            ['meter_total_power_fast', 1100],
+            ['battery_power', -1200],
+          ]) {
+            window.__epSetEntityByKey(key, value);
+          }
+          await settle();
+          const restored = read();
+
+          return {
+            initial,
+            reversed,
+            unknown,
+            idle,
+            restored,
+            identity: {
+              main: main === root.querySelector('main'),
+              links: Object.entries(selectors).every(
+                ([key, selector]) => links[key] === root.querySelector(selector)
+              ),
+              arrows: Object.entries(links).every(
+                ([key, link]) => arrows[key] === link?.querySelector('.ep-v041-flow-arrow')
+              ),
+            },
+            responsive: Boolean(
+              overview && overview.scrollWidth <= overview.clientWidth + 1 &&
+              overview.getBoundingClientRect().width <= window.__epScroller.clientWidth + 1
+            ),
+          };
+        }
+        """
+    )
+
+
 def open_and_close_menu(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "open": False,
@@ -964,9 +1088,17 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
         "layout_stable": False,
         "automatic_stable": False,
         "strategy_stable": False,
-        "bottom_anchor_stable": False,
+        "scroll_anchor_stable": False,
         "button_position_stable": False,
+        "floating": False,
+        "viewport_reachable": False,
+        "safe_edge_spacing": False,
+        "touch_target": False,
+        "outside_optional_card": False,
+        "visible_with_card_hidden": False,
+        "footer_clear": False,
         "scroll_working": False,
+        "scroll_probe": {},
         "button_idle": False,
         "marker": False,
         "error": None,
@@ -975,9 +1107,14 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
         return result
 
     try:
-        button = shadow(page, ".ep-optimize-now")
-        button.evaluate(
-            "node => node.scrollIntoView({block: 'center', inline: 'nearest'})"
+        page.evaluate(
+            """
+            () => {
+              const scroller = window.__epScroller;
+              const maximum = scroller.scrollHeight - scroller.clientHeight;
+              scroller.scrollTop = maximum;
+            }
+            """
         )
         page.wait_for_timeout(180)
         initial = page.evaluate(
@@ -1015,6 +1152,19 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
                 scrollTop: scroller.scrollTop,
                 bottomDistance: maximum - scroller.scrollTop,
                 buttonTop: rect?.top ?? null,
+                buttonLeft: rect?.left ?? null,
+                buttonHeight: rect?.height ?? 0,
+                buttonWidth: rect?.width ?? 0,
+                position: optimize ? getComputedStyle(optimize).position : "",
+                outsideOptionalCard: optimize?.parentElement === root.querySelector("main"),
+                viewportReachable: Boolean(
+                  rect && rect.top >= 0 && rect.left >= 0 &&
+                  rect.bottom <= innerHeight && rect.right <= innerWidth
+                ),
+                safeEdgeSpacing: Boolean(
+                  rect && rect.left >= 10 && rect.top >= 10 &&
+                  rect.right <= innerWidth - 10 && rect.bottom <= innerHeight - 10
+                ),
               };
             }
             """
@@ -1057,11 +1207,7 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
               const rect = optimize?.getBoundingClientRect();
               const maximum = scroller.scrollHeight - scroller.clientHeight;
               const afterOptimize = scroller.scrollTop;
-              const downSpace = maximum - afterOptimize;
               const distance = Math.max(320, Math.round(scroller.clientHeight * 0.45));
-              const target = downSpace >= 250
-                ? Math.min(maximum, afterOptimize + distance)
-                : Math.max(0, afterOptimize - Math.min(distance, afterOptimize));
               const calls = window.__epServiceCalls.filter(
                 call => call.domain === 'button' && call.service === 'press' &&
                   call.data?.entity_id === optimizeId
@@ -1079,21 +1225,54 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
                   window.__epOptimizeIdentity.strategy === root.querySelector(
                     '[data-ep-v038-profile="mad_steve"]'
                   ),
-                bottomAnchorDelta:
+                scrollAnchorDelta:
                   (maximum - afterOptimize) - initial.bottomDistance,
                 scrollTopDelta: afterOptimize - initial.scrollTop,
-                scrollRangeDelta: maximum - initial.maximum,
                 buttonTopDelta:
                   rect && initial.buttonTop !== null ? rect.top - initial.buttonTop : null,
-                probeDistance: Math.abs(target - afterOptimize),
-                target,
+                buttonLeftDelta:
+                  rect && initial.buttonLeft !== null ? rect.left - initial.buttonLeft : null,
                 buttonBusy: optimize?.getAttribute('aria-busy'),
                 buttonDisabled: Boolean(optimize?.disabled),
                 marker: optimize?.dataset?.epV044StableOptimize || '',
               };
+              scroller.scrollTop = 0;
+              await new Promise((resolve) => setTimeout(resolve, 180));
+              const probeStart = scroller.scrollTop;
+              const target = Math.min(maximum, probeStart + distance);
+              const probeDistance = Math.abs(target - probeStart);
               scroller.scrollTop = target;
               await new Promise((resolve) => setTimeout(resolve, 180));
-              return { ...beforeProbe, scrollAfterProbe: scroller.scrollTop };
+              const scrolledRect = optimize?.getBoundingClientRect();
+              const emhassCard = root.querySelector('[data-ep-card="emhass"]');
+              const cardHiddenBefore = Boolean(emhassCard?.hidden);
+              if (emhassCard) emhassCard.hidden = true;
+              const hiddenRect = optimize?.getBoundingClientRect();
+              const visibleWithCardHidden = Boolean(
+                optimize && getComputedStyle(optimize).display !== "none" &&
+                getComputedStyle(optimize).visibility !== "hidden" &&
+                hiddenRect && hiddenRect.width > 0 && hiddenRect.height > 0
+              );
+              if (emhassCard) emhassCard.hidden = cardHiddenBefore;
+              const scrollAfterProbe = scroller.scrollTop;
+              scroller.scrollTop = maximum;
+              await new Promise((resolve) => setTimeout(resolve, 180));
+              const footerRect = root.querySelector("footer")?.getBoundingClientRect();
+              const bottomRect = optimize?.getBoundingClientRect();
+              const footerClear = Boolean(
+                footerRect && bottomRect && footerRect.bottom <= bottomRect.top - 8
+              );
+              scroller.scrollTop = target;
+              return {
+                ...beforeProbe,
+                probeDistance,
+                target,
+                scrollAfterProbe,
+                scrolledButtonTop: scrolledRect?.top ?? null,
+                scrolledButtonLeft: scrolledRect?.left ?? null,
+                visibleWithCardHidden,
+                footerClear,
+              };
             }
             """,
             initial,
@@ -1107,19 +1286,35 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
                 "layout_stable": measured["layoutStable"],
                 "automatic_stable": measured["automaticStable"],
                 "strategy_stable": measured["strategyStable"],
-                "bottom_anchor_stable": abs(measured["bottomAnchorDelta"]) <= 5,
+                "scroll_anchor_stable": abs(measured["scrollAnchorDelta"]) <= 5,
                 "button_position_stable": (
                     measured["buttonTopDelta"] is not None
-                    and abs(measured["buttonTopDelta"]) <= 5
-                    and abs(
-                        measured["scrollTopDelta"] - measured["scrollRangeDelta"]
-                    )
-                    <= 5
+                    and measured["buttonLeftDelta"] is not None
+                    and measured["scrolledButtonTop"] is not None
+                    and measured["scrolledButtonLeft"] is not None
+                    and abs(measured["buttonTopDelta"]) <= 2
+                    and abs(measured["buttonLeftDelta"]) <= 2
+                    and abs(measured["scrolledButtonTop"] - initial["buttonTop"]) <= 2
+                    and abs(measured["scrolledButtonLeft"] - initial["buttonLeft"]) <= 2
                 ),
+                "floating": initial["position"] == "fixed",
+                "viewport_reachable": initial["viewportReachable"],
+                "safe_edge_spacing": initial["safeEdgeSpacing"],
+                "touch_target": (
+                    initial["buttonHeight"] >= 44 and initial["buttonWidth"] >= 44
+                ),
+                "outside_optional_card": initial["outsideOptionalCard"],
+                "visible_with_card_hidden": measured["visibleWithCardHidden"],
+                "footer_clear": measured["footerClear"],
                 "scroll_working": (
                     measured["probeDistance"] >= 200
                     and abs(measured["scrollAfterProbe"] - measured["target"]) <= 5
                 ),
+                "scroll_probe": {
+                    "distance": measured["probeDistance"],
+                    "target": measured["target"],
+                    "actual": measured["scrollAfterProbe"],
+                },
                 "button_idle": (
                     measured["buttonBusy"] == "false"
                     and measured["buttonDisabled"] is False
@@ -1144,6 +1339,10 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
         "costfun_control_stable": False,
         "max_export_control_stable": False,
         "strategy_control_stable": False,
+        "actual_soc_visible": False,
+        "forecast_soc_visible": False,
+        "soc_axis_visible": False,
+        "soc_values_valid": False,
         "error": None,
     }
     try:
@@ -1225,6 +1424,25 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
                       window.__epPlanIdentity.strategy === root.querySelector(
                         '[data-ep-v038-profile="mad_steve"]'
                       ),
+                    actual_soc_visible: Boolean(
+                      root.querySelector('.ep-v027-battery-plan-card [data-series="actual-soc"]')
+                    ),
+                    forecast_soc_visible: Boolean(
+                      root.querySelector('.ep-v027-battery-plan-card [data-series="forecast-soc"]')
+                    ),
+                    soc_axis_visible: Array.from(
+                      root.querySelectorAll('.ep-v027-battery-plan-card svg text')
+                    ).some(node => node.textContent?.trim() === 'SOC (%)'),
+                    soc_values_valid: Boolean(
+                      window.__epPanel.__epV027BatteryPlanData?.actualSocRows?.length &&
+                      window.__epPanel.__epV027BatteryPlanData?.socPlanPoints?.length &&
+                      window.__epPanel.__epV027BatteryPlanData.actualSocRows.every(
+                        point => point.pct >= 0 && point.pct <= 100
+                      ) &&
+                      window.__epPanel.__epV027BatteryPlanData.socPlanPoints.every(
+                        point => point.pct >= 0 && point.pct <= 100
+                      )
+                    ),
                   };
                 }
                 """,
@@ -1239,6 +1457,7 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
 def exercise_language(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "localized": False,
+        "flow_localized": False,
         "main_stable_during_telemetry": False,
         "idle_delta": None,
         "error": None,
@@ -1271,11 +1490,17 @@ def exercise_language(page: Page) -> dict[str, object]:
                 after: scroller.scrollTop,
                 mainStable:
                   window.__epDutchMain === window.__epPanel.shadowRoot.querySelector('main'),
+                flowLabel:
+                  root.querySelector('.ep-link-grid')?.getAttribute('aria-label') || '',
               };
             }
             """
         )
         result["main_stable_during_telemetry"] = telemetry["mainStable"]
+        result["flow_localized"] = (
+            "Systeem naar net" in telemetry["flowLabel"]
+            and "relatieve stroom" in telemetry["flowLabel"]
+        )
         result["idle_delta"] = telemetry["after"] - telemetry["before"]
     except PlaywrightError as err:
         result["error"] = str(err)
@@ -1506,6 +1731,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
           scroller.scrollTop = Math.max(0, Math.round(max * 0.55));
           return {
             entrypoint: window.__epEntryPoint,
+            releaseVersion: root.querySelector('.version')?.textContent?.trim() || '',
             stableMarker: root.querySelector('main')?.dataset.epV041StableDom || '',
             scrollTop: scroller.scrollTop,
             scrollHeight: scroller.scrollHeight,
@@ -1544,6 +1770,8 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         }
         """
     )
+
+    static_flow = exercise_static_flow(page)
 
     motion = page.evaluate(
         """
@@ -1596,6 +1824,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "idle_after": idle_after,
         "idle_delta": idle_after - idle_before,
         "telemetry_identity": telemetry_identity,
+        "static_flow": static_flow,
         "motion": motion,
         "pv_insight": pv_insight,
         "pv_settings": pv_settings,
@@ -1619,6 +1848,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     name = profile.name
     initial = result["initial"]
     identity = result["telemetry_identity"]
+    static_flow = result["static_flow"]
     motion = result["motion"]
     pv_insight = result["pv_insight"]
     pv_settings = result["pv_settings"]
@@ -1635,6 +1865,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
 
     if EXPECTED_ENTRYPOINT and initial["entrypoint"] != EXPECTED_ENTRYPOINT:
         failures.append(f"{name}: loaded {initial['entrypoint']} instead of {EXPECTED_ENTRYPOINT}")
+    if EXPECTED_ENTRYPOINT == "v045" and initial["releaseVersion"] != "v0.45 BETA":
+        failures.append(f"{name}: release badge is {initial['releaseVersion']!r} instead of v0.45 BETA")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and initial["stableMarker"] != "1":
         failures.append(f"{name}: stable-DOM marker is missing")
     if initial["max"] < 500:
@@ -1643,6 +1875,63 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
+    expected_initial = {
+        "pv": ("active", "right", "high", "→"),
+        "grid": ("active", "right", "low", "→"),
+        "house": ("active", "up", "medium", "↑"),
+        "battery": ("active", "down", "low", "↓"),
+    }
+    for key, expected in expected_initial.items():
+        state = static_flow["initial"][key]
+        actual = (
+            state["status"], state["direction"], state["intensity"], state["arrow"]
+        )
+        if actual != expected:
+            failures.append(f"{name}: initial {key} flow {actual} != {expected}")
+        if (
+            state["role"] != "img"
+            or not state["label"]
+            or "relative flow" not in state["label"]
+            or state["arrowDisplay"] != "flex"
+            or state["stateDisplay"] != "none"
+            or not state["inside"]
+        ):
+            failures.append(f"{name}: initial {key} flow is not visible/accessibly labelled")
+    if static_flow["initial"]["pv"]["thickness"] < 5:
+        failures.append(f"{name}: high flow does not use a strong pipeline")
+    if static_flow["initial"]["house"]["thickness"] < 3:
+        failures.append(f"{name}: medium flow does not use a distinct pipeline")
+    if static_flow["initial"]["grid"]["thickness"] > 3:
+        failures.append(f"{name}: low flow pipeline is not visually bounded")
+    if (
+        static_flow["reversed"]["grid"]["direction"] != "left"
+        or static_flow["reversed"]["grid"]["arrow"] != "←"
+        or static_flow["reversed"]["battery"]["direction"] != "up"
+        or static_flow["reversed"]["battery"]["arrow"] != "↑"
+    ):
+        failures.append(f"{name}: import/discharge physical direction is wrong")
+    for key, state in static_flow["unknown"].items():
+        if (
+            state["status"] != "unknown"
+            or state["intensity"] != "none"
+            or state["state"] != "?"
+            or state["stateDisplay"] != "flex"
+            or "unavailable" not in state["label"]
+        ):
+            failures.append(f"{name}: {key} unknown flow presentation is ambiguous")
+    for key, state in static_flow["idle"].items():
+        if (
+            state["status"] != "idle"
+            or state["intensity"] != "none"
+            or state["state"] != "•"
+            or state["stateDisplay"] != "flex"
+            or "idle below 50 W" not in state["label"]
+        ):
+            failures.append(f"{name}: {key} near-zero flow presentation is ambiguous")
+    if not all(static_flow["identity"].values()):
+        failures.append(f"{name}: flow telemetry replaced stable DOM nodes")
+    if not static_flow["responsive"]:
+        failures.append(f"{name}: flow overview overflows its responsive container")
     for key, stable in identity.items():
         if stable is not True:
             failures.append(f"{name}: telemetry replaced the {key} DOM node")
@@ -1687,7 +1976,9 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
-            "strategy_stable", "bottom_anchor_stable", "button_position_stable",
+            "strategy_stable", "scroll_anchor_stable", "button_position_stable",
+            "floating", "viewport_reachable", "safe_edge_spacing", "touch_target",
+            "outside_optional_card", "visible_with_card_hidden", "footer_clear",
             "scroll_working", "button_idle", "marker",
         )
         if not all(optimize_stability[key] is True for key in required_optimize):
@@ -1727,6 +2018,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "layout_control_stable", "auto_control_stable",
             "optimize_control_stable", "costfun_control_stable",
             "max_export_control_stable", "strategy_control_stable",
+            "actual_soc_visible", "forecast_soc_visible", "soc_axis_visible",
+            "soc_values_valid",
         )
     ):
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
@@ -1734,6 +2027,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: battery-plan refresh interaction error")
     if language_result["localized"] is not True:
         failures.append(f"{name}: Dutch structural render did not localize")
+    if language_result["flow_localized"] is not True:
+        failures.append(f"{name}: Dutch flow accessibility label did not localize")
     if language_result["main_stable_during_telemetry"] is not True:
         failures.append(f"{name}: Dutch telemetry replaced the main DOM")
     if abs(language_result["idle_delta"] or 0) > 2:
@@ -1742,6 +2037,11 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: deliberate narrow-layout structural render failed")
     if structural["menu_open"] is not True or structural["menu_close"] is not True:
         failures.append(f"{name}: controls failed after a structural layout render")
+    if EXPECTED_ENTRYPOINT == "v045" and not all(
+        structural.get(key) is True
+        for key in ("settings_open", "optimize_in_settings", "settings_close")
+    ):
+        failures.append(f"{name}: Optimize now was not reachable in Settings")
     if structural["error"]:
         failures.append(f"{name}: post-structure menu interaction error")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and (

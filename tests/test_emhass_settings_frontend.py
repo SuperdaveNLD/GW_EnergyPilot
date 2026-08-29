@@ -19,16 +19,16 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v045.js?v=0.45-pv-soc1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-pv-soc1"', v045)
+        self.assertIn("gw-energy-pilot-v045.js?v=0.45-integrated1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-integrated1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.45-pv-soc1"',
+            'import "./gw-energy-pilot-v043.js?v=0.45-integrated1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.45-pv-soc1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.45-pv-soc1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.45-pv-soc1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.45-integrated1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.45-integrated1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.45-integrated1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:

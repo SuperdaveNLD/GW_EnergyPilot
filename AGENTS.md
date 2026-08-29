@@ -346,7 +346,7 @@ gw-energy-pilot-v045.js
                                      -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.45 owns only release presentation and the full active-graph cache boundary. v0.44 owns the bounded Optimize-now listener replacement, v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, v0.41 owns stable-DOM telemetry/plan refresh/PV presentation, and the v0.38/v0.39 layers retain rebuilt strategy controls, physical live-flow direction, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v0.45 owns only release presentation and the full active-graph cache boundary. v0.44 owns the bounded Optimize-now listener plus its safe-area-aware floating presentation, v0.43 owns touch-hover presentation, v0.42 owns the EMHASS settings overview, and v0.41 owns stable-DOM telemetry/plan refresh/PV/static-flow presentation. The v0.27 plan modules own SOC chart rendering; the v0.38 model remains the physical live-flow direction source, while the v0.38/v0.39 layers retain rebuilt strategy controls, visual hover continuity and Dutch Controller localization. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

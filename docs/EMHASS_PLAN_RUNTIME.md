@@ -41,6 +41,8 @@ P_grid > 0  grid import
 P_grid < 0  grid export
 ```
 
+Schema 1.x also defines bare `SOC_opt` for a single battery as a fraction in `0..1`. EnergyPilot validates that exact column and normalizes it once to percentage for visualization. It never treats other numeric columns or already-published Home Assistant percentages as plan fractions.
+
 EnergyPilot does not write or replace that EMHASS plan.
 
 ## EnergyPilot mirror
@@ -60,6 +62,7 @@ The mirror contains only the latest validated plan evidence:
 - exclusive `valid_until` boundary;
 - normalized `P_batt` points;
 - normalized `P_grid` points;
+- optional normalized `SOC_opt` percentage points;
 - configured Home Assistant publication entity IDs for diagnostics.
 
 This is a resilience cache, not a second optimizer or a second settings database.
@@ -110,7 +113,9 @@ This distinction is intentional:
 
 ## Dashboard
 
-Battery · Plan · Price obtains the future `P_batt` horizon from the same plan runtime used by control. Recorder remains the source for historical published targets and actual GoodWe battery power.
+Battery · Plan · Price obtains the future `P_batt` horizon and optional single-battery `SOC_opt` forecast from the same official plan runtime used by control. Recorder remains the source for historical published targets, actual GoodWe battery power and actual GoodWe SOC.
+
+The Home Assistant schedule fallback intentionally fills only `P_batt`/`P_grid`. EnergyPilot does not have a configured SOC-forecast output entity, so it does not guess EMHASS's default or a custom runtime ID. Multi-battery plans expose only per-battery SOC columns and remain unavailable in the aggregate chart.
 
 This removes the previous split where the controller and chart could disagree about whether a valid plan existed.
 

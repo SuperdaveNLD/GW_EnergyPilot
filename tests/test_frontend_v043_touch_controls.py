@@ -18,13 +18,13 @@ class FrontendV043TouchControlsTests(unittest.TestCase):
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         v044 = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v045.js?v=0.45-pv-soc1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-pv-soc1"', v045)
+        self.assertIn("gw-energy-pilot-v045.js?v=0.45-integrated1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-integrated1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.45-pv-soc1"',
+            'import "./gw-energy-pilot-v043.js?v=0.45-integrated1"',
             v044,
         )
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.45-pv-soc1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.45-integrated1"', self.source)
         self.assertIn('const VERSION = "0.43"', self.source)
 
     def test_touch_hover_cannot_impersonate_selected_state(self) -> None:

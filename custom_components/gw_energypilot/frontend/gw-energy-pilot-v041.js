@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=0.45-pv-soc1";
+import "./gw-energy-pilot-v039.js?v=0.45-integrated1";
 import {
   FLOW_THRESHOLD_W,
-  flowMotionMap,
+  flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=0.45-pv-soc1";
+} from "./gw-energy-pilot-v038-model.js?v=0.45-integrated1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=0.45-pv-soc1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.45-pv-soc1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.45-pv-soc1";
+} from "./gw-energy-pilot-v038-i18n.js?v=0.45-integrated1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.45-integrated1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.45-integrated1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -43,6 +43,17 @@ const COPY = Object.freeze({
     today: "Today",
     yesterday: "Yesterday",
     motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
+    flowUnknown: "power unavailable",
+    flowIdle: "idle below 50 W",
+    flowLow: "low relative flow",
+    flowMedium: "medium relative flow",
+    flowHigh: "high relative flow",
+    pvToSystem: "PV to system",
+    gridToSystem: "Grid to system",
+    systemToGrid: "System to grid",
+    systemToHouse: "System to house",
+    batteryToSystem: "Battery to system",
+    systemToBattery: "System to battery",
     pvSources: "PV sources",
     noPvSources: "No sources configured",
     internalPvTelemetry: "Internal GoodWe telemetry",
@@ -71,6 +82,17 @@ const COPY = Object.freeze({
     today: "Vandaag",
     yesterday: "Gisteren",
     motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
+    flowUnknown: "vermogen niet beschikbaar",
+    flowIdle: "inactief onder 50 W",
+    flowLow: "lage relatieve stroom",
+    flowMedium: "gemiddelde relatieve stroom",
+    flowHigh: "hoge relatieve stroom",
+    pvToSystem: "PV naar systeem",
+    gridToSystem: "Net naar systeem",
+    systemToGrid: "Systeem naar net",
+    systemToHouse: "Systeem naar woning",
+    batteryToSystem: "Batterij naar systeem",
+    systemToBattery: "Systeem naar batterij",
     pvSources: "PV-bronnen",
     noPvSources: "Geen bronnen geconfigureerd",
     internalPvTelemetry: "Interne GoodWe-telemetrie",
@@ -120,6 +142,105 @@ const NO_MOTION_CSS = `
   :host .ep-flow-hub::after,
   :host .ep-v011-particles span {
     display: none !important;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status] {
+    --ep-v041-pipe-size: 3px;
+    --ep-v041-pipe-opacity: .72;
+    opacity: 1;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="low"] {
+    --ep-v041-pipe-size: 2px;
+    --ep-v041-pipe-opacity: .58;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] {
+    --ep-v041-pipe-size: 4px;
+    --ep-v041-pipe-opacity: .74;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] {
+    --ep-v041-pipe-size: 6px;
+    --ep-v041-pipe-opacity: .92;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"],
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] {
+    --ep-v041-pipe-size: 2px;
+    color: #71879a;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"] {
+    --ep-v041-pipe-opacity: .48;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] {
+    --ep-v041-pipe-opacity: .64;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status] .ep-flow-track {
+    inset: auto 0;
+    top: 50%;
+    width: auto;
+    height: var(--ep-v041-pipe-size);
+    transform: translateY(-50%);
+    background: currentColor;
+    box-shadow: none;
+    opacity: var(--ep-v041-pipe-opacity);
+  }
+  :host .ep-link-house[data-ep-v041-flow-status] .ep-flow-track,
+  :host .ep-link-battery[data-ep-v041-flow-status] .ep-flow-track {
+    inset: 0 auto;
+    left: 50%;
+    width: var(--ep-v041-pipe-size);
+    height: auto;
+    transform: translateX(-50%);
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-flow-track {
+    background: repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px);
+  }
+  :host .ep-link-house[data-ep-v041-flow-status="unknown"] .ep-flow-track,
+  :host .ep-link-battery[data-ep-v041-flow-status="unknown"] .ep-flow-track {
+    background: repeating-linear-gradient(180deg,currentColor 0 5px,transparent 5px 9px);
+  }
+  :host .ep-v041-flow-arrow,
+  :host .ep-v041-flow-state {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 7;
+    display: none;
+    min-width: 17px;
+    min-height: 17px;
+    padding: 0 2px;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: #071a2e;
+    color: currentColor;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-arrow,
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state,
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-v041-flow-state {
+    display: flex;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] .ep-v041-flow-arrow {
+    min-width: 19px;
+    min-height: 19px;
+    font-size: 16px;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] .ep-v041-flow-arrow {
+    min-width: 21px;
+    min-height: 21px;
+    font-size: 18px;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state {
+    border-style: solid;
+    font-size: 15px;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-v041-flow-state {
+    border-style: dashed;
+    font-size: 11px;
   }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
@@ -355,9 +476,80 @@ function formatDecimal(value, decimals = 4) {
   return number === null ? "—" : number.toFixed(decimals);
 }
 
+const FLOW_ARROWS = Object.freeze({
+  right: "→",
+  left: "←",
+  up: "↑",
+  down: "↓",
+});
+
+function ensureStaticFlowNodes(link) {
+  let arrow = link.querySelector(".ep-v041-flow-arrow");
+  if (!arrow) {
+    arrow = document.createElement("span");
+    arrow.className = "ep-v041-flow-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    link.appendChild(arrow);
+  }
+  let state = link.querySelector(".ep-v041-flow-state");
+  if (!state) {
+    state = document.createElement("span");
+    state.className = "ep-v041-flow-state";
+    state.setAttribute("aria-hidden", "true");
+    link.appendChild(state);
+  }
+  return { arrow, state };
+}
+
+function flowDirectionText(panel, key, direction) {
+  const t = copy(panel);
+  if (key === "pv") return t.pvToSystem;
+  if (key === "house") return t.systemToHouse;
+  if (key === "grid") return direction === "left" ? t.gridToSystem : t.systemToGrid;
+  return direction === "up" ? t.batteryToSystem : t.systemToBattery;
+}
+
+function flowSourceText(panel, key) {
+  return {
+    pv: "PV",
+    grid: language(panel) === "nl" ? "Net" : "Grid",
+    house: language(panel) === "nl" ? "Woning" : "House",
+    battery: language(panel) === "nl" ? "Batterij" : "Battery",
+  }[key];
+}
+
+function patchStaticFlowLink(panel, link, key, presentation) {
+  const { arrow, state } = ensureStaticFlowNodes(link);
+  const t = copy(panel);
+  link.dataset.epV038Motion = presentation.direction;
+  link.dataset.epV041FlowStatus = presentation.status;
+  link.dataset.epV041FlowIntensity = presentation.intensity;
+  arrow.textContent = FLOW_ARROWS[presentation.direction] || "";
+  state.textContent = presentation.status === "unknown" ? "?" : "•";
+
+  let label;
+  if (presentation.status === "unknown") {
+    label = `${flowSourceText(panel, key)} · ${t.flowUnknown}`;
+  } else if (presentation.status === "idle") {
+    label = `${flowSourceText(panel, key)} · ${t.flowIdle}`;
+  } else {
+    const intensity = {
+      low: t.flowLow,
+      medium: t.flowMedium,
+      high: t.flowHigh,
+    }[presentation.intensity];
+    label =
+      `${flowDirectionText(panel, key, presentation.direction)} · ` +
+      `${panel._formatPower(Math.abs(presentation.power))} · ${intensity}`;
+  }
+  link.setAttribute("role", "img");
+  link.setAttribute("aria-label", label);
+  link.title = label;
+}
+
 function patchFlow(panel, root, pv, load, grid, battery, soc) {
   const house = resolveHousePower(load, pv, grid, battery);
-  const motion = flowMotionMap({ pv, house, grid, battery }, FLOW_THRESHOLD_W);
+  const visual = flowVisualMap({ pv, house, grid, battery }, FLOW_THRESHOLD_W);
   const t = copy(panel);
   const gridMode = gridPresentation(panel, grid);
   const batteryMode = batteryPresentation(panel, battery);
@@ -395,7 +587,7 @@ function patchFlow(panel, root, pv, load, grid, battery, soc) {
     if (!link) continue;
     link.classList.remove("idle", "inbound", "outbound");
     link.classList.add(semantic[key]);
-    link.dataset.epV038Motion = motion[key];
+    patchStaticFlowLink(panel, link, key, visual[key]);
   }
 }
 

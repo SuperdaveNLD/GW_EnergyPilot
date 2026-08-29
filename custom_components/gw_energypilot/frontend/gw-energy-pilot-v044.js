@@ -1,8 +1,9 @@
-import "./gw-energy-pilot-v043.js?v=0.45-pv-soc1";
+import "./gw-energy-pilot-v043.js?v=0.45-integrated1";
 
 const VERSION = "0.44";
 const PANEL_NAME = "gw-energypilot-panel";
 const OPTIMIZE_MARKER = "epV044StableOptimize";
+const FLOATING_STYLE_ID = "ep-v044-floating-optimize";
 const RUNNING_STATES = new Set([
   "preparing",
   "reading_history",
@@ -40,6 +41,30 @@ const COPY = Object.freeze({
     actionFailed: "EnergyPilot-optimalisatie mislukt",
   }),
 });
+
+const FLOATING_OPTIMIZE_CSS = `
+  :host main[data-ep-v041-stable-dom="1"] {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+  :host .ep-optimize-now[data-ep-v044-stable-optimize="1"] {
+    position: fixed !important;
+    z-index: 9000;
+    right: calc(16px + env(safe-area-inset-right));
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    min-width: 44px;
+    min-height: 44px;
+    max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    padding: 11px 16px;
+    white-space: nowrap;
+  }
+  @media (max-width: 720px) {
+    :host .ep-optimize-now[data-ep-v044-stable-optimize="1"] {
+      right: calc(12px + env(safe-area-inset-right));
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      max-width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    }
+  }
+`;
 
 function language(panel) {
   const raw = panel?._hass?.locale?.language || panel?._hass?.language || "en";
@@ -88,6 +113,14 @@ function optimizeSnapshot(panel) {
   };
 }
 
+function ensureFloatingOptimizeStyle(root) {
+  if (!root || root.querySelector(`#${FLOATING_STYLE_ID}`)) return;
+  const style = document.createElement("style");
+  style.id = FLOATING_STYLE_ID;
+  style.textContent = FLOATING_OPTIMIZE_CSS;
+  root.appendChild(style);
+}
+
 function patchOrchestrator(panel, root, attributes) {
   const block = root?.querySelector(".ep-v010-orchestrator");
   if (!block) return;
@@ -127,6 +160,12 @@ function installStableOptimizeButton(panel, root) {
   button.replaceWith(replacement);
   button = replacement;
 
+  // Keep one canonical action outside the optional EMHASS card so layout
+  // visibility preferences cannot hide it. Fixed positioning then makes the
+  // same stable node reachable throughout native dashboard scrolling.
+  const main = root.querySelector("main");
+  if (main) main.appendChild(button);
+
   button.addEventListener("click", async (event) => {
     event.preventDefault();
     const pressedButton = event.currentTarget;
@@ -161,6 +200,7 @@ function patchOptimizeUi(panel) {
   const root = panel?.shadowRoot;
   if (!root) return;
 
+  ensureFloatingOptimizeStyle(root);
   const snapshot = optimizeSnapshot(panel);
   const button = installStableOptimizeButton(panel, root);
   const status = String(snapshot.attributes.orchestrator_status || "");

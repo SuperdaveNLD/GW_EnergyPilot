@@ -16,6 +16,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .battery_plan import (
+    finite_number,
     infer_plan_step_seconds,
     normalize_emhass_api_plan,
     normalize_emhass_forecasts,
@@ -116,10 +117,24 @@ class GWEnergyPilotPlanRuntime:
         emhass_schema_version: str | None,
         p_batt: list[dict[str, Any]],
         p_grid: list[dict[str, Any]],
+        soc_opt: list[dict[str, Any]],
     ) -> dict[str, Any] | None:
         if not p_batt:
             return None
-        step_seconds = infer_plan_step_seconds(p_batt, p_grid)
+        validated_soc: list[dict[str, Any]] = []
+        for point in soc_opt:
+            parsed = normalized_timestamp(point.get("start"))
+            percentage = finite_number(point.get("value_pct"))
+            if (
+                parsed is None
+                or percentage is None
+                or not 0.0 <= percentage <= 100.0
+            ):
+                continue
+            validated_soc.append(
+                {"start": parsed[0], "value_pct": round(percentage, 3)}
+            )
+        step_seconds = infer_plan_step_seconds(p_batt, p_grid, validated_soc)
         valid_until = plan_valid_until(p_batt, step_seconds)
         if step_seconds is None or valid_until is None:
             return None
@@ -134,6 +149,7 @@ class GWEnergyPilotPlanRuntime:
             "p_grid_entity_id": self._p_grid_entity_id(),
             "p_batt": [dict(point) for point in p_batt],
             "p_grid": [dict(point) for point in p_grid],
+            "soc_opt": validated_soc,
         }
 
     def _validated_snapshot(self, value: Any) -> dict[str, Any] | None:
@@ -141,7 +157,12 @@ class GWEnergyPilotPlanRuntime:
             return None
         p_batt = value.get("p_batt")
         p_grid = value.get("p_grid", [])
-        if not isinstance(p_batt, list) or not isinstance(p_grid, list):
+        soc_opt = value.get("soc_opt", [])
+        if (
+            not isinstance(p_batt, list)
+            or not isinstance(p_grid, list)
+            or not isinstance(soc_opt, list)
+        ):
             return None
         snapshot = self._build_snapshot(
             source=str(value.get("source") or "store"),
@@ -153,6 +174,7 @@ class GWEnergyPilotPlanRuntime:
             ),
             p_batt=[dict(point) for point in p_batt if isinstance(point, Mapping)],
             p_grid=[dict(point) for point in p_grid if isinstance(point, Mapping)],
+            soc_opt=[dict(point) for point in soc_opt if isinstance(point, Mapping)],
         )
         return snapshot
 
@@ -228,6 +250,7 @@ class GWEnergyPilotPlanRuntime:
             emhass_schema_version=schema_version,
             p_batt=normalized["p_batt"],
             p_grid=normalized["p_grid"],
+            soc_opt=normalized["soc_opt"],
         )
         if snapshot is None:
             self.last_error = "EMHASS plan contains no usable P_batt horizon"
@@ -262,6 +285,9 @@ class GWEnergyPilotPlanRuntime:
             emhass_schema_version=None,
             p_batt=p_batt,
             p_grid=p_grid,
+            # The HA fallback does not expose a configured SOC-forecast entity.
+            # Do not guess the default/custom EMHASS output entity here.
+            soc_opt=[],
         )
 
     async def async_refresh(self, *, reason: str) -> bool:
@@ -336,6 +362,7 @@ class GWEnergyPilotPlanRuntime:
             "step_seconds": snapshot.get("step_seconds"),
             "p_batt_points": len(snapshot.get("p_batt") or []),
             "p_grid_points": len(snapshot.get("p_grid") or []),
+            "soc_opt_points": len(snapshot.get("soc_opt") or []),
             "restored_from_store": self.restored_from_store,
             "last_error": self.last_error,
         }

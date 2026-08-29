@@ -163,3 +163,47 @@ export function flowMotionMap(values, threshold = FLOW_THRESHOLD_W) {
           : "down",
   };
 }
+
+export function flowVisualMap(values, threshold = FLOW_THRESHOLD_W) {
+  const pv = finite(values?.pv);
+  const grid = finite(values?.grid);
+  const battery = finite(values?.battery);
+  const house = resolveHousePower(values?.house, pv, grid, battery);
+  const direction = flowMotionMap({ pv, grid, battery, house }, threshold);
+  const powers = { pv, grid, house, battery };
+  const activeMaximum = Math.max(
+    0,
+    ...Object.entries(powers)
+      .filter(([key, power]) => power !== null && direction[key] !== "idle")
+      .map(([, power]) => Math.abs(power))
+  );
+
+  return Object.fromEntries(
+    Object.entries(powers).map(([key, power]) => {
+      if (power === null) {
+        return [key, {
+          direction: "idle",
+          status: "unknown",
+          intensity: "none",
+          power: null,
+        }];
+      }
+      if (direction[key] === "idle") {
+        return [key, {
+          direction: "idle",
+          status: "idle",
+          intensity: "none",
+          power,
+        }];
+      }
+
+      const relative = activeMaximum > 0 ? Math.abs(power) / activeMaximum : 0;
+      return [key, {
+        direction: direction[key],
+        status: "active",
+        intensity: relative >= 0.75 ? "high" : relative >= 0.35 ? "medium" : "low",
+        power,
+      }];
+    })
+  );
+}

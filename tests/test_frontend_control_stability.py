@@ -27,7 +27,7 @@ class FrontendControlStabilityTests(unittest.TestCase):
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
         self.assertIn("gw-energy-pilot-v038-runtime.js?v=", self.entry)
-        self.assertIn('gw-energy-pilot-v034.js?v=0.45-pv-soc1', self.runtime)
+        self.assertIn('gw-energy-pilot-v034.js?v=0.45-integrated1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
         self.assertNotIn("gw-energy-pilot-v0363-control-stability.js", combined)
@@ -134,6 +134,11 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("@keyframes epV038VDown", self.styles)
         self.assertIn("animation-direction:normal !important", self.styles)
         self.assertIn("synchronizeFlowDirections(this, root)", self.runtime)
+        self.assertIn("export function flowVisualMap", self.model)
+        self.assertIn("const direction = flowMotionMap", self.model)
+        self.assertIn('status: "unknown"', self.model)
+        self.assertIn('status: "idle"', self.model)
+        self.assertIn('status: "active"', self.model)
 
 
 if __name__ == "__main__":

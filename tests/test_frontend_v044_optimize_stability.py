@@ -23,12 +23,12 @@ class FrontendV044OptimizeStabilityTests(unittest.TestCase):
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         self.assertEqual(manifest["version"], "0.45")
         self.assertIn(
-            "gw-energy-pilot-v045.js?v=0.45-pv-soc1",
+            "gw-energy-pilot-v045.js?v=0.45-integrated1",
             init_source,
         )
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-pv-soc1"', v045)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.45-integrated1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.45-pv-soc1"',
+            'import "./gw-energy-pilot-v043.js?v=0.45-integrated1"',
             self.source,
         )
         self.assertIn('const VERSION = "0.44"', self.source)
@@ -49,6 +49,42 @@ class FrontendV044OptimizeStabilityTests(unittest.TestCase):
             self.source,
         )
         self.assertNotIn("panel._queueRender();", self.source)
+
+    def test_optimize_action_is_one_safe_area_aware_floating_control(self) -> None:
+        self.assertIn(
+            'const FLOATING_STYLE_ID = "ep-v044-floating-optimize"',
+            self.source,
+        )
+        self.assertIn("function ensureFloatingOptimizeStyle(root)", self.source)
+        self.assertIn("position: fixed !important", self.source)
+        self.assertIn(
+            "right: calc(16px + env(safe-area-inset-right))",
+            self.source,
+        )
+        self.assertIn(
+            "bottom: calc(16px + env(safe-area-inset-bottom))",
+            self.source,
+        )
+        self.assertIn("min-width: 44px", self.source)
+        self.assertIn("min-height: 44px", self.source)
+        self.assertIn(
+            "padding-bottom: calc(96px + env(safe-area-inset-bottom))",
+            self.source,
+        )
+        self.assertIn('const main = root.querySelector("main")', self.source)
+        self.assertIn("if (main) main.appendChild(button)", self.source)
+        self.assertNotIn("position: sticky", self.source)
+        for forbidden in (
+            "animation:",
+            "transition:",
+            "scrollTop",
+            "scrollLeft",
+            "setPointerCapture",
+            "touchstart",
+            "touchmove",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, self.source)
 
     def test_optimize_runtime_status_is_patched_in_place(self) -> None:
         self.assertIn("function patchOptimizeUi(panel)", self.source)

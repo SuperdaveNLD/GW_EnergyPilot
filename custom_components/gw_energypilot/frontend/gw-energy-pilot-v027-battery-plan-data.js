@@ -8,10 +8,12 @@ const VALID_SIZES = new Set(["compact", "normal", "large"]);
 const TEXT = {
   en: {
     title: "BATTERY · PLAN · PRICE",
-    subtitle: "Today · actual battery power, active EMHASS plan and market price",
-    powerAxis: "Power (kW)", priceAxis: "Price ({currency}/kWh)",
+    subtitle: "Today · battery power, actual/forecast SOC and market price",
+    powerAxis: "Power (kW)", priceAxis: "Price ({currency}/kWh)", priceAxisShort: "{currency}/kWh",
+    socAxis: "SOC (%)",
     actualCharge: "Actual charging", actualDischarge: "Actual discharging",
     actual: "Actual", plan: "EMHASS plan", marketPrice: "Market price",
+    actualSoc: "Actual SOC", forecastSoc: "Forecast SOC",
     chargedToday: "Charged today", dischargedToday: "Discharged today",
     plannedCharge: "Plan charge", plannedDischarge: "Plan discharge",
     currentPrice: "Current price", goodweCounter: "GoodWe day counter",
@@ -20,6 +22,9 @@ const TEXT = {
     energySource: "Daily totals use GoodWe 35208/35211 when available. Recorder power integration remains visible as a comparison.",
     noActual: "Recorder has not collected enough actual battery-power statistics yet.",
     noPlan: "No usable EMHASS P_batt history or battery schedule is available yet.",
+    noActualSoc: "Recorder has not collected enough actual GoodWe SOC statistics yet.",
+    noForecastSoc: "No safe EMHASS SOC_opt forecast is available from the official plan mirror.",
+    socSource: "Actual SOC is the Recorder 5-minute mean of the existing GoodWe battery_soc percentage sensor. Forecast SOC is validated EMHASS SOC_opt (0..1) normalized to percent.",
     noPrice: "The market-price line is unavailable until timestamped runtime prices can be loaded.",
     discrepancy: "The native GoodWe day counter and Recorder power integral use different measurement paths and can differ. The GoodWe counter remains the headline total.",
     now: "NOW", updated: "updated {time}", waiting: "waiting for data",
@@ -29,10 +34,12 @@ const TEXT = {
   },
   nl: {
     title: "ACCU · PLAN · PRIJS",
-    subtitle: "Vandaag · werkelijk accuvermogen, actief EMHASS-plan en marktprijs",
-    powerAxis: "Vermogen (kW)", priceAxis: "Prijs ({currency}/kWh)",
+    subtitle: "Vandaag · accuvermogen, werkelijke/verwachte SOC en marktprijs",
+    powerAxis: "Vermogen (kW)", priceAxis: "Prijs ({currency}/kWh)", priceAxisShort: "{currency}/kWh",
+    socAxis: "SOC (%)",
     actualCharge: "Werkelijk laden", actualDischarge: "Werkelijk ontladen",
     actual: "Werkelijk", plan: "EMHASS-plan", marketPrice: "Marktprijs",
+    actualSoc: "Werkelijke SOC", forecastSoc: "Verwachte SOC",
     chargedToday: "Vandaag geladen", dischargedToday: "Vandaag ontladen",
     plannedCharge: "Gepland laden", plannedDischarge: "Gepland ontladen",
     currentPrice: "Huidige prijs", goodweCounter: "GoodWe-dagteller",
@@ -41,6 +48,9 @@ const TEXT = {
     energySource: "Dagtotalen gebruiken GoodWe 35208/35211 wanneer beschikbaar. De Recorder-vermogensintegratie blijft zichtbaar als vergelijking.",
     noActual: "Recorder heeft nog onvoldoende statistieken van het werkelijke accuvermogen.",
     noPlan: "Er is nog geen bruikbare EMHASS P_batt-historie of accuschema beschikbaar.",
+    noActualSoc: "Recorder heeft nog onvoldoende statistieken van de werkelijke GoodWe-SOC.",
+    noForecastSoc: "De officiële planmirror bevat nog geen veilig bruikbare EMHASS SOC_opt-prognose.",
+    socSource: "Werkelijke SOC is het Recorder-gemiddelde per 5 minuten van de bestaande GoodWe battery_soc-percentagesensor. Verwachte SOC is gevalideerde EMHASS SOC_opt (0..1), omgerekend naar procent.",
     noPrice: "De marktprijslijn verschijnt zodra tijdgebonden runtimeprijzen beschikbaar zijn.",
     discrepancy: "De GoodWe-dagteller en Recorder-vermogensintegratie gebruiken verschillende meetpaden en kunnen afwijken. Voor het hoofdtotaal blijft de GoodWe-teller leidend.",
     now: "NU", updated: "bijgewerkt {time}", waiting: "wachten op gegevens",
@@ -101,6 +111,16 @@ function normalizeStatisticRows(rows, startMs, endMs) {
     .sort((a, b) => a.t - b.t);
 }
 
+export function normalizeSocStatisticRows(rows, startMs, endMs) {
+  return (rows || [])
+    .map((row) => ({ t: timestampMs(row.start), pct: finiteNumber(row.mean) }))
+    .filter((p) => (
+      p.t !== null && p.pct !== null && p.pct >= 0 && p.pct <= 100 &&
+      p.t >= startMs && p.t < endMs
+    ))
+    .sort((a, b) => a.t - b.t);
+}
+
 function normalizePricePoints(points, startMs, endMs) {
   return (points || [])
     .map((p) => ({
@@ -115,6 +135,16 @@ function normalizeFuturePlan(points, startMs, endMs) {
   return (points || [])
     .map((p) => ({ t: timestampMs(p.start), w: finiteNumber(p.value_w) }))
     .filter((p) => p.t !== null && p.w !== null && p.t >= startMs && p.t < endMs)
+    .sort((a, b) => a.t - b.t);
+}
+
+export function normalizeSocPlanPoints(points, startMs, endMs) {
+  return (points || [])
+    .map((p) => ({ t: timestampMs(p.start), pct: finiteNumber(p.value_pct) }))
+    .filter((p) => (
+      p.t !== null && p.pct !== null && p.pct >= 0 && p.pct <= 100 &&
+      p.t >= startMs && p.t < endMs
+    ))
     .sort((a, b) => a.t - b.t);
 }
 
@@ -258,6 +288,7 @@ export async function loadChartData(panel, force = false) {
   if (panel.__epV027BatteryPlanPromise) return panel.__epV027BatteryPlanPromise;
 
   const batteryId = panel._entityId?.("battery_power");
+  const batterySocId = panel._entityId?.("battery_soc");
   if (!batteryId || !panel._hass?.callWS) return null;
 
   const bounds = localDayBounds();
@@ -276,6 +307,13 @@ export async function loadChartData(panel, force = false) {
         start_time: bounds.start.toISOString(), end_time: bounds.now.toISOString(),
         statistic_ids: [batteryId], period: "5minute", types: ["mean"],
       });
+      const actualSocRequest = batterySocId
+        ? panel._hass.callWS({
+            type: "recorder/statistics_during_period",
+            start_time: bounds.start.toISOString(), end_time: bounds.now.toISOString(),
+            statistic_ids: [batterySocId], period: "5minute", types: ["mean"],
+          })
+        : Promise.resolve({});
       const planRequest = planEntityId
         ? panel._hass.callWS({
             type: "history/history_during_period",
@@ -285,11 +323,15 @@ export async function loadChartData(panel, force = false) {
           })
         : Promise.resolve({});
 
-      const [actualResult, planResult] = await Promise.allSettled([actualRequest, planRequest]);
+      const [actualResult, actualSocResult, planResult] = await Promise.allSettled([
+        actualRequest, actualSocRequest, planRequest,
+      ]);
       const actualStats = actualResult.status === "fulfilled" ? actualResult.value : {};
+      const actualSocStats = actualSocResult.status === "fulfilled" ? actualSocResult.value : {};
       const planHistory = planResult.status === "fulfilled" ? planResult.value : {};
       const errors = [
         actualResult.status === "rejected" ? actualResult.reason?.message || String(actualResult.reason) : null,
+        actualSocResult.status === "rejected" ? actualSocResult.reason?.message || String(actualSocResult.reason) : null,
         planResult.status === "rejected" ? planResult.reason?.message || String(planResult.reason) : null,
       ].filter(Boolean);
       const inherited = panel.__epV026BatteryPriceData;
@@ -298,8 +340,10 @@ export async function loadChartData(panel, force = false) {
       const data = {
         at: Date.now(), startMs, endMs, nowMs: bounds.now.getTime(),
         actualRows: normalizeStatisticRows(actualStats?.[batteryId] || inherited?.batteryRows || [], startMs, endMs),
+        actualSocRows: normalizeSocStatisticRows(actualSocStats?.[batterySocId] || [], startMs, endMs),
         historicalPlanRows: normalizeHistoryRows(planHistory, planEntityId, startMs, bounds.now.getTime()),
         futurePlanPoints: normalizeFuturePlan(payload?.battery_plan?.points || [], startMs, endMs),
+        socPlanPoints: normalizeSocPlanPoints(payload?.battery_soc_plan?.points || [], startMs, endMs),
         pricePoints: normalizePricePoints(payload?.points || inherited?.pricePoints || [], startMs, endMs),
         payload, statisticsError: errors.join(" · ") || null,
       };
@@ -311,7 +355,8 @@ export async function loadChartData(panel, force = false) {
       const data = {
         at: Date.now(), startMs: bounds.start.getTime(), endMs: bounds.end.getTime(),
         nowMs: bounds.now.getTime(), actualRows: inherited?.batteryRows || [],
-        historicalPlanRows: [], futurePlanPoints: [], pricePoints: inherited?.pricePoints || [],
+        actualSocRows: [], historicalPlanRows: [], futurePlanPoints: [], socPlanPoints: [],
+        pricePoints: inherited?.pricePoints || [],
         payload: inherited?.pricePayload || null, statisticsError: err?.message || String(err),
       };
       panel.__epV027BatteryPlanData = data;

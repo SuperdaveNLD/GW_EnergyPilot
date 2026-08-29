@@ -248,7 +248,7 @@
     initialStates["sensor.p_batt_forecast"] = makeExternalState("sensor.p_batt_forecast", -1200, "W");
     initialStates["sensor.p_grid_forecast"] = makeExternalState("sensor.p_grid_forecast", 1100, "W");
     initialStates["sensor.optim_status"] = makeExternalState("sensor.optim_status", "Optimal");
-    initialStates["sensor.soc_batt_forecast"] = makeExternalState("sensor.soc_batt_forecast", 0.56);
+    initialStates["sensor.soc_batt_forecast"] = makeExternalState("sensor.soc_batt_forecast", 56, "%");
     initialStates["sensor.p_load_forecast"] = makeExternalState("sensor.p_load_forecast", 2500, "W");
     initialStates["sensor.p_pv_forecast"] = makeExternalState("sensor.p_pv_forecast", 4800, "W");
     initialStates["sensor.external_roof_pv"] = makeExternalState("sensor.external_roof_pv", 1200, "W");
@@ -347,9 +347,13 @@
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         value_w: index % 4 === 0 ? -1600 : index % 5 === 0 ? 1100 : 0,
       }));
+      const socPlan = Array.from({ length: 24 }, (_, index) => ({
+        start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
+        value_pct: Math.min(95, 54 + index * 1.25),
+      }));
       const pBattState = window.__epHass?.states?.["sensor.p_batt_forecast"];
       return {
-        schema: 4,
+        chart_schema_version: 5,
         entry_id: ENTRY_ID,
         generated_at: new Date().toISOString(),
         plan_revision: planRevision,
@@ -359,6 +363,14 @@
           entity_id: "sensor.p_batt_forecast",
           last_updated: pBattState?.last_updated || new Date().toISOString(),
           points: plan,
+        },
+        battery_soc_plan: {
+          available: true,
+          unit: "%",
+          source: "emhass_api_v1_plan",
+          source_column: "SOC_opt",
+          source_unit: "fraction_0_1",
+          points: [...socPlan, { start: hour.toISOString(), value_pct: 156 }],
         },
         actual: [],
         historical_plan: [],
@@ -396,7 +408,29 @@
       if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
-      if (type.includes("history") || type.includes("statistic")) return {};
+      if (type === "recorder/statistics_during_period") {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Math.max(0, now.getHours() - 2));
+        const result = {};
+        for (const statisticId of message.statistic_ids || []) {
+          if (statisticId === entityIdForKey("battery_power")) {
+            result[statisticId] = Array.from({ length: 24 }, (_, index) => ({
+              start: new Date(start.getTime() + index * 5 * 60 * 1000).toISOString(),
+              mean: index % 3 === 0 ? -1300 : 850,
+            }));
+          } else if (statisticId === entityIdForKey("battery_soc")) {
+            result[statisticId] = [
+              ...Array.from({ length: 24 }, (_, index) => ({
+                start: new Date(start.getTime() + index * 5 * 60 * 1000).toISOString(),
+                mean: 48 + index * 0.25,
+              })),
+              { start: start.toISOString(), mean: 140 },
+            ];
+          }
+        }
+        return result;
+      }
+      if (type.includes("history")) return {};
       unknownWsTypes.add(type);
       return {};
     }
