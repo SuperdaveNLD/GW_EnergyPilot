@@ -223,6 +223,52 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sensor.p_grid", tracked_entities)
         self.assertFalse(hasattr(hass, "tracked_intervals"))
 
+    async def test_missing_scheduled_plan_step_holds_enabled_battery(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="4200",
+            p_grid="-4200",
+        )
+        controller.enabled = True
+
+        await controller.async_hold_for_plan_step("plan_step_unavailable")
+
+        self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
+        self.assertEqual(controller.last_command, "plan_step_unavailable")
+        self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_plan_step_fail_safe_does_not_take_manual_ownership(self):
+        controller, _, client, coordinator = self.make_controller(
+            coordinator_mode=const.MODE_BATTERY_HOLD,
+            coordinator_power=0,
+        )
+
+        await controller.async_hold_for_plan_step("plan_step_publish_failed")
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(coordinator.refresh_count, 0)
+        self.assertEqual(controller.last_command, "goodwe_auto")
+
+    async def test_plan_source_events_wait_until_orchestrator_resumes_controller(self):
+        controller, hass, client, _ = self.make_controller(
+            p_batt="2500",
+            p_grid="-2500",
+        )
+        controller.enabled = True
+        controller.suspend_plan_updates()
+
+        controller._async_source_changed(
+            Event({"entity_id": "sensor.p_batt"})
+        )
+        await controller.async_evaluate()
+
+        self.assertEqual(hass.tasks, [])
+        self.assertEqual(client.calls, [])
+
+        controller.resume_plan_updates()
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 2500)])
+
     async def test_positive_p_grid_maps_to_mode9_import_target(self):
         controller, _, client, coordinator = self.make_controller(
             p_batt="-4200",

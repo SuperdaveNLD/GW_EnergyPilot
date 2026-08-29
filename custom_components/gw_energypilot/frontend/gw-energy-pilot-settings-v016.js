@@ -582,6 +582,15 @@ function fieldHtml(panel, sectionId, field) {
     const step = field.step === undefined ? "" : ` step="${field.step}"`;
     return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="number" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}"${min}${max}${step}${disabled}>${description}</label>`;
   }
+  if (field.type === "select") {
+    const options = (field.options || []).map((option) => {
+      const optionValue = String(option?.value ?? option ?? "");
+      const optionLabel = String(option?.label ?? optionValue);
+      const selected = String(value ?? "") === optionValue ? " selected" : "";
+      return `<option value="${panel._escape(optionValue)}"${selected}>${panel._escape(optionLabel)}</option>`;
+    }).join("");
+    return `<label class="${fieldClass}">${label}<select class="ep-v016-input" data-setting-key="${panel._escape(field.key)}"${disabled}>${options}</select>${description}</label>`;
+  }
   if (field.type === "entity") {
     const listId = `ep-v016-${field.key}-entities`;
     return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" list="${panel._escape(listId)}" placeholder="sensor…" autocomplete="off"${disabled}><datalist id="${panel._escape(listId)}">${powerEntityOptions(panel)}</datalist>${description}</label>`;

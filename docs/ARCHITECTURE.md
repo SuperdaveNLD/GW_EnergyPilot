@@ -20,6 +20,7 @@ GWEnergyPilotCoordinator
                                   |
                                   +--> EnergyPilot Battery Saver policy
                                   +--> EMHASS optimize/publish
+                                  +--> wall-clock active-plan-step publish
                                   +--> canonical timestamped price cache
                                   +--> refresh official EMHASS /api/v1/plan
                                   +--> advance plan_revision
@@ -238,7 +239,7 @@ orchestrator_v044.GWEnergyPilotOrchestrator
 
 Responsibilities are layered deliberately:
 
-- base/v012/v013: existing optimization, publication and runtime-evidence behavior;
+- base/v012/v013: optimization, fixed wall-clock scheduling, active-plan-step publication and runtime-evidence behavior;
 - v026: canonical timestamped price-series support for dashboard/optimizer use;
 - v031: Battery Saver policy ownership, canonical EMHASS runtime-contract application, GoodWe minimum-SOC synchronization before owned solves and runtime final-SOC clamping;
 - v033: refresh the persistent canonical plan after a successful optimize/publish cycle and increment `plan_revision` in a `finally` block after the refresh attempt.
@@ -247,10 +248,19 @@ Responsibilities are layered deliberately:
 The EnergyPilot-required runtime contract is defined once in `emhass_sync.py` and reused by both explicit **Synchronize required config** and automatic pre-solve preparation:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
+
+EnergyPilot is the single scheduling owner. The configured full optimization
+cadence is 15, 30 or 60 minutes (15 recommended) and is anchored to local clock
+boundaries at second 15. The same clock callback publishes the active row when
+the inferred persisted-plan timestep is due. A due full optimization runs first
+and its initial publish suppresses a duplicate timestep publish. The complete
+solve/publish/fresh-output/control transaction is serialized. Controller
+plan-source listeners are deferred until fresh `P_batt` and, for Grid/Hybrid,
+fresh `P_grid` are proven; EV anti-discharge remains higher priority.
 
 This contract deliberately does **not** contain installation/model topology. The following remain EMHASS/operator-owned and are preserved exactly:
 

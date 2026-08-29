@@ -29,6 +29,7 @@ emhass_sync.py          canonical EnergyPilot runtime contract + safe required-c
 emhass_sync_api.py      admin sync/readback API using canonical sync ownership keys
 orchestrator.py         base EMHASS orchestration
 orchestrator_v012.py    reliability/startup/price refinements
+wall_clock.py           pure wall-clock cadence/plan-step helpers
 orchestrator_v013.py    G20 load semantics + persistent last_success/optimization log
 orchestrator_v026.py    canonical dashboard price-series cache/read path
 orchestrator_v031.py    Battery Saver policy + canonical runtime contract + min-SOC/final-SOC ownership + fresh-output validation
@@ -73,6 +74,7 @@ All layers are active runtime code. Check subclasses before changing a base meth
 Ownership by active layer:
 
 - v026: read-only dashboard/optimizer price-series caching;
+- v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries;
 - v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
 - v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup.
@@ -84,12 +86,12 @@ Do not add release inheritance merely to change a label or constant when an exis
 `emhass_sync.py` is the canonical definition for the small EnergyPilot runtime contract used by both explicit **Synchronize required config** and automatic pre-solve preparation:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
 
-The helper `apply_emhass_runtime_contract()` applies only those values to a copy of the complete current EMHASS configuration. `orchestrator_v031.py` must use that helper rather than maintaining a second required-value list.
+The helper `apply_emhass_runtime_contract()` applies only those values to a copy of the complete current EMHASS configuration. `orchestrator_v031.py` must use that helper rather than maintaining a second required-value list. `continual_publish = false` reserves schedule ownership for the v012 wall-clock callback; do not add another periodic publisher.
 
 Installation/model topology is outside this contract:
 

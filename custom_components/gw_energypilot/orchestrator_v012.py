@@ -17,7 +17,7 @@ from homeassistant.core import CoreState, Event, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_time_change
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -25,16 +25,31 @@ from .const import (
     CONF_EMHASS_FALLBACK_LOAD,
     CONF_EMHASS_OPTIMIZATION_INTERVAL,
     CONF_EMHASS_URL,
+    CONF_P_BATT_ENTITY,
+    CONF_P_GRID_ENTITY,
     CONF_SELL_PRICE_DEDUCTION,
     CONF_USE_NORDPOOL_PRICES,
+    CONTROL_STRATEGY_BATTERY,
     DEFAULT_BUY_PRICE_ADDER,
     DEFAULT_EMHASS_FALLBACK_LOAD,
     DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     DEFAULT_EMHASS_URL,
+    DEFAULT_P_BATT_ENTITY,
+    DEFAULT_P_GRID_ENTITY,
     DEFAULT_SELL_PRICE_DEDUCTION,
     DEFAULT_USE_NORDPOOL_PRICES,
 )
-from .orchestrator import GWEnergyPilotOrchestrator as _BaseOrchestrator
+from .orchestrator import (
+    OUTPUT_TIMEOUT,
+    GWEnergyPilotOrchestrator as _BaseOrchestrator,
+)
+from .wall_clock import (
+    PLAN_FAIL_SAFE_CHECK_MINUTES,
+    WALL_CLOCK_OFFSET_SECOND,
+    WALL_CLOCK_TICK_MINUTES,
+    cadence_is_due,
+    plan_step_minutes,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +66,10 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
         self.last_price_entity: str | None = None
         self.emhass_health_status: str | None = None
         self.emhass_version: str | None = None
+        self.last_plan_step_success: datetime | None = None
+        self.last_plan_step_error: str | None = None
+        self._wall_clock_lock = asyncio.Lock()
+        self._cycle_lock = asyncio.Lock()
 
     @property
     def attributes(self) -> dict[str, Any]:
@@ -62,6 +81,12 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
                 "price_entity": self.last_price_entity,
                 "emhass_health": self.emhass_health_status,
                 "emhass_version": self.emhass_version,
+                "last_plan_step_success": (
+                    self.last_plan_step_success.isoformat()
+                    if self.last_plan_step_success
+                    else None
+                ),
+                "last_plan_step_error": self.last_plan_step_error,
                 "calculated_home_power": self._calculated_home_power(),
                 "parallel_goodwe_entries": [
                     config_entry.title
@@ -85,20 +110,12 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
             )
             return
 
-        interval = int(
-            self.entry.options.get(
-                CONF_EMHASS_OPTIMIZATION_INTERVAL,
-                DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
-            )
-        )
-        interval = max(5, min(60, interval))
         self._unsubs.append(
-            async_track_time_interval(
+            async_track_time_change(
                 self.hass,
-                self._async_scheduled_optimize,
-                timedelta(minutes=interval),
-                name=f"GW EnergyPilot EMHASS optimization ({self.entry.entry_id})",
-                cancel_on_shutdown=True,
+                self._async_wall_clock_tick,
+                minute=f"/{WALL_CLOCK_TICK_MINUTES}",
+                second=WALL_CLOCK_OFFSET_SECOND,
             )
         )
 
@@ -117,6 +134,222 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
             )
 
         self._set_status("scheduled")
+
+    def _optimization_interval_minutes(self) -> int:
+        """Return the configured cadence, including preserved legacy values."""
+        try:
+            interval = int(
+                self.entry.options.get(
+                    CONF_EMHASS_OPTIMIZATION_INTERVAL,
+                    DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
+                )
+            )
+        except (TypeError, ValueError):
+            interval = DEFAULT_EMHASS_OPTIMIZATION_INTERVAL
+        if not 5 <= interval <= 60 or interval % 5:
+            return DEFAULT_EMHASS_OPTIMIZATION_INTERVAL
+        return interval
+
+    def _plan_runtime(self):
+        runtime_data = getattr(self.entry, "runtime_data", None)
+        return getattr(runtime_data, "plan_runtime", None)
+
+    def _controller(self):
+        runtime_data = getattr(self.entry, "runtime_data", None)
+        return getattr(runtime_data, "controller", None)
+
+    def _p_batt_report_timestamp(self) -> datetime | None:
+        """Return compatibility freshness evidence for a published P_batt."""
+        entity_id = str(
+            self.entry.options.get(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
+            or DEFAULT_P_BATT_ENTITY
+        )
+        state = self.hass.states.get(entity_id)
+        return self._state_report_timestamp(state)
+
+    @staticmethod
+    def _state_report_timestamp(state) -> datetime | None:
+        """Prefer last_reported while supporting older State-like objects."""
+        if state is None:
+            return None
+        return getattr(state, "last_reported", state.last_updated)
+
+    def _p_grid_entity_id(self) -> str:
+        return str(
+            self.entry.options.get(CONF_P_GRID_ENTITY, DEFAULT_P_GRID_ENTITY)
+            or DEFAULT_P_GRID_ENTITY
+        )
+
+    def _controller_requires_p_grid(self) -> bool:
+        controller = self._controller()
+        return bool(
+            controller is not None
+            and controller.control_strategy != CONTROL_STRATEGY_BATTERY
+        )
+
+    async def _async_wait_for_fresh_entity(
+        self,
+        entity_id: str,
+        before: datetime | None,
+    ) -> float | None:
+        """Wait for a freshly reported finite optimizer output entity."""
+        deadline = self.hass.loop.time() + OUTPUT_TIMEOUT
+        while self.hass.loop.time() < deadline:
+            state = self.hass.states.get(entity_id)
+            if state is not None and self._optimization_ready():
+                value = self._safe_number(state.state)
+                reported = self._state_report_timestamp(state)
+                is_fresh = before is None or (
+                    reported is not None and reported > before
+                )
+                if value is not None and is_fresh:
+                    return value
+            await asyncio.sleep(0.5)
+        return None
+
+    @staticmethod
+    def _suspend_controller(controller) -> None:
+        if controller is not None:
+            controller.suspend_plan_updates()
+
+    @staticmethod
+    def _resume_controller(controller) -> None:
+        if controller is not None:
+            controller.resume_plan_updates()
+
+    async def _async_publish_plan_step(self) -> None:
+        """Serialize one active-plan-step publication against all solve cycles."""
+        if self._cycle_lock.locked():
+            raise HomeAssistantError("An EnergyPilot EMHASS cycle is already running")
+        async with self._cycle_lock:
+            await self._async_publish_plan_step_cycle()
+
+    async def _async_publish_plan_step_cycle(self) -> None:
+        """Publish the current EMHASS plan row and verify fresh HA output."""
+        if self._lock.locked():
+            raise HomeAssistantError("An EnergyPilot EMHASS cycle is already running")
+
+        controller = self._controller()
+        self._suspend_controller(controller)
+        try:
+            async with self._lock:
+                before = self._p_batt_report_timestamp()
+                require_grid = self._controller_requires_p_grid()
+                grid_entity_id = self._p_grid_entity_id()
+                grid_state = self.hass.states.get(grid_entity_id)
+                grid_before = self._state_report_timestamp(grid_state)
+                self.last_reason = "plan_step"
+                self.publish_http_status = None
+                self.last_plan_step_error = None
+                self._set_status("publishing_plan_step")
+                publish_status, publish_content = await self._async_post_emhass(
+                    "/action/publish-data",
+                    {},
+                    60,
+                )
+                self.publish_http_status = publish_status
+                async_dispatcher_send(self.hass, self.signal)
+                if not 200 <= publish_status < 300:
+                    error = (
+                        f"EMHASS plan-step publish HTTP {publish_status}: "
+                        f"{publish_content[:300]}"
+                    )
+                    self.last_plan_step_error = error
+                    self._set_status("error_plan_step_publish", error)
+                    raise HomeAssistantError(error)
+
+                self._set_status("waiting_for_plan_step")
+                pending = [self._async_wait_for_fresh_output(before)]
+                if require_grid:
+                    pending.append(
+                        self._async_wait_for_fresh_entity(
+                            grid_entity_id,
+                            grid_before,
+                        )
+                    )
+                outputs = await asyncio.gather(*pending)
+                if outputs[0] is None or (require_grid and outputs[1] is None):
+                    missing = "P_batt/P_grid" if require_grid else "P_batt"
+                    error = (
+                        "EMHASS plan-step publish returned successfully but no "
+                        f"fresh numeric {missing} output became available"
+                    )
+                    self.last_plan_step_error = error
+                    self._set_status("stale_plan_step_output", error)
+                    raise HomeAssistantError(error)
+
+                self.last_p_batt = outputs[0]
+                self.last_plan_step_success = dt_util.utcnow()
+                self._set_status("ready")
+        finally:
+            self._resume_controller(controller)
+
+        if controller is not None:
+            try:
+                await controller.async_evaluate()
+            except Exception as err:  # noqa: BLE001 - convert to scheduler failure
+                error = f"Published plan step could not be applied: {err}"
+                self.last_plan_step_error = error
+                self._set_status("error_plan_step_control", error)
+                raise HomeAssistantError(error) from err
+
+    async def _async_fail_safe_hold(self, reason: str) -> None:
+        """Hold the battery when no current scheduled plan step can be proven."""
+        controller = self._controller()
+        if controller is None:
+            return
+        try:
+            await controller.async_hold_for_plan_step(reason)
+        except Exception:  # noqa: BLE001 - timer callbacks must retain future runs
+            _LOGGER.exception("Unable to apply plan-step Battery Hold fail-safe")
+
+    async def _async_wall_clock_tick(self, now: datetime) -> None:
+        """Optimize or publish exactly once for a local wall-clock boundary."""
+        if not self.enabled or self._wall_clock_lock.locked():
+            return
+
+        async with self._wall_clock_lock:
+            local_now = dt_util.as_local(now)
+            success_before = self.last_success
+            if self._cycle_lock.locked():
+                async with self._cycle_lock:
+                    pass
+                if self.last_success != success_before:
+                    return
+
+            optimization_due = cadence_is_due(
+                local_now, self._optimization_interval_minutes()
+            )
+            if optimization_due:
+                try:
+                    await self.async_optimize(reason="scheduled")
+                    return
+                except Exception as err:  # noqa: BLE001 - fall back to valid plan
+                    _LOGGER.warning("Scheduled EMHASS optimization failed: %s", err)
+
+            plan_runtime = self._plan_runtime()
+            step_minutes = plan_step_minutes(
+                plan_runtime.current_step_seconds()
+                if plan_runtime is not None
+                else None
+            )
+            if step_minutes is None:
+                if cadence_is_due(local_now, PLAN_FAIL_SAFE_CHECK_MINUTES):
+                    await self._async_fail_safe_hold("plan_step_unavailable")
+                return
+            if not cadence_is_due(local_now, step_minutes):
+                return
+
+            try:
+                await self._async_publish_plan_step()
+            except Exception as err:  # noqa: BLE001 - fail safe and keep timer alive
+                _LOGGER.warning("Scheduled EMHASS plan-step execution failed: %s", err)
+                hold_reason = (
+                    "plan_step_control_failed"
+                    if self.status == "error_plan_step_control"
+                    else "plan_step_publish_failed"
+                )
+                await self._async_fail_safe_hold(hold_reason)
 
     @staticmethod
     def _safe_number(value: Any) -> float | None:
@@ -393,6 +626,13 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
         async_dispatcher_send(self.hass, self.signal)
 
     async def async_optimize(self, reason: str = "manual") -> None:
+        """Serialize a complete solve/publish/fresh-output/control transaction."""
+        if self._cycle_lock.locked():
+            raise HomeAssistantError("An EnergyPilot EMHASS cycle is already running")
+        async with self._cycle_lock:
+            await self._async_optimize_cycle(reason)
+
+    async def _async_optimize_cycle(self, reason: str) -> None:
         """Guard optimization until HA and EnergyPilot telemetry are ready."""
         if self.hass.state is not CoreState.running:
             error = (
@@ -411,8 +651,29 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
             raise HomeAssistantError(error)
 
         await self._async_probe_emhass()
+        controller = self._controller()
+        require_grid = self._controller_requires_p_grid()
+        grid_entity_id = self._p_grid_entity_id()
+        grid_before = self._state_report_timestamp(
+            self.hass.states.get(grid_entity_id)
+        )
+        success_before = self.last_success
+        self._suspend_controller(controller)
         try:
             await super().async_optimize(reason=reason)
+            if require_grid:
+                p_grid = await self._async_wait_for_fresh_entity(
+                    grid_entity_id,
+                    grid_before,
+                )
+                if p_grid is None:
+                    self.last_success = success_before
+                    error = (
+                        "EMHASS published successfully but no fresh numeric P_grid "
+                        "output became available for the active control strategy"
+                    )
+                    self._set_status("stale_output", error)
+                    raise HomeAssistantError(error)
         except HomeAssistantError as err:
             if not (
                 self.status.startswith("error")
@@ -421,3 +682,16 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
             ):
                 self._set_status("error_optimization", str(err))
             raise
+        finally:
+            self._resume_controller(controller)
+
+        if controller is not None:
+            try:
+                await controller.async_evaluate()
+            except Exception as err:  # noqa: BLE001 - surface actuator failure
+                self.last_success = success_before
+                error = f"Fresh optimization could not be applied: {err}"
+                self._set_status("error_optimization_control", error)
+                await self._async_fail_safe_hold("optimization_control_failed")
+                raise HomeAssistantError(error) from err
+        self.last_plan_step_error = None

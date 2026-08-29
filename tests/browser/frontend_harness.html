@@ -313,7 +313,20 @@
             title: "EMHASS",
             short_title: "EMHASS",
             description: "EMHASS settings.",
-            fields: [],
+            fields: [
+              {
+                key: "emhass_optimization_interval",
+                label: "Optimization interval",
+                type: "select",
+                value: "15",
+                options: [
+                  { value: "15", label: "15 minutes" },
+                  { value: "30", label: "30 minutes" },
+                  { value: "60", label: "60 minutes" },
+                ],
+                readonly: false,
+              },
+            ],
           },
           pv: {
             title: "PV",

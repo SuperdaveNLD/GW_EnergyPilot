@@ -81,6 +81,13 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         self.assertIn("actions.prepend(controls.defaults)", self.source)
         self.assertIn("buildSummary(panel, form, current, controls.sync)", self.source)
 
+    def test_settings_renderer_supports_bounded_interval_select(self) -> None:
+        settings_source = (
+            FRONTEND / "gw-energy-pilot-settings-v016.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('field.type === "select"', settings_source)
+        self.assertIn('<select class="ep-v016-input"', settings_source)
+
     def test_emhass_only_values_are_not_falsely_attached_to_energypilot_fields(self) -> None:
         self.assertIn("The editable fields are EnergyPilot settings", self.source)
         self.assertIn("De bewerkbare velden zijn EnergyPilot-instellingen", self.source)

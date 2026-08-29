@@ -11,7 +11,7 @@ DEFAULT_PV_FORECAST_ENTITY = "sensor.p_pv_forecast"
 # required for EnergyPilot orchestration, unlike installation/model topology
 # settings such as set_use_pv and inverter_is_hybrid which remain EMHASS-owned.
 REQUIRED_RUNTIME_CONFIG: dict[str, Any] = {
-    "continual_publish": True,
+    "continual_publish": False,
     "method_ts_round": "first",
     "set_use_battery": True,
 }

@@ -55,7 +55,7 @@ The EMHASS section owns EnergyPilot's EMHASS integration settings:
 
 - native orchestrator enable/disable;
 - EMHASS URL;
-- optimization interval;
+- wall-clock optimization interval: 15, 30 or 60 minutes, with 15 minutes recommended;
 - EnergyPilot runtime final SOC target;
 - fallback load;
 - `P_batt` and `P_grid` output entities;
@@ -71,6 +71,11 @@ self-consumption
 ```
 
 Changing `costfun` does not change the GoodWe actuator strategy.
+
+Scheduled optimization is anchored to local clock boundaries at second 15.
+Active plan-step publication follows the inferred EMHASS plan timestep. When
+both are due, the full optimization and its initial publish complete before
+Automatic Control is explicitly evaluated.
 
 ## PV page
 

@@ -218,12 +218,18 @@ Use only one continuously polling/controlling direct GoodWe integration where pr
 EnergyPilot's automatic pre-solve preparation and **Synchronize required config** use the same small runtime contract:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
 
-Those values are required for the EnergyPilot orchestration/publication path. Installation topology is different and remains owned by EMHASS/the operator:
+EnergyPilot owns both the full-optimization schedule and the active-plan-step
+publication schedule, so EMHASS's independent continual publisher is disabled.
+New installations can choose a 15, 30 or 60 minute wall-clock optimization
+cadence; 15 minutes is recommended. Runs occur at the matching local boundary
+plus 15 seconds. Plan-step publication follows the inferred persisted EMHASS
+timestep, and optimization always runs first when both are due. Installation
+topology is different and remains owned by EMHASS/the operator:
 
 ```text
 set_use_pv

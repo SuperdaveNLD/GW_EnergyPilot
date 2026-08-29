@@ -61,6 +61,7 @@ from .const import (
     DEFAULT_SLAVE,
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
+    EMHASS_OPTIMIZATION_INTERVALS,
     EXTERNAL_PV_ENTITY_KEYS,
     NAME,
 )
@@ -85,7 +86,23 @@ async def _async_validate_connection(host: str, port: int, slave: int) -> None:
         await client.async_close()
 
 
-def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
+def _optimization_interval_options(current: Any = None) -> list[str]:
+    """Return supported choices while preserving one stored legacy cadence."""
+    options = [str(value) for value in EMHASS_OPTIMIZATION_INTERVALS]
+    try:
+        legacy = int(current)
+    except (TypeError, ValueError):
+        return options
+    if 5 <= legacy <= 60 and legacy % 5 == 0 and str(legacy) not in options:
+        options.append(str(legacy))
+    return options
+
+
+def _controller_schema(
+    *,
+    orchestrator_default: bool = True,
+    optimization_interval: Any = None,
+) -> vol.Schema:
     """Return controller and native orchestrator options schema."""
     return vol.Schema(
         {
@@ -154,14 +171,11 @@ def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
             ): selector.TextSelector(),
             vol.Required(
                 CONF_EMHASS_OPTIMIZATION_INTERVAL,
-                default=DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=5,
-                    max=60,
-                    step=5,
-                    mode=selector.NumberSelectorMode.BOX,
-                    unit_of_measurement="min",
+                default=str(DEFAULT_EMHASS_OPTIMIZATION_INTERVAL),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=_optimization_interval_options(optimization_interval),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
             vol.Required(
@@ -260,6 +274,10 @@ def _controller_schema(*, orchestrator_default: bool = True) -> vol.Schema:
 def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
     """Convert user-facing values to runtime/storage values."""
     options = dict(user_input)
+    optimization_interval = int(options[CONF_EMHASS_OPTIMIZATION_INTERVAL])
+    if not 5 <= optimization_interval <= 60 or optimization_interval % 5:
+        raise vol.Invalid("Optimization interval must be a 5-minute cadence")
+    options[CONF_EMHASS_OPTIMIZATION_INTERVAL] = optimization_interval
     max_power_kw = float(options.pop(CONF_MAX_POWER_KW))
     options[CONF_MAX_POWER] = int(round(max_power_kw * 1000))
     soc_final_pct = float(options.pop(CONF_EMHASS_SOC_FINAL_PCT))
@@ -282,6 +300,9 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     form_options.setdefault(
         CONF_EMHASS_OPTIMIZATION_INTERVAL,
         DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
+    )
+    form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL] = str(
+        form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL]
     )
     form_options.setdefault(
         CONF_EMHASS_FALLBACK_LOAD,
@@ -432,7 +453,10 @@ class GWOptionsFlow(OptionsFlowWithReload):
                         CONF_ENABLE_EMHASS_ORCHESTRATOR,
                         True,
                     )
-                )
+                ),
+                optimization_interval=self.config_entry.options.get(
+                    CONF_EMHASS_OPTIMIZATION_INTERVAL
+                ),
             ),
             _options_for_form(dict(self.config_entry.options)),
         )

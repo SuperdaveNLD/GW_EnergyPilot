@@ -339,6 +339,16 @@ class GWEnergyPilotPlanRuntime:
         """Return the current persisted P_grid target."""
         return self.current_value("p_grid")
 
+    def current_step_seconds(self) -> int | None:
+        """Return the inferred timestep for a plan that is valid now."""
+        if not self.has_current_plan() or self._snapshot is None:
+            return None
+        try:
+            step = int(self._snapshot.get("step_seconds"))
+        except (TypeError, ValueError):
+            return None
+        return step if step > 0 else None
+
     def has_current_plan(self) -> bool:
         """Return whether the mirrored battery plan contains a target for now."""
         return self.current_p_batt() is not None

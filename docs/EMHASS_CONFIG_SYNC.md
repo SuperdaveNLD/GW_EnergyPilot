@@ -21,11 +21,16 @@ The runtime resolves the actual Home Assistant entity IDs for EnergyPilot load p
 
 The required EMHASS runtime contract is:
 
-- `continual_publish = true`
+- `continual_publish = false`
 - `method_ts_round = first`
 - `set_use_battery = true`
 
-`continual_publish = true` is required because EnergyPilot performs full optimizations on its own schedule/events, while EMHASS must advance and republish the saved plan at each `optimization_time_step`. EnergyPilot deliberately does not add a second periodic publish loop.
+`continual_publish = false` establishes a single scheduler owner. EnergyPilot
+performs full optimizations at fixed local wall-clock boundaries and publishes
+the active saved-plan row at each inferred plan timestep. This prevents an
+EMHASS background loop and an EnergyPilot timer from racing or leaving schedule
+ownership ambiguous. A full optimization includes its initial publish and wins
+when both operations are due at the same boundary.
 
 ## Settings-page presentation
 
@@ -83,7 +88,7 @@ An explicit slider change retains the existing safety order: write and verify Go
 
 The manual **Synchronize required config** action itself does not launch an optimization and does not write a GoodWe register. After changing required config manually, run a fresh EnergyPilot optimization before enabling Automatic Control.
 
-EnergyPilot-owned optimization runs also enforce the small core runtime contract immediately before solving, so `continual_publish`, battery use and timestamp rounding cannot silently drift away after a manual EMHASS edit. Installation-topology settings remain EMHASS-owned.
+EnergyPilot-owned optimization runs also enforce the small core runtime contract immediately before solving, so publisher ownership, battery use and timestamp rounding cannot silently drift away after a manual EMHASS edit. Installation-topology settings remain EMHASS-owned.
 
 ## Flow animation regression guard
 

@@ -18,6 +18,7 @@ from .config_flow import (
     CannotConnect,
     _async_validate_connection,
     _controller_schema,
+    _optimization_interval_options,
     _options_for_form,
     _options_from_form,
 )
@@ -69,6 +70,7 @@ from .const import (
     DEFAULT_SLAVE,
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
+    EMHASS_OPTIMIZATION_INTERVALS,
     EXTERNAL_PV_ENTITY_KEYS,
     NAME,
 )
@@ -231,13 +233,17 @@ EMHASS_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     {
         "key": CONF_EMHASS_OPTIMIZATION_INTERVAL,
         "label": "Optimization interval",
-        "type": "number",
-        "default": DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
+        "type": "select",
+        "default": str(DEFAULT_EMHASS_OPTIMIZATION_INTERVAL),
         "unit": "min",
-        "min": 5,
-        "max": 60,
-        "step": 5,
-        "description": "Periodic cadence; event triggers can still optimize immediately.",
+        "options": [
+            {"value": str(value), "label": f"{value} minutes"}
+            for value in EMHASS_OPTIMIZATION_INTERVALS
+        ],
+        "description": (
+            "Runs at matching local wall-clock boundaries plus 15 seconds; "
+            "event triggers can still optimize immediately."
+        ),
     },
     {
         "key": CONF_EMHASS_SOC_FINAL_PCT,
@@ -380,6 +386,19 @@ def _fields_from_specs(
     for spec in specs:
         field = {key: value for key, value in spec.items() if key != "default"}
         field["value"] = options.get(spec["key"], spec.get("default"))
+        if spec["key"] == CONF_EMHASS_OPTIMIZATION_INTERVAL:
+            current = field["value"]
+            field["options"] = [
+                {
+                    "value": value,
+                    "label": (
+                        f"{value} minutes"
+                        if int(value) in EMHASS_OPTIMIZATION_INTERVALS
+                        else f"{value} minutes (existing setting)"
+                    ),
+                }
+                for value in _optimization_interval_options(current)
+            ]
         field["readonly"] = False
         fields.append(field)
     return fields
@@ -688,7 +707,10 @@ async def websocket_update_settings(
             validated = _controller_schema(
                 orchestrator_default=bool(
                     form_values.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, True)
-                )
+                ),
+                optimization_interval=form_values.get(
+                    CONF_EMHASS_OPTIMIZATION_INTERVAL
+                ),
             )(form_values)
             stored_options = _options_from_form(validated)
         except (vol.Invalid, TypeError, ValueError) as err:

@@ -45,6 +45,35 @@ Schema 1.x also defines bare `SOC_opt` for a single battery as a fraction in `0.
 
 EnergyPilot does not write or replace that EMHASS plan.
 
+## Wall-clock execution
+
+EnergyPilot is the single owner of scheduled execution. Full optimizations use
+one of three new-installation choices—15, 30 or 60 minutes, with 15 minutes
+recommended—and are anchored to local wall-clock boundaries at second 15. For
+example, a 30-minute cadence runs at `00:00:15`, `00:30:15`, and so on.
+
+The same callback reads the inferred timestep from the current persistent plan.
+When a plan step is due without a full optimization, EnergyPilot calls
+`/action/publish-data`, requires a freshly reported finite `P_batt` and also a
+fresh `P_grid` for Grid/Hybrid control, and only then explicitly evaluates
+Automatic Control. Ordinary plan-entity listeners are deferred during this
+transaction so a partially published pair cannot steer the inverter. The
+higher-priority EV anti-discharge path remains active. When both scheduled
+operations are due, the full optimization runs first and its initial publish is
+the only publication.
+
+EMHASS `continual_publish` is therefore `false`; two independent publication
+loops are not permitted. Existing stored legacy 5-minute-multiple optimization
+cadences remain executable after reload, while the UI offers only the supported
+15/30/60 choices for new selection.
+
+If a scheduled optimization fails, a due still-valid mirrored plan step may be
+published as the resilience fallback. If no current step can be proven, or its
+publication/freshness check fails, enabled Automatic Control is moved to GoodWe
+mode 8 Battery Hold. All solve/publish/control transactions are serialized,
+overlapping callbacks cannot duplicate them, and config-entry unload removes
+the single wall-clock listener.
+
 ## EnergyPilot mirror
 
 EnergyPilot maintains one per-config-entry Home Assistant Store mirror:
@@ -124,6 +153,6 @@ This removes the previous split where the controller and chart could disagree ab
 - EMHASS remains an external prerequisite and canonical plan owner.
 - No new GoodWe register or Modbus block is introduced.
 - No existing entity ID or unique ID is replaced.
-- EnergyPilot does not overwrite `sensor.p_batt_forecast` or `sensor.p_grid_forecast`.
+- EnergyPilot asks EMHASS to publish `sensor.p_batt_forecast` / `sensor.p_grid_forecast`; it does not create duplicate entities or synthesize their values.
 - Existing custom entity mappings remain the live publication path.
 - Home Assistant schedule attributes remain a fallback for older/custom EMHASS publication paths.

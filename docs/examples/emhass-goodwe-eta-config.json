@@ -22,7 +22,7 @@
   "battery_target_state_of_charge": 0.1,
   "capacity_cost_per_kw": 0,
   "compute_curtailment": false,
-  "continual_publish": true,
+  "continual_publish": false,
   "cost_forecast_per_deferrable_load": [],
   "costfun": "profit",
   "def_minimum_off_time": [],

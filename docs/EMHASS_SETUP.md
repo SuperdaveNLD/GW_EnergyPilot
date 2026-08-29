@@ -210,10 +210,16 @@ Use the real battery and inverter limits for the installation. For a configurati
 Recommended publishing setting:
 
 ```json
-"continual_publish": false
+"continual_publish": false,
+"method_ts_round": "first"
 ```
 
-EnergyPilot publishes only after a successful optimization. This prevents a stale plan from being republished after a failed run.
+EnergyPilot owns both scheduled paths. It runs a full optimization on fixed
+local wall-clock boundaries and event triggers, then performs the initial
+publish only after that optimization succeeds. Between full optimizations it
+advances the saved EMHASS plan through `/action/publish-data` on the inferred
+plan timestep. `method_ts_round = first` selects the active plan row. EMHASS's
+independent continual-publish loop stays disabled.
 
 Recommended EnergyPilot starting values:
 
@@ -223,7 +229,7 @@ EMHASS URL                            http://5b918bf2-emhass:5000
 P_batt output entity                  sensor.p_batt_forecast
 P_grid output entity                  sensor.p_grid_forecast
 Optimization status                   sensor.optim_status
-Optimization interval                 60 min
+Optimization interval                 15 min recommended; 30/60 min available
 Runtime final SOC target              installation dependent
 Fallback house load                   installation dependent
 Use runtime Nord Pool prices          ON when a supported source exists
@@ -302,7 +308,7 @@ fresh numeric outputs + expected optimization state
 ready
 ```
 
-EnergyPilot never blocks Home Assistant startup on an EMHASS solve. v0.48 retains the v0.44 background recovery behavior: one attempt 60 seconds after EnergyPilot setup when native orchestration is enabled. The normal Home Assistant-running, GoodWe-telemetry, EMHASS-health and finite-output gates still apply. A transient failure retries after 15, 30 and 60 seconds; any successful manual, event-driven or scheduled optimization after setup cancels the remaining startup sequence. After the bounded retries are exhausted, the normal periodic schedule remains active.
+EnergyPilot never blocks Home Assistant startup on an EMHASS solve. v0.48 retains the v0.44 background recovery behavior: one attempt 60 seconds after EnergyPilot setup when native orchestration is enabled. The normal Home Assistant-running, GoodWe-telemetry, EMHASS-health and finite-output gates still apply. A transient failure retries after 15, 30 and 60 seconds; any successful manual, event-driven or scheduled optimization after setup cancels the remaining startup sequence. After the bounded retries are exhausted, the normal wall-clock schedule remains active.
 
 ## 13. Enable Automatic Control
 
@@ -379,7 +385,8 @@ GoodWe/SEMS+ and the battery BMS have separate protection limits. For example, a
 
 ```text
 GoodWe telemetry                   configured scan interval
-Periodic optimization              normally every 60 minutes
+Wall-clock optimization            15/30/60 min at the boundary +15 s; 15 recommended
+Active plan-step publish           inferred plan timestep at the boundary +15 s
 Optimize now                       immediately
 AUTO                               fresh optimize, then enable control
 Strategy change                    fresh optimize after save
@@ -388,6 +395,10 @@ EV charging stops                  immediate fresh optimization when configured
 SOC limit changes                  debounced after final change
 Post-restart recovery              after 60 s; transient retry 15/30/60 s
 ```
+
+When optimization and plan-step publication are due together, optimization
+runs first and its initial publish is reused. A failed due step places enabled
+Automatic Control in Battery Hold unless a valid fallback step can be published.
 
 There is no v0.22 30-second mode-11 grid-neutral feedback scheduler when Smart Meter control is enabled.
 

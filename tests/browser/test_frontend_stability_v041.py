@@ -28,7 +28,11 @@ def exercise_emhass_settings(page):
                 description: 'Connection, orchestration, outputs and runtime price integration.',
                 fields: [
                   { key: 'emhass_url', label: 'EMHASS URL', type: 'text', value: 'http://emhass:5000', readonly: false },
-                  { key: 'emhass_optimization_interval', label: 'Optimization interval', type: 'number', value: 60, unit: 'min', readonly: false },
+                  { key: 'emhass_optimization_interval', label: 'Optimization interval', type: 'select', value: '15', options: [
+                    { value: '15', label: '15 minutes' },
+                    { value: '30', label: '30 minutes' },
+                    { value: '60', label: '60 minutes' },
+                  ], readonly: false },
                   { key: 'p_batt_entity', label: 'P_batt output entity', type: 'text', value: 'sensor.p_batt_forecast', readonly: false },
                   { key: 'p_grid_entity', label: 'P_grid output entity', type: 'text', value: 'sensor.p_grid_forecast', readonly: false },
                   { key: 'optim_status_entity', label: 'Optimization status entity', type: 'text', value: 'sensor.optim_status', readonly: false },
@@ -70,8 +74,8 @@ def exercise_emhass_settings(page):
                 },
                 {
                   key: 'continual_publish',
-                  current: true,
-                  required: true,
+                  current: false,
+                  required: false,
                   synchronized: true,
                 },
               ],
@@ -86,6 +90,9 @@ def exercise_emhass_settings(page):
           const control = root.querySelector('.ep-v041-emhass-control');
           const stored = control?.textContent || '';
           const syncButton = root.querySelector('.ep-v041-emhass-sync-action');
+          const intervalSelect = root.querySelector(
+            'select[data-setting-key="emhass_optimization_interval"]'
+          );
           const viewportContained = window.__epScroller.scrollWidth <= window.__epScroller.clientWidth + 2;
           const result = {
             summary: Boolean(summary),
@@ -94,6 +101,10 @@ def exercise_emhass_settings(page):
             storedMismatch: stored.includes('sensor.old_battery_power'),
             synchronizedValue: stored.includes('sensor.gw_energypilot_total_load_power'),
             syncButton: Boolean(syncButton),
+            intervalSelect: Boolean(
+              intervalSelect && intervalSelect.value === '15' &&
+              intervalSelect.options.length === 3
+            ),
             viewportContained,
             customMode: false,
             customInputs: 0,
@@ -147,7 +158,7 @@ def exercise_emhass_settings(page):
           if (
             !result.summary || result.groups < 3 || result.rows < 4 ||
             !result.storedMismatch || !result.synchronizedValue ||
-            !result.syncButton || !result.viewportContained || !result.customMode ||
+            !result.syncButton || !result.intervalSelect || !result.viewportContained || !result.customMode ||
             result.customInputs !== 5 || !result.customSaved || !result.customTypography
           ) {
             throw new Error(`EMHASS settings layout regression: ${JSON.stringify(result)}`);

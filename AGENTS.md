@@ -282,10 +282,18 @@ Also inspect SOC, neighboring prices and `battery_stress_cost` before concluding
 - The canonical EnergyPilot runtime contract is defined once in `emhass_sync.py` and contains exactly:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
+
+EnergyPilot is the single schedule owner. New configuration choices are 15, 30
+or 60 minutes (15 recommended), aligned to local wall-clock boundaries at
+second 15. The same callback publishes due active plan steps. A full
+optimization wins when both are due and supplies the only publish for that
+boundary. Ordinary plan-source controller events are deferred until fresh
+`P_batt` and, for Grid/Hybrid, fresh `P_grid` are proven; EV anti-discharge
+retains priority.
 
 - Both explicit EMHASS configuration synchronization and automatic pre-solve preparation must use that shared runtime contract rather than maintaining duplicate required-value lists.
 - `set_use_pv` and `inverter_is_hybrid` are installation-specific EMHASS settings. Preserve explicit `false`, explicit `true` and missing values; never infer inverter topology from the GoodWe hardware model.

@@ -92,6 +92,7 @@ class GWEnergyPilotController:
         self._unsubs: list[Callable[[], None]] = []
         self._ev_was_active = False
         self._control_lock = asyncio.Lock()
+        self._plan_update_suspensions = 0
         self.grid_neutral_active = False
         self.grid_neutral_charge_cap = 0
         self.grid_neutral_last_meter_power: float | None = None
@@ -159,7 +160,10 @@ class GWEnergyPilotController:
             ev_was_active = self._ev_was_active
             self._ev_was_active = ev_active
             if ev_active:
-                self.hass.async_create_task(self.async_evaluate(), "gw-energypilot-ev-anti-discharge")
+                self.hass.async_create_task(
+                    self.async_evaluate(allow_suspended=True),
+                    "gw-energypilot-ev-anti-discharge",
+                )
                 return
             if ev_was_active and self.entry.options.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, False):
                 self.target_power = 0
@@ -167,6 +171,8 @@ class GWEnergyPilotController:
                 self.last_command = "waiting_for_ev_stop_optimization"
                 self._notify_state()
                 return
+        if self._plan_update_suspensions:
+            return
         self.hass.async_create_task(self.async_evaluate(), "gw-energypilot-evaluate")
 
     @callback
@@ -260,6 +266,26 @@ class GWEnergyPilotController:
             self.manual_charge_limit_soc = None
             self.enabled = False
             await self._async_apply_command(MODE_AUTO, 0, "goodwe_auto")
+
+    async def async_hold_for_plan_step(self, command: str) -> None:
+        """Fail safe to Battery Hold when a scheduled plan step is unavailable."""
+        async with self._control_lock:
+            if not self.enabled:
+                return
+            await self._async_apply_command(
+                MODE_BATTERY_HOLD,
+                0,
+                command,
+                skip_if_readback_matches=True,
+            )
+
+    def suspend_plan_updates(self) -> None:
+        """Defer ordinary plan-source events until publication is complete."""
+        self._plan_update_suspensions += 1
+
+    def resume_plan_updates(self) -> None:
+        """Release one plan-publication suspension without going negative."""
+        self._plan_update_suspensions = max(0, self._plan_update_suspensions - 1)
 
     async def async_manual_command(self, mode: int, power: int, command: str) -> None:
         async with self._control_lock:
@@ -386,6 +412,8 @@ class GWEnergyPilotController:
             return
         await self._async_apply_smart_meter_plan(p_grid, deadband, max_power)
 
-    async def async_evaluate(self) -> None:
+    async def async_evaluate(self, *, allow_suspended: bool = False) -> None:
+        if self._plan_update_suspensions and not allow_suspended:
+            return
         async with self._control_lock:
             await self._async_evaluate_locked()
