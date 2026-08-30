@@ -2,127 +2,149 @@ name: Publish release
 
 on:
   push:
-    branches:
-      - main
     tags:
-      - "*.*"
-  workflow_dispatch:
+      - "v1.*.*"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  validate-and-publish:
+  validate:
     runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.contract.outputs.channel }}
+      notes_file: ${{ steps.contract.outputs.notes_file }}
+      prerelease: ${{ steps.contract.outputs.prerelease }}
+      source_branch: ${{ steps.contract.outputs.source_branch }}
+      tag: ${{ steps.contract.outputs.tag }}
+      title: ${{ steps.contract.outputs.title }}
     steps:
-      - name: Check out repository
+      - name: Check out tagged commit
         uses: actions/checkout@v4
-
-      - name: Resolve release version
-        id: release
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-          import re
-          from pathlib import Path
-
-          version = str(
-              json.loads(
-                  Path("custom_components/gw_energypilot/manifest.json").read_text(
-                      encoding="utf-8"
-                  )
-              ).get("version", "")
-          ).strip()
-          ref_type = os.environ.get("GITHUB_REF_TYPE", "")
-          ref_name = os.environ.get("GITHUB_REF_NAME", "")
-          tag = ref_name if ref_type == "tag" else version
-
-          if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", version):
-              raise SystemExit(
-                  f"Manifest version {version!r} is invalid; use a numeric version such as 0.30"
-              )
-          if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", tag):
-              raise SystemExit(
-                  f"Release tag {tag!r} is invalid; use a numeric tag such as 0.30"
-              )
-          if tag != version:
-              raise SystemExit(
-                  f"Release tag {tag!r} must match manifest version {version!r}"
-              )
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"tag={tag}\n")
-          print(f"Release version resolved: {tag}")
-          PY
-
-      - name: Check whether release already exists
-        id: release_status
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "needs_publish=false" >> "$GITHUB_OUTPUT"
-            echo "GitHub release $RELEASE_TAG already exists; validation/publish can be skipped."
-          else
-            echo "needs_publish=true" >> "$GITHUB_OUTPUT"
-          fi
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
-        if: steps.release_status.outputs.needs_publish == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate release contract
+        id: contract
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: >-
+          python scripts/release_contract.py
+          --tag "$RELEASE_TAG"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Verify exact source branch head
+        env:
+          SOURCE_BRANCH: ${{ steps.contract.outputs.source_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/heads/$SOURCE_BRANCH:refs/remotes/origin/$SOURCE_BRANCH"
+          release_commit="$(git rev-list -n 1 "$GITHUB_REF")"
+          branch_commit="$(git rev-parse "origin/$SOURCE_BRANCH")"
+          if [[ "$release_commit" != "$branch_commit" ]]; then
+            echo "Release commit $release_commit is not the exact origin/$SOURCE_BRANCH head $branch_commit" >&2
+            exit 1
+          fi
+
       - name: Compile Python sources
-        if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m compileall -q custom_components/gw_energypilot scripts tests
 
+      - name: Validate active frontend JavaScript
+        run: |
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v050.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v049.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v048.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v047.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v046.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v045.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v044.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v043.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v042.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v041-emhass-settings.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v041.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v040.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v039.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-model.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-styles.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-strategy.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-i18n.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038-runtime.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v038.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v027-battery-plan-data.js
+          node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v027-battery-plan-core.js
+          node tests/test_frontend_v038.mjs
+          node tests/test_frontend_v038_controls.mjs
+          node tests/test_frontend_v038_i18n.mjs
+
       - name: Run unit tests
-        if: steps.release_status.outputs.needs_publish == 'true'
         run: python -m unittest discover -s tests -v
 
       - name: Validate repository invariants
-        if: steps.release_status.outputs.needs_publish == 'true'
         run: python scripts/validate_repo.py
 
       - name: HACS validation
-        if: steps.release_status.outputs.needs_publish == 'true'
         uses: hacs/action@main
         with:
           category: integration
 
       - name: Hassfest validation
-        if: steps.release_status.outputs.needs_publish == 'true'
         uses: home-assistant/actions/hassfest@master
 
-      - name: Publish GitHub release
-        if: steps.release_status.outputs.needs_publish == 'true'
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@v4
+
+      - name: Publish immutable-channel GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          NOTES_FILE: ${{ needs.validate.outputs.notes_file }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_TITLE: ${{ needs.validate.outputs.title }}
         shell: bash
         run: |
           set -euo pipefail
 
-          tag="$RELEASE_TAG"
-          notes_file="docs/RELEASE_NOTES_V${tag//./}.md"
-          title="GW EnergyPilot v${tag} Beta"
-
-          args=("$tag" --title "$title")
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            args+=(--verify-tag)
-          else
-            args+=(--target "$GITHUB_SHA")
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            actual="$(gh release view "$RELEASE_TAG" --json isPrerelease --jq '.isPrerelease')"
+            if [[ "$actual" != "$PRERELEASE" ]]; then
+              echo "Existing release $RELEASE_TAG has prerelease=$actual; expected $PRERELEASE" >&2
+              exit 1
+            fi
+            echo "Release $RELEASE_TAG already exists with the correct channel; nothing to publish."
+            exit 0
           fi
 
-          if [[ -f "$notes_file" ]]; then
-            gh release create "${args[@]}" --notes-file "$notes_file"
+          args=(
+            "$RELEASE_TAG"
+            --verify-tag
+            --title "$RELEASE_TITLE"
+            --notes-file "$NOTES_FILE"
+          )
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease --latest=false)
           else
-            gh release create "${args[@]}" --generate-notes
+            args+=(--latest)
           fi
+          gh release create "${args[@]}"

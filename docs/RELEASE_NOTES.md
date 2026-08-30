@@ -6,10 +6,16 @@ This page is the user-facing release index for GW EnergyPilot.
 
 ## Status definitions
 
+- **Stable** — production release selected by HACS unless a user explicitly
+  opts in to prereleases.
 - **Validated** — no intentionally unconfirmed control/hardware semantics are introduced by that release and repository checks passed.
 - **Beta** — functionality is intentionally available before broad field testing across installations/firmware is complete.
 - **Validated + beta diagnostics** — release behavior is validated while optional diagnostics still need field correlation.
 - **Historical** — older development milestone retained for release history.
+
+Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
+`beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
+history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
 # v0.51 — EMHASS-to-GoodWe history and actual source estimates
 

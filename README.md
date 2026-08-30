@@ -16,10 +16,27 @@ Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
 In this project, **Beta** means functionality is intentionally available before broad field testing across installations and firmware versions is complete.
 
+### Release channels from v1
+
+GW EnergyPilot keeps one Home Assistant integration/domain and exposes two HACS
+release channels:
+
+- stable production releases use `v1.x.x`, are normal GitHub Releases and are
+  the default for HACS users;
+- opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
+- branch pushes never publish a release; only a validated tag can do so.
+
+`v0.50` remains the final historical 0.x Beta. The first release under the new
+contract will be `v1.0.0-beta.1`, followed by `v1.0.0` only after promotion.
+Normal users keep the HACS prerelease switch off. Testers explicitly enable the
+HACS prerelease switch for GW EnergyPilot and can then select a published beta.
+See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
+
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
 - `docs/RELEASE_NOTES_V051.md` — v0.51 EMHASS-to-GoodWe execution history and source attribution;
+- `docs/RELEASE_WORKFLOW.md` — v1 stable/beta branches, tags, gates and HACS selection;
 - `docs/RELEASE_NOTES_V050.md` — v0.50 GoodWe phase-aware EV charger control and feedback;
 - `docs/RELEASE_NOTES_V049.md` — v0.49 wall-clock plans, EV coordination and dashboard reliability;
 - `docs/RELEASE_NOTES_V048.md` — v0.48 neutral-safe signed Hybrid PCC control;

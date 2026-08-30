@@ -36,6 +36,14 @@ All notable changes to GW EnergyPilot are documented here.
   non-controlling evidence. Existing installs start with empty history and
   require no migration.
 
+### Changed
+
+- Replace branch-push release publication with a tag-only v1 contract: beta
+  releases use `v1.x.x-beta.N` from `beta` and are GitHub prereleases that are
+  never Latest; stable releases use `v1.x.x` from `main` and are normal/latest
+  releases. HACS now hides the unversioned default branch, and automated checks
+  enforce tag/manifest/channel/source-branch/release-note consistency.
+
 ## [0.50] - 2026-08-30
 
 ### Changed

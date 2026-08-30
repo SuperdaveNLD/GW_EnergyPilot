@@ -513,7 +513,8 @@ For each bug/feature:
 7. Check entity/device/storage compatibility.
 8. Update user and maintainer documentation for externally visible behavior.
 9. Run repository checks.
-10. For releases require Quality + HACS + hassfest on the exact final head.
+10. For releases require Quality + HACS + hassfest on the exact tagged head and
+    follow `docs/RELEASE_WORKFLOW.md`.
 
 ## Repository checks
 
@@ -525,7 +526,11 @@ python scripts/validate_repo.py
 
 Quality runs these automatically.
 
-The validator covers register/read-block structure, JSON validity, frontend import existence, active frontend/manifest version agreement and changelog/release-note version coverage.
+The validator covers the single integration/domain structure,
+register/read-block structure, JSON validity, HACS release-only selection,
+frontend import existence, active frontend/manifest version agreement and
+changelog/release-note version coverage. `scripts/release_contract.py`
+separately validates future v1 tag, channel, branch and release-note metadata.
 
 Static CI does not prove GoodWe hardware semantics or browser rendering.
 
@@ -560,6 +565,7 @@ Do not perform these refactors opportunistically inside unrelated feature/bug re
 
 Before merge verify:
 
+- target branch (`beta` for `1.x.x-beta.N`, `main` for `1.x.x`);
 - manifest version;
 - active frontend module/cache-buster and frontend `VERSION`;
 - changelog version entry;
@@ -571,3 +577,8 @@ Before merge verify:
 - no accidental unique-ID/device-identifier/storage-key changes;
 - no undocumented register/control semantic changes;
 - Beta features are bounded and reversible where practical.
+
+Publishing is tag-only. Use `v1.x.x-beta.N` for a prerelease from the exact
+remote `beta` head and `v1.x.x` for stable from the exact remote `main` head.
+Never reuse or move a published tag. The workflow marks beta as prerelease and
+not Latest; stable is a normal/latest release. See `docs/RELEASE_WORKFLOW.md`.

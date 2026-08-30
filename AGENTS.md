@@ -25,6 +25,18 @@ Current release line:
 v0.51 Beta
 ```
 
+Release-channel migration is prepared for v1:
+
+```text
+beta branch -> v1.x.x-beta.N -> GitHub prerelease, never Latest
+main branch -> v1.x.x        -> normal/latest GitHub Release
+```
+
+Branch pushes never publish. The tag must match the manifest version after
+removing its leading `v` and must point to the exact configured source-branch
+head. Keep exactly one `custom_components/gw_energypilot` integration/domain.
+Follow `docs/RELEASE_WORKFLOW.md`; do not reuse or move published tags.
+
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
 ## Frontend stability contract (v0.41+, active v0.51)

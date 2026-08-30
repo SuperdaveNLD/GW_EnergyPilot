@@ -1,4 +1,5 @@
 {
+  "hide_default_branch": true,
   "name": "GW EnergyPilot",
   "homeassistant": "2026.8.0"
 }
