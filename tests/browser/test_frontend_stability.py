@@ -2595,11 +2595,157 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
     return result
 
 
+def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]:
+    """Refresh the plan card during one physical S/M/L press."""
+    enabled = EXPECTED_ENTRYPOINT == "v047"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "refresh_during_press": False,
+        "click_delivered": False,
+        "size_selected": False,
+        "preference_saved": False,
+        "single_card": False,
+        "main_stable": False,
+        "card_stable": False,
+        "header_stable": False,
+        "button_stable": False,
+        "window_bar_present": False,
+        "window_bar_stable": False,
+        "restored_normal": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.__epV027BatteryPlanData &&
+              !window.__epPanel.__epV027BatteryPlanPromise &&
+              window.__epPanel.shadowRoot.querySelector('[data-chart-size="compact"]')
+            )
+            """,
+            timeout=15_000,
+        )
+        button = shadow(page, '[data-chart-size="compact"]')
+        button.scroll_into_view_if_needed(timeout=5_000)
+        box = button.bounding_box()
+        if box is None:
+            raise RuntimeError("Compact chart-size button has no hit area")
+
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const card = root.querySelector('.ep-v027-battery-plan-card');
+              const button = root.querySelector('[data-chart-size="compact"]');
+              window.__epIssue97Identity = {
+                main: root.querySelector('main'),
+                card,
+                header: card.querySelector(':scope > .ep-v027-head'),
+                button,
+                windowBar: card.querySelector(':scope > .ep-v031-card-windowbar'),
+                renderKey: card.dataset.epRenderKey || '',
+                clicks: 0,
+              };
+              button.addEventListener('click', () => {
+                window.__epIssue97Identity.clicks += 1;
+              });
+              root.addEventListener('pointerdown', () => {
+                panel.__epV027BatteryPlanData = {
+                  ...panel.__epV027BatteryPlanData,
+                  at: panel.__epV027BatteryPlanData.at + 1,
+                };
+                panel.__epV041RefreshBatteryPlan();
+              }, {capture: true, once: true});
+            }
+            """
+        )
+
+        x = box["x"] + box["width"] / 2
+        y = box["y"] + box["height"] / 2
+        if profile.touch:
+            page.touchscreen.tap(x, y)
+        else:
+            page.mouse.move(x, y)
+            page.mouse.down()
+            page.wait_for_timeout(80)
+            page.mouse.up()
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v027-battery-plan-card'
+            )?.classList.contains('size-compact')
+            """,
+            timeout=10_000,
+        )
+        result.update(
+            page.evaluate(
+                """
+                () => {
+                  const root = window.__epPanel.shadowRoot;
+                  const card = root.querySelector('.ep-v027-battery-plan-card');
+                  const selected = card.querySelector(
+                    '[data-chart-size="compact"]'
+                  );
+                  let stored = null;
+                  try {
+                    stored = JSON.parse(
+                      localStorage.getItem('gw_energypilot_dashboard_v008') || '{}'
+                    )?.sizes?.['battery-price'] || null;
+                  } catch (_err) {
+                    stored = null;
+                  }
+                  return {
+                    refresh_during_press:
+                      card.dataset.epRenderKey !== window.__epIssue97Identity.renderKey,
+                    click_delivered: window.__epIssue97Identity.clicks === 1,
+                    size_selected:
+                      card.classList.contains('size-compact') &&
+                      selected?.getAttribute('aria-pressed') === 'true',
+                    preference_saved: stored === 'compact',
+                    single_card:
+                      root.querySelectorAll('.ep-v027-battery-plan-card').length === 1,
+                    main_stable:
+                      window.__epIssue97Identity.main === root.querySelector('main'),
+                    card_stable: window.__epIssue97Identity.card === card,
+                    header_stable:
+                      window.__epIssue97Identity.header ===
+                        card.querySelector(':scope > .ep-v027-head'),
+                    button_stable:
+                      window.__epIssue97Identity.button === selected &&
+                      selected?.isConnected === true,
+                    window_bar_present: Boolean(window.__epIssue97Identity.windowBar),
+                    window_bar_stable:
+                      window.__epIssue97Identity.windowBar ===
+                        card.querySelector(':scope > .ep-v031-card-windowbar'),
+                  };
+                }
+                """
+            )
+        )
+        activate(page, profile, '[data-chart-size="normal"]')
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v027-battery-plan-card'
+            )?.classList.contains('size-normal')
+            """,
+            timeout=10_000,
+        )
+        result["restored_normal"] = True
+    except (PlaywrightError, RuntimeError) as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_plan_refresh(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "ready": False,
         "data_changed": False,
-        "card_changed": False,
+        "card_stable": False,
         "main_stable": False,
         "layout_control_stable": False,
         "auto_control_stable": False,
@@ -2675,8 +2821,8 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
                   return {
                     data_changed:
                       window.__epPanel.__epV027BatteryPlanData?.payload?.plan_revision !== previousRevision,
-                    card_changed:
-                      window.__epPlanIdentity.card !== root.querySelector('.ep-v027-battery-plan-card'),
+                    card_stable:
+                      window.__epPlanIdentity.card === root.querySelector('.ep-v027-battery-plan-card'),
                     main_stable: window.__epPlanIdentity.main === root.querySelector('main'),
                     layout_control_stable:
                       window.__epPlanIdentity.layout === root.querySelector('.ep-layout-button'),
@@ -3217,6 +3363,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     automatic = exercise_automatic_control(page)
     soc_slider = exercise_soc_slider_draft(page)
     strategy = exercise_strategy(page)
+    chart_size_press = exercise_chart_size_press(page, profile)
     plan = exercise_plan_refresh(page)
     language_result = exercise_language(page)
     structural = exercise_structural_rerender(page)
@@ -3245,6 +3392,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "automatic": automatic,
         "soc_slider": soc_slider,
         "strategy": strategy,
+        "chart_size_press": chart_size_press,
         "plan": plan,
         "language": language_result,
         "structural": structural,
@@ -3276,6 +3424,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     automatic = result["automatic"]
     soc_slider = result["soc_slider"]
     strategy = result["strategy"]
+    chart_size_press = result["chart_size_press"]
     plan = result["plan"]
     language_result = result["language"]
     structural = result["structural"]
@@ -3530,10 +3679,22 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: Battery Strategy button did not apply")
     if strategy["error"]:
         failures.append(f"{name}: Battery Strategy interaction error")
+    if EXPECTED_ENTRYPOINT == "v047" and not all(
+        chart_size_press[key] is True
+        for key in (
+            "ran", "refresh_during_press", "click_delivered", "size_selected",
+            "preference_saved", "single_card", "main_stable", "card_stable",
+            "header_stable", "button_stable", "window_bar_present",
+            "window_bar_stable", "restored_normal",
+        )
+    ):
+        failures.append(f"{name}: plan refresh interrupted an S/M/L chart-size press")
+    if chart_size_press["error"]:
+        failures.append(f"{name}: chart-size press interaction error")
     if not all(
         plan[key] is True
         for key in (
-            "ready", "data_changed", "card_changed", "main_stable",
+            "ready", "data_changed", "card_stable", "main_stable",
             "layout_control_stable", "auto_control_stable",
             "optimize_control_stable", "costfun_control_stable",
             "max_export_control_stable", "strategy_control_stable",

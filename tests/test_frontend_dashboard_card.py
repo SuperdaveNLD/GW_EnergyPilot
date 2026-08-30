@@ -21,6 +21,8 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("existingCards.slice(1)", installer)
         self.assertIn("duplicate.remove()", installer)
         self.assertIn("dataset.epRenderKey", installer)
+        self.assertIn("preserveInteractiveShell(existingCard, card)", installer)
+        self.assertIn("installedCard = existingCard", installer)
         self.assertIn("existingCard.replaceWith(card)", installer)
         self.assertLess(installer.index(duplicate_guard), installer.index(card_creation))
 

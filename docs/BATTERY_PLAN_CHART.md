@@ -167,7 +167,7 @@ The frontend normally keeps a short chart-data cache. v0.33 uses two independent
 1. **EnergyPilot optimization revision.** Every successful call through the central orchestrator refreshes `GWEnergyPilotPlanRuntime`, advances `plan_revision` and emits the existing orchestrator dispatcher signal. The existing Optimize Now button entity already subscribes to that signal and exposes orchestrator attributes, so no new entity is added. The chart compares that live revision with the revision stored in its last `battery_price/get` payload and force-refreshes immediately when they differ.
 2. **External EMHASS publication fallback.** The configured `P_batt` entity's `last_updated` is still compared with the timestamp in the cached chart payload. A plan changed outside EnergyPilot therefore also bypasses normal cache expiry.
 
-After either freshness signal, the chart calls the read-only API with force refresh, rebuilds/replaces the one canonical `.ep-v027-battery-plan-card`, and removes any accidental duplicate card left by a prior layered-render regression.
+After either freshness signal, the chart calls the read-only API with force refresh, rebuilds the data-dependent contents inside the one connected canonical `.ep-v027-battery-plan-card`, and removes any accidental duplicate card left by a prior layered-render regression. Its S/M/L selector, expand action and window bar stay connected so a refresh between native press and release cannot swallow that interaction.
 
 The duplicate-card guard must therefore **not** return permanently just because a canonical card already exists. It may skip rendering only when the render key is unchanged and no fresh plan evidence exists.
 

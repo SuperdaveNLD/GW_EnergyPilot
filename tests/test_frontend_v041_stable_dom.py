@@ -157,6 +157,11 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("function schedulePlanRefresh(panel)", self.source)
         self.assertIn("void loadChartData(panel, true)", self.source)
         self.assertIn("refreshBatteryPlanCard(this)", self.source)
+        self.assertIn("function preserveInteractiveShell", self.plan_core)
+        self.assertIn("child !== windowBar && child !== existingHead", self.plan_core)
+        self.assertNotIn('addEventListener("pointerdown"', self.plan_core)
+        self.assertNotIn("setPointerCapture", self.plan_core)
+        self.assertNotIn("preventDefault", self.plan_core)
 
     def test_all_dashboard_motion_is_disabled(self) -> None:
         self.assertIn("animation: none !important", self.source)
@@ -194,6 +199,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("exercise_touch_controls", browser_test)
         self.assertIn("exercise_optimize_stability", browser_test)
         self.assertIn("exercise_host_property_press", browser_test)
+        self.assertIn("exercise_chart_size_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
         self.assertIn("test_frontend_stability_v048.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
