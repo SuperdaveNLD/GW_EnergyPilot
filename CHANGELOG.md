@@ -4,6 +4,25 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.0.1-beta.1] - 2026-08-30
+
+### Fixed
+
+- Normalize integral legacy wall-clock optimization cadences such as numeric
+  `15.0` and string `"30.0"` before presenting the select field, while leaving
+  unsupported fractional values invalid (#111).
+- Avoid rewriting unchanged Optimize now and EMHASS cost-function button text
+  during live telemetry patches, preserving WebKit's pending native click
+  between pointer-down and pointer-up (#110).
+
+### Validation and compatibility
+
+- Add focused config-flow tests plus a desktop Chromium, iPad WebKit and iPhone
+  WebKit regression that holds both affected controls through rapid telemetry,
+  requires zero label-child mutations and verifies exactly one service action.
+- Keep all GoodWe registers/writes, EMS decisions, EMHASS ownership, entity and
+  device identity, persistent state, accounting and chart behavior unchanged.
+
 ## [1.0.0] - 2026-08-30
 
 ### Added

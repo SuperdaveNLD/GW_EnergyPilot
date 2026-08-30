@@ -97,11 +97,20 @@ async def _async_validate_connection(host: str, port: int, slave: int) -> None:
         await client.async_close()
 
 
+def _optimization_interval_for_form(value: Any) -> str:
+    """Return an integral stored cadence in the selector's canonical form."""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return str(value)
+    return str(int(numeric)) if numeric.is_integer() else str(value)
+
+
 def _optimization_interval_options(current: Any = None) -> list[str]:
     """Return supported choices while preserving one stored legacy cadence."""
     options = [str(value) for value in EMHASS_OPTIMIZATION_INTERVALS]
     try:
-        legacy = int(current)
+        legacy = int(_optimization_interval_for_form(current))
     except (TypeError, ValueError):
         return options
     if 5 <= legacy <= 60 and legacy % 5 == 0 and str(legacy) not in options:
@@ -315,7 +324,7 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
         CONF_EMHASS_OPTIMIZATION_INTERVAL,
         DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     )
-    form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL] = str(
+    form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL] = _optimization_interval_for_form(
         form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL]
     )
     form_options.setdefault(

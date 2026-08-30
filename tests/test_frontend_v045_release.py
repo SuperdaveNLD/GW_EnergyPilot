@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "0.51-h1"
+CACHE_KEY = "1.0.1-beta1"
 
 
 class FrontendV045ReleaseTests(unittest.TestCase):
@@ -21,17 +21,17 @@ class FrontendV045ReleaseTests(unittest.TestCase):
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "1.0.0")
+        self.assertEqual(manifest["version"], "1.0.1-beta.1")
         self.assertIn(
-            "gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source
+            "gw-energy-pilot-v101.js?v=1.0.1-beta1", init_source
         )
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.51-h1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.51-h1"', active)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.51-h1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.0.1-beta1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.0.1-beta1"', active)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.0.1-beta1"', v046)
         self.assertIn('const VERSION = "0.45"', release)
         self.assertIn("__epV045Installed", release)
         self.assertIn(
-            'import "./gw-energy-pilot-v044.js?v=0.51-h1"', release
+            'import "./gw-energy-pilot-v044.js?v=1.0.1-beta1"', release
         )
 
     def test_v045_subgraph_uses_the_active_v047_cache_key(self) -> None:

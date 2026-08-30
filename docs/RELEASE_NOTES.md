@@ -17,6 +17,19 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.0.1-beta.1 — Mobile click and legacy interval compatibility
+
+The options flow now accepts supported wall-clock cadences that older stored
+configuration represented as integral floats, such as `15.0`, and presents
+them in the selector's canonical string form. Fractional or unsupported values
+remain invalid.
+
+Optimize now and EMHASS cost-function telemetry patches no longer rewrite an
+unchanged button text node while WebKit is holding a native press. The browser
+matrix verifies the complete press and exactly one service action on desktop
+Chromium, iPad WebKit and iPhone WebKit. Controller, GoodWe and EMHASS command
+semantics are unchanged. See `docs/releases/v1.0.1-beta.1.md`.
+
 # v1.0.0 — First stable production release
 
 The dashboard now links each EnergyPilot controller decision to its plan,
@@ -84,6 +97,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.0.1-beta.1** | 2026-08-30 | **Beta** | Normalizes integral legacy optimization intervals and keeps native mobile clicks connected while unchanged Optimize/strategy copy is patched. |
 | **1.0.0** | 2026-08-30 | **Stable** | First stable v1: execution/read-back history, EV protection underlays, source-attribution estimates, historical wanted SOC, presentation fixes and safe tag-only stable/beta channels. |
 | **0.50** | 2026-08-30 | **Beta** | Reads GoodWe L1/L2/L3 automatically for one-/three-phase EV guarding, separates writable current-limit control from allocated-current feedback, verifies applied requests and fixes Zaptec/online entity pairing. |
 | **0.49** | 2026-08-30 | **Beta** | Consolidates wall-clock EMHASS plan execution, isolated soft EV load balancing, connectivity/EV safety visibility, persisted EMS evidence and stable graph/SOC/Hybrid presentation fixes. |

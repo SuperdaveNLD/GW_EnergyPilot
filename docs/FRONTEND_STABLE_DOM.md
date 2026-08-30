@@ -3,7 +3,7 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v1.0.0 Stable**. v1.0.0 retains the complete stable behavior through a presentation-only stable wrapper; its nested v0.51 feature layer adds one scoped execution-history card and owns the complete inner cache boundary.
+This document is the canonical frontend render/interaction decision for **GW EnergyPilot v1.0.1-beta.1**. The beta retains the complete stable behavior through a presentation-only wrapper; its nested v0.51 feature layer supplies the scoped execution-history card.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,29 +17,28 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v100.js?v=1.0.0-stable1
-       -> gw-energy-pilot-v051.js?v=1.0.0-stable1
-            -> gw-energy-pilot-v051-history.js?v=0.51-h1
-            -> gw-energy-pilot-v050.js?v=0.51-h1
-            -> gw-energy-pilot-v049.js?v=0.51-h1
-                 -> gw-energy-pilot-v048.js?v=0.51-h1
-                      -> gw-energy-pilot-v047.js?v=0.51-h1
-                           -> gw-energy-pilot-v046.js?v=0.51-h1
-                                -> gw-energy-pilot-v045.js?v=0.51-h1
-                                     -> gw-energy-pilot-v044.js?v=0.51-h1
-                                          -> gw-energy-pilot-v043.js?v=0.51-h1
-                                               -> gw-energy-pilot-v042.js?v=0.51-h1
-                                                    -> gw-energy-pilot-v041-emhass-settings.js?v=0.51-h1
-                                                         -> gw-energy-pilot-v041.js?v=0.51-h1
-                                                              -> gw-energy-pilot-v039.js?v=0.51-h1
-                                                                   -> gw-energy-pilot-v038.js?v=0.51-h1
-                                                                        -> gw-energy-pilot-v038-runtime.js?v=0.51-h1
+  -> gw-energy-pilot-v101.js?v=1.0.1-beta1
+       -> gw-energy-pilot-v051.js?v=1.0.1-beta1
+            -> gw-energy-pilot-v051-history.js?v=1.0.1-beta1
+            -> gw-energy-pilot-v050.js?v=1.0.1-beta1
+            -> gw-energy-pilot-v049.js?v=1.0.1-beta1
+                 -> gw-energy-pilot-v048.js?v=1.0.1-beta1
+                      -> gw-energy-pilot-v047.js?v=1.0.1-beta1
+                           -> gw-energy-pilot-v046.js?v=1.0.1-beta1
+                                -> gw-energy-pilot-v045.js?v=1.0.1-beta1
+                                     -> gw-energy-pilot-v044.js?v=1.0.1-beta1
+                                          -> gw-energy-pilot-v043.js?v=1.0.1-beta1
+                                               -> gw-energy-pilot-v042.js?v=1.0.1-beta1
+                                                    -> gw-energy-pilot-v041-emhass-settings.js?v=1.0.1-beta1
+                                                         -> gw-energy-pilot-v041.js?v=1.0.1-beta1
+                                                              -> gw-energy-pilot-v039.js?v=1.0.1-beta1
+                                                                   -> gw-energy-pilot-v038.js?v=1.0.1-beta1
+                                                                        -> gw-energy-pilot-v038-runtime.js?v=1.0.1-beta1
 ```
 
-The v1.0.0 entrypoint and direct v0.51 feature import use `1.0.0-stable1`.
-Every import inside the feature graph uses `0.51-h1`. This ensures an upgraded
-v0.50 browser cannot reuse older nested plan/history modules while keeping the
-stable wrapper presentation-only.
+Every import in the active v1.0.1-beta.1 graph uses `1.0.1-beta1`. This ensures
+an upgraded browser cannot reuse older button-patch or nested plan/history
+modules while keeping the beta wrapper presentation-only.
 
 ## Render ownership
 
@@ -119,7 +118,7 @@ A normal telemetry burst must preserve `main`, Dashboard layout-button, Automati
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v1.0.0 by `tests/browser/test_frontend_stability_v100.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They force a plan-card refresh during a physical S/M/L press and require exactly one delivered click with stable card/header/control identity. They also require the Hybrid explanation to retain node identity, height and child-list stability through sixty telemetry patches. The matrix further requires the header reachability control in its exact position with green/red/live-detail transitions and stable node identity; one external-PV group with four fields and correct switch/value preservation; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; editable Custom costs with stable main-node identity and larger typography; combined PV and bounded SOC telemetry; all static flow states; the single history card, immutable wanted-SOC history, detailed source bars, verified EV-protection underlays and full-table modal; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after scoped card refreshes.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v1.0.1-beta.1 by `tests/browser/test_frontend_stability_v101.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also hold Optimize now and EMHASS strategy presses across rapid live-copy patches and require unchanged button child nodes until the native click is delivered. They force a plan-card refresh during a physical S/M/L press and require exactly one delivered click with stable card/header/control identity. They also require the Hybrid explanation to retain node identity, height and child-list stability through sixty telemetry patches. The matrix further requires the header reachability control in its exact position with green/red/live-detail transitions and stable node identity; one external-PV group with four fields and correct switch/value preservation; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; editable Custom costs with stable main-node identity and larger typography; combined PV and bounded SOC telemetry; all static flow states; the single history card, immutable wanted-SOC history, detailed source bars, verified EV-protection underlays and full-table modal; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after scoped card refreshes.
 
 ## Contributor rules
 

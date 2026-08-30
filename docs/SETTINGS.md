@@ -88,6 +88,10 @@ The EMHASS section owns EnergyPilot's EMHASS integration settings:
 - optimization status entity/required state;
 - Nord Pool/runtime-price settings.
 
+Supported integral cadences stored by an older release as a float, for example
+`15.0`, are normalized to `15` when the options form opens. Unsupported
+fractional values remain invalid instead of being silently rounded.
+
 The stateful EMHASS optimization strategy remains the active `costfun` value:
 
 ```text
