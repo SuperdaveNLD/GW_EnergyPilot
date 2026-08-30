@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.47 runtime structure
+## Current v0.48 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v0.47 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v0.48 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -120,20 +120,21 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v047.js
-    -> gw-energy-pilot-v046.js
-        -> gw-energy-pilot-v045.js
-            -> gw-energy-pilot-v044.js
-                -> gw-energy-pilot-v043.js
-                    -> gw-energy-pilot-v042.js
-                        -> gw-energy-pilot-v041-emhass-settings.js
-                            -> gw-energy-pilot-v041.js
-                                -> gw-energy-pilot-v039.js
-                                    -> gw-energy-pilot-v038.js
-                                        -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v048.js
+    -> gw-energy-pilot-v047.js
+        -> gw-energy-pilot-v046.js
+            -> gw-energy-pilot-v045.js
+                -> gw-energy-pilot-v044.js
+                    -> gw-energy-pilot-v043.js
+                        -> gw-energy-pilot-v042.js
+                            -> gw-energy-pilot-v041-emhass-settings.js
+                                -> gw-energy-pilot-v041.js
+                                    -> gw-energy-pilot-v039.js
+                                        -> gw-energy-pilot-v038.js
+                                            -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.47 is a version-only presentation wrapper and cache boundary over v0.46. Its shared `0.47-custom-battery1` import key reloads the active dependency graph containing Custom Battery Saver editing, larger strategy/settings typography and field-tuned profile presentation. The existing Battery Saver/strategy modules remain the behavior owners; v0.46 retains the external-PV release presentation, v0.44 owns the bounded Optimize listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS.
+v0.48 is a bounded release/presentation wrapper over v0.47. It owns only current Hybrid operator copy, the v0.48 badge/footer and the `0.48-hybrid-control1` top-level cache boundary. v0.47 retains Custom Battery Saver editing, larger strategy/settings typography and field-tuned profile presentation; v0.46 retains external-PV presentation, v0.44 owns the bounded Optimize listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
@@ -158,13 +159,13 @@ P_grid near 0 W    -> mode 1
 Hybrid strategy:
 
 ```text
-P_grid > +deadband -> mode 9  (buy/import; setpoint abs(P_grid))
-else P_batt > +deadband -> mode 12 (sell/discharge; setpoint abs(P_batt))
-else P_batt near 0 W -> mode 8
-otherwise -> mode 1 GoodWe Auto / self-use
+P_batt near 0 W -> mode 8
+else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
+else P_grid > +deadband -> mode 9 using abs(P_grid)
+else P_grid < -deadband -> mode 10 using abs(P_grid)
 ```
 
-The Hybrid import branch intentionally uses `P_grid` because mode 9 owns the PCC import target. The Hybrid sell branch intentionally uses `P_batt` because mode 12 owns direct battery discharge. A charging plan without planned grid import normally falls through to mode 1 so GoodWe can absorb available local PV instead of forcing a forecast-sized battery charge.
+The Hybrid neutral-battery branch is evaluated first so ordinary forecast house import/export does not become an active PCC target while EMHASS asked the battery to remain idle. Every non-neutral plan is PCC-controlled: mode 1 owns a near-zero `P_grid`, while modes 9/10 own non-zero import/export targets. The variable configured deadband includes exact boundaries and classifies the branch only; never subtract it from the transmitted setpoint.
 
 ### EV anti-discharge override
 

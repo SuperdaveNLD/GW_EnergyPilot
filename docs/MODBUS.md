@@ -393,7 +393,7 @@ This is EnergyPilot's normal automatic discharge mode.
 | **4 vs 9** | Mode 4 is **inverter-level grid import scheduling**; mode 9 targets **net import at the smart meter/PCC** and may move the battery in either direction. |
 | **5 vs 10** | Mode 5 is **inverter-level export scheduling**; mode 10 targets **net export at the smart meter/PCC**. |
 
-These distinctions are why EnergyPilot currently keeps its automatic execution conservative: battery direction comes from EMHASS `P_batt`, automatic charge/discharge uses modes **11/12**, hold uses **8**, and disabling automatic ownership returns to **1**. Grid-target modes **9/10** are not silently substituted for battery-power modes.
+These distinctions are why EnergyPilot keeps automatic strategy ownership explicit. Battery strategy maps EMHASS `P_batt` to modes **11/12/8**; Grid strategy maps signed `P_grid` to **9/10/1**. Hybrid first holds a neutral `P_batt` plan in mode **8**, then maps every non-neutral signed `P_grid` target to **9/10/1**. Disabling automatic ownership returns to **1**. Manual mode selections are never remapped.
 
 ### Manual mode selector
 

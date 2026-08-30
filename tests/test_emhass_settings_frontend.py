@@ -15,13 +15,15 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
 
     def test_active_panel_loads_enhanced_emhass_settings_entrypoint(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
         v047 = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v047.js?v=0.47-custom-battery1", init_source)
+        self.assertIn("gw-energy-pilot-v048.js?v=0.48-hybrid-control1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1"', v048)
         self.assertIn('import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"', v047)
         self.assertIn('import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"', v046)
         self.assertIn('import "./gw-energy-pilot-v044.js?v=0.47-custom-battery1"', v045)

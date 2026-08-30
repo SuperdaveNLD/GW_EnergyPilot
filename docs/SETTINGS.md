@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.47 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.48 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -155,15 +155,13 @@ P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
 **Hybrid control**
 
 ```text
-P_grid > +deadband -> mode 9 Grid import target (buy/import)
-else P_batt > +deadband -> mode 12 Battery discharge power (sell/discharge)
-else P_batt near 0 W -> mode 8 Battery Hold
-otherwise -> mode 1 GoodWe Auto / self-use
+P_batt near 0 W -> mode 8 Battery Hold
+else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
+else P_grid > +deadband -> mode 9 Grid import target
+else P_grid < -deadband -> mode 10 Grid export target
 ```
 
-Hybrid deliberately combines two control domains. Buying/import is controlled at the PCC through mode 9, using the EMHASS `P_grid` import magnitude. Selling/discharging is controlled directly through mode 12, using the EMHASS `P_batt` discharge magnitude.
-
-The mode-9 branch is evaluated first because a positive planned `P_grid` is the authoritative Hybrid buying signal. A battery-charge request without planned grid import falls through to GoodWe mode 1/self-use so locally available PV can be absorbed without forcing the forecast-sized `P_batt` charging setpoint. A neutral battery plan remains mode 8.
+Hybrid evaluates the configured deadband against `P_batt` first, so a neutral battery plan always remains mode 8. Every non-neutral plan then follows signed `P_grid`: mode 1 around zero lets GoodWe close the current local balance, while modes 9/10 receive the complete absolute planned import/export magnitude. Exact deadband boundaries remain neutral and the deadband is never subtracted from the setpoint.
 
 When no explicit `control_strategy` exists, backwards compatibility remains:
 

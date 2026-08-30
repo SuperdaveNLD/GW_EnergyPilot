@@ -11,19 +11,21 @@ CACHE_KEY = "0.47-custom-battery1"
 
 
 class FrontendV045ReleaseTests(unittest.TestCase):
-    def test_v045_remains_in_the_active_v047_chain(self) -> None:
+    def test_v045_remains_in_the_active_v048_chain(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         release = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "0.47")
+        self.assertEqual(manifest["version"], "0.48")
         self.assertIn(
-            "gw-energy-pilot-v047.js?v=0.47-custom-battery1", init_source
+            "gw-energy-pilot-v048.js?v=0.48-hybrid-control1", init_source
         )
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1"', v048)
         self.assertIn('import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"', active)
         self.assertIn('import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"', v046)
         self.assertIn('const VERSION = "0.45"', release)

@@ -11,6 +11,16 @@ This page is the user-facing release index for GW EnergyPilot.
 - **Validated + beta diagnostics** — release behavior is validated while optional diagnostics still need field correlation.
 - **Historical** — older development milestone retained for release history.
 
+# v0.48 — Neutral-safe signed Hybrid PCC control
+
+Hybrid Automatic Control now preserves a neutral `P_batt` plan through mode 8 before considering grid flow. For every non-neutral battery plan, signed `P_grid` selects mode 1 around zero, mode 9 for planned import and mode 10 for planned export. Exact configured deadband boundaries remain neutral, and mode-9/10 setpoints keep the complete absolute grid target without deadband subtraction.
+
+The correction follows live v0.47 diagnostics where `P_batt = +1.223 kW` and `P_grid = 0 W` still selected the inherited direct-discharge mode 12. The same plan now selects mode 1 so GoodWe can close the actual local balance. The dashboard provides matching English and Dutch Hybrid guidance.
+
+EV anti-discharge remains higher priority. Battery/Grid strategies, manual EMS control, GoodWe registers/write order, v0.47 Battery Saver policy, EMHASS ownership and persistent state are unchanged.
+
+See `docs/RELEASE_NOTES_V048.md` and `docs/CHANGELOG_V048.md`.
+
 # v0.47 — Editable Custom battery costs and profile tuning
 
 The dashboard and **Settings → EMHASS → Battery Saver** now both include **Custom / Aangepast** as a visible choice. When active, the five displayed EMHASS battery cost values are editable and saved together before EnergyPilot immediately rebuilds the plan. Invalid or negative costs are rejected, unrelated EMHASS settings are preserved and a failed save/optimization restores the previous Battery Saver transaction. The Battery Strategy and settings typography is also larger for improved readability on desktop and touch layouts.
@@ -27,6 +37,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.48** | 2026-08-30 | **Beta** | Makes Hybrid neutral-safe and signed-PCC based: mode 8 for a neutral battery plan, mode 1 around zero grid target, and complete mode-9/10 import/export targets outside the configured variable deadband. |
 | **0.47** | 2026-08-29 | **Beta** | Adds administrator-editable Custom EMHASS battery costs, field-tuned anti-churn/power-stress policy and a shared soft 95–100% high-SOC red zone while preserving installation-owned settings and all GoodWe control semantics. |
 | **0.46** | 2026-08-29 | **Beta** | Adds an independent external-PV master switch and groups the four entity selectors in one enabled/disabled panel while preserving existing v0.45 configurations. |
 | **0.45** | 2026-08-29 | **Beta** | Consolidates PV insight and SOC-slider stability with #83 floating Optimize, #85 actual/forecast SOC and #86 static accessible live flow under one active frontend cache graph; #84 and #87 are excluded. |

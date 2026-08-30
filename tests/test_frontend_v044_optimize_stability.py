@@ -14,20 +14,22 @@ class FrontendV044OptimizeStabilityTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_v047_retains_v044_over_the_complete_frontend(self) -> None:
+    def test_v048_retains_v044_over_the_complete_frontend(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
+        v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
         v047 = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.47")
+        self.assertEqual(manifest["version"], "0.48")
         self.assertIn(
-            "gw-energy-pilot-v047.js?v=0.47-custom-battery1",
+            "gw-energy-pilot-v048.js?v=0.48-hybrid-control1",
             init_source,
         )
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1"', v048)
         self.assertIn('import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"', v047)
         self.assertIn('import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"', v046)
         self.assertIn('import "./gw-energy-pilot-v044.js?v=0.47-custom-battery1"', v045)

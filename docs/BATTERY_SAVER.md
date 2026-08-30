@@ -18,7 +18,7 @@ Selecting a managed strategy is one transaction: EnergyPilot stores the selected
 
 Selecting **Custom** deliberately releases managed-profile ownership without resetting the currently effective EMHASS battery values. A fresh optimization is still run so the plan reflects that ownership transition immediately. The customer card exposes the existing minimum/maximum SOC entities as sliders and shows the remaining active EMHASS battery penalties for transparency. It does not create duplicate SOC entities or a second battery configuration path.
 
-The low-level controller command (for example `hybrid_battery_discharge`) remains available in the Diagnostics snapshot rather than the customer-facing Controller metrics.
+The low-level controller command (for example `hybrid_grid_export`) remains available in the Diagnostics snapshot rather than the customer-facing Controller metrics.
 
 Every successful EnergyPilot optimization refreshes the persistent plan and advances `plan_revision`. The battery/price graph watches that revision and bypasses its normal cache when the active plan changes, so profile changes and SOC-limit optimizations are reflected in the graph after the new solve is published.
 

@@ -5,6 +5,7 @@ on:
     branches:
       - fix/frontend-stability-v041
       - fix/mobile-touch-controls-v042
+      - codex/release-v0.48
   pull_request:
     paths:
       - "custom_components/gw_energypilot/frontend/**"

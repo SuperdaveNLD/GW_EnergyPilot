@@ -131,18 +131,13 @@ P_grid near 0 W    -> mode 1
 ### Hybrid strategy
 
 ```text
-P_grid > +deadband -> mode 9  using abs(P_grid)
-else P_batt > +deadband -> mode 12 using abs(P_batt)
-else P_batt near 0 W -> mode 8
-otherwise -> mode 1
+P_batt near 0 W -> mode 8
+else P_grid near 0 W -> mode 1
+else P_grid > +deadband -> mode 9 using abs(P_grid)
+else P_grid < -deadband -> mode 10 using abs(P_grid)
 ```
 
-Hybrid intentionally combines two GoodWe control domains:
-
-- **buy/import** is a PCC target and uses mode 9 with the EMHASS `P_grid` import magnitude;
-- **sell/discharge** is a battery-power target and uses mode 12 with the EMHASS `P_batt` discharge magnitude;
-- a neutral battery plan is held with mode 8;
-- a battery-charge plan without planned grid import normally falls through to mode 1/self-use so locally available PV can be absorbed by GoodWe without forcing the EMHASS forecast-sized charge setpoint.
+Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance around a zero grid target, while modes 9/10 own non-zero planned import/export. The configured deadband is evaluated independently against `P_batt` and `P_grid` in that order; exact boundaries remain neutral and the threshold is never subtracted from the final mode-9/10 setpoint.
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
