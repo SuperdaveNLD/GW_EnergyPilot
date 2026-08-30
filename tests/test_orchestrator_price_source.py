@@ -105,6 +105,7 @@ def _load_orchestrator():
         "homeassistant.helpers.event",
         async_call_later=lambda *_args, **_kwargs: lambda: None,
         async_track_state_change_event=lambda *_args, **_kwargs: lambda: None,
+        async_track_time_change=lambda *_args, **_kwargs: lambda: None,
         async_track_time_interval=lambda *_args, **_kwargs: lambda: None,
     )
     helpers.event = event
