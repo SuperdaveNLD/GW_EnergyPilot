@@ -34,6 +34,10 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.manual = (FRONTEND / "gw-energy-pilot-v021.js").read_text(
             encoding="utf-8"
         )
+        self.controller = (INTEGRATION / "controller.py").read_text(
+            encoding="utf-8"
+        )
+        self.sensor = (INTEGRATION / "sensor.py").read_text(encoding="utf-8")
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
@@ -89,6 +93,24 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("formatTimestamp(panel", self.source)
         self.assertIn("def exercise_setpoint_update", browser)
         self.assertIn("stableMetric", browser)
+
+    def test_ev_protection_banner_is_stable_status_only_ui(self) -> None:
+        self.assertIn("function installEvProtectionBanner(root)", self.source)
+        self.assertIn("function patchEvProtectionBanner(panel, root)", self.source)
+        self.assertIn("patchEvProtectionBanner(panel, root)", self.source)
+        self.assertIn('banner.setAttribute("role", "status")', self.source)
+        self.assertIn('banner.setAttribute("aria-live", "polite")', self.source)
+        self.assertIn("ev_protection_state", self.source)
+        self.assertIn("EV CHARGING · ANTI-DISCHARGE ACTIVE", self.source)
+        self.assertIn("EV LAADT · ONTLAADBEVEILIGING ACTIEF", self.source)
+        self.assertNotIn("ev-override", self.source)
+        self.assertIn("def ev_protection_state(self)", self.controller)
+        self.assertIn('"ev_protection_state": controller.ev_protection_state', self.sensor)
+        self.assertIn("async_dispatcher_connect(", self.sensor)
+        browser_test = (BROWSER / "test_frontend_stability.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("exercise_ev_protection_banner", browser_test)
 
     def test_other_persistent_selectors_use_stable_live_state(self) -> None:
         self.assertIn("function patchCostFunctionSelector", self.source)

@@ -741,6 +741,158 @@ def exercise_automatic_control(page: Page) -> dict[str, object]:
     return result
 
 
+def exercise_ev_protection_banner(page: Page) -> dict[str, object]:
+    """Verify EV status patches one stable, non-interactive controller banner."""
+    result: dict[str, object] = {
+        "present": False,
+        "initial_hidden": False,
+        "blocking": False,
+        "allowing": False,
+        "waiting": False,
+        "inactive_hidden": False,
+        "main_stable": False,
+        "banner_stable": False,
+        "non_interactive": False,
+        "error": None,
+    }
+    try:
+        banner = page.locator("gw-energypilot-panel").locator(
+            ".ep-v041-ev-protection"
+        )
+        if banner.count() != 1:
+            return result
+        result["present"] = True
+        initial = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              window.__epEvIdentity = {
+                main: root.querySelector('main'),
+                banner: root.querySelector('.ep-v041-ev-protection'),
+              };
+              return window.__epEvIdentity.banner.hidden;
+            }
+            """
+        )
+        result["initial_hidden"] = initial
+
+        page.evaluate(
+            """
+            window.__epSetEntityByKey('control_command', 'ev_anti_discharge_hold', {
+              ev_active: true,
+              ev_protection_state: 'blocking_discharge',
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v041-ev-protection[data-state="blocking_discharge"]:not([hidden])'
+            )
+            """
+        )
+        blocking = page.evaluate(
+            """
+            () => {
+              const banner = window.__epPanel.shadowRoot.querySelector('.ep-v041-ev-protection');
+              return {
+                title: banner.querySelector('.ep-v041-ev-title')?.textContent?.trim(),
+                detail: banner.querySelector('.ep-v041-ev-detail')?.textContent?.trim(),
+              };
+            }
+            """
+        )
+        result["blocking"] = blocking == {
+            "title": "EV CHARGING · ANTI-DISCHARGE ACTIVE",
+            "detail": "Home battery discharge is blocked · Mode 8 Battery Hold",
+        }
+
+        page.evaluate(
+            """
+            window.__epSetEntityByKey('control_command', 'ev_battery_charge', {
+              ev_active: true,
+              ev_protection_state: 'allowing_charge',
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v041-ev-protection[data-state="allowing_charge"]:not([hidden])'
+            )
+            """
+        )
+        result["allowing"] = page.evaluate(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v041-ev-title'
+            )?.textContent?.trim() === 'EV CHARGING · BATTERY CHARGE ALLOWED'
+            """
+        )
+
+        page.evaluate(
+            """
+            window.__epSetEntityByKey('control_command', 'waiting_for_ev_stop_optimization', {
+              ev_active: false,
+              ev_protection_state: 'waiting_for_fresh_plan',
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v041-ev-protection[data-state="waiting_for_fresh_plan"]:not([hidden])'
+            )
+            """
+        )
+        result["waiting"] = page.evaluate(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v041-ev-title'
+            )?.textContent?.trim() === 'EV CHARGING STOPPED · FRESH PLAN REQUIRED'
+            """
+        )
+
+        page.evaluate(
+            """
+            window.__epSetEntityByKey('control_command', 'battery_charge', {
+              ev_active: false,
+              ev_protection_state: 'inactive',
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v041-ev-protection'
+            )?.hidden === true
+            """
+        )
+        stable = page.evaluate(
+            """
+            async () => {
+              await window.__epTelemetryBurst(20, 4);
+              await new Promise((resolve) => setTimeout(resolve, 150));
+              const root = window.__epPanel.shadowRoot;
+              const banner = root.querySelector('.ep-v041-ev-protection');
+              return {
+                inactiveHidden: banner.hidden,
+                mainStable: window.__epEvIdentity.main === root.querySelector('main'),
+                bannerStable: window.__epEvIdentity.banner === banner,
+                nonInteractive: banner.querySelectorAll('button, a, input, select').length === 0,
+              };
+            }
+            """
+        )
+        result["inactive_hidden"] = stable["inactiveHidden"]
+        result["main_stable"] = stable["mainStable"]
+        result["banner_stable"] = stable["bannerStable"]
+        result["non_interactive"] = stable["nonInteractive"]
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_strategy(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "present": False,
@@ -3019,6 +3171,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     setpoint_update = exercise_setpoint_update(page)
     static_flow = exercise_static_flow(page)
     connectivity = exercise_connectivity_status(page, profile)
+    ev_protection = exercise_ev_protection_banner(page)
 
     motion = page.evaluate(
         """
@@ -3078,6 +3231,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "setpoint_update": setpoint_update,
         "static_flow": static_flow,
         "connectivity": connectivity,
+        "ev_protection": ev_protection,
         "motion": motion,
         "pv_insight": pv_insight,
         "pv_settings": pv_settings,
@@ -3108,6 +3262,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     setpoint_update = result["setpoint_update"]
     static_flow = result["static_flow"]
     connectivity = result["connectivity"]
+    ev_protection = result["ev_protection"]
     motion = result["motion"]
     pv_insight = result["pv_insight"]
     pv_settings = result["pv_settings"]
@@ -3242,6 +3397,14 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     if abs(motion["final"] - motion["target"]) > 5:
         failures.append(f"{name}: scrolling did not reach its target during telemetry")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS:
+        required_ev_protection = (
+            "present", "initial_hidden", "blocking", "allowing", "waiting",
+            "inactive_hidden", "main_stable", "banner_stable", "non_interactive",
+        )
+        if not all(ev_protection[key] is True for key in required_ev_protection):
+            failures.append(f"{name}: EV protection banner state/stability regression failed")
+        if ev_protection["error"]:
+            failures.append(f"{name}: EV protection banner interaction error")
         if not all(
             pv_insight[key] is True
             for key in (

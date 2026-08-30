@@ -88,6 +88,23 @@ When the native EMHASS orchestrator is enabled and EV charging stops, the existi
 3. request/wait for a fresh optimization;
 4. resume normal automatic control from the new plan.
 
+## Dashboard status
+
+The Controller card presents the current EV protection state directly from the
+existing controller command:
+
+- **Anti-discharge active**: EV charging is active and home-battery discharge is
+  blocked with mode `8` (**Battery Hold**).
+- **Battery charge allowed**: EV charging is active and the explicit
+  home-battery charging plan continues.
+- **Fresh plan required**: EV charging has stopped, but Battery Hold remains
+  active until the native orchestrator publishes a fresh EMHASS plan.
+
+The status is presentation-only. It does not add an override, charger control,
+new controller ownership mode or additional Modbus write path. A future
+override would change safety and control ownership semantics and therefore
+requires a separate explicit design decision and review.
+
 ## Safety boundary
 
 GoodWe and the battery BMS remain authoritative for inverter, battery, SOC and electrical limits. This feature does not infer or add GoodWe registers and does not introduce a second fast feedback loop.

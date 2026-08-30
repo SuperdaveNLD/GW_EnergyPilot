@@ -518,6 +518,28 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
         self.assertEqual(coordinator.refresh_count, 1)
 
+    async def test_ev_protection_presentation_has_no_independent_control_state(self):
+        controller, _, _, _ = self.make_controller(
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+                const.CONF_EV_DEADBAND: 500,
+            },
+            states={"sensor.ev_power": "1200"},
+        )
+
+        self.assertEqual(controller.ev_protection_state, "inactive")
+
+        controller.enabled = True
+        self.assertEqual(controller.ev_protection_state, "active_pending")
+
+        controller.last_command = "ev_anti_discharge_hold"
+        self.assertEqual(controller.ev_protection_state, "blocking_discharge")
+
+        controller.last_command = "waiting_for_ev_stop_optimization"
+        controller.hass.states.set("sensor.ev_power", "0")
+        self.assertEqual(controller.ev_protection_state, "waiting_for_fresh_plan")
+
     async def test_disable_returns_to_goodwe_auto(self):
         controller, _, client, coordinator = self.make_controller(
             p_grid="5000",

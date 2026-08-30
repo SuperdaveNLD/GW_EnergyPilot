@@ -49,6 +49,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
         self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
+        self.assertEqual(controller.ev_protection_state, "blocking_discharge")
 
     async def test_ev_neutral_plan_is_held(self):
         controller, client = self.make_controller(
@@ -73,6 +74,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 2500)])
         self.assertEqual(controller.last_command, "ev_battery_charge")
+        self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
     async def test_ev_grid_strategy_charge_uses_mode9(self):
         controller, client = self.make_controller(
@@ -85,6 +87,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 4000)])
         self.assertEqual(controller.last_command, "ev_grid_import_charge")
+        self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
     async def test_ev_hybrid_charge_without_import_falls_back_to_mode11(self):
         controller, client = self.make_controller(
@@ -97,6 +100,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 2500)])
         self.assertEqual(controller.last_command, "ev_charge_fallback")
+        self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
 
 if __name__ == "__main__":

@@ -475,7 +475,7 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_control_command"
 
     async def async_added_to_hass(self) -> None:
-        """Publish command evidence immediately after controller updates."""
+        """Publish controller decisions and command evidence immediately."""
         await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(
@@ -487,6 +487,7 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
 
     @callback
     def _async_controller_updated(self) -> None:
+        """Refresh command evidence and EV-protection presentation state."""
         self.async_write_ha_state()
 
     @property
@@ -505,6 +506,8 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
             "last_ems_setpoint": controller.last_ems_setpoint,
             "last_ems_mode": controller.last_ems_mode,
             "last_ems_setpoint_command": controller.last_ems_setpoint_command,
+            "ev_active": controller.ev_is_active(),
+            "ev_protection_state": controller.ev_protection_state,
         }
 
 

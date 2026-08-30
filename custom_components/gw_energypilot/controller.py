@@ -158,6 +158,29 @@ class GWEnergyPilotController:
         """Compatibility property for older diagnostics/frontend layers."""
         return self.control_strategy != CONTROL_STRATEGY_BATTERY
 
+    @property
+    def ev_protection_state(self) -> str:
+        """Return the presentation state of the EV anti-discharge guard.
+
+        This is deliberately derived from the already selected controller
+        command. It exposes control ownership without adding another control
+        decision or write path.
+        """
+        if self.last_command == "waiting_for_ev_stop_optimization":
+            return "waiting_for_fresh_plan"
+        if not self.enabled or not self.ev_is_active():
+            return "inactive"
+        if self.last_command == "ev_anti_discharge_hold":
+            return "blocking_discharge"
+        if self.last_command in {
+            "ev_battery_charge",
+            "ev_charge_allowed",
+            "ev_charge_fallback",
+            "ev_grid_import_charge",
+        }:
+            return "allowing_charge"
+        return "active_pending"
+
     def _notify_state(self) -> None:
         async_dispatcher_send(self.hass, self.signal)
 

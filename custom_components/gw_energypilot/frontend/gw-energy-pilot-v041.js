@@ -95,6 +95,14 @@ const COPY = Object.freeze({
     pausesIn: "pauses in",
     resumesIn: "resumes in",
     lastEmsSetpointUpdate: "Last update",
+    evBlockingTitle: "EV CHARGING · ANTI-DISCHARGE ACTIVE",
+    evBlockingDetail: "Home battery discharge is blocked · Mode 8 Battery Hold",
+    evChargeAllowedTitle: "EV CHARGING · BATTERY CHARGE ALLOWED",
+    evChargeAllowedDetail: "The home battery is following the active charging plan",
+    evWaitingTitle: "EV CHARGING STOPPED · FRESH PLAN REQUIRED",
+    evWaitingDetail: "Battery Hold remains active while EnergyPilot waits for a fresh EMHASS plan",
+    evPendingTitle: "EV CHARGING · PROTECTION EVALUATING",
+    evPendingDetail: "EnergyPilot is determining the safe home-battery direction",
   }),
   nl: Object.freeze({
     autoActive: "AUTO ACTIEF",
@@ -158,6 +166,14 @@ const COPY = Object.freeze({
     pausesIn: "pauzeert over",
     resumesIn: "hervat over",
     lastEmsSetpointUpdate: "Laatste update",
+    evBlockingTitle: "EV LAADT · ONTLAADBEVEILIGING ACTIEF",
+    evBlockingDetail: "Ontladen van de thuisaccu is geblokkeerd · Modus 8 Battery Hold",
+    evChargeAllowedTitle: "EV LAADT · THUISACCU LADEN TOEGESTAAN",
+    evChargeAllowedDetail: "De thuisaccu volgt het actieve laadplan",
+    evWaitingTitle: "EV-LADEN GESTOPT · NIEUW PLAN NODIG",
+    evWaitingDetail: "Battery Hold blijft actief terwijl EnergyPilot op een nieuw EMHASS-plan wacht",
+    evPendingTitle: "EV LAADT · BEVEILIGING WORDT BEOORDEELD",
+    evPendingDetail: "EnergyPilot bepaalt de veilige richting voor de thuisaccu",
   }),
 });
 
@@ -466,6 +482,69 @@ const NO_MOTION_CSS = `
     font-size: 8px;
     line-height: 1.35;
   }
+  :host .ep-v041-ev-protection[hidden] {
+    display: none !important;
+  }
+  :host .ep-v041-ev-protection {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    padding: 13px 14px;
+    box-sizing: border-box;
+    border: 1px solid rgba(42, 219, 236, .38);
+    border-radius: 13px;
+    color: #dffcff;
+    background: linear-gradient(135deg, rgba(11, 74, 91, .72), rgba(8, 42, 64, .78));
+  }
+  :host .ep-v041-ev-protection[data-state="allowing_charge"] {
+    border-color: rgba(46, 225, 165, .34);
+    background: linear-gradient(135deg, rgba(10, 78, 70, .66), rgba(8, 42, 61, .78));
+  }
+  :host .ep-v041-ev-protection[data-state="waiting_for_fresh_plan"] {
+    border-color: rgba(255, 180, 79, .40);
+    background: linear-gradient(135deg, rgba(91, 57, 16, .62), rgba(48, 37, 34, .78));
+  }
+  :host .ep-v041-ev-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 1px solid rgba(115, 241, 249, .48);
+    border-radius: 12px 12px 16px 16px;
+    color: #92f7fb;
+    background: rgba(7, 29, 49, .72);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .06em;
+  }
+  :host .ep-v041-ev-protection[data-state="allowing_charge"] .ep-v041-ev-icon {
+    border-color: rgba(105, 246, 199, .45);
+    color: #9ff9d8;
+  }
+  :host .ep-v041-ev-protection[data-state="waiting_for_fresh_plan"] .ep-v041-ev-icon {
+    border-color: rgba(255, 199, 116, .48);
+    color: #ffd398;
+  }
+  :host .ep-v041-ev-copy {
+    min-width: 0;
+  }
+  :host .ep-v041-ev-title {
+    color: inherit;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .075em;
+    line-height: 1.3;
+  }
+  :host .ep-v041-ev-detail {
+    margin-top: 4px;
+    color: #a8cbd5;
+    font-size: 11px;
+    line-height: 1.4;
+  }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
       top: calc(74px + env(safe-area-inset-top)) !important;
@@ -473,6 +552,15 @@ const NO_MOTION_CSS = `
       left: calc(14px + env(safe-area-inset-left)) !important;
       width: auto !important;
       max-height: calc(100dvh - 94px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    }
+    :host .ep-v041-ev-protection {
+      grid-template-columns: 38px minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px;
+    }
+    :host .ep-v041-ev-icon {
+      width: 38px;
+      height: 38px;
     }
   }
 `;
@@ -938,6 +1026,78 @@ function patchFlow(panel, root, pv, load, grid, battery, soc) {
   }
 }
 
+function installEvProtectionBanner(root) {
+  const card = root?.querySelector(".panel-card.controller");
+  if (!card || card.querySelector(".ep-v041-ev-protection")) return;
+
+  const banner = document.createElement("aside");
+  banner.className = "ep-v041-ev-protection";
+  banner.hidden = true;
+  banner.setAttribute("role", "status");
+  banner.setAttribute("aria-live", "polite");
+  banner.setAttribute("aria-atomic", "true");
+
+  const icon = document.createElement("span");
+  icon.className = "ep-v041-ev-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "EV";
+
+  const text = document.createElement("span");
+  text.className = "ep-v041-ev-copy";
+  const title = document.createElement("span");
+  title.className = "ep-v041-ev-title";
+  const detail = document.createElement("span");
+  detail.className = "ep-v041-ev-detail";
+  title.style.display = "block";
+  detail.style.display = "block";
+  text.append(title, detail);
+  banner.append(icon, text);
+
+  const safetyNote = card.querySelector(".safety-note");
+  if (safetyNote) safetyNote.before(banner);
+  else card.appendChild(banner);
+}
+
+function evProtectionState(panel) {
+  const commandState = panel._stateByKey?.("control_command");
+  const explicit = String(commandState?.attributes?.ev_protection_state || "");
+  if (explicit) return explicit;
+  const command = String(commandState?.state || "");
+  if (command === "ev_anti_discharge_hold") return "blocking_discharge";
+  if (command === "waiting_for_ev_stop_optimization") return "waiting_for_fresh_plan";
+  if ([
+    "ev_battery_charge",
+    "ev_charge_allowed",
+    "ev_charge_fallback",
+    "ev_grid_import_charge",
+  ].includes(command)) return "allowing_charge";
+  return "inactive";
+}
+
+function patchEvProtectionBanner(panel, root) {
+  const banner = root.querySelector(".ep-v041-ev-protection");
+  if (!banner) return;
+  const state = evProtectionState(panel);
+  const t = copy(panel);
+  const presentation = {
+    blocking_discharge: [t.evBlockingTitle, t.evBlockingDetail],
+    allowing_charge: [t.evChargeAllowedTitle, t.evChargeAllowedDetail],
+    waiting_for_fresh_plan: [t.evWaitingTitle, t.evWaitingDetail],
+    active_pending: [t.evPendingTitle, t.evPendingDetail],
+  }[state];
+
+  banner.hidden = !presentation;
+  if (!presentation) {
+    delete banner.dataset.state;
+    return;
+  }
+  banner.dataset.state = state;
+  const title = banner.querySelector(".ep-v041-ev-title");
+  const detail = banner.querySelector(".ep-v041-ev-detail");
+  if (title) title.textContent = presentation[0];
+  if (detail) detail.textContent = presentation[1];
+}
+
 function patchController(panel, root, automaticOn) {
   const card = root.querySelector(".panel-card.controller");
   if (!card) return;
@@ -1041,6 +1201,7 @@ function patchController(panel, root, automaticOn) {
   }
 
   localizeV038Controller(panel, root);
+  patchEvProtectionBanner(panel, root);
 }
 
 function patchBatteryQuickActions(panel, root, automaticOn) {
@@ -1650,6 +1811,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     const result = previousRender.apply(this, args);
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
+    installEvProtectionBanner(this.shadowRoot);
     this.__epV041RefreshLiveDom = () => {
       ensureNoMotionStyle(this.shadowRoot);
       patchLiveDom(this);
