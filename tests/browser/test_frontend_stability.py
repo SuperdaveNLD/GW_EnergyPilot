@@ -285,6 +285,9 @@ def exercise_connectivity_status(page: Page, profile: Profile) -> dict[str, obje
         "placed": False,
         "initial_ok": False,
         "details_open": False,
+        "above_card_controls": False,
+        "pointer_isolated": False,
+        "hit_isolated": False,
         "issue_visible": False,
         "unknown_visible": False,
         "countdown_visible": False,
@@ -336,12 +339,33 @@ def exercise_connectivity_status(page: Page, profile: Profile) -> dict[str, obje
               const root = window.__epPanel.shadowRoot;
               const button = root.querySelector('.ep-connectivity-status');
               const popover = root.querySelector('.ep-connectivity-popover');
-              return button?.getAttribute('aria-expanded') === 'true' &&
-                popover && getComputedStyle(popover).display === 'block';
+              const cardControls = root.querySelector('.ep-v031-card-windowbar');
+              const popoverStyle = popover ? getComputedStyle(popover) : null;
+              const controlsStyle = cardControls ? getComputedStyle(cardControls) : null;
+              const rect = popover?.getBoundingClientRect();
+              const hit = rect
+                ? root.elementFromPoint(
+                    rect.left + rect.width / 2,
+                    rect.top + rect.height / 2
+                  )
+                : null;
+              return {
+                open: button?.getAttribute('aria-expanded') === 'true' &&
+                  popoverStyle?.display === 'block',
+                aboveCardControls:
+                  Number(popoverStyle?.zIndex) > Number(controlsStyle?.zIndex),
+                pointerIsolated: popoverStyle?.pointerEvents !== 'none',
+                hitIsolated: Boolean(
+                  hit && popover && (hit === popover || popover.contains(hit))
+                ),
+              };
             }
             """
         )
-        result["details_open"] = opened
+        result["details_open"] = opened["open"]
+        result["above_card_controls"] = opened["aboveCardControls"]
+        result["pointer_isolated"] = opened["pointerIsolated"]
+        result["hit_isolated"] = opened["hitIsolated"]
 
         page.evaluate(
             """
@@ -3815,7 +3839,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         required_connectivity = (
             "ran", "placed", "initial_ok", "details_open", "issue_visible",
             "unknown_visible", "countdown_visible", "main_stable",
-            "button_stable", "restored",
+            "button_stable", "restored", "above_card_controls",
+            "pointer_isolated", "hit_isolated",
         )
         if not all(connectivity[key] is True for key in required_connectivity):
             failures.append(f"{name}: connectivity status stable-DOM regression failed")

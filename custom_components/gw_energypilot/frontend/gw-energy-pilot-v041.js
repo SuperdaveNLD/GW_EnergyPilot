@@ -424,7 +424,7 @@ const NO_MOTION_CSS = `
   }
   :host .ep-connectivity-popover {
     position: absolute;
-    z-index: 30;
+    z-index: 100;
     top: calc(100% + 8px);
     right: 0;
     display: none;
@@ -436,7 +436,7 @@ const NO_MOTION_CSS = `
     background: #081d34;
     box-shadow: 0 16px 38px rgba(0, 0, 0, .34);
     text-align: left;
-    pointer-events: none;
+    pointer-events: auto;
   }
   :host .ep-connectivity-wrap.open .ep-connectivity-popover,
   :host .ep-connectivity-wrap:focus-within .ep-connectivity-popover {
