@@ -139,6 +139,7 @@
       "control_command": {"name": "Regelcommando"},
       "target_power": {"name": "Doelvermogen"},
       "ev_status": {"name": "EV-laadstatus"},
+      "ev_load_balancing": {"name": "EV-loadbalancing"},
       "pv_generation_power": {"name": "PV-opwekkingsvermogen"}
     },
     "switch": {

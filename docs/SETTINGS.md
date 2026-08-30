@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.48 settings chain keeps EnergyPilot, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.48 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -34,10 +34,27 @@ The EP section owns:
 - maximum controller/setpoint power;
 - control deadband;
 - GoodWe telemetry interval;
-- EV anti-discharge protection enable/disable;
-- EV mode/power observation entities and activity threshold.
 
-EV inputs are observation-only. EnergyPilot does not start, stop or modulate the EV charger.
+## EV page
+
+The EV section owns two independent feature groups:
+
+- the existing observation-based battery anti-discharge coordination;
+- opt-in soft house-connection load balancing through one charger NumberEntity.
+
+Load balancing configures the house-connection profile, a one-phase current
+sensor, the three-phase charger current control, the shared `1–15` minute
+condition window, and charger minimum/maximum boundaries. `3 × 25 A`, `5 min`,
+`6 A` minimum and `16 A` maximum are the defaults. Custom one-phase and
+three-phase connection profiles accept a per-phase current value.
+
+The load balancer never calls the GoodWe client or EMS controller. A new charger
+maximum above `16 A` requires explicit frontend and backend confirmation and
+appends a durable operational acknowledgement to
+`gw_energypilot.ev_load_balancing_audit.<entry_id>`. See
+`docs/EV_LOAD_BALANCING.md`.
+
+The anti-discharge EV mode/power inputs remain observation-only.
 
 During active EV charging:
 
@@ -239,6 +256,8 @@ EnergyPilot currently uses per-entry Home Assistant Stores for:
 gw_energypilot.runtime.<entry_id>          last_success runtime evidence
 gw_energypilot.accounting.<entry_id>       daily grid accounting state
 gw_energypilot.optimization_log.<entry_id> newest optimization attempts
+gw_energypilot.plan.<entry_id>             validated EMHASS plan mirror
+gw_energypilot.ev_load_balancing_audit.<entry_id> confirmed limits above 16 A
 ```
 
 These stores are not editable configuration.
@@ -256,7 +275,7 @@ Connection changes must not create a second EnergyPilot device. Existing entity 
 ## Security and reload behavior
 
 - Dashboard configuration write APIs require a Home Assistant administrator.
-- EP/EMHASS/PV setting changes normally reload the existing entry where the settings API requires it.
+- EP/EV/EMHASS/PV setting changes normally reload the existing entry where the settings API requires it.
 - GoodWe connection changes validate first, then reload.
 - Automatic strategy changes can be applied without a full reload and re-evaluate the active plan when Automatic Control is on.
 - Minimum-SOC synchronization is an explicit NumberEntity transaction and does not reload the integration.

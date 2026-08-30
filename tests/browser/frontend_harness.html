@@ -263,6 +263,18 @@
       friendly_name: "Garage roof PV",
       device_class: "power",
     });
+    initialStates["sensor.grid_phase_current"] = makeExternalState("sensor.grid_phase_current", 24.5, "A");
+    Object.assign(initialStates["sensor.grid_phase_current"].attributes, {
+      friendly_name: "Grid phase L1 current",
+      device_class: "current",
+    });
+    initialStates["number.zaptec_max_current"] = makeExternalState("number.zaptec_max_current", 16, "A");
+    Object.assign(initialStates["number.zaptec_max_current"].attributes, {
+      friendly_name: "Zaptec max current",
+      min: 6,
+      max: 32,
+      step: 1,
+    });
 
     function batterySaverPayload() {
       const modes = [
@@ -308,6 +320,25 @@
             short_title: "EP",
             description: "Controller and telemetry.",
             fields: [],
+          },
+          ev: {
+            title: "EV",
+            short_title: "EV",
+            description: "Soft EV charger load balancing.",
+            fields: [
+              { key: "enable_ev_load_balancing", label: "Load balancing for EV charger", type: "boolean", value: false, readonly: false },
+              { key: "grid_connection_profile", label: "House connection", type: "select", value: "3x25", readonly: false, options: [
+                { value: "3x25", label: "3 × 25 A" },
+                { value: "custom_1_phase", label: "Custom · 1 phase" },
+                { value: "custom_3_phase", label: "Custom · 3 phase" },
+              ] },
+              { key: "grid_custom_current", label: "Custom connection current", type: "number", value: 25, min: 6, max: 100, step: 1, readonly: false },
+              { key: "ev_grid_current_entity", label: "Measured phase current", type: "entity", domains: ["sensor"], units: ["A", "mA"], value: "sensor.grid_phase_current", readonly: false },
+              { key: "ev_charger_current_entity", label: "Charger maximum-current control", type: "entity", domains: ["number"], value: "number.zaptec_max_current", readonly: false },
+              { key: "ev_load_balance_window", label: "Sustained condition window", type: "select", value: 5, readonly: false, options: [1, 5, 15].map((value) => ({ value, label: `${value} min` })) },
+              { key: "ev_charger_min_current", label: "Minimum charger current", type: "number", value: 6, min: 6, max: 16, step: 1, readonly: false },
+              { key: "ev_charger_max_current", label: "Maximum charger current", type: "number", value: 16, min: 6, max: 32, step: 1, readonly: false },
+            ],
           },
           emhass: {
             title: "EMHASS",
@@ -446,6 +477,10 @@
         return batterySaverPayload();
       }
       if (type === "gw_energypilot/settings/get") return settingsPayload();
+      if (type === "gw_energypilot/settings/update") {
+        await actionDelay();
+        return { require_restart: false, settings: settingsPayload() };
+      }
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };

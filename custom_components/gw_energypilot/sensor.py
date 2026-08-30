@@ -22,12 +22,14 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_track_state_change_event
 
 from . import GWConfigEntry
 from .accounting_sensor import GWGridDailyEnergySensor
 from .const import (
     CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_EV_LOAD_BALANCING,
     CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     DEFAULT_ENABLE_EXTERNAL_PV,
@@ -250,6 +252,8 @@ async def async_setup_entry(
 
     if entry.options.get(CONF_ENABLE_EV_COORDINATION, False):
         entities.append(GWEVActiveSensor(entry))
+    if entry.options.get(CONF_ENABLE_EV_LOAD_BALANCING, False):
+        entities.append(GWEVLoadBalancingSensor(entry))
 
     entities.extend(GWTelemetrySensor(entry, description) for description in TELEMETRY_SENSORS)
     async_add_entities(entities)
@@ -504,3 +508,32 @@ class GWEVActiveSensor(GWEnergyPilotEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         return "active" if self.entry.runtime_data.controller.ev_is_active() else "inactive"
+
+
+class GWEVLoadBalancingSensor(GWEnergyPilotEntity, SensorEntity):
+    """Diagnostic state of the external EV charger load balancer."""
+
+    _attr_translation_key = "ev_load_balancing"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, entry: GWConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_ev_load_balancing"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                self.entry.runtime_data.ev_load_balancer.signal,
+                self.async_write_ha_state,
+            )
+        )
+
+    @property
+    def native_value(self) -> str:
+        return self.entry.runtime_data.ev_load_balancer.status
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return self.entry.runtime_data.ev_load_balancer.diagnostics

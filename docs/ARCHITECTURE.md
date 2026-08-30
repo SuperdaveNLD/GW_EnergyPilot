@@ -48,6 +48,18 @@ coordinator pv_total_power + up to four configured HA power entities
 
 That aggregate does not feed the controller, orchestrator, EMHASS or accounting. External entity changes update the aggregate independently; internal GoodWe PV continues to follow coordinator updates. See `docs/PV_INSIGHT.md`.
 
+EV charger load balancing is a separate actuator domain:
+
+```text
+selected HA one-phase current sensor
+    -> GWEnergyPilotEVLoadBalancer
+    -> number.set_value on one configured three-phase charger control
+```
+
+It has no reference to `GWModbusClient`, EMS registers or Automatic Control. It
+uses a continuous soft condition window and fails without a write when source or
+charger state is invalid. See `docs/EV_LOAD_BALANCING.md`.
+
 Persistent EnergyPilot-owned data is split by purpose:
 
 ```text
@@ -58,6 +70,7 @@ gw_energypilot.runtime.<entry_id>          last_success runtime evidence
 gw_energypilot.accounting.<entry_id>       derived daily grid accounting
 gw_energypilot.optimization_log.<entry_id> newest optimization attempts
 gw_energypilot.plan.<entry_id>             bounded mirror of latest valid EMHASS plan
+gw_energypilot.ev_load_balancing_audit.<entry_id> append-only >16 A acknowledgements
 ```
 
 No Home Assistant Store is a second configuration database or optimizer.
@@ -73,6 +86,7 @@ No Home Assistant Store is a second configuration database or optimizer.
 - `GWEnergyPilotPlanRuntime`;
 - `GWEnergyPilotAccounting`;
 - `GWEnergyPilotDebugRuntime`.
+- `GWEnergyPilotEVLoadBalancer`.
 
 Entity platforms remain sensor, switch, number, select and button.
 
@@ -492,6 +506,7 @@ Entity unique IDs remain config-entry based. Host/unit-ID changes must not creat
 ```text
 register/transport problem -> registers.py / client.py / coordinator.py
 controller decision        -> controller.py + bounded controller_v033 availability/EV layer
+EV charger current         -> ev_load_balancing.py only
 EMHASS config ownership    -> emhass_sync.py / emhass_sync_api.py / emhass_config.py
 EMHASS optimization        -> orchestrator*.py
 persistent plan resilience -> plan_runtime.py / battery_plan.py

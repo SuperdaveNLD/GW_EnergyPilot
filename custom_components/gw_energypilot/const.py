@@ -28,6 +28,14 @@ EXTERNAL_PV_ENTITY_KEYS = (
 CONF_MAX_POWER = "max_power"
 CONF_DEADBAND = "deadband"
 CONF_EV_DEADBAND = "ev_deadband"
+CONF_ENABLE_EV_LOAD_BALANCING = "enable_ev_load_balancing"
+CONF_GRID_CONNECTION_PROFILE = "grid_connection_profile"
+CONF_GRID_CUSTOM_CURRENT = "grid_custom_current"
+CONF_EV_GRID_CURRENT_ENTITY = "ev_grid_current_entity"
+CONF_EV_CHARGER_CURRENT_ENTITY = "ev_charger_current_entity"
+CONF_EV_CHARGER_MIN_CURRENT = "ev_charger_min_current"
+CONF_EV_CHARGER_MAX_CURRENT = "ev_charger_max_current"
+CONF_EV_LOAD_BALANCE_WINDOW = "ev_load_balance_window"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 CONTROL_STRATEGY_BATTERY = "battery"
@@ -62,6 +70,29 @@ DEFAULT_CONTROL_STRATEGY = CONTROL_STRATEGY_BATTERY
 DEFAULT_MAX_POWER = 15000
 DEFAULT_DEADBAND = 300
 DEFAULT_EV_DEADBAND = 500
+DEFAULT_ENABLE_EV_LOAD_BALANCING = False
+DEFAULT_GRID_CONNECTION_PROFILE = "3x25"
+DEFAULT_GRID_CUSTOM_CURRENT = 25
+DEFAULT_EV_CHARGER_MIN_CURRENT = 6
+DEFAULT_EV_CHARGER_MAX_CURRENT = 16
+DEFAULT_EV_LOAD_BALANCE_WINDOW = 5
+EV_LOAD_BALANCE_WINDOW_OPTIONS = (1, 2, 3, 5, 10, 15)
+EV_LOAD_BALANCE_HYSTERESIS = 0.5
+
+# Per-phase current limits. The phase count is presentation/configuration
+# metadata; the first controller deliberately measures and controls one phase.
+GRID_CONNECTION_PROFILES = {
+    "1x25": (1, 25),
+    "1x35": (1, 35),
+    "1x40": (1, 40),
+    "3x25": (3, 25),
+    "3x35": (3, 35),
+    "3x40": (3, 40),
+    "3x50": (3, 50),
+    "3x63": (3, 63),
+    "3x80": (3, 80),
+}
+GRID_CONNECTION_CUSTOM_PROFILES = {"custom_1_phase": 1, "custom_3_phase": 3}
 DEFAULT_ENABLE_INTERNAL_PV = True
 DEFAULT_ENABLE_EXTERNAL_PV = False
 DEFAULT_SCAN_INTERVAL = 10

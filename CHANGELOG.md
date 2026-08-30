@@ -4,6 +4,27 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added opt-in soft house-connection load balancing for one three-phase EV
+  charger. It observes one configured phase-current entity, waits for a
+  continuous configurable 1–15 minute overload/headroom window, and adjusts only
+  one configured charger maximum-current NumberEntity (#94).
+- Added an EV settings tab with common Dutch one-/three-phase connection
+  profiles, custom profiles, charger minimum/maximum boundaries and a dedicated
+  diagnostic sensor.
+- Added a second confirmation gate and append-only per-entry audit history for
+  newly configured charger maxima above the normal 16 A boundary.
+
+### Safety and compatibility
+
+- The EV load balancer never calls GoodWe, Modbus EMS, Automatic Control or
+  EMHASS. Invalid measurements fail without a charger write; unrelated settings
+  saves preserve all EV load-balancing options.
+- This is a best-effort soft guard, not a replacement for correctly rated wiring,
+  breakers, charger protection or the main fuse. The first implementation sees
+  one phase and controls all three charger phases together.
+
 ## [0.48] - 2026-08-30
 
 ### Fixed

@@ -27,6 +27,7 @@ from .debug_log_api import async_register_debug_log_api
 from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
+from .ev_load_balancing import GWEnergyPilotEVLoadBalancer
 from .optimization_log_api import async_register_optimization_log_api
 from .orchestrator_v044 import GWEnergyPilotOrchestrator
 from .plan_runtime import GWEnergyPilotPlanRuntime
@@ -59,6 +60,7 @@ class GWRuntimeData:
     accounting: GWEnergyPilotAccounting
     debug_log: GWEnergyPilotDebugRuntime
     plan_runtime: GWEnergyPilotPlanRuntime
+    ev_load_balancer: GWEnergyPilotEVLoadBalancer
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -137,6 +139,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
     debug_log = GWEnergyPilotDebugRuntime(hass, entry.entry_id)
     plan_runtime = GWEnergyPilotPlanRuntime(hass, entry)
+    ev_load_balancer = GWEnergyPilotEVLoadBalancer(hass, entry)
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -145,6 +148,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         accounting=accounting,
         debug_log=debug_log,
         plan_runtime=plan_runtime,
+        ev_load_balancer=ev_load_balancer,
     )
 
     await plan_runtime.async_restore()
@@ -156,6 +160,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     await debug_log.async_start(entry)
     await accounting.async_prepare()
     await controller.async_setup()
+    await ev_load_balancer.async_setup()
     await orchestrator.async_setup()
     entry.runtime_data.event_unsubs.extend(async_setup_event_triggers(hass, entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -178,6 +183,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         await entry.runtime_data.debug_log.async_unload()
         await entry.runtime_data.accounting.async_unload()
         await entry.runtime_data.orchestrator.async_unload()
+        await entry.runtime_data.ev_load_balancer.async_unload()
         await entry.runtime_data.controller.async_unload()
         await entry.runtime_data.client.async_close()
     return unload_ok

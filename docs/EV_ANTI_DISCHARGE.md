@@ -8,7 +8,10 @@ The EV feature is an **anti-discharge protection**, not an EV charging controlle
 
 While the EV is charging, the home battery must not discharge into the EV. If EMHASS explicitly requests home-battery charging at the same time, GW EnergyPilot must continue that charge request instead of holding the battery.
 
-The EV charger remains responsible for starting, stopping and modulating the EV charging session. GW EnergyPilot only observes the configured EV state/power entities.
+The anti-discharge feature only observes the configured EV state/power entities.
+The separately opt-in EV load balancer may modulate one charger current entity,
+but it is not part of this GoodWe battery-direction controller. See
+`EV_LOAD_BALANCING.md`.
 
 ## Ownership boundary
 
@@ -81,4 +84,4 @@ GoodWe and the battery BMS remain authoritative for inverter, battery, SOC and e
 
 ## Non-goals
 
-This feature does not schedule EV charging, choose EV target SOC, change charger current, integrate with charger-cloud APIs, or replace charger-side/GoodWe-side load balancing. Its responsibility is limited to preventing home-battery discharge into an actively charging EV while still allowing a legitimate home-battery charging plan.
+This feature does not schedule EV charging, choose EV target SOC, change charger current, or integrate with charger-cloud APIs. Its responsibility is limited to preventing home-battery discharge into an actively charging EV while still allowing a legitimate home-battery charging plan. The independent EV load balancer is the only EnergyPilot component permitted to change the configured charger-current NumberEntity.

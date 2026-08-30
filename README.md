@@ -38,6 +38,7 @@ Release documentation:
 - `docs/EMHASS_PLAN_RUNTIME.md` — persistent canonical EMHASS plan/recovery contract;
 - `docs/BATTERY_SAVER.md` — Battery Saver profiles, anti-churn tuning and ownership;
 - `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge control contract;
+- `docs/EV_LOAD_BALANCING.md` — isolated soft EV charger load-balancing contract;
 - `docs/DEBUG_LOG.md` — opt-in LOG-tab debug-session/support-report contract;
 - `docs/EMS_MODES.md` — GoodWe EMS modes 1–12;
 - `docs/ACCOUNTING.md` — persistent grid accounting;
@@ -173,6 +174,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - optional Nord Pool/runtime prices;
 - Battery plan / actual / price visualization;
 - EV anti-discharge protection;
+- optional soft load balancing for one three-phase EV charger without GoodWe writes;
 - synchronized normal on-grid minimum SOC between EMHASS and GoodWe `45356`;
 - low-level Beta SOC API retained for diagnostics/backwards-compatible tooling;
 - built-in EnergyPilot dashboard and support diagnostics.
@@ -294,6 +296,21 @@ Hybrid strategy  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 
 This prevents the home battery from feeding the EV while avoiding the previous blanket hold on legitimate charging. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.
 
+### EV charger load balancing
+
+Settings → **EV** can optionally guard the house connection by observing one
+phase-current entity and adjusting one charger maximum-current NumberEntity that
+applies to all three phases. The default connection is `3 × 25 A`; common Dutch
+connection profiles and custom one-/three-phase profiles are available. A
+continuous `1–15` minute window is used for both reducing and restoring current;
+`5` minutes is recommended.
+
+This is a soft, best-effort guard, not fuse protection. It never writes GoodWe,
+does nothing on invalid measurements, and cannot protect an unmeasured phase. The
+normal maximum is `16 A`; a newly selected value above `16 A` requires an extra
+warning/confirmation and is permanently recorded in the per-entry audit Store.
+See `docs/EV_LOAD_BALANCING.md`.
+
 ## EMS / sign conventions
 
 Battery power:
@@ -395,6 +412,7 @@ gw_energypilot.runtime.<entry_id>
 gw_energypilot.accounting.<entry_id>
 gw_energypilot.optimization_log.<entry_id>
 gw_energypilot.plan.<entry_id>
+gw_energypilot.ev_load_balancing_audit.<entry_id>
 ```
 
 The plan Store is a bounded resilience mirror of EMHASS's canonical plan, not a second optimizer or settings database. It is valid only through its inferred final plan interval. The debug session is intentionally **not** persistent and is not added to this list.

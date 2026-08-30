@@ -2663,6 +2663,87 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Verify the EV tab, entity filtering and >16 A acknowledgement path."""
+    result: dict[str, object] = {
+        "ran": False,
+        "tab_present": False,
+        "profiles_present": False,
+        "recommended_window": False,
+        "current_entity_present": False,
+        "charger_entity_present": False,
+        "warning_prominent": False,
+        "confirmation_sent": False,
+        "closed": False,
+        "error": None,
+    }
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        page.wait_for_selector(
+            'gw-energypilot-panel >> [data-settings-tab="ev"]', timeout=10_000
+        )
+        result["tab_present"] = True
+        activate(page, profile, '[data-settings-tab="ev"]')
+        page.wait_for_selector(
+            'gw-energypilot-panel >> .ep-v016-form[data-section="ev"]',
+            timeout=10_000,
+        )
+        page.evaluate("window.confirm = () => true")
+        state = page.evaluate(
+            """
+            async () => {
+              const root = window.__epPanel.shadowRoot;
+              const form = root.querySelector('.ep-v016-form[data-section="ev"]');
+              const profile = form.querySelector('[data-setting-key="grid_connection_profile"]');
+              const windowSelect = form.querySelector('[data-setting-key="ev_load_balance_window"]');
+              const max = form.querySelector('[data-setting-key="ev_charger_max_current"]');
+              const datalistValues = [...form.querySelectorAll('datalist option')]
+                .map((option) => option.value);
+              max.value = '20';
+              max.dispatchEvent(new Event('input', { bubbles: true }));
+              const warningProminent = root.querySelector('[data-ev-safety-note]')
+                ?.classList.contains('danger');
+              form.dispatchEvent(new Event('submit', {
+                bubbles: true, composed: true, cancelable: true,
+              }));
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              const call = [...window.__epWsCalls].reverse().find(
+                (item) => item.type === 'gw_energypilot/settings/update' && item.section === 'ev'
+              );
+              return {
+                profilesPresent: [...profile.options].some((option) => option.value === '3x25') &&
+                  [...profile.options].some((option) => option.value === 'custom_1_phase') &&
+                  [...profile.options].some((option) => option.value === 'custom_3_phase'),
+                recommendedWindow: windowSelect.value === '5',
+                currentEntityPresent: datalistValues.includes('sensor.grid_phase_current'),
+                chargerEntityPresent: datalistValues.includes('number.zaptec_max_current'),
+                warningProminent,
+                confirmationSent: call?.values?.ev_charger_max_current === 20 &&
+                  call?.values?._confirm_high_current === true,
+              };
+            }
+            """
+        )
+        result.update({
+            "profiles_present": state["profilesPresent"],
+            "recommended_window": state["recommendedWindow"],
+            "current_entity_present": state["currentEntityPresent"],
+            "charger_entity_present": state["chargerEntityPresent"],
+            "warning_prominent": state["warningProminent"],
+            "confirmation_sent": state["confirmationSent"],
+        })
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        result["closed"] = True
+        result["ran"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
@@ -2773,6 +2854,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 
     pv_insight = exercise_pv_insight(page)
     pv_settings = exercise_pv_settings(page, profile)
+    ev_settings = exercise_ev_settings(page, profile)
     host_property_press = exercise_host_property_press(page, profile)
     quick_action_state = exercise_quick_action_state(page, profile)
     selector_stability = exercise_selector_stability(page, profile)
@@ -2797,6 +2879,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "motion": motion,
         "pv_insight": pv_insight,
         "pv_settings": pv_settings,
+        "ev_settings": ev_settings,
         "host_property_press": host_property_press,
         "quick_action_state": quick_action_state,
         "selector_stability": selector_stability,
@@ -2824,6 +2907,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     motion = result["motion"]
     pv_insight = result["pv_insight"]
     pv_settings = result["pv_settings"]
+    ev_settings = result["ev_settings"]
     host_property_press = result["host_property_press"]
     quick_action_state = result["quick_action_state"]
     selector_stability = result["selector_stability"]
@@ -2961,7 +3045,19 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048"}:
+    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049"}:
+        if not all(
+            ev_settings[key] is True
+            for key in (
+                "ran", "tab_present", "profiles_present", "recommended_window",
+                "current_entity_present", "charger_entity_present",
+                "warning_prominent", "confirmation_sent", "closed",
+            )
+        ):
+            failures.append(f"{name}: EV load-balancing settings safety regression failed")
+        if ev_settings["error"]:
+            failures.append(f"{name}: EV settings interaction error")
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049"}:
         required_host_press = (
             "ran", "no_full_render", "main_stable", "controls_stable",
             "native_click", "touch_click",

@@ -47,7 +47,8 @@ accounting_sensor.py    native Today import/export entities
 runtime_store.py        persistent last_success evidence
 optimization_log.py     bounded optimization-attempt history
 optimization_log_api.py read-only optimization history API
-settings_api.py         EP/EMHASS/GoodWe connection settings
+ev_load_balancing.py    isolated one-phase-observed EV charger current control + audit Store
+settings_api.py         EP/EV/EMHASS/PV/GoodWe settings
 smart_meter_api.py      automatic control-strategy API
 beta_soc_api.py         bounded verified 45356/45358 low-level field-test API
 debug_log_runtime.py    bounded memory-only runtime diagnostic capture
@@ -186,7 +187,12 @@ Grid    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 ```
 
-This override must not control the EV charger or create a second fast feedback loop. EV-stop fresh-plan protection remains unchanged. Manual commands never inherit or reinterpret the automatic strategy.
+This anti-discharge override must not control the EV charger or create a second
+fast feedback loop. The separately owned `ev_load_balancing.py` runtime may call
+only the selected charger NumberEntity after its full minute-scale condition
+window; it never calls this controller or GoodWe. EV-stop fresh-plan protection
+remains unchanged. Manual commands never inherit or reinterpret the automatic
+strategy.
 
 ## Persistent plan availability contract
 

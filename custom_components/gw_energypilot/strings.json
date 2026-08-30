@@ -139,6 +139,7 @@
       "control_command": {"name": "Control command"},
       "target_power": {"name": "Target power"},
       "ev_status": {"name": "EV charging status"},
+      "ev_load_balancing": {"name": "EV load balancing"},
       "pv_generation_power": {"name": "PV generation power"}
     },
     "switch": {
