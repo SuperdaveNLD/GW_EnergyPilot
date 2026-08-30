@@ -218,6 +218,11 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("exercise_chart_size_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
         self.assertIn("exercise_soc_limit_fallback", browser_test)
+        self.assertIn("window.__epBeforeNarrowMain", browser_test)
+        self.assertIn(
+            "window.__epPanel.shadowRoot.querySelector('main') !==",
+            browser_test,
+        )
         self.assertIn("test_frontend_stability_v100.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)

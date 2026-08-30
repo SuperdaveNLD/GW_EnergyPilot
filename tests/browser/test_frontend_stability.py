@@ -3101,11 +3101,14 @@ def exercise_structural_rerender(page: Page) -> dict[str, object]:
             """
             () => Boolean(
               window.__epPanel.shadowRoot.querySelector('main[data-ep-v041-stable-dom="1"]') &&
+              window.__epPanel.shadowRoot.querySelector('main') !==
+                window.__epBeforeNarrowMain &&
               window.__epPanel.shadowRoot.querySelectorAll('[data-ep-card]').length >= 8
             )
             """,
             timeout=10_000,
         )
+        wait_render_idle(page)
         result["cards"] = page.evaluate(
             "window.__epPanel.shadowRoot.querySelectorAll('[data-ep-card]').length"
         )
