@@ -167,6 +167,14 @@
           ev_grace_seconds: 300,
         });
       }
+      if (key === "control_command") {
+        Object.assign(attributes, {
+          last_ems_setpoint_updated_at: "2026-08-29T18:15:30+00:00",
+          last_ems_setpoint: 1200,
+          last_ems_mode: 11,
+          last_ems_setpoint_command: "battery_charge",
+        });
+      }
       if (key === "pv_generation_power") {
         Object.assign(attributes, {
           internal_enabled: true,
@@ -203,6 +211,10 @@
           controller_command: "battery_charge",
           controller_target_power: -1200,
           controller_expected_mode: 11,
+          last_ems_setpoint_updated_at: "2026-08-29T18:15:30+00:00",
+          last_ems_setpoint: 1200,
+          last_ems_mode: 11,
+          last_ems_setpoint_command: "battery_charge",
           controller_max_power: 15000,
           controller_deadband: 50,
           ems_mode: 11,

@@ -25,6 +25,7 @@ connectivity_model.py   pure charger reachability debounce/state machine
 connectivity.py         coordinator/entity-backed status, five-minute timer and transition logging
 controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
+control_history.py      persistent latest successful EMS-setpoint update evidence
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
 emhass_config.py        safe full EMHASS config read/write helpers
 emhass_sync.py          canonical EnergyPilot runtime contract + safe required-config synchronization

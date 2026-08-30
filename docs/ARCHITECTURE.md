@@ -68,6 +68,7 @@ ConfigEntry data/options                   user/integration configuration
 GoodWe registers                           hardware state + inverter settings
 EMHASS configuration/output                optimizer configuration + canonical plan
 gw_energypilot.runtime.<entry_id>          last_success runtime evidence
+gw_energypilot.control.<entry_id>          latest successful EMS setpoint update
 gw_energypilot.accounting.<entry_id>       derived daily grid accounting
 gw_energypilot.optimization_log.<entry_id> newest optimization attempts
 gw_energypilot.plan.<entry_id>             bounded mirror of latest valid EMHASS plan
@@ -82,6 +83,7 @@ No Home Assistant Store is a second configuration database or optimizer.
 
 - `GWModbusClient`;
 - `GWEnergyPilotCoordinator`;
+- `GWEnergyPilotControlHistory`;
 - `GWEnergyPilotController` from `controller_v033.py`;
 - `GWEnergyPilotOrchestrator` from `orchestrator_v044.py`;
 - `GWEnergyPilotPlanRuntime`;
@@ -479,6 +481,8 @@ Recorder is not part of the live accounting loop. It remains an optional bootstr
 `optimization_log.py` stores the newest 50 EnergyPilot-owned optimization attempts per config entry. Failed and successful runs share the log. A log persistence failure must never convert a successful optimize/publish cycle into a control failure.
 
 `last_success` remains a separate contract in `runtime_store.py`.
+
+`control_history.py` persists the latest successfully completed EMS setpoint update separately. The controller advances it only after `async_set_mode()` completes; skipped matching commands and failed commands retain the previous timestamp. It is diagnostic evidence of a completed write transaction, while coordinator mode/setpoint telemetry remains the hardware read-back source.
 
 `GWEnergyPilotDebugRuntime` is deliberately different: it is bounded, memory-only, disabled by default and observes the existing runtime. It does not add Modbus polling, EMHASS optimization or hardware writes.
 

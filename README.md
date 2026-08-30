@@ -169,6 +169,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences, profile-owned maximum SOC and anti-churn battery-throughput costs;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
+- persistent latest successful EMS-setpoint update evidence in Controller diagnostics;
 - opt-in bounded LOG-tab debug sessions and copyable support reports;
 - persistent Today/Yesterday grid import/export accounting;
 - optional Nord Pool/runtime prices;
@@ -412,6 +413,7 @@ EnergyPilot-owned persistent runtime stores are separate:
 
 ```text
 gw_energypilot.runtime.<entry_id>
+gw_energypilot.control.<entry_id>
 gw_energypilot.accounting.<entry_id>
 gw_energypilot.optimization_log.<entry_id>
 gw_energypilot.plan.<entry_id>

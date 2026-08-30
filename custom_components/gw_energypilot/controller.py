@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from datetime import datetime, timezone
 from math import isfinite
+from typing import TYPE_CHECKING
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import (
@@ -46,8 +48,12 @@ from .const import (
     MODE_DISCHARGE_BATTERY,
     MODE_GRID_EXPORT_TARGET,
     MODE_GRID_IMPORT_TARGET,
+    MODES_ZERO_POWER,
 )
 from .coordinator import GWEnergyPilotCoordinator
+
+if TYPE_CHECKING:
+    from .control_history import GWEnergyPilotControlHistory
 
 
 class GWEnergyPilotController:
@@ -81,15 +87,43 @@ class GWEnergyPilotController:
     smart-meter boolean mapping for backwards compatibility.
     """
 
-    def __init__(self, hass: HomeAssistant, entry, client: GWModbusClient, coordinator: GWEnergyPilotCoordinator) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry,
+        client: GWModbusClient,
+        coordinator: GWEnergyPilotCoordinator,
+        control_history: GWEnergyPilotControlHistory | None = None,
+    ) -> None:
         self.hass = hass
         self.entry = entry
         self.client = client
         self.coordinator = coordinator
+        self.control_history = control_history
         self.enabled = False
         self.target_power = 0
         self.expected_mode = MODE_AUTO
         self.last_command = "goodwe_auto"
+        self.last_ems_setpoint_updated_at = (
+            control_history.last_ems_setpoint_updated_at
+            if control_history is not None
+            else None
+        )
+        self.last_ems_setpoint = (
+            control_history.last_ems_setpoint
+            if control_history is not None
+            else None
+        )
+        self.last_ems_mode = (
+            control_history.last_ems_mode
+            if control_history is not None
+            else None
+        )
+        self.last_ems_setpoint_command = (
+            control_history.last_command
+            if control_history is not None
+            else None
+        )
         self.manual_power = min(DEFAULT_MAX_POWER, int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)))
         self.manual_charge_limit_soc: float | None = None
         self._unsubs: list[Callable[[], None]] = []
@@ -283,7 +317,9 @@ class GWEnergyPilotController:
         return actual_power is not None and int(actual_power) == int(power)
 
     async def _async_apply_command(self, mode: int, power: int, command: str, *, skip_if_readback_matches: bool = False) -> None:
-        power = max(0, int(power))
+        power = max(0, min(int(power), 15000))
+        if mode in MODES_ZERO_POWER:
+            power = 0
         self.target_power = power
         self.expected_mode = mode
         self.last_command = command
@@ -291,6 +327,20 @@ class GWEnergyPilotController:
         if skip_if_readback_matches and self._actual_command_matches(mode, power):
             return
         await self.client.async_set_mode(mode, power)
+        timestamp = datetime.now(timezone.utc)
+        self.last_ems_setpoint_updated_at = timestamp
+        self.last_ems_setpoint = power
+        self.last_ems_mode = mode
+        self.last_ems_setpoint_command = command
+        if self.control_history is not None:
+            self.control_history.record(
+                timestamp,
+                setpoint=power,
+                mode=mode,
+                command=command,
+            )
+            await self.control_history.async_save()
+        self._notify_state()
         await self.coordinator.async_request_refresh()
 
     async def async_enable(self) -> None:

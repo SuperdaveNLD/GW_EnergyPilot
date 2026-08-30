@@ -9,10 +9,11 @@ GW EnergyPilot keeps configuration and runtime history separate.
 - EMHASS remains the source of optimizer configuration and published plan outputs.
 - Small EnergyPilot-owned runtime history that must survive an integration reload or Home Assistant restart is stored with Home Assistant's `Store` helper.
 
-Two per-config-entry stores are used for orchestrator runtime evidence:
+Three per-config-entry stores are used for controller/orchestrator runtime evidence:
 
 ```text
 gw_energypilot.runtime.<config_entry_id>
+gw_energypilot.control.<config_entry_id>
 gw_energypilot.optimization_log.<config_entry_id>
 ```
 
@@ -40,6 +41,23 @@ Behavior contract:
 - a newer successful run replaces the previous timestamp.
 
 Malformed or timezone-less stored timestamps are ignored safely and do not block integration startup.
+
+## Last successful EMS setpoint update
+
+Issue #96 adds a separate controller-history store:
+
+```json
+{
+  "last_ems_setpoint_updated_at": "2026-08-30T08:15:02+00:00",
+  "last_ems_setpoint": 3750,
+  "last_ems_mode": 9,
+  "last_command": "grid_import_target"
+}
+```
+
+The timestamp advances only after the existing complete EMS command returns without a Modbus error. That command still writes setpoint register `47512`, waits and then writes mode register `47511`. A command skipped because current mode/setpoint read-back already matches does not advance the timestamp. A failed or partial command also leaves the previous successful evidence intact.
+
+The value is deliberately described as an **EMS setpoint update**, not verified read-back. The normal coordinator refresh still supplies live mode/setpoint telemetry separately. The persisted context is exposed through the existing `control_command` diagnostic entity, Optimize diagnostics, support report and opt-in LOG session. It survives config-entry reloads and Home Assistant restarts without changing Automatic Control ownership or reissuing a command.
 
 ## Optimization history
 

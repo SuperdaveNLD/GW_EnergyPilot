@@ -94,6 +94,7 @@ const COPY = Object.freeze({
     temporarilyPaused: "Temporarily paused",
     pausesIn: "pauses in",
     resumesIn: "resumes in",
+    lastEmsSetpointUpdate: "Last update",
   }),
   nl: Object.freeze({
     autoActive: "AUTO ACTIEF",
@@ -156,6 +157,7 @@ const COPY = Object.freeze({
     temporarilyPaused: "Tijdelijk gepauzeerd",
     pausesIn: "pauzeert over",
     resumesIn: "hervat over",
+    lastEmsSetpointUpdate: "Laatste update",
   }),
 });
 
@@ -511,6 +513,20 @@ function copy(panel) {
 function finite(panel, key) {
   const value = panel._numberByKey?.(key, null);
   return Number.isFinite(value) ? value : null;
+}
+
+function formatTimestamp(panel, value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const locale = panel?._hass?.locale?.language || panel?._hass?.language || undefined;
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
 }
 
 function pvGenerationSnapshot(panel) {
@@ -940,7 +956,16 @@ function patchController(panel, root, automaticOn) {
     ? localizedEmsMode(language(panel), mode).name
     : modeState?.attributes?.mode_name || "—";
   patchMetric(card, ["EMS mode", "EMS-modus"], `${modeState?.state || "—"} · ${modeName}`);
-  patchMetric(card, ["EMS setpoint", "EMS-setpoint"], panel._formatPower(finite(panel, "ems_setpoint")));
+  const commandAttrs = panel._stateByKey?.("control_command")?.attributes || {};
+  patchMetric(
+    card,
+    ["EMS setpoint", "EMS-setpoint"],
+    panel._formatPower(finite(panel, "ems_setpoint")),
+    `${t.lastEmsSetpointUpdate}: ${formatTimestamp(
+      panel,
+      commandAttrs.last_ems_setpoint_updated_at
+    )}`
+  );
   patchMetric(
     card,
     ["EnergyPilot target", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel"],
@@ -1261,6 +1286,9 @@ function diagnosticValue(panel, label, attrs, configAttrs) {
     return attrs.ems_mode === null || attrs.ems_mode === undefined
       ? "—"
       : `${attrs.ems_mode} · ${attrs.ems_mode_name || "Unknown"}`;
+  }
+  if (key.includes("last ems setpoint update") || key.includes("laatste ems-setpointupdate")) {
+    return formatTimestamp(panel, attrs.last_ems_setpoint_updated_at);
   }
   if (key.includes("ems setpoint")) return power(attrs.ems_setpoint);
   if (key.includes("app / work")) return text(attrs.app_work_mode_47000);

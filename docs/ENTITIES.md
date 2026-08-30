@@ -338,6 +338,17 @@ Manual action buttons intentionally take manual ownership before issuing the EMS
 
 ## Diagnostic entities
 
+The existing `control_command` diagnostic sensor retains its stable unique ID and state semantics. Its attributes also expose the latest successfully completed EMS setpoint update:
+
+```text
+last_ems_setpoint_updated_at
+last_ems_setpoint
+last_ems_mode
+last_ems_setpoint_command
+```
+
+The timestamp changes only after an actual `47512 -> wait -> 47511` command succeeds. A controller evaluation that skips a duplicate write because live read-back already matches does not change it. The dashboard shows the localized timestamp below the live EMS setpoint, while Diagnose/LOG retains the raw ISO timestamp and command context.
+
 Raw inverter, operating-mode, warning/error, meter-status, and similar sensors may be disabled by default.
 
 The three v0.17 SOC Beta entities are intentionally an exception: they are Diagnostic category **and enabled by default** because current field validation requires testers to compare the values directly with SolarGo/SEMS+.

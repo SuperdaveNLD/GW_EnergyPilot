@@ -288,6 +288,14 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.target_power, 3750)
         self.assertEqual(controller.expected_mode, const.MODE_GRID_IMPORT_TARGET)
         self.assertEqual(controller.last_command, "grid_import_target")
+        self.assertIsNotNone(controller.last_ems_setpoint_updated_at)
+        self.assertIsNotNone(controller.last_ems_setpoint_updated_at.tzinfo)
+        self.assertEqual(controller.last_ems_setpoint, 3750)
+        self.assertEqual(controller.last_ems_mode, const.MODE_GRID_IMPORT_TARGET)
+        self.assertEqual(
+            controller.last_ems_setpoint_command,
+            "grid_import_target",
+        )
         self.assertEqual(coordinator.refresh_count, 1)
 
     async def test_negative_p_grid_maps_to_mode10_export_target(self):
@@ -334,6 +342,14 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(controller.expected_mode, const.MODE_AUTO)
                 self.assertEqual(controller.last_command, "grid_zero_auto")
                 self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_zero_power_mode_records_the_actual_written_setpoint(self):
+        controller, _, client, _ = self.make_controller()
+
+        await controller.async_manual_command(const.MODE_AUTO, 4200, "manual_auto")
+
+        self.assertEqual(client.calls, [(const.MODE_AUTO, 0)])
+        self.assertEqual(controller.last_ems_setpoint, 0)
 
     async def test_grid_target_is_clamped_to_configured_maximum(self):
         for p_grid, mode in (
@@ -554,6 +570,24 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [])
         self.assertEqual(controller.target_power, 2400)
         self.assertEqual(controller.last_command, "grid_import_target")
+        self.assertIsNone(controller.last_ems_setpoint_updated_at)
+        self.assertEqual(coordinator.refresh_count, 0)
+
+    async def test_failed_write_does_not_advance_setpoint_update_evidence(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="-3000",
+            p_grid="2400",
+        )
+        controller.enabled = True
+
+        async def fail_write(_mode, _power):
+            raise RuntimeError("write failed")
+
+        client.async_set_mode = fail_write
+        with self.assertRaisesRegex(RuntimeError, "write failed"):
+            await controller.async_evaluate()
+
+        self.assertIsNone(controller.last_ems_setpoint_updated_at)
         self.assertEqual(coordinator.refresh_count, 0)
 
     async def test_ev_stop_waits_for_fresh_native_optimization(self):

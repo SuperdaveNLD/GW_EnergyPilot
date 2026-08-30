@@ -198,6 +198,20 @@ class GWEnergyPilotPanel extends HTMLElement {
     return `${stateObj.state}${unit ? ` ${unit}` : ""}`;
   }
 
+  _formatTimestamp(value, fallback = "—") {
+    if (!value) return fallback;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return fallback;
+    const locale = this._hass?.locale?.language || this._hass?.language || undefined;
+    return new Intl.DateTimeFormat(locale, {
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(date);
+  }
+
   _escape(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -322,7 +336,11 @@ class GWEnergyPilotPanel extends HTMLElement {
     const emsModeName = emsModeState?.attributes?.mode_name || "Unknown";
     const emsSetpoint = this._numberByKey("ems_setpoint");
     const targetPower = this._numberByKey("target_power");
+    const commandState = this._stateByKey("control_command");
     const command = this._textByKey("control_command");
+    const lastEmsSetpointUpdate = this._formatTimestamp(
+      commandState?.attributes?.last_ems_setpoint_updated_at
+    );
 
     const autoEntity = this._entityId("automatic_control");
     const autoState = autoEntity ? this._state(autoEntity) : null;
@@ -488,7 +506,11 @@ class GWEnergyPilotPanel extends HTMLElement {
             </div>
             <div class="control-grid">
               ${this._metric("EMS mode", `${emsMode} · ${emsModeName}`)}
-              ${this._metric("EMS setpoint", this._formatPower(emsSetpoint))}
+              ${this._metric(
+                "EMS setpoint",
+                this._formatPower(emsSetpoint),
+                `Last update: ${lastEmsSetpointUpdate}`
+              )}
               ${this._metric("EnergyPilot target", this._formatPower(targetPower))}
               ${this._metric("Command", command)}
             </div>

@@ -15,6 +15,7 @@ All notable changes to GW EnergyPilot are documented here.
   diagnostic sensor.
 - Added a second confirmation gate and append-only per-entry audit history for
   newly configured charger maxima above the normal 16 A boundary.
+- Persist the timestamp and context of the latest successfully completed EMS setpoint write, expose it through existing controller diagnostics and LOG/support output, and show the localized time beneath the live EMS setpoint without rebuilding the Controller card (#96).
 
 ### Safety and compatibility
 
@@ -24,6 +25,7 @@ All notable changes to GW EnergyPilot are documented here.
 - This is a best-effort soft guard, not a replacement for correctly rated wiring,
   breakers, charger protection or the main fuse. The first implementation sees
   one phase and controls all three charger phases together.
+- The EMS timestamp advances only after the established `47512 -> wait -> 47511` command completes without a Modbus error. Read-back-matched no-op evaluations and failed commands do not advance it; EMS mapping, write order, entity unique IDs and controller ownership are unchanged.
 
 ## [0.48] - 2026-08-30
 

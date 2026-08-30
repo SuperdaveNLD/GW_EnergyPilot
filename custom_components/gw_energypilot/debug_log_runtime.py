@@ -101,6 +101,14 @@ class GWEnergyPilotDebugRuntime:
             "last_command": controller.last_command,
             "target_power": controller.target_power,
             "expected_mode": controller.expected_mode,
+            "last_ems_setpoint_updated_at": (
+                controller.last_ems_setpoint_updated_at.isoformat()
+                if controller.last_ems_setpoint_updated_at is not None
+                else None
+            ),
+            "last_ems_setpoint": controller.last_ems_setpoint,
+            "last_ems_mode": controller.last_ems_mode,
+            "last_ems_setpoint_command": controller.last_ems_setpoint_command,
             "manual_power": controller.manual_power,
             "manual_charge_limit_soc": controller.manual_charge_limit_soc,
             "ev_active": controller.ev_is_active(),

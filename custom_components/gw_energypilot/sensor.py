@@ -474,9 +474,38 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
         super().__init__(entry)
         self._attr_unique_id = f"{entry.entry_id}_control_command"
 
+    async def async_added_to_hass(self) -> None:
+        """Publish command evidence immediately after controller updates."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                self.entry.runtime_data.controller.signal,
+                self._async_controller_updated,
+            )
+        )
+
+    @callback
+    def _async_controller_updated(self) -> None:
+        self.async_write_ha_state()
+
     @property
     def native_value(self) -> str:
         return self.entry.runtime_data.controller.last_command
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose persistent evidence for the latest actual EMS setpoint write."""
+        controller = self.entry.runtime_data.controller
+        timestamp = controller.last_ems_setpoint_updated_at
+        return {
+            "last_ems_setpoint_updated_at": (
+                timestamp.isoformat() if timestamp is not None else None
+            ),
+            "last_ems_setpoint": controller.last_ems_setpoint,
+            "last_ems_mode": controller.last_ems_mode,
+            "last_ems_setpoint_command": controller.last_ems_setpoint_command,
+        }
 
 
 class GWTargetPowerSensor(GWEnergyPilotEntity, SensorEntity):

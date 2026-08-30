@@ -79,6 +79,17 @@ class FrontendV041StableDomTests(unittest.TestCase):
             '.ep-battery-action[data-action="resume_auto"]:hover', self.touch_hover
         )
 
+    def test_ems_setpoint_update_is_patched_in_place(self) -> None:
+        base = (FRONTEND / "gw-energy-pilot.js").read_text(encoding="utf-8")
+        browser = (BROWSER / "test_frontend_stability.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("last_ems_setpoint_updated_at", base)
+        self.assertIn("lastEmsSetpointUpdate", self.source)
+        self.assertIn("formatTimestamp(panel", self.source)
+        self.assertIn("def exercise_setpoint_update", browser)
+        self.assertIn("stableMetric", browser)
+
     def test_other_persistent_selectors_use_stable_live_state(self) -> None:
         self.assertIn("function patchCostFunctionSelector", self.source)
         self.assertIn("patchCostFunctionSelector(panel, root)", self.source)

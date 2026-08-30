@@ -309,6 +309,7 @@ Current EnergyPilot stores include:
 
 ```text
 gw_energypilot.runtime.<config_entry_id>
+gw_energypilot.control.<config_entry_id>
 gw_energypilot.accounting.<config_entry_id>
 gw_energypilot.optimization_log.<config_entry_id>
 gw_energypilot.plan.<config_entry_id>

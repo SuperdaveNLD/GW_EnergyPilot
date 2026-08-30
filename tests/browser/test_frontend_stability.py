@@ -456,6 +456,53 @@ def open_and_close_menu(page: Page) -> dict[str, object]:
     return result
 
 
+def exercise_setpoint_update(page: Page) -> dict[str, object]:
+    """Keep the Controller DOM stable while its persisted write time advances."""
+    try:
+        return page.evaluate(
+            """
+            async () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const metric = [...root.querySelectorAll('.panel-card.controller .metric')].find(
+                node => ['EMS setpoint', 'EMS-setpoint'].includes(
+                  node.querySelector('.metric-label')?.textContent?.trim()
+                )
+              );
+              const main = root.querySelector('main');
+              const sub = metric?.querySelector('.metric-sub');
+              const before = sub?.textContent || '';
+              window.__epSetEntityByKey('control_command', 'battery_charge', {
+                last_ems_setpoint_updated_at: '2026-08-29T18:30:45+00:00',
+                last_ems_setpoint: 1200,
+                last_ems_mode: 11,
+                last_ems_setpoint_command: 'battery_charge',
+              });
+              for (let attempt = 0; attempt < 40; attempt += 1) {
+                if (sub?.textContent !== before) break;
+                await new Promise(resolve => setTimeout(resolve, 20));
+              }
+              return {
+                present: Boolean(sub && before.includes('Last update:')),
+                changed: Boolean(sub && sub.textContent !== before),
+                stableMain: root.querySelector('main') === main,
+                stableMetric: [...root.querySelectorAll('.panel-card.controller .metric')].includes(metric),
+                value: sub?.textContent || '',
+              };
+            }
+            """
+        )
+    except PlaywrightError as err:
+        return {
+            "present": False,
+            "changed": False,
+            "stableMain": False,
+            "stableMetric": False,
+            "value": "",
+            "error": str(err),
+        }
+
+
 def exercise_automatic_control(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "present": False,
@@ -2528,6 +2575,7 @@ def exercise_language(page: Page) -> dict[str, object]:
         "localized": False,
         "flow_localized": False,
         "manual_summary_localized": False,
+        "setpoint_update_localized": False,
         "main_stable_during_telemetry": False,
         "idle_delta": None,
         "error": None,
@@ -2548,6 +2596,14 @@ def exercise_language(page: Page) -> dict[str, object]:
             () => window.__epPanel.shadowRoot.querySelector(
               '.ep-v021-manual-pad [data-manual-note]'
             )?.textContent.includes('Automatische regeling bestuurt de omvormer.')
+            """
+        )
+        result["setpoint_update_localized"] = page.evaluate(
+            """
+            () => Array.from(window.__epPanel.shadowRoot.querySelectorAll(
+              '.panel-card.controller .metric'
+            )).find(metric => metric.querySelector('.metric-label')?.textContent.trim() === 'EMS-setpoint')
+              ?.querySelector('.metric-sub')?.textContent.trim().startsWith('Laatste update:') === true
             """
         )
         telemetry = page.evaluate(
@@ -2960,6 +3016,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         """
     )
 
+    setpoint_update = exercise_setpoint_update(page)
     static_flow = exercise_static_flow(page)
     connectivity = exercise_connectivity_status(page, profile)
 
@@ -3018,6 +3075,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "idle_after": idle_after,
         "idle_delta": idle_after - idle_before,
         "telemetry_identity": telemetry_identity,
+        "setpoint_update": setpoint_update,
         "static_flow": static_flow,
         "connectivity": connectivity,
         "motion": motion,
@@ -3047,6 +3105,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     name = profile.name
     initial = result["initial"]
     identity = result["telemetry_identity"]
+    setpoint_update = result["setpoint_update"]
     static_flow = result["static_flow"]
     connectivity = result["connectivity"]
     motion = result["motion"]
@@ -3097,6 +3156,13 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
+    if not all(
+        setpoint_update.get(key)
+        for key in ("present", "changed", "stableMain", "stableMetric")
+    ):
+        failures.append(
+            f"{name}: EMS setpoint update evidence is missing or rebuilt: {setpoint_update}"
+        )
     expected_initial = {
         "pv": ("active", "right", "high", "→"),
         "grid": ("active", "right", "low", "→"),
@@ -3318,6 +3384,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     if (
         language_result["localized"] is not True
         or language_result["manual_summary_localized"] is not True
+        or language_result["setpoint_update_localized"] is not True
     ):
         failures.append(f"{name}: Dutch structural render did not localize")
     if language_result["flow_localized"] is not True:

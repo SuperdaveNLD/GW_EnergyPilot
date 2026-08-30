@@ -21,6 +21,7 @@ from .battery_saver_api import async_register_battery_saver_api
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .connectivity import GWEnergyPilotConnectivity
+from .control_history import GWEnergyPilotControlHistory
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller_v033 import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
@@ -63,6 +64,7 @@ class GWRuntimeData:
     plan_runtime: GWEnergyPilotPlanRuntime
     ev_load_balancer: GWEnergyPilotEVLoadBalancer
     connectivity: GWEnergyPilotConnectivity
+    control_history: GWEnergyPilotControlHistory
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -136,7 +138,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         client,
         scan_interval=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
     )
-    controller = GWEnergyPilotController(hass, entry, client, coordinator)
+    control_history = GWEnergyPilotControlHistory(hass, entry.entry_id)
+    await control_history.async_restore()
+    controller = GWEnergyPilotController(
+        hass,
+        entry,
+        client,
+        coordinator,
+        control_history,
+    )
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
     debug_log = GWEnergyPilotDebugRuntime(hass, entry.entry_id)
@@ -158,6 +168,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         plan_runtime=plan_runtime,
         ev_load_balancer=ev_load_balancer,
         connectivity=connectivity,
+        control_history=control_history,
     )
 
     await plan_runtime.async_restore()

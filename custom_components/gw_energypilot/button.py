@@ -144,6 +144,7 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
         )
 
         mode = coordinator.data.mode if coordinator.data else None
+        setpoint_timestamp = controller.last_ems_setpoint_updated_at
         return {
             "orchestrator_status": orchestrator.status,
             **orchestrator.attributes,
@@ -151,6 +152,14 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             "controller_command": controller.last_command,
             "controller_target_power": controller.target_power,
             "controller_expected_mode": controller.expected_mode,
+            "last_ems_setpoint_updated_at": (
+                setpoint_timestamp.isoformat()
+                if setpoint_timestamp is not None
+                else None
+            ),
+            "last_ems_setpoint": controller.last_ems_setpoint,
+            "last_ems_mode": controller.last_ems_mode,
+            "last_ems_setpoint_command": controller.last_ems_setpoint_command,
             "controller_max_power": int(
                 self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)
             ),
