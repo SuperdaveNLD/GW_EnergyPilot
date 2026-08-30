@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.48 Beta**.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.49 Beta**.
 
 ## Purpose
 
@@ -167,15 +167,15 @@ The frontend normally keeps a short chart-data cache. v0.33 uses two independent
 1. **EnergyPilot optimization revision.** Every successful call through the central orchestrator refreshes `GWEnergyPilotPlanRuntime`, advances `plan_revision` and emits the existing orchestrator dispatcher signal. The existing Optimize Now button entity already subscribes to that signal and exposes orchestrator attributes, so no new entity is added. The chart compares that live revision with the revision stored in its last `battery_price/get` payload and force-refreshes immediately when they differ.
 2. **External EMHASS publication fallback.** The configured `P_batt` entity's `last_updated` is still compared with the timestamp in the cached chart payload. A plan changed outside EnergyPilot therefore also bypasses normal cache expiry.
 
-After either freshness signal, the chart calls the read-only API with force refresh, rebuilds/replaces the one canonical `.ep-v027-battery-plan-card`, and removes any accidental duplicate card left by a prior layered-render regression.
+After either freshness signal, the chart calls the read-only API with force refresh, rebuilds the data-dependent contents inside the one connected canonical `.ep-v027-battery-plan-card`, and removes any accidental duplicate card left by a prior layered-render regression. Its S/M/L selector, expand action and window bar stay connected so a refresh between native press and release cannot swallow that interaction.
 
 The duplicate-card guard must therefore **not** return permanently just because a canonical card already exists. It may skip rendering only when the render key is unchanged and no fresh plan evidence exists.
 
 ## Frontend cache contract
 
-The active v0.48 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v0.49 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v0.48 loads its current wrapper and v0.47 dependency through `0.48-hybrid-control1`; the unchanged nested v0.47 graph retains its complete `0.47-custom-battery1` cache boundary. The older v0.33 plan-refresh mechanism remains historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v0.49 loads every import in the active graph through `0.49-consolidated1`, including the scoped plan-refresh owner. The older v0.33 plan-refresh mechanism remains historical compatibility context.
 
 The optimization revision and `P_batt` freshness checks are independent of ordinary five-minute chart-data cache expiry, so a newly published plan does not intentionally remain stale for that full interval.
 

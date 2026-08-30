@@ -18,6 +18,7 @@ from .config_flow import (
     CannotConnect,
     _async_validate_connection,
     _controller_schema,
+    _optimization_interval_options,
     _options_for_form,
     _options_from_form,
 )
@@ -30,11 +31,20 @@ from .const import (
     CONF_EMHASS_URL,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_EV_LOAD_BALANCING,
     CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
+    CONF_EV_CHARGER_CURRENT_ENTITY,
+    CONF_EV_CHARGER_MAX_CURRENT,
+    CONF_EV_CHARGER_MIN_CURRENT,
+    CONF_EV_GRID_CURRENT_ENTITY,
+    CONF_EV_LOAD_BALANCE_WINDOW,
     CONF_EV_MODE_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
     CONF_EV_POWER_ENTITY,
+    CONF_GRID_CONNECTION_PROFILE,
+    CONF_GRID_CUSTOM_CURRENT,
     CONF_NORDPOOL_AREA,
     CONF_NORDPOOL_CURRENCY,
     CONF_OPTIMIZE_ON_TOMORROW_PRICES,
@@ -55,6 +65,12 @@ from .const import (
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
     DEFAULT_EV_DEADBAND,
+    DEFAULT_ENABLE_EV_LOAD_BALANCING,
+    DEFAULT_EV_CHARGER_MAX_CURRENT,
+    DEFAULT_EV_CHARGER_MIN_CURRENT,
+    DEFAULT_EV_LOAD_BALANCE_WINDOW,
+    DEFAULT_GRID_CONNECTION_PROFILE,
+    DEFAULT_GRID_CUSTOM_CURRENT,
     DEFAULT_MAX_POWER,
     DEFAULT_NORDPOOL_AREA,
     DEFAULT_NORDPOOL_CURRENCY,
@@ -69,13 +85,19 @@ from .const import (
     DEFAULT_SLAVE,
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
+    EMHASS_OPTIMIZATION_INTERVALS,
     EXTERNAL_PV_ENTITY_KEYS,
+    EV_LOAD_BALANCE_WINDOW_OPTIONS,
+    GRID_CONNECTION_CUSTOM_PROFILES,
+    GRID_CONNECTION_PROFILES,
     NAME,
 )
+from .ev_load_balancing import EVLoadBalancingAudit, high_current_audit_record
 from .pv_insight import external_sources_enabled
 
 SECTION_ENERGYPILOT = "energypilot"
 SECTION_EMHASS = "emhass"
+SECTION_EV = "ev"
 SECTION_GOODWE = "goodwe"
 SECTION_PV = "pv"
 
@@ -83,9 +105,26 @@ ENERGYPILOT_KEYS = {
     CONF_MAX_POWER_KW,
     CONF_DEADBAND,
     CONF_SCAN_INTERVAL,
+}
+EV_KEYS = {
     CONF_ENABLE_EV_COORDINATION,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
+    CONF_EV_DEADBAND,
+    CONF_ENABLE_EV_LOAD_BALANCING,
+    CONF_GRID_CONNECTION_PROFILE,
+    CONF_GRID_CUSTOM_CURRENT,
+    CONF_EV_GRID_CURRENT_ENTITY,
+    CONF_EV_CHARGER_CURRENT_ENTITY,
+    CONF_EV_CHARGER_MIN_CURRENT,
+    CONF_EV_CHARGER_MAX_CURRENT,
+    CONF_EV_LOAD_BALANCE_WINDOW,
+}
+EV_LOAD_BALANCING_KEYS = EV_KEYS - {
+    CONF_ENABLE_EV_COORDINATION,
+    CONF_EV_MODE_ENTITY,
+    CONF_EV_POWER_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
     CONF_EV_DEADBAND,
 }
 EMHASS_KEYS = {
@@ -105,7 +144,11 @@ EMHASS_KEYS = {
     CONF_BUY_PRICE_ADDER,
     CONF_SELL_PRICE_DEDUCTION,
 }
-OPTIONAL_ENTITY_KEYS = {CONF_EV_MODE_ENTITY, CONF_EV_POWER_ENTITY}
+OPTIONAL_ENTITY_KEYS = {
+    CONF_EV_MODE_ENTITY,
+    CONF_EV_POWER_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
+}
 PV_KEYS = {
     CONF_ENABLE_INTERNAL_PV,
     CONF_ENABLE_EXTERNAL_PV,
@@ -145,6 +188,107 @@ GOODWE_SCHEMA = vol.Schema(
     extra=vol.PREVENT_EXTRA,
 )
 
+ENTITY_ID = vol.All(str, str.strip, vol.Match(r"^[a-z0-9_]+\.[a-z0-9_]+$"))
+EV_SCHEMA = vol.Schema(
+    {
+        vol.Required(
+            CONF_ENABLE_EV_LOAD_BALANCING,
+            default=DEFAULT_ENABLE_EV_LOAD_BALANCING,
+        ): bool,
+        vol.Required(
+            CONF_GRID_CONNECTION_PROFILE,
+            default=DEFAULT_GRID_CONNECTION_PROFILE,
+        ): vol.In([*GRID_CONNECTION_PROFILES, *GRID_CONNECTION_CUSTOM_PROFILES]),
+        vol.Required(
+            CONF_GRID_CUSTOM_CURRENT, default=DEFAULT_GRID_CUSTOM_CURRENT
+        ): vol.All(vol.Coerce(float), vol.Range(min=6, max=100)),
+        vol.Optional(CONF_EV_GRID_CURRENT_ENTITY): vol.All(
+            ENTITY_ID, vol.Match(r"^sensor\.")
+        ),
+        vol.Optional(CONF_EV_CHARGER_CURRENT_ENTITY): vol.All(
+            ENTITY_ID, vol.Match(r"^number\.")
+        ),
+        vol.Required(
+            CONF_EV_LOAD_BALANCE_WINDOW,
+            default=DEFAULT_EV_LOAD_BALANCE_WINDOW,
+        ): vol.All(vol.Coerce(int), vol.In(EV_LOAD_BALANCE_WINDOW_OPTIONS)),
+        vol.Required(
+            CONF_EV_CHARGER_MIN_CURRENT,
+            default=DEFAULT_EV_CHARGER_MIN_CURRENT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=6, max=16)),
+        vol.Required(
+            CONF_EV_CHARGER_MAX_CURRENT,
+            default=DEFAULT_EV_CHARGER_MAX_CURRENT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=6, max=32)),
+        vol.Required(CONF_ENABLE_EV_COORDINATION, default=False): bool,
+        vol.Optional(CONF_EV_MODE_ENTITY): ENTITY_ID,
+        vol.Optional(CONF_EV_POWER_ENTITY): ENTITY_ID,
+        vol.Required(CONF_EV_DEADBAND, default=DEFAULT_EV_DEADBAND): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=3000)
+        ),
+    },
+    extra=vol.PREVENT_EXTRA,
+)
+
+
+def _validate_ev_values(values: dict[str, Any]) -> dict[str, Any]:
+    """Validate the dedicated EV ownership and safety settings."""
+    cleaned = {
+        key: value
+        for key, value in values.items()
+        if key
+        not in {
+            CONF_EV_MODE_ENTITY,
+            CONF_EV_POWER_ENTITY,
+            CONF_EV_GRID_CURRENT_ENTITY,
+            CONF_EV_CHARGER_CURRENT_ENTITY,
+        }
+        or value not in (None, "")
+    }
+    validated = dict(EV_SCHEMA(cleaned))
+    if (
+        validated[CONF_EV_CHARGER_MIN_CURRENT]
+        > validated[CONF_EV_CHARGER_MAX_CURRENT]
+    ):
+        raise vol.Invalid(
+            "Minimum charger current cannot exceed maximum charger current"
+        )
+    if validated[CONF_ENABLE_EV_LOAD_BALANCING]:
+        if not validated.get(CONF_EV_GRID_CURRENT_ENTITY):
+            raise vol.Invalid("A measured phase-current entity is required")
+        if not validated.get(CONF_EV_CHARGER_CURRENT_ENTITY):
+            raise vol.Invalid("A charger maximum-current number entity is required")
+    return validated
+
+
+def _validate_ev_entity_contract(hass: HomeAssistant, values: dict[str, Any]) -> None:
+    """Reject known entities whose units/ranges do not match current control."""
+    source = hass.states.get(values.get(CONF_EV_GRID_CURRENT_ENTITY, ""))
+    if source is not None and source.attributes.get("unit_of_measurement") not in {
+        "A",
+        "mA",
+    }:
+        raise vol.Invalid("The measured phase-current entity must use A or mA")
+
+    charger = hass.states.get(values.get(CONF_EV_CHARGER_CURRENT_ENTITY, ""))
+    if charger is None:
+        return
+    if charger.attributes.get("unit_of_measurement") != "A":
+        raise vol.Invalid("The charger maximum-current entity must use A")
+    try:
+        entity_minimum = float(charger.attributes["min"])
+        entity_maximum = float(charger.attributes["max"])
+    except (KeyError, TypeError, ValueError):
+        raise vol.Invalid("The charger entity must expose numeric min and max values")
+    if values[CONF_EV_CHARGER_MIN_CURRENT] < entity_minimum:
+        raise vol.Invalid(
+            f"Charger minimum cannot be below the entity minimum of {entity_minimum:g} A"
+        )
+    if values[CONF_EV_CHARGER_MAX_CURRENT] > entity_maximum:
+        raise vol.Invalid(
+            f"Charger maximum cannot exceed the entity maximum of {entity_maximum:g} A"
+        )
+
 EP_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     {
         "key": CONF_MAX_POWER_KW,
@@ -179,12 +323,116 @@ EP_FIELD_SPECS: tuple[dict[str, Any], ...] = (
         "step": 1,
         "description": "Polling cadence for local GoodWe Modbus telemetry.",
     },
+)
+
+EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "key": CONF_ENABLE_EV_LOAD_BALANCING,
+        "label": "Load balancing for EV charger",
+        "type": "boolean",
+        "default": DEFAULT_ENABLE_EV_LOAD_BALANCING,
+        "description": (
+            "Adjust only the charger's current limit; GoodWe is never controlled "
+            "by this regulator."
+        ),
+    },
+    {
+        "key": CONF_GRID_CONNECTION_PROFILE,
+        "label": "House connection",
+        "type": "select",
+        "default": DEFAULT_GRID_CONNECTION_PROFILE,
+        "options": [
+            {"value": key, "label": key.replace("x", " × ") + " A"}
+            for key in GRID_CONNECTION_PROFILES
+        ] + [
+            {"value": "custom_1_phase", "label": "Custom · 1 phase"},
+            {"value": "custom_3_phase", "label": "Custom · 3 phase"},
+        ],
+        "description": "The selected ampere value is the limit for the measured phase.",
+    },
+    {
+        "key": CONF_GRID_CUSTOM_CURRENT,
+        "label": "Custom connection current",
+        "type": "number",
+        "default": DEFAULT_GRID_CUSTOM_CURRENT,
+        "unit": "A / phase",
+        "min": 6,
+        "max": 100,
+        "step": 1,
+        "description": "Used only for a custom one-phase or three-phase connection.",
+    },
+    {
+        "key": CONF_EV_GRID_CURRENT_ENTITY,
+        "label": "Measured phase current",
+        "type": "entity",
+        "domains": ["sensor"],
+        "units": ["A", "mA"],
+        "default": "",
+        "description": "Current measurement for the one phase that guards the connection.",
+    },
+    {
+        "key": CONF_EV_CHARGER_CURRENT_ENTITY,
+        "label": "Charger maximum-current control",
+        "type": "entity",
+        "domains": ["number"],
+        "default": "",
+        "description": (
+            "One Home Assistant number entity that sets all three charger phases "
+            "together."
+        ),
+    },
+    {
+        "key": CONF_EV_LOAD_BALANCE_WINDOW,
+        "label": "Sustained condition window",
+        "type": "select",
+        "default": DEFAULT_EV_LOAD_BALANCE_WINDOW,
+        "options": [
+            {
+                "value": value,
+                "label": f"{value} min"
+                + (" · recommended" if value == 5 else ""),
+            }
+            for value in EV_LOAD_BALANCE_WINDOW_OPTIONS
+        ],
+        "description": (
+            "The overload or headroom must persist for this entire period before "
+            "each adjustment."
+        ),
+    },
+    {
+        "key": CONF_EV_CHARGER_MIN_CURRENT,
+        "label": "Minimum charger current",
+        "type": "number",
+        "default": DEFAULT_EV_CHARGER_MIN_CURRENT,
+        "unit": "A",
+        "min": 6,
+        "max": 16,
+        "step": 1,
+        "description": "EnergyPilot never commands the charger below this boundary.",
+    },
+    {
+        "key": CONF_EV_CHARGER_MAX_CURRENT,
+        "label": "Maximum charger current",
+        "type": "number",
+        "default": DEFAULT_EV_CHARGER_MAX_CURRENT,
+        "unit": "A",
+        "min": 6,
+        "max": 32,
+        "step": 1,
+        "description": (
+            "16 A is the safe default. Higher values require an explicit audited "
+            "acknowledgement."
+        ),
+    },
     {
         "key": CONF_ENABLE_EV_COORDINATION,
-        "label": "EV coordination",
+        "label": "EV battery coordination",
         "type": "boolean",
         "default": False,
-        "description": "Re-optimize after a configured EV charging session ends.",
+        "description": (
+            "Observe charging for battery anti-discharge and re-optimize after "
+            "charging ends."
+        ),
     },
     {
         "key": CONF_EV_MODE_ENTITY,
@@ -196,9 +444,20 @@ EP_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     {
         "key": CONF_EV_POWER_ENTITY,
         "label": "EV power entity",
-        "type": "text",
+        "type": "entity",
+        "domains": ["sensor"],
         "default": "",
         "description": "Optional Home Assistant power entity for EV coordination.",
+    },
+    {
+        "key": CONF_EV_ONLINE_ENTITY,
+        "label": "EV online entity",
+        "type": "text",
+        "default": "",
+        "description": (
+            "Optional Home Assistant entity whose availability reports whether "
+            "the charger is reachable. Binary sensors use on/off explicitly."
+        ),
     },
     {
         "key": CONF_EV_DEADBAND,
@@ -231,13 +490,17 @@ EMHASS_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     {
         "key": CONF_EMHASS_OPTIMIZATION_INTERVAL,
         "label": "Optimization interval",
-        "type": "number",
-        "default": DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
+        "type": "select",
+        "default": str(DEFAULT_EMHASS_OPTIMIZATION_INTERVAL),
         "unit": "min",
-        "min": 5,
-        "max": 60,
-        "step": 5,
-        "description": "Periodic cadence; event triggers can still optimize immediately.",
+        "options": [
+            {"value": str(value), "label": f"{value} minutes"}
+            for value in EMHASS_OPTIMIZATION_INTERVALS
+        ],
+        "description": (
+            "Runs at matching local wall-clock boundaries plus 15 seconds; "
+            "event triggers can still optimize immediately."
+        ),
     },
     {
         "key": CONF_EMHASS_SOC_FINAL_PCT,
@@ -380,6 +643,19 @@ def _fields_from_specs(
     for spec in specs:
         field = {key: value for key, value in spec.items() if key != "default"}
         field["value"] = options.get(spec["key"], spec.get("default"))
+        if spec["key"] == CONF_EMHASS_OPTIMIZATION_INTERVAL:
+            current = field["value"]
+            field["options"] = [
+                {
+                    "value": value,
+                    "label": (
+                        f"{value} minutes"
+                        if int(value) in EMHASS_OPTIMIZATION_INTERVALS
+                        else f"{value} minutes (existing setting)"
+                    ),
+                }
+                for value in _optimization_interval_options(current)
+            ]
         field["readonly"] = False
         fields.append(field)
     return fields
@@ -457,8 +733,18 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
             SECTION_ENERGYPILOT: {
                 "title": "EnergyPilot",
                 "short_title": "EP",
-                "description": "Controller, telemetry and optional EV coordination.",
+                "description": "GoodWe controller boundaries and telemetry cadence.",
                 "fields": _fields_from_specs(options, EP_FIELD_SPECS),
+            },
+            SECTION_EV: {
+                "title": "EV",
+                "short_title": "EV",
+                "description": (
+                    "Soft house-connection load balancing and the existing EV "
+                    "battery coordination. The load balancer controls only the "
+                    "configured charger current entity, never GoodWe."
+                ),
+                "fields": _fields_from_specs(options, EV_FIELD_SPECS),
             },
             SECTION_EMHASS: {
                 "title": "EMHASS",
@@ -538,7 +824,13 @@ async def websocket_get_settings(
         vol.Required("type"): "gw_energypilot/settings/update",
         vol.Required("entry_id"): str,
         vol.Required("section"): vol.In(
-            [SECTION_ENERGYPILOT, SECTION_EMHASS, SECTION_GOODWE, SECTION_PV]
+            [
+                SECTION_ENERGYPILOT,
+                SECTION_EV,
+                SECTION_EMHASS,
+                SECTION_GOODWE,
+                SECTION_PV,
+            ]
         ),
         vol.Required("values"): dict,
     }
@@ -607,6 +899,56 @@ async def websocket_update_settings(
             unique_id=unique_id,
             title=f"{NAME} ({host})",
         )
+    elif section == SECTION_EV:
+        confirmation = values.pop("_confirm_high_current", False) is True
+        unknown = set(values) - EV_KEYS
+        if unknown:
+            connection.send_error(
+                msg["id"],
+                "invalid_settings",
+                f"Unsupported EV settings: {', '.join(sorted(unknown))}",
+            )
+            return
+        try:
+            validated = _validate_ev_values(values)
+            _validate_ev_entity_contract(hass, validated)
+        except (vol.Invalid, TypeError, ValueError) as err:
+            connection.send_error(msg["id"], "invalid_settings", str(err))
+            return
+        previous_maximum = float(
+            entry.options.get(
+                CONF_EV_CHARGER_MAX_CURRENT, DEFAULT_EV_CHARGER_MAX_CURRENT
+            )
+        )
+        maximum = float(validated[CONF_EV_CHARGER_MAX_CURRENT])
+        if maximum > 16 and maximum != previous_maximum and not confirmation:
+            connection.send_error(
+                msg["id"],
+                "high_current_confirmation_required",
+                "A charger current above 16 A requires explicit confirmation",
+            )
+            return
+
+        stored_options = dict(entry.options)
+        for key in EV_KEYS:
+            stored_options.pop(key, None)
+        stored_options.update(validated)
+        if maximum > 16 and maximum != previous_maximum:
+            runtime = getattr(entry, "runtime_data", None)
+            audit = (
+                runtime.ev_load_balancer.audit
+                if runtime is not None
+                else EVLoadBalancingAudit(hass, entry.entry_id)
+            )
+            user = getattr(connection, "user", None)
+            await audit.async_append(
+                high_current_audit_record(
+                    user_id=getattr(user, "id", None),
+                    maximum=maximum,
+                    options=stored_options,
+                )
+            )
+        hass.config_entries.async_update_entry(entry, options=stored_options)
     elif section == SECTION_PV:
         unknown = set(values) - PV_KEYS
         if unknown:
@@ -679,6 +1021,11 @@ async def websocket_update_settings(
         form_values.pop(CONF_BATTERY_SAVER_MODE, None)
         for key in PV_KEYS:
             form_values.pop(key, None)
+        preserved_ev_load_balancing = {
+            key: form_values.pop(key)
+            for key in EV_LOAD_BALANCING_KEYS
+            if key in form_values
+        }
         form_values.update(values)
         for key in OPTIONAL_ENTITY_KEYS:
             if form_values.get(key) in (None, ""):
@@ -688,7 +1035,10 @@ async def websocket_update_settings(
             validated = _controller_schema(
                 orchestrator_default=bool(
                     form_values.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, True)
-                )
+                ),
+                optimization_interval=form_values.get(
+                    CONF_EMHASS_OPTIMIZATION_INTERVAL
+                ),
             )(form_values)
             stored_options = _options_from_form(validated)
         except (vol.Invalid, TypeError, ValueError) as err:
@@ -701,6 +1051,7 @@ async def websocket_update_settings(
         for key in PV_KEYS:
             if key in entry.options:
                 stored_options[key] = entry.options[key]
+        stored_options.update(preserved_ev_load_balancing)
         hass.config_entries.async_update_entry(entry, options=stored_options)
 
     require_restart = await _async_reload_entry(hass, entry)

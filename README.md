@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.48 · Beta**
+**v0.49 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V049.md` — v0.49 wall-clock plans, EV coordination and dashboard reliability;
 - `docs/RELEASE_NOTES_V048.md` — v0.48 neutral-safe signed Hybrid PCC control;
 - `docs/RELEASE_NOTES_V047.md` — v0.47 editable Custom battery costs and profile tuning;
 - `docs/RELEASE_NOTES_V046.md` — v0.46 grouped external-PV controls and master switch;
@@ -38,6 +39,7 @@ Release documentation:
 - `docs/EMHASS_PLAN_RUNTIME.md` — persistent canonical EMHASS plan/recovery contract;
 - `docs/BATTERY_SAVER.md` — Battery Saver profiles, anti-churn tuning and ownership;
 - `docs/EV_ANTI_DISCHARGE.md` — EV anti-discharge control contract;
+- `docs/EV_LOAD_BALANCING.md` — isolated soft EV charger load-balancing contract;
 - `docs/DEBUG_LOG.md` — opt-in LOG-tab debug-session/support-report contract;
 - `docs/EMS_MODES.md` — GoodWe EMS modes 1–12;
 - `docs/ACCOUNTING.md` — persistent grid accounting;
@@ -46,6 +48,16 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v0.49 highlights
+
+- One serialized scheduler owns full EMHASS optimization and active saved-plan publication on local wall-clock boundaries; new choices are 15/30/60 minutes with 15 recommended.
+- Optional soft EV load balancing adjusts one configured charger-current entity after sustained overload/headroom without writing GoodWe, Automatic Control or EMHASS.
+- Compact connectivity status covers Modbus, charger and effective EV coordination, including a five-minute stale-charger suspension guard.
+- Controller diagnostics show the active EV protection decision and persist the latest successfully completed EMS setpoint transaction.
+- Plan S/M/L controls survive scoped graph refresh, SOC targets retain canonical live fallbacks, and the Hybrid explanation no longer changes height during telemetry.
+- The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the consolidated `0.49-consolidated1` frontend graph.
+- Issue #99 remains open/on hold without a speculative fix because its white-screen report could not be reproduced.
 
 ## v0.48 highlights
 
@@ -168,11 +180,14 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences, profile-owned maximum SOC and anti-churn battery-throughput costs;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
+- persistent latest successful EMS-setpoint update evidence in Controller diagnostics;
 - opt-in bounded LOG-tab debug sessions and copyable support reports;
 - persistent Today/Yesterday grid import/export accounting;
 - optional Nord Pool/runtime prices;
 - Battery plan / actual / price visualization;
 - EV anti-discharge protection;
+- optional soft load balancing for one three-phase EV charger without GoodWe writes;
+- compact Modbus/charger reachability status with an optional five-minute EV-coordination suspension guard;
 - synchronized normal on-grid minimum SOC between EMHASS and GoodWe `45356`;
 - low-level Beta SOC API retained for diagnostics/backwards-compatible tooling;
 - built-in EnergyPilot dashboard and support diagnostics.
@@ -218,12 +233,18 @@ Use only one continuously polling/controlling direct GoodWe integration where pr
 EnergyPilot's automatic pre-solve preparation and **Synchronize required config** use the same small runtime contract:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
 
-Those values are required for the EnergyPilot orchestration/publication path. Installation topology is different and remains owned by EMHASS/the operator:
+EnergyPilot owns both the full-optimization schedule and the active-plan-step
+publication schedule, so EMHASS's independent continual publisher is disabled.
+New installations can choose a 15, 30 or 60 minute wall-clock optimization
+cadence; 15 minutes is recommended. Runs occur at the matching local boundary
+plus 15 seconds. Plan-step publication follows the inferred persisted EMHASS
+timestep, and optimization always runs first when both are due. Installation
+topology is different and remains owned by EMHASS/the operator:
 
 ```text
 set_use_pv
@@ -287,6 +308,23 @@ Hybrid strategy  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 ```
 
 This prevents the home battery from feeding the EV while avoiding the previous blanket hold on legitimate charging. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.
+
+### EV charger load balancing
+
+Settings → **EV** can optionally guard the house connection by observing one
+phase-current entity and adjusting one charger maximum-current NumberEntity that
+applies to all three phases. The default connection is `3 × 25 A`; common Dutch
+connection profiles and custom one-/three-phase profiles are available. A
+continuous `1–15` minute window is used for both reducing and restoring current;
+`5` minutes is recommended.
+
+This is a soft, best-effort guard, not fuse protection. It never writes GoodWe,
+does nothing on invalid measurements, and cannot protect an unmeasured phase. The
+normal maximum is `16 A`; a newly selected value above `16 A` requires an extra
+warning/confirmation and is permanently recorded in the per-entry audit Store.
+See `docs/EV_LOAD_BALANCING.md`.
+
+An optional charger-online entity can protect this feature against stale EV state. Five stable minutes unreachable temporarily suspend effective EV coordination; five stable minutes online restore it only when the user setting remained enabled. The saved setting is not overwritten. The dashboard header summarizes Modbus, charger and EV-coordination status; its Modbus state follows the configured telemetry refresh interval.
 
 ## EMS / sign conventions
 
@@ -386,9 +424,11 @@ EnergyPilot-owned persistent runtime stores are separate:
 
 ```text
 gw_energypilot.runtime.<entry_id>
+gw_energypilot.control.<entry_id>
 gw_energypilot.accounting.<entry_id>
 gw_energypilot.optimization_log.<entry_id>
 gw_energypilot.plan.<entry_id>
+gw_energypilot.ev_load_balancing_audit.<entry_id>
 ```
 
 The plan Store is a bounded resilience mirror of EMHASS's canonical plan, not a second optimizer or settings database. It is valid only through its inferred final plan interval. The debug session is intentionally **not** persistent and is not added to this list.

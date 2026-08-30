@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=0.47-custom-battery1";
+import "./gw-energy-pilot-v039.js?v=0.49-consolidated1";
 import {
   FLOW_THRESHOLD_W,
   flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=0.47-custom-battery1";
+} from "./gw-energy-pilot-v038-model.js?v=0.49-consolidated1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=0.47-custom-battery1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.47-custom-battery1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.47-custom-battery1";
+} from "./gw-energy-pilot-v038-i18n.js?v=0.49-consolidated1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.49-consolidated1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.49-consolidated1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -77,6 +77,32 @@ const COPY = Object.freeze({
     noPvSources: "No sources configured",
     internalPvTelemetry: "Internal GoodWe telemetry",
     externalPvEntity: "External PV entity",
+    connectivityTitle: "System status",
+    connectivityOk: "ALL OK",
+    connectivityIssue: "ISSUE",
+    connectivityChecking: "CHECKING",
+    modbus: "Modbus",
+    evCharger: "EV charger",
+    evCoordination: "EV coordination",
+    online: "Online",
+    unreachable: "Unknown / unreachable",
+    checkingStatus: "Waiting for first poll",
+    refreshEvery: "refresh every",
+    notConfigured: "Online check not configured",
+    active: "Active",
+    offByUser: "Off by user",
+    temporarilyPaused: "Temporarily paused",
+    pausesIn: "pauses in",
+    resumesIn: "resumes in",
+    lastEmsSetpointUpdate: "Last update",
+    evBlockingTitle: "EV CHARGING · ANTI-DISCHARGE ACTIVE",
+    evBlockingDetail: "Home battery discharge is blocked · Mode 8 Battery Hold",
+    evChargeAllowedTitle: "EV CHARGING · BATTERY CHARGE ALLOWED",
+    evChargeAllowedDetail: "The home battery is following the active charging plan",
+    evWaitingTitle: "EV CHARGING STOPPED · FRESH PLAN REQUIRED",
+    evWaitingDetail: "Battery Hold remains active while EnergyPilot waits for a fresh EMHASS plan",
+    evPendingTitle: "EV CHARGING · PROTECTION EVALUATING",
+    evPendingDetail: "EnergyPilot is determining the safe home-battery direction",
   }),
   nl: Object.freeze({
     autoActive: "AUTO ACTIEF",
@@ -122,6 +148,32 @@ const COPY = Object.freeze({
     noPvSources: "Geen bronnen geconfigureerd",
     internalPvTelemetry: "Interne GoodWe-telemetrie",
     externalPvEntity: "Externe PV-entiteit",
+    connectivityTitle: "Systeemstatus",
+    connectivityOk: "ALLES OK",
+    connectivityIssue: "STORING",
+    connectivityChecking: "CONTROLEREN",
+    modbus: "Modbus",
+    evCharger: "Laadpaal",
+    evCoordination: "EV-regeling",
+    online: "Online",
+    unreachable: "Onbekend / niet bereikbaar",
+    checkingStatus: "Wachten op eerste poll",
+    refreshEvery: "verversing iedere",
+    notConfigured: "Onlinecontrole niet ingesteld",
+    active: "Actief",
+    offByUser: "Uit door gebruiker",
+    temporarilyPaused: "Tijdelijk gepauzeerd",
+    pausesIn: "pauzeert over",
+    resumesIn: "hervat over",
+    lastEmsSetpointUpdate: "Laatste update",
+    evBlockingTitle: "EV LAADT · ONTLAADBEVEILIGING ACTIEF",
+    evBlockingDetail: "Ontladen van de thuisaccu is geblokkeerd · Modus 8 Battery Hold",
+    evChargeAllowedTitle: "EV LAADT · THUISACCU LADEN TOEGESTAAN",
+    evChargeAllowedDetail: "De thuisaccu volgt het actieve laadplan",
+    evWaitingTitle: "EV-LADEN GESTOPT · NIEUW PLAN NODIG",
+    evWaitingDetail: "Battery Hold blijft actief terwijl EnergyPilot op een nieuw EMHASS-plan wacht",
+    evPendingTitle: "EV LAADT · BEVEILIGING WORDT BEOORDEELD",
+    evPendingDetail: "EnergyPilot bepaalt de veilige richting voor de thuisaccu",
   }),
 });
 
@@ -330,6 +382,169 @@ const NO_MOTION_CSS = `
     width: 18px;
     height: 10px;
   }
+  :host .ep-connectivity-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  :host .ep-connectivity-status {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 31px;
+    padding: 7px 11px;
+    border: 1px solid rgba(145, 167, 189, .17);
+    border-radius: 999px;
+    color: #c4d2df;
+    background: rgba(145, 167, 189, .09);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  :host .ep-connectivity-status.ok {
+    color: #dffff4;
+    border-color: rgba(24, 239, 163, .25);
+    background: rgba(24, 239, 163, .11);
+  }
+  :host .ep-connectivity-status.issue {
+    color: #ffd1cc;
+    border-color: rgba(241, 101, 89, .36);
+    background: rgba(149, 43, 36, .25);
+  }
+  :host .ep-connectivity-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 12px currentColor;
+  }
+  :host .ep-connectivity-popover {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 8px);
+    right: 0;
+    display: none;
+    width: min(310px, calc(100vw - 28px));
+    padding: 11px;
+    border: 1px solid rgba(86, 174, 218, .20);
+    border-radius: 13px;
+    color: #dcecf5;
+    background: #081d34;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .34);
+    text-align: left;
+    pointer-events: none;
+  }
+  :host .ep-connectivity-wrap.open .ep-connectivity-popover,
+  :host .ep-connectivity-wrap:focus-within .ep-connectivity-popover {
+    display: block;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :host .ep-connectivity-wrap:hover .ep-connectivity-popover {
+      display: block;
+    }
+  }
+  :host .ep-connectivity-popover-title {
+    margin: 0 0 6px;
+    color: #f0f9fd;
+    font-size: 10px;
+    font-weight: 850;
+  }
+  :host .ep-connectivity-row {
+    display: grid;
+    grid-template-columns: 9px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 2px;
+    border-top: 1px solid rgba(102, 165, 199, .09);
+  }
+  :host .ep-connectivity-row:first-of-type { border-top: 0; }
+  :host .ep-connectivity-row-marker {
+    width: 7px;
+    height: 7px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: #7891a1;
+  }
+  :host .ep-connectivity-row.good .ep-connectivity-row-marker { background: #55dfaa; }
+  :host .ep-connectivity-row.bad .ep-connectivity-row-marker { background: #f1786d; }
+  :host .ep-connectivity-row strong {
+    display: block;
+    color: #d8e9f1;
+    font-size: 9px;
+  }
+  :host .ep-connectivity-row span:last-child {
+    display: block;
+    margin-top: 2px;
+    color: #86a4b5;
+    font-size: 8px;
+    line-height: 1.35;
+  }
+  :host .ep-v041-ev-protection[hidden] {
+    display: none !important;
+  }
+  :host .ep-v041-ev-protection {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    padding: 13px 14px;
+    box-sizing: border-box;
+    border: 1px solid rgba(42, 219, 236, .38);
+    border-radius: 13px;
+    color: #dffcff;
+    background: linear-gradient(135deg, rgba(11, 74, 91, .72), rgba(8, 42, 64, .78));
+  }
+  :host .ep-v041-ev-protection[data-state="allowing_charge"] {
+    border-color: rgba(46, 225, 165, .34);
+    background: linear-gradient(135deg, rgba(10, 78, 70, .66), rgba(8, 42, 61, .78));
+  }
+  :host .ep-v041-ev-protection[data-state="waiting_for_fresh_plan"] {
+    border-color: rgba(255, 180, 79, .40);
+    background: linear-gradient(135deg, rgba(91, 57, 16, .62), rgba(48, 37, 34, .78));
+  }
+  :host .ep-v041-ev-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 1px solid rgba(115, 241, 249, .48);
+    border-radius: 12px 12px 16px 16px;
+    color: #92f7fb;
+    background: rgba(7, 29, 49, .72);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .06em;
+  }
+  :host .ep-v041-ev-protection[data-state="allowing_charge"] .ep-v041-ev-icon {
+    border-color: rgba(105, 246, 199, .45);
+    color: #9ff9d8;
+  }
+  :host .ep-v041-ev-protection[data-state="waiting_for_fresh_plan"] .ep-v041-ev-icon {
+    border-color: rgba(255, 199, 116, .48);
+    color: #ffd398;
+  }
+  :host .ep-v041-ev-copy {
+    min-width: 0;
+  }
+  :host .ep-v041-ev-title {
+    color: inherit;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .075em;
+    line-height: 1.3;
+  }
+  :host .ep-v041-ev-detail {
+    margin-top: 4px;
+    color: #a8cbd5;
+    font-size: 11px;
+    line-height: 1.4;
+  }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
       top: calc(74px + env(safe-area-inset-top)) !important;
@@ -337,6 +552,15 @@ const NO_MOTION_CSS = `
       left: calc(14px + env(safe-area-inset-left)) !important;
       width: auto !important;
       max-height: calc(100dvh - 94px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    }
+    :host .ep-v041-ev-protection {
+      grid-template-columns: 38px minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px;
+    }
+    :host .ep-v041-ev-icon {
+      width: 38px;
+      height: 38px;
     }
   }
 `;
@@ -377,6 +601,20 @@ function copy(panel) {
 function finite(panel, key) {
   const value = panel._numberByKey?.(key, null);
   return Number.isFinite(value) ? value : null;
+}
+
+function formatTimestamp(panel, value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const locale = panel?._hass?.locale?.language || panel?._hass?.language || undefined;
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
 }
 
 function pvGenerationSnapshot(panel) {
@@ -463,6 +701,115 @@ function setStatus(node, active, text) {
   const trailing = [...node.childNodes].find((child) => child.nodeType === 3);
   if (trailing) trailing.textContent = text;
   else node.append(document.createTextNode(text));
+}
+
+function formatConnectivityDuration(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(value / 60);
+  const remainder = value % 60;
+  return minutes > 0 ? `${minutes}m ${String(remainder).padStart(2, "0")}s` : `${remainder}s`;
+}
+
+function ensureConnectivityStatus(panel, root) {
+  const actions = root?.querySelector(".header-actions");
+  if (!actions || actions.querySelector(".ep-connectivity-wrap")) return;
+  const wrap = document.createElement("div");
+  wrap.className = "ep-connectivity-wrap";
+  wrap.innerHTML = `
+    <button type="button" class="ep-connectivity-status checking" aria-expanded="false" aria-controls="ep-connectivity-popover">
+      <span class="ep-connectivity-dot" aria-hidden="true"></span>
+      <span class="ep-connectivity-label"></span>
+    </button>
+    <div class="ep-connectivity-popover" id="ep-connectivity-popover" role="tooltip">
+      <div class="ep-connectivity-popover-title"></div>
+      ${["modbus", "ev", "coordination"].map((key) => `
+        <div class="ep-connectivity-row" data-connectivity-row="${key}">
+          <span class="ep-connectivity-row-marker" aria-hidden="true"></span>
+          <div><strong></strong><span></span></div>
+        </div>`).join("")}
+    </div>`;
+  const version = actions.querySelector(".version");
+  actions.insertBefore(wrap, version || null);
+  const button = wrap.querySelector(".ep-connectivity-status");
+  button?.addEventListener("click", () => {
+    const open = !wrap.classList.contains("open");
+    wrap.classList.toggle("open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  button?.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    wrap.classList.remove("open");
+    button.setAttribute("aria-expanded", "false");
+    button.focus();
+  });
+}
+
+function patchConnectivityRow(root, key, tone, label, detail) {
+  const row = root.querySelector(`[data-connectivity-row="${key}"]`);
+  if (!row) return;
+  row.classList.remove("good", "bad", "neutral");
+  row.classList.add(tone);
+  setText(row, "strong", label);
+  setText(row, "span:last-child", detail);
+}
+
+function patchConnectivityStatus(panel, root) {
+  const wrap = root.querySelector(".ep-connectivity-wrap");
+  const button = wrap?.querySelector(".ep-connectivity-status");
+  if (!wrap || !button) return;
+  const t = copy(panel);
+  const state = panel._stateByKey?.("connectivity_status");
+  const attrs = state?.attributes || {};
+  const status = String(state?.state || "checking");
+  const label = status === "all_ok"
+    ? t.connectivityOk
+    : status === "issue" ? t.connectivityIssue : t.connectivityChecking;
+  button.classList.remove("ok", "issue", "checking");
+  button.classList.add(status === "all_ok" ? "ok" : status === "issue" ? "issue" : "checking");
+  setText(button, ".ep-connectivity-label", label);
+  button.setAttribute("aria-label", `${t.connectivityTitle}: ${label}`);
+  setText(wrap, ".ep-connectivity-popover-title", t.connectivityTitle);
+
+  const modbus = String(attrs.modbus_status || "checking");
+  const refresh = finiteValue(attrs.refresh_seconds);
+  patchConnectivityRow(
+    root,
+    "modbus",
+    modbus === "online" ? "good" : modbus === "unreachable" ? "bad" : "neutral",
+    t.modbus,
+    modbus === "online"
+      ? `${t.online}${refresh === null ? "" : ` · ${t.refreshEvery} ${Math.round(refresh)}s`}`
+      : modbus === "unreachable" ? t.unreachable : t.checkingStatus
+  );
+
+  const ev = String(attrs.ev_status || "not_configured");
+  patchConnectivityRow(
+    root,
+    "ev",
+    ev === "online" ? "good" : ev === "unreachable" ? "bad" : "neutral",
+    t.evCharger,
+    ev === "online" ? t.online : ev === "unreachable" ? t.unreachable : t.notConfigured
+  );
+
+  const requested = attrs.ev_coordination_requested === true;
+  const effective = attrs.ev_coordination_effective === true;
+  const transition = String(attrs.ev_transition || "");
+  const remaining = finiteValue(attrs.ev_transition_remaining_seconds);
+  let coordinationDetail = !requested
+    ? t.offByUser
+    : effective ? t.active : t.temporarilyPaused;
+  if (transition === "suspend_pending" && remaining !== null) {
+    coordinationDetail = `${t.active} · ${t.pausesIn} ${formatConnectivityDuration(remaining)}`;
+  } else if (transition === "resume_pending" && remaining !== null) {
+    coordinationDetail = `${t.temporarilyPaused} · ${t.resumesIn} ${formatConnectivityDuration(remaining)}`;
+  }
+  patchConnectivityRow(
+    root,
+    "coordination",
+    !requested ? "neutral" : effective ? "good" : "bad",
+    t.evCoordination,
+    coordinationDetail
+  );
 }
 
 function replaceTrailingButtonText(button, text) {
@@ -679,6 +1026,78 @@ function patchFlow(panel, root, pv, load, grid, battery, soc) {
   }
 }
 
+function installEvProtectionBanner(root) {
+  const card = root?.querySelector(".panel-card.controller");
+  if (!card || card.querySelector(".ep-v041-ev-protection")) return;
+
+  const banner = document.createElement("aside");
+  banner.className = "ep-v041-ev-protection";
+  banner.hidden = true;
+  banner.setAttribute("role", "status");
+  banner.setAttribute("aria-live", "polite");
+  banner.setAttribute("aria-atomic", "true");
+
+  const icon = document.createElement("span");
+  icon.className = "ep-v041-ev-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "EV";
+
+  const text = document.createElement("span");
+  text.className = "ep-v041-ev-copy";
+  const title = document.createElement("span");
+  title.className = "ep-v041-ev-title";
+  const detail = document.createElement("span");
+  detail.className = "ep-v041-ev-detail";
+  title.style.display = "block";
+  detail.style.display = "block";
+  text.append(title, detail);
+  banner.append(icon, text);
+
+  const safetyNote = card.querySelector(".safety-note");
+  if (safetyNote) safetyNote.before(banner);
+  else card.appendChild(banner);
+}
+
+function evProtectionState(panel) {
+  const commandState = panel._stateByKey?.("control_command");
+  const explicit = String(commandState?.attributes?.ev_protection_state || "");
+  if (explicit) return explicit;
+  const command = String(commandState?.state || "");
+  if (command === "ev_anti_discharge_hold") return "blocking_discharge";
+  if (command === "waiting_for_ev_stop_optimization") return "waiting_for_fresh_plan";
+  if ([
+    "ev_battery_charge",
+    "ev_charge_allowed",
+    "ev_charge_fallback",
+    "ev_grid_import_charge",
+  ].includes(command)) return "allowing_charge";
+  return "inactive";
+}
+
+function patchEvProtectionBanner(panel, root) {
+  const banner = root.querySelector(".ep-v041-ev-protection");
+  if (!banner) return;
+  const state = evProtectionState(panel);
+  const t = copy(panel);
+  const presentation = {
+    blocking_discharge: [t.evBlockingTitle, t.evBlockingDetail],
+    allowing_charge: [t.evChargeAllowedTitle, t.evChargeAllowedDetail],
+    waiting_for_fresh_plan: [t.evWaitingTitle, t.evWaitingDetail],
+    active_pending: [t.evPendingTitle, t.evPendingDetail],
+  }[state];
+
+  banner.hidden = !presentation;
+  if (!presentation) {
+    delete banner.dataset.state;
+    return;
+  }
+  banner.dataset.state = state;
+  const title = banner.querySelector(".ep-v041-ev-title");
+  const detail = banner.querySelector(".ep-v041-ev-detail");
+  if (title) title.textContent = presentation[0];
+  if (detail) detail.textContent = presentation[1];
+}
+
 function patchController(panel, root, automaticOn) {
   const card = root.querySelector(".panel-card.controller");
   if (!card) return;
@@ -697,7 +1116,16 @@ function patchController(panel, root, automaticOn) {
     ? localizedEmsMode(language(panel), mode).name
     : modeState?.attributes?.mode_name || "—";
   patchMetric(card, ["EMS mode", "EMS-modus"], `${modeState?.state || "—"} · ${modeName}`);
-  patchMetric(card, ["EMS setpoint", "EMS-setpoint"], panel._formatPower(finite(panel, "ems_setpoint")));
+  const commandAttrs = panel._stateByKey?.("control_command")?.attributes || {};
+  patchMetric(
+    card,
+    ["EMS setpoint", "EMS-setpoint"],
+    panel._formatPower(finite(panel, "ems_setpoint")),
+    `${t.lastEmsSetpointUpdate}: ${formatTimestamp(
+      panel,
+      commandAttrs.last_ems_setpoint_updated_at
+    )}`
+  );
   patchMetric(
     card,
     ["EnergyPilot target", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel"],
@@ -773,6 +1201,7 @@ function patchController(panel, root, automaticOn) {
   }
 
   localizeV038Controller(panel, root);
+  patchEvProtectionBanner(panel, root);
 }
 
 function patchBatteryQuickActions(panel, root, automaticOn) {
@@ -840,6 +1269,23 @@ function patchCostFunctionSelector(panel, root) {
   }
 }
 
+function socLimitValue(panel, kind) {
+  const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
+  const entityValue = finite(panel, key);
+  if (Number.isFinite(entityValue)) return entityValue;
+
+  // The SOC NumberEntities initialize asynchronously and can remain unknown
+  // after a transient startup read failure. Keep the presentation usable from
+  // sources that already follow the same ownership contract: GoodWe 45356 is
+  // canonical for Minimum SOC, while the periodically refreshed EMHASS config
+  // diagnostics are canonical for Maximum SOC.
+  const fallback = kind === "min"
+    ? optimizeAttributes(panel).battery_discharge_depth_on_grid_45356
+    : diagnosticConfigAttributes(panel).emhass_maximum_soc_pct;
+  const value = finiteValue(fallback);
+  return value !== null && value >= 0 && value <= 100 ? value : null;
+}
+
 function patchEmhass(panel, root) {
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
@@ -888,8 +1334,7 @@ function patchEmhass(panel, root) {
 
   for (const input of card.querySelectorAll("input[data-soc-slider]")) {
     const kind = input.dataset.socSlider;
-    const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
-    const value = finite(panel, key);
+    const value = socLimitValue(panel, kind);
     if (!Number.isFinite(value)) continue;
     const draft = finiteValue(input.dataset.epSocDraft);
     const acknowledged = Number.isFinite(draft) && value === draft;
@@ -910,8 +1355,7 @@ function patchStrategy(panel, root) {
   if (!strategy) return;
   for (const input of strategy.querySelectorAll("input[data-ep-v038-soc]")) {
     const kind = input.dataset.epV038Soc;
-    const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
-    const value = finite(panel, key);
+    const value = socLimitValue(panel, kind);
     if (!Number.isFinite(value)) continue;
     const draft = finiteValue(input.dataset.epSocDraft);
     const acknowledged = Number.isFinite(draft) && value === draft;
@@ -1018,6 +1462,9 @@ function diagnosticValue(panel, label, attrs, configAttrs) {
     return attrs.ems_mode === null || attrs.ems_mode === undefined
       ? "—"
       : `${attrs.ems_mode} · ${attrs.ems_mode_name || "Unknown"}`;
+  }
+  if (key.includes("last ems setpoint update") || key.includes("laatste ems-setpointupdate")) {
+    return formatTimestamp(panel, attrs.last_ems_setpoint_updated_at);
   }
   if (key.includes("ems setpoint")) return power(attrs.ems_setpoint);
   if (key.includes("app / work")) return text(attrs.app_work_mode_47000);
@@ -1151,6 +1598,7 @@ function patchLiveDom(panel) {
 
   const headerStatus = root.querySelector("header .status");
   setStatus(headerStatus, automaticOn, automaticOn ? t.autoActive : t.goodweAuto);
+  patchConnectivityStatus(panel, root);
 
   const solar = root.querySelector(".energy-card.solar");
   setText(solar, ".hero-value", panel._formatPower(pv));
@@ -1378,6 +1826,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     const result = previousRender.apply(this, args);
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
+    installEvProtectionBanner(this.shadowRoot);
     this.__epV041RefreshLiveDom = () => {
       ensureNoMotionStyle(this.shadowRoot);
       patchLiveDom(this);
@@ -1388,6 +1837,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
       patchLiveDom(this);
     };
     const root = this.shadowRoot;
+    ensureConnectivityStatus(this, root);
     const versionBadge = root?.querySelector(".version");
     if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
     const footerItems = root?.querySelectorAll("footer span") || [];

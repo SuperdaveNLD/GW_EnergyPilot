@@ -20,6 +20,8 @@ from .battery_price_api import async_register_battery_price_api
 from .battery_saver_api import async_register_battery_saver_api
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
+from .connectivity import GWEnergyPilotConnectivity
+from .control_history import GWEnergyPilotControlHistory
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller_v033 import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
@@ -27,6 +29,7 @@ from .debug_log_api import async_register_debug_log_api
 from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
+from .ev_load_balancing import GWEnergyPilotEVLoadBalancer
 from .optimization_log_api import async_register_optimization_log_api
 from .orchestrator_v044 import GWEnergyPilotOrchestrator
 from .plan_runtime import GWEnergyPilotPlanRuntime
@@ -44,7 +47,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v048.js?v=0.48-hybrid-control1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v049.js?v=0.49-consolidated1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -59,6 +62,9 @@ class GWRuntimeData:
     accounting: GWEnergyPilotAccounting
     debug_log: GWEnergyPilotDebugRuntime
     plan_runtime: GWEnergyPilotPlanRuntime
+    ev_load_balancer: GWEnergyPilotEVLoadBalancer
+    connectivity: GWEnergyPilotConnectivity
+    control_history: GWEnergyPilotControlHistory
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -132,11 +138,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         client,
         scan_interval=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
     )
-    controller = GWEnergyPilotController(hass, entry, client, coordinator)
+    control_history = GWEnergyPilotControlHistory(hass, entry.entry_id)
+    await control_history.async_restore()
+    controller = GWEnergyPilotController(
+        hass,
+        entry,
+        client,
+        coordinator,
+        control_history,
+    )
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
     debug_log = GWEnergyPilotDebugRuntime(hass, entry.entry_id)
     plan_runtime = GWEnergyPilotPlanRuntime(hass, entry)
+    ev_load_balancer = GWEnergyPilotEVLoadBalancer(hass, entry)
+    connectivity = GWEnergyPilotConnectivity(
+        hass,
+        entry,
+        coordinator,
+        debug_log,
+    )
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -145,6 +166,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         accounting=accounting,
         debug_log=debug_log,
         plan_runtime=plan_runtime,
+        ev_load_balancer=ev_load_balancer,
+        connectivity=connectivity,
+        control_history=control_history,
     )
 
     await plan_runtime.async_restore()
@@ -154,8 +178,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         f"GW EnergyPilot EMHASS plan refresh ({entry.entry_id})",
     )
     await debug_log.async_start(entry)
+    await connectivity.async_start()
     await accounting.async_prepare()
     await controller.async_setup()
+    await ev_load_balancer.async_setup()
     await orchestrator.async_setup()
     entry.runtime_data.event_unsubs.extend(async_setup_event_triggers(hass, entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -175,9 +201,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     if unload_ok:
         while entry.runtime_data.event_unsubs:
             entry.runtime_data.event_unsubs.pop()()
+        await entry.runtime_data.connectivity.async_unload()
         await entry.runtime_data.debug_log.async_unload()
         await entry.runtime_data.accounting.async_unload()
         await entry.runtime_data.orchestrator.async_unload()
+        await entry.runtime_data.ev_load_balancer.async_unload()
         await entry.runtime_data.controller.async_unload()
         await entry.runtime_data.client.async_close()
     return unload_ok

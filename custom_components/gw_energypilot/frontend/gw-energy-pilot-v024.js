@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v023.js?v=0.47-custom-battery1";
+import "./gw-energy-pilot-v023.js?v=0.49-consolidated1";
 
 const VERSION = "0.24";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -96,6 +96,7 @@ function updateStrategyNote(panel, root) {
   const note = root.querySelector(".ep-v022-strategy-note");
   const strategy = panel.__epV022SmartMeter?.data?.strategy;
   if (!note || !strategy) return;
+  if (note.dataset.epReleasePresentationOwner === "v048-hybrid" && strategy === "hybrid") return;
   note.innerHTML = `<strong>Automatische regelstrategie:</strong> ${STRATEGY_LABELS[strategy]} · ${STRATEGY_DESCRIPTIONS[strategy]} EV anti-discharge protection blijft als veiligheidsoverride actief.`;
 }
 

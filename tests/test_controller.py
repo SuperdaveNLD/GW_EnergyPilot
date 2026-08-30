@@ -71,8 +71,13 @@ def _load_controller():
     def async_dispatcher_send(hass, signal, *args):
         hass.dispatched.append((signal, args))
 
+    def async_dispatcher_connect(hass, signal, callback_func):
+        hass.dispatcher_listeners.append((signal, callback_func))
+        return lambda: None
+
     dispatcher = _module(
         "homeassistant.helpers.dispatcher",
+        async_dispatcher_connect=async_dispatcher_connect,
         async_dispatcher_send=async_dispatcher_send,
     )
     helpers.dispatcher = dispatcher
@@ -130,6 +135,7 @@ class FakeHass:
     def __init__(self, states=None):
         self.states = FakeStates(states)
         self.dispatched = []
+        self.dispatcher_listeners = []
         self.tracked_state_changes = []
         self.tasks = []
 
@@ -223,6 +229,52 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sensor.p_grid", tracked_entities)
         self.assertFalse(hasattr(hass, "tracked_intervals"))
 
+    async def test_missing_scheduled_plan_step_holds_enabled_battery(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="4200",
+            p_grid="-4200",
+        )
+        controller.enabled = True
+
+        await controller.async_hold_for_plan_step("plan_step_unavailable")
+
+        self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
+        self.assertEqual(controller.last_command, "plan_step_unavailable")
+        self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_plan_step_fail_safe_does_not_take_manual_ownership(self):
+        controller, _, client, coordinator = self.make_controller(
+            coordinator_mode=const.MODE_BATTERY_HOLD,
+            coordinator_power=0,
+        )
+
+        await controller.async_hold_for_plan_step("plan_step_publish_failed")
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(coordinator.refresh_count, 0)
+        self.assertEqual(controller.last_command, "goodwe_auto")
+
+    async def test_plan_source_events_wait_until_orchestrator_resumes_controller(self):
+        controller, hass, client, _ = self.make_controller(
+            p_batt="2500",
+            p_grid="-2500",
+        )
+        controller.enabled = True
+        controller.suspend_plan_updates()
+
+        controller._async_source_changed(
+            Event({"entity_id": "sensor.p_batt"})
+        )
+        await controller.async_evaluate()
+
+        self.assertEqual(hass.tasks, [])
+        self.assertEqual(client.calls, [])
+
+        controller.resume_plan_updates()
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 2500)])
+
     async def test_positive_p_grid_maps_to_mode9_import_target(self):
         controller, _, client, coordinator = self.make_controller(
             p_batt="-4200",
@@ -236,6 +288,14 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.target_power, 3750)
         self.assertEqual(controller.expected_mode, const.MODE_GRID_IMPORT_TARGET)
         self.assertEqual(controller.last_command, "grid_import_target")
+        self.assertIsNotNone(controller.last_ems_setpoint_updated_at)
+        self.assertIsNotNone(controller.last_ems_setpoint_updated_at.tzinfo)
+        self.assertEqual(controller.last_ems_setpoint, 3750)
+        self.assertEqual(controller.last_ems_mode, const.MODE_GRID_IMPORT_TARGET)
+        self.assertEqual(
+            controller.last_ems_setpoint_command,
+            "grid_import_target",
+        )
         self.assertEqual(coordinator.refresh_count, 1)
 
     async def test_negative_p_grid_maps_to_mode10_export_target(self):
@@ -282,6 +342,14 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(controller.expected_mode, const.MODE_AUTO)
                 self.assertEqual(controller.last_command, "grid_zero_auto")
                 self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_zero_power_mode_records_the_actual_written_setpoint(self):
+        controller, _, client, _ = self.make_controller()
+
+        await controller.async_manual_command(const.MODE_AUTO, 4200, "manual_auto")
+
+        self.assertEqual(client.calls, [(const.MODE_AUTO, 0)])
+        self.assertEqual(controller.last_ems_setpoint, 0)
 
     async def test_grid_target_is_clamped_to_configured_maximum(self):
         for p_grid, mode in (
@@ -386,6 +454,31 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
         self.assertEqual(coordinator.refresh_count, 1)
 
+    async def test_suspended_ev_coordination_does_not_apply_ev_override(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="2500",
+            p_grid="4000",
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+                const.CONF_EV_DEADBAND: 500,
+            },
+            states={"sensor.ev_power": "1200"},
+        )
+        controller.entry.runtime_data = types.SimpleNamespace(
+            connectivity=types.SimpleNamespace(
+                ev_coordination_effective=False,
+                signal="test_connectivity",
+            )
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 4000)])
+        self.assertEqual(controller.last_command, "grid_import_target")
+        self.assertEqual(coordinator.refresh_count, 1)
+
     async def test_ev_charging_allows_explicit_battery_charge(self):
         controller, _, client, coordinator = self.make_controller(
             p_batt="-2500",
@@ -424,6 +517,28 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
         self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
         self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_ev_protection_presentation_has_no_independent_control_state(self):
+        controller, _, _, _ = self.make_controller(
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+                const.CONF_EV_DEADBAND: 500,
+            },
+            states={"sensor.ev_power": "1200"},
+        )
+
+        self.assertEqual(controller.ev_protection_state, "inactive")
+
+        controller.enabled = True
+        self.assertEqual(controller.ev_protection_state, "active_pending")
+
+        controller.last_command = "ev_anti_discharge_hold"
+        self.assertEqual(controller.ev_protection_state, "blocking_discharge")
+
+        controller.last_command = "waiting_for_ev_stop_optimization"
+        controller.hass.states.set("sensor.ev_power", "0")
+        self.assertEqual(controller.ev_protection_state, "waiting_for_fresh_plan")
 
     async def test_disable_returns_to_goodwe_auto(self):
         controller, _, client, coordinator = self.make_controller(
@@ -477,6 +592,24 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [])
         self.assertEqual(controller.target_power, 2400)
         self.assertEqual(controller.last_command, "grid_import_target")
+        self.assertIsNone(controller.last_ems_setpoint_updated_at)
+        self.assertEqual(coordinator.refresh_count, 0)
+
+    async def test_failed_write_does_not_advance_setpoint_update_evidence(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="-3000",
+            p_grid="2400",
+        )
+        controller.enabled = True
+
+        async def fail_write(_mode, _power):
+            raise RuntimeError("write failed")
+
+        client.async_set_mode = fail_write
+        with self.assertRaisesRegex(RuntimeError, "write failed"):
+            await controller.async_evaluate()
+
+        self.assertIsNone(controller.last_ems_setpoint_updated_at)
         self.assertEqual(coordinator.refresh_count, 0)
 
     async def test_ev_stop_waits_for_fresh_native_optimization(self):

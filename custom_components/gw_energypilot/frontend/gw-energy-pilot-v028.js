@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v027-battery-plan.js?v=0.47-custom-battery1";
+import "./gw-energy-pilot-v027-battery-plan.js?v=0.49-consolidated1";
 
 const VERSION = "0.28";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -40,7 +40,7 @@ function clarifyHybridStrategy(panel, root) {
   }
 
   const note = root.querySelector(".ep-v022-strategy-note");
-  if (note) {
+  if (note && note.dataset.epReleasePresentationOwner !== "v048-hybrid") {
     note.innerHTML = `<strong>${copy.strategyNote}</strong> ${copy.hybridLabel} · ${copy.hybridDescription} ${copy.evOverride}`;
   }
 }

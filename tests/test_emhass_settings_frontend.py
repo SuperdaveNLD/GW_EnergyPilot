@@ -22,19 +22,19 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v048.js?v=0.48-hybrid-control1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.47-custom-battery1"', v045)
+        self.assertIn("gw-energy-pilot-v049.js?v=0.49-consolidated1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.49-consolidated1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.49-consolidated1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.49-consolidated1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.49-consolidated1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.47-custom-battery1"',
+            'import "./gw-energy-pilot-v043.js?v=0.49-consolidated1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.47-custom-battery1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.47-custom-battery1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.47-custom-battery1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.49-consolidated1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.49-consolidated1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.49-consolidated1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:
@@ -80,6 +80,13 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         self.assertIn("const sync = buttons[1]", self.source)
         self.assertIn("actions.prepend(controls.defaults)", self.source)
         self.assertIn("buildSummary(panel, form, current, controls.sync)", self.source)
+
+    def test_settings_renderer_supports_bounded_interval_select(self) -> None:
+        settings_source = (
+            FRONTEND / "gw-energy-pilot-settings-v016.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('field.type === "select"', settings_source)
+        self.assertIn('<select class="ep-v016-input"', settings_source)
 
     def test_emhass_only_values_are_not_falsely_attached_to_energypilot_fields(self) -> None:
         self.assertIn("The editable fields are EnergyPilot settings", self.source)

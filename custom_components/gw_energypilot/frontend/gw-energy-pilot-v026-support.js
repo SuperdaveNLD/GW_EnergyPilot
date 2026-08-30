@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v026-complete.js?v=0.47-custom-battery1";
+import "./gw-energy-pilot-v026-complete.js?v=0.49-consolidated1";
 
 const VERSION = "0.26";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -17,6 +17,7 @@ const TEXT = {
     automatic: "Automatic control", command: "Command", target: "Controller target",
     expected: "Expected EMS mode", pBatt: "P_batt target", pGrid: "P_grid target",
     optimization: "Optimization", orchestrator: "Orchestrator", trigger: "Last trigger",
+    setpointUpdate: "Last EMS setpoint update",
     error: "Last error", currentSoc: "Current battery SOC",
     minimumPair: "Minimum SOC · EMHASS / GoodWe", maximumSoc: "Maximum SOC",
     optimizationSoc: "Last optimization · init → final", configuredFinal: "Configured next final target",
@@ -34,6 +35,7 @@ const TEXT = {
     automatic: "Automatische regeling", command: "Commando", target: "Regeldoel",
     expected: "Verwachte EMS-modus", pBatt: "P_batt-doel", pGrid: "P_grid-doel",
     optimization: "Optimalisatie", orchestrator: "Orchestrator", trigger: "Laatste trigger",
+    setpointUpdate: "Laatste EMS-setpointupdate",
     error: "Laatste fout", currentSoc: "Huidige accu-SOC",
     minimumPair: "Minimum-SOC · EMHASS / GoodWe", maximumSoc: "Maximum-SOC",
     optimizationSoc: "Laatste optimalisatie · start → eind", configuredFinal: "Volgend ingesteld einddoel",
@@ -127,6 +129,12 @@ function reportValue(value, suffix = "") {
   return value === null || value === undefined || value === "" ? "—" : `${value}${suffix}`;
 }
 
+function timestamp(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
+}
+
 function supportReport(panel) {
   const c = context(panel);
   const a = c.attrs;
@@ -135,7 +143,9 @@ function supportReport(panel) {
   const fields = [
     ["Automatic control", a.controller_enabled ? "ON" : "OFF"],
     ["Control strategy", strategy], ["Command", a.controller_command], ["Controller target W", a.controller_target_power],
-    ["Expected EMS mode", a.controller_expected_mode], ["P_batt W", a.p_batt_value], ["P_grid W", a.p_grid_value],
+    ["Expected EMS mode", a.controller_expected_mode], ["Last EMS setpoint update", timestamp(a.last_ems_setpoint_updated_at)],
+    ["Last written EMS setpoint W", a.last_ems_setpoint], ["Last written EMS mode", a.last_ems_mode],
+    ["P_batt W", a.p_batt_value], ["P_grid W", a.p_grid_value],
     ["Optimization status", a.optim_status_value], ["Orchestrator", a.orchestrator_status], ["Last trigger", a.last_reason], ["Last error", a.last_error],
     ["EMS mode 47511", `${reportValue(a.ems_mode)} · ${reportValue(a.ems_mode_name)}`], ["EMS setpoint 47512 W", a.ems_setpoint],
     ["APP / Work 47000", a.app_work_mode_47000], ["Work mode 35187", a.work_mode_35187], ["Operation mode 35188", a.operation_mode_35188], ["Grid mode 35136", a.grid_mode_35136],
@@ -224,6 +234,7 @@ function cleanDiagnostics(panel, root) {
       ${row(panel, text.command, String(a.controller_command ?? "—"))}
       ${row(panel, text.target, power(panel, a.controller_target_power))}
       ${row(panel, text.expected, String(a.controller_expected_mode ?? "—"))}
+      ${row(panel, text.setpointUpdate, timestamp(a.last_ems_setpoint_updated_at))}
       ${row(panel, text.pBatt, power(panel, a.p_batt_value))}
       ${row(panel, text.pGrid, power(panel, a.p_grid_value))}
       ${row(panel, text.optimization, String(a.optim_status_value ?? "—"))}

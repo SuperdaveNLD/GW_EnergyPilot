@@ -53,6 +53,18 @@ Important enabled-by-default telemetry includes concepts such as:
 
 A number of raw or diagnostic values are intentionally disabled by default.
 
+## Connectivity status sensor
+
+The enabled diagnostic enum sensor uses stable unique-ID suffix:
+
+```text
+{config_entry_id}_connectivity_status
+```
+
+Its states are `checking`, `all_ok` and `issue`. It remains available when a GoodWe poll fails so it can report Modbus unreachability rather than disappearing with coordinator-backed telemetry. Attributes expose the coordinator-derived Modbus status and configured refresh interval, optional charger reachability, requested/effective EV coordination, five-minute transition state/countdown and last Modbus success/failure/error evidence.
+
+The sensor does not poll or control either device. The dashboard header pill consumes this single entity and patches its existing DOM node on state changes.
+
 ## Combined PV insight sensor
 
 The read-only PV insight feature adds one aggregate entity with stable unique-ID suffix:
@@ -138,6 +150,19 @@ Contract:
 - future import-cost/export-revenue accounting must consume the same accounting deltas rather than reconstructing energy independently.
 
 See `docs/ACCOUNTING.md` for the full accounting and future financial-accounting contract.
+
+## EV load-balancing Diagnostic entity
+
+When EV load balancing is enabled, one diagnostic sensor with stable unique-ID
+suffix `ev_load_balancing` reports states such as `balanced`,
+`waiting_overload`, `waiting_headroom`, `command_sent`, `minimum_reached`,
+`unavailable`, and `write_failed`. Attributes expose the configured connection
+phases/per-phase limit, measured phase current, charger current boundary, last
+action/error and the explicit `goodwe_control: false` ownership marker.
+
+The sensor is diagnostic only. The sole actuator is the external NumberEntity
+selected in Settings → EV; EnergyPilot does not create a duplicate charger
+NumberEntity.
 
 ## Beta SOC Diagnostic entities
 
@@ -312,6 +337,17 @@ Creates a fresh optimization first and enables automatic control only after opti
 Manual action buttons intentionally take manual ownership before issuing the EMS command.
 
 ## Diagnostic entities
+
+The existing `control_command` diagnostic sensor retains its stable unique ID and state semantics. Its attributes also expose the latest successfully completed EMS setpoint update:
+
+```text
+last_ems_setpoint_updated_at
+last_ems_setpoint
+last_ems_mode
+last_ems_setpoint_command
+```
+
+The timestamp changes only after an actual `47512 -> wait -> 47511` command succeeds. A controller evaluation that skips a duplicate write because live read-back already matches does not change it. The dashboard shows the localized timestamp below the live EMS setpoint, while Diagnose/LOG retains the raw ISO timestamp and command context.
 
 Raw inverter, operating-mode, warning/error, meter-status, and similar sensors may be disabled by default.
 

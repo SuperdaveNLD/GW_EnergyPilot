@@ -14,7 +14,7 @@ class FrontendV045SocChartTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_v045_release_wrapper_remains_below_v048(self) -> None:
+    def test_v045_release_wrapper_remains_below_v049(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
@@ -23,19 +23,19 @@ class FrontendV045SocChartTests(unittest.TestCase):
         v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.48")
-        self.assertIn("gw-energy-pilot-v048.js?v=0.48-hybrid-control1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1"', v048)
+        self.assertEqual(manifest["version"], "0.49")
+        self.assertIn("gw-energy-pilot-v049.js?v=0.49-consolidated1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.49-consolidated1"', v048)
         self.assertIn(
-            'import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"',
+            'import "./gw-energy-pilot-v046.js?v=0.49-consolidated1"',
             active,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"',
+            'import "./gw-energy-pilot-v045.js?v=0.49-consolidated1"',
             v046,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v044.js?v=0.47-custom-battery1"',
+            'import "./gw-energy-pilot-v044.js?v=0.49-consolidated1"',
             self.source,
         )
         self.assertIn('const VERSION = "0.45"', self.source)

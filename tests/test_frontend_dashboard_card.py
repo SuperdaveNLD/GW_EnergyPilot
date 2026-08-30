@@ -21,6 +21,8 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("existingCards.slice(1)", installer)
         self.assertIn("duplicate.remove()", installer)
         self.assertIn("dataset.epRenderKey", installer)
+        self.assertIn("preserveInteractiveShell(existingCard, card)", installer)
+        self.assertIn("installedCard = existingCard", installer)
         self.assertIn("existingCard.replaceWith(card)", installer)
         self.assertLess(installer.index(duplicate_guard), installer.index(card_creation))
 
@@ -181,11 +183,11 @@ class FrontendDashboardCardTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            'gw-energy-pilot-v031-battery-saver.js?v=0.47-custom-battery1',
+            'gw-energy-pilot-v031-battery-saver.js?v=0.49-consolidated1',
             release_v034,
         )
         self.assertIn(
-            'gw-energy-pilot-v027-battery-plan-core.js?v=0.47-custom-battery1',
+            'gw-energy-pilot-v027-battery-plan-core.js?v=0.49-consolidated1',
             release_v034,
         )
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)

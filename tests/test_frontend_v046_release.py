@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "0.47-custom-battery1"
+CACHE_KEY = "0.49-consolidated1"
 
 
 class FrontendV046ReleaseTests(unittest.TestCase):
@@ -16,7 +16,7 @@ class FrontendV046ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_v046_remains_below_the_active_v048_wrapper(self) -> None:
+    def test_v046_remains_below_the_active_v049_wrapper(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
@@ -25,15 +25,15 @@ class FrontendV046ReleaseTests(unittest.TestCase):
         v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "0.48")
-        self.assertIn("gw-energy-pilot-v048.js?v=0.48-hybrid-control1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1"', v048)
+        self.assertEqual(manifest["version"], "0.49")
+        self.assertIn("gw-energy-pilot-v049.js?v=0.49-consolidated1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.49-consolidated1"', v048)
         self.assertIn(
-            'import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"',
+            'import "./gw-energy-pilot-v046.js?v=0.49-consolidated1"',
             active,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"',
+            'import "./gw-energy-pilot-v045.js?v=0.49-consolidated1"',
             self.source,
         )
         self.assertIn('const VERSION = "0.46"', self.source)

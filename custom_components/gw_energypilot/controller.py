@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from datetime import datetime, timezone
 from math import isfinite
+from typing import TYPE_CHECKING
 
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .client import GWModbusClient
@@ -43,8 +48,12 @@ from .const import (
     MODE_DISCHARGE_BATTERY,
     MODE_GRID_EXPORT_TARGET,
     MODE_GRID_IMPORT_TARGET,
+    MODES_ZERO_POWER,
 )
 from .coordinator import GWEnergyPilotCoordinator
+
+if TYPE_CHECKING:
+    from .control_history import GWEnergyPilotControlHistory
 
 
 class GWEnergyPilotController:
@@ -78,20 +87,50 @@ class GWEnergyPilotController:
     smart-meter boolean mapping for backwards compatibility.
     """
 
-    def __init__(self, hass: HomeAssistant, entry, client: GWModbusClient, coordinator: GWEnergyPilotCoordinator) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry,
+        client: GWModbusClient,
+        coordinator: GWEnergyPilotCoordinator,
+        control_history: GWEnergyPilotControlHistory | None = None,
+    ) -> None:
         self.hass = hass
         self.entry = entry
         self.client = client
         self.coordinator = coordinator
+        self.control_history = control_history
         self.enabled = False
         self.target_power = 0
         self.expected_mode = MODE_AUTO
         self.last_command = "goodwe_auto"
+        self.last_ems_setpoint_updated_at = (
+            control_history.last_ems_setpoint_updated_at
+            if control_history is not None
+            else None
+        )
+        self.last_ems_setpoint = (
+            control_history.last_ems_setpoint
+            if control_history is not None
+            else None
+        )
+        self.last_ems_mode = (
+            control_history.last_ems_mode
+            if control_history is not None
+            else None
+        )
+        self.last_ems_setpoint_command = (
+            control_history.last_command
+            if control_history is not None
+            else None
+        )
         self.manual_power = min(DEFAULT_MAX_POWER, int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)))
         self.manual_charge_limit_soc: float | None = None
         self._unsubs: list[Callable[[], None]] = []
         self._ev_was_active = False
+        self._ev_coordination_was_effective = True
         self._control_lock = asyncio.Lock()
+        self._plan_update_suspensions = 0
         self.grid_neutral_active = False
         self.grid_neutral_charge_cap = 0
         self.grid_neutral_last_meter_power: float | None = None
@@ -119,6 +158,29 @@ class GWEnergyPilotController:
         """Compatibility property for older diagnostics/frontend layers."""
         return self.control_strategy != CONTROL_STRATEGY_BATTERY
 
+    @property
+    def ev_protection_state(self) -> str:
+        """Return the presentation state of the EV anti-discharge guard.
+
+        This is deliberately derived from the already selected controller
+        command. It exposes control ownership without adding another control
+        decision or write path.
+        """
+        if self.last_command == "waiting_for_ev_stop_optimization":
+            return "waiting_for_fresh_plan"
+        if not self.enabled or not self.ev_is_active():
+            return "inactive"
+        if self.last_command == "ev_anti_discharge_hold":
+            return "blocking_discharge"
+        if self.last_command in {
+            "ev_battery_charge",
+            "ev_charge_allowed",
+            "ev_charge_fallback",
+            "ev_grid_import_charge",
+        }:
+            return "allowing_charge"
+        return "active_pending"
+
     def _notify_state(self) -> None:
         async_dispatcher_send(self.hass, self.signal)
 
@@ -135,6 +197,7 @@ class GWEnergyPilotController:
         return {str(entity_id) for entity_id in entity_ids}
 
     async def async_setup(self) -> None:
+        self._ev_coordination_was_effective = self._ev_coordination_effective()
         self._ev_was_active = self.ev_is_active()
         entity_ids = {self._p_batt_entity_id(), self._p_grid_entity_id(), self.entry.options.get(CONF_OPTIM_STATUS_ENTITY), *self._ev_source_ids()}
         entity_ids.discard(None)
@@ -144,6 +207,16 @@ class GWEnergyPilotController:
         add_listener = getattr(self.coordinator, "async_add_listener", None)
         if add_listener is not None:
             self._unsubs.append(add_listener(self._async_coordinator_updated))
+        runtime_data = getattr(self.entry, "runtime_data", None)
+        connectivity = getattr(runtime_data, "connectivity", None)
+        if connectivity is not None:
+            self._unsubs.append(
+                async_dispatcher_connect(
+                    self.hass,
+                    connectivity.signal,
+                    self._async_connectivity_updated,
+                )
+            )
 
     async def async_unload(self) -> None:
         while self._unsubs:
@@ -159,7 +232,10 @@ class GWEnergyPilotController:
             ev_was_active = self._ev_was_active
             self._ev_was_active = ev_active
             if ev_active:
-                self.hass.async_create_task(self.async_evaluate(), "gw-energypilot-ev-anti-discharge")
+                self.hass.async_create_task(
+                    self.async_evaluate(allow_suspended=True),
+                    "gw-energypilot-ev-anti-discharge",
+                )
                 return
             if ev_was_active and self.entry.options.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, False):
                 self.target_power = 0
@@ -167,6 +243,8 @@ class GWEnergyPilotController:
                 self.last_command = "waiting_for_ev_stop_optimization"
                 self._notify_state()
                 return
+        if self._plan_update_suspensions:
+            return
         self.hass.async_create_task(self.async_evaluate(), "gw-energypilot-evaluate")
 
     @callback
@@ -207,8 +285,17 @@ class GWEnergyPilotController:
             return None
         return value
 
-    def ev_is_active(self) -> bool:
+    def _ev_coordination_effective(self) -> bool:
         if not self.entry.options.get(CONF_ENABLE_EV_COORDINATION, False):
+            return False
+        runtime_data = getattr(self.entry, "runtime_data", None)
+        connectivity = getattr(runtime_data, "connectivity", None)
+        if connectivity is None:
+            return True
+        return bool(connectivity.ev_coordination_effective)
+
+    def ev_is_active(self) -> bool:
+        if not self._ev_coordination_effective():
             return False
         mode_entity = self.entry.options.get(CONF_EV_MODE_ENTITY)
         power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
@@ -219,6 +306,21 @@ class GWEnergyPilotController:
             mode_active = state is not None and state.state.lower() == "connected_charging"
         ev_power = self._state_float(power_entity)
         return mode_active or (ev_power is not None and ev_power > ev_deadband)
+
+    @callback
+    def _async_connectivity_updated(self) -> None:
+        """Re-evaluate only when effective EV coordination changes."""
+        effective = self._ev_coordination_effective()
+        if effective == self._ev_coordination_was_effective:
+            return
+        self._ev_coordination_was_effective = effective
+        self._ev_was_active = self.ev_is_active()
+        self._notify_state()
+        if self.enabled:
+            self.hass.async_create_task(
+                self.async_evaluate(),
+                "gw-energypilot-ev-connectivity-change",
+            )
 
     def _optim_is_ready(self) -> bool:
         entity_id = self.entry.options.get(CONF_OPTIM_STATUS_ENTITY)
@@ -238,7 +340,9 @@ class GWEnergyPilotController:
         return actual_power is not None and int(actual_power) == int(power)
 
     async def _async_apply_command(self, mode: int, power: int, command: str, *, skip_if_readback_matches: bool = False) -> None:
-        power = max(0, int(power))
+        power = max(0, min(int(power), 15000))
+        if mode in MODES_ZERO_POWER:
+            power = 0
         self.target_power = power
         self.expected_mode = mode
         self.last_command = command
@@ -246,6 +350,20 @@ class GWEnergyPilotController:
         if skip_if_readback_matches and self._actual_command_matches(mode, power):
             return
         await self.client.async_set_mode(mode, power)
+        timestamp = datetime.now(timezone.utc)
+        self.last_ems_setpoint_updated_at = timestamp
+        self.last_ems_setpoint = power
+        self.last_ems_mode = mode
+        self.last_ems_setpoint_command = command
+        if self.control_history is not None:
+            self.control_history.record(
+                timestamp,
+                setpoint=power,
+                mode=mode,
+                command=command,
+            )
+            await self.control_history.async_save()
+        self._notify_state()
         await self.coordinator.async_request_refresh()
 
     async def async_enable(self) -> None:
@@ -260,6 +378,26 @@ class GWEnergyPilotController:
             self.manual_charge_limit_soc = None
             self.enabled = False
             await self._async_apply_command(MODE_AUTO, 0, "goodwe_auto")
+
+    async def async_hold_for_plan_step(self, command: str) -> None:
+        """Fail safe to Battery Hold when a scheduled plan step is unavailable."""
+        async with self._control_lock:
+            if not self.enabled:
+                return
+            await self._async_apply_command(
+                MODE_BATTERY_HOLD,
+                0,
+                command,
+                skip_if_readback_matches=True,
+            )
+
+    def suspend_plan_updates(self) -> None:
+        """Defer ordinary plan-source events until publication is complete."""
+        self._plan_update_suspensions += 1
+
+    def resume_plan_updates(self) -> None:
+        """Release one plan-publication suspension without going negative."""
+        self._plan_update_suspensions = max(0, self._plan_update_suspensions - 1)
 
     async def async_manual_command(self, mode: int, power: int, command: str) -> None:
         async with self._control_lock:
@@ -386,6 +524,8 @@ class GWEnergyPilotController:
             return
         await self._async_apply_smart_meter_plan(p_grid, deadband, max_power)
 
-    async def async_evaluate(self) -> None:
+    async def async_evaluate(self, *, allow_suspended: bool = False) -> None:
+        if self._plan_update_suspensions and not allow_suspended:
+            return
         async with self._control_lock:
             await self._async_evaluate_locked()

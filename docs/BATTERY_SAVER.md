@@ -209,7 +209,7 @@ The minimum SOC is deliberately not in this list because it has separate GoodWe-
 For every EnergyPilot-owned optimization EnergyPilot continues to enforce:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
@@ -233,7 +233,7 @@ EnergyPilot dayahead optimization
         ↓
 initial /action/publish-data
         ↓
-EMHASS continual_publish
+EnergyPilot wall-clock plan-step publication
         ↓
 fresh P_batt / P_grid
         ↓
@@ -244,7 +244,9 @@ existing EnergyPilot Automatic Control + refreshed dashboard graph
 GoodWe EMS command
 ```
 
-EMHASS remains the plan owner and EnergyPilot does not create a second 15-minute plan publisher.
+EMHASS remains the plan owner. EnergyPilot is the single schedule owner: it
+publishes active plan steps from that EMHASS plan and keeps EMHASS
+`continual_publish` disabled.
 
 ## Minimum SOC synchronization
 

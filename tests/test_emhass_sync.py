@@ -26,7 +26,7 @@ class EMHASSSyncTests(unittest.TestCase):
         self.assertEqual(
             emhass_sync.REQUIRED_RUNTIME_CONFIG,
             {
-                "continual_publish": True,
+                "continual_publish": False,
                 "method_ts_round": "first",
                 "set_use_battery": True,
             },
@@ -46,7 +46,7 @@ class EMHASSSyncTests(unittest.TestCase):
         self.assertFalse(updated["inverter_is_hybrid"])
         self.assertTrue(updated["set_use_pv"])
         self.assertEqual(updated["custom"], {"keep": 1})
-        self.assertTrue(updated["continual_publish"])
+        self.assertFalse(updated["continual_publish"])
         self.assertEqual(updated["method_ts_round"], "first")
         self.assertTrue(updated["set_use_battery"])
         self.assertEqual(original["continual_publish"], False)
@@ -86,7 +86,7 @@ class EMHASSSyncTests(unittest.TestCase):
             [ENTITY_IDS["pv"], ENTITY_IDS["load"], "sensor.keep_interp"],
         )
         self.assertEqual(synced["var_model"], ENTITY_IDS["load"])
-        self.assertTrue(synced["continual_publish"])
+        self.assertFalse(synced["continual_publish"])
         self.assertEqual(synced["method_ts_round"], "first")
         self.assertTrue(synced["set_use_pv"])
         self.assertTrue(synced["set_use_battery"])
@@ -138,7 +138,7 @@ class EMHASSSyncTests(unittest.TestCase):
             synced["sensor_replace_zero"], ["sensor.customer_optional_pv"]
         )
         self.assertEqual(synced["sensor_linear_interp"], [ENTITY_IDS["load"]])
-        self.assertTrue(synced["continual_publish"])
+        self.assertFalse(synced["continual_publish"])
 
     def test_missing_pv_forecast_uses_emhass_standard_output_when_pv_enabled(self):
         synced, warnings = emhass_sync.build_emhass_sync_config(
@@ -188,20 +188,20 @@ class EMHASSSyncTests(unittest.TestCase):
 
     def test_diff_contains_only_changed_managed_keys_in_stable_order(self):
         current = {
-            "continual_publish": False,
+            "continual_publish": True,
             "set_use_battery": True,
             "inverter_is_hybrid": False,
             "custom": 1,
         }
         synced = {
-            "continual_publish": True,
+            "continual_publish": False,
             "set_use_battery": True,
             "inverter_is_hybrid": True,
             "custom": 2,
         }
         self.assertEqual(
             emhass_sync.emhass_sync_changes(current, synced),
-            [{"key": "continual_publish", "current": False, "required": True}],
+            [{"key": "continual_publish", "current": True, "required": False}],
         )
 
     def test_missing_required_battery_entity_mapping_is_rejected(self):

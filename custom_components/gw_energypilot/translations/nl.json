@@ -29,7 +29,7 @@
           "scan_interval": "Modbus-scaninterval",
           "enable_emhass_orchestrator": "Ingebouwde EMHASS-orchestrator inschakelen",
           "emhass_url": "EMHASS-URL",
-          "emhass_optimization_interval": "Periodiek optimalisatie-interval",
+          "emhass_optimization_interval": "Optimalisatie-interval op vaste kloktijden",
           "emhass_soc_final_pct": "Doel-SOC aan het einde van de optimalisatie",
           "emhass_fallback_load": "Fallback huisverbruik",
           "use_nordpool_prices": "Nord Pool-runtimeprijzen gebruiken",
@@ -41,6 +41,7 @@
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
           "ev_mode_entity": "Entiteit voor EV-laadmodus",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
+          "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
         },
         "data_description": {
@@ -53,7 +54,7 @@
           "scan_interval": "Hoe vaak EnergyPilot de omvormer uitleest. Aanbevolen: 10 seconden.",
           "enable_emhass_orchestrator": "Voert optimalisatie en publicatie onafhankelijk van Automatische regeling uit.",
           "emhass_url": "Standaard Home Assistant EMHASS add-on-URL: http://5b918bf2-emhass:5000.",
-          "emhass_optimization_interval": "Periodiek fallback-interval. Aanbevolen: 60 minuten. Gebeurtenistriggers starten direct.",
+          "emhass_optimization_interval": "Kies 15, 30 of 60 minuten. Aanbevolen: 15 minuten. Geplande runs starten op vaste klokgrenzen plus 15 seconden; gebeurtenistriggers starten nog steeds direct.",
           "emhass_soc_final_pct": "Runtime soc_final-doel. Dit vervangt de minimale/maximale SOC-limieten van EMHASS niet.",
           "emhass_fallback_load": "Wordt alleen gebruikt wanneer actuele en historische huisbelasting niet bruikbaar zijn.",
           "use_nordpool_prices": "Gebruikt nordpool.get_prices_for_date indien beschikbaar, anders een sensor met raw_today/raw_tomorrow. Schakel dit uit om de in EMHASS geconfigureerde prijsmethode te gebruiken.",
@@ -65,6 +66,7 @@
           "enable_ev_coordination": "Voorkomt ontladen van de thuisaccu tijdens actief EV-laden en optimaliseert opnieuw wanneer het laden stopt.",
           "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
           "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
       }
@@ -91,7 +93,7 @@
           "scan_interval": "Modbus-scaninterval",
           "enable_emhass_orchestrator": "Ingebouwde EMHASS-orchestrator inschakelen",
           "emhass_url": "EMHASS-URL",
-          "emhass_optimization_interval": "Periodiek optimalisatie-interval",
+          "emhass_optimization_interval": "Optimalisatie-interval op vaste kloktijden",
           "emhass_soc_final_pct": "Doel-SOC aan het einde van de optimalisatie",
           "emhass_fallback_load": "Fallback huisverbruik",
           "use_nordpool_prices": "Nord Pool-runtimeprijzen gebruiken",
@@ -103,6 +105,7 @@
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
           "ev_mode_entity": "Entiteit voor EV-laadmodus",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
+          "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
         },
         "data_description": {
@@ -113,9 +116,9 @@
           "max_power_kw": "Maximaal modespecifiek GoodWe-setpoint in kW.",
           "deadband": "Aanbevolen: 300 W. Geldt voor P_grid in PCC-regeling of P_batt in directe accuregeling.",
           "scan_interval": "Aanbevolen: 10 seconden.",
-          "enable_emhass_orchestrator": "Schakelt periodieke en gebeurtenisgestuurde optimalisatie in. Tijdens het opstarten van Home Assistant wordt geen plan aangemaakt.",
+          "enable_emhass_orchestrator": "Schakelt optimalisatie op vaste kloktijden, gebeurtenisgestuurde optimalisatie en publicatie van de actieve planstap in.",
           "emhass_url": "Standaard: http://5b918bf2-emhass:5000.",
-          "emhass_optimization_interval": "Aanbevolen: 60 minuten.",
+          "emhass_optimization_interval": "Kies 15, 30 of 60 minuten. Aanbevolen: 15 minuten. Vaste klokgrenzen starten op +15 seconden.",
           "emhass_soc_final_pct": "Standaard: 10%.",
           "emhass_fallback_load": "Alleen fallback; normaal gebruikt EnergyPilot GoodWe-belasting plus Recorder-historie.",
           "use_nordpool_prices": "Schakel uit om EMHASS de eigen geconfigureerde prijsmethode te laten gebruiken.",
@@ -127,6 +130,7 @@
           "enable_ev_coordination": "Optionele EV-ontlaadbeveiliging en heroptimalisatie na stoppen met laden.",
           "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
           "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
       }
@@ -138,7 +142,16 @@
       "ems_setpoint": {"name": "EMS-setpoint"},
       "control_command": {"name": "Regelcommando"},
       "target_power": {"name": "Doelvermogen"},
+      "connectivity_status": {
+        "name": "Verbindingsstatus",
+        "state": {
+          "checking": "Controleren",
+          "all_ok": "Alles oké",
+          "issue": "Storing"
+        }
+      },
       "ev_status": {"name": "EV-laadstatus"},
+      "ev_load_balancing": {"name": "EV-loadbalancing"},
       "pv_generation_power": {"name": "PV-opwekkingsvermogen"}
     },
     "switch": {

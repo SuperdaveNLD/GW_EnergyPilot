@@ -17,10 +17,15 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
 
     def test_active_frontend_loads_fresh_hybrid_control_module(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        active = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v048.js?v=0.48-hybrid-control1", init_source)
+        self.assertIn("gw-energy-pilot-v049.js?v=0.49-consolidated1", init_source)
         self.assertIn(
-            'import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1";',
+            'import "./gw-energy-pilot-v048.js?v=0.49-consolidated1";',
+            active,
+        )
+        self.assertIn(
+            'import "./gw-energy-pilot-v047.js?v=0.49-consolidated1";',
             self.source,
         )
         self.assertIn('panel._stateByKey?.("control_strategy")?.state', self.source)

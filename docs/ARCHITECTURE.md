@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.47 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v0.49 Beta**.
 
 ## High-level flow
 
@@ -15,11 +15,13 @@ GWModbusClient
 GWEnergyPilotCoordinator
     |----------------------> Home Assistant telemetry/entities
     |----------------------> GWEnergyPilotAccounting
+    |----------------------> GWEnergyPilotConnectivity
     |----------------------> GWEnergyPilotController (controller_v033)
     `----------------------> GWEnergyPilotOrchestrator (orchestrator_v044)
                                   |
                                   +--> EnergyPilot Battery Saver policy
                                   +--> EMHASS optimize/publish
+                                  +--> wall-clock active-plan-step publish
                                   +--> canonical timestamped price cache
                                   +--> refresh official EMHASS /api/v1/plan
                                   +--> advance plan_revision
@@ -47,6 +49,18 @@ coordinator pv_total_power + up to four configured HA power entities
 
 That aggregate does not feed the controller, orchestrator, EMHASS or accounting. External entity changes update the aggregate independently; internal GoodWe PV continues to follow coordinator updates. See `docs/PV_INSIGHT.md`.
 
+EV charger load balancing is a separate actuator domain:
+
+```text
+selected HA one-phase current sensor
+    -> GWEnergyPilotEVLoadBalancer
+    -> number.set_value on one configured three-phase charger control
+```
+
+It has no reference to `GWModbusClient`, EMS registers or Automatic Control. It
+uses a continuous soft condition window and fails without a write when source or
+charger state is invalid. See `docs/EV_LOAD_BALANCING.md`.
+
 Persistent EnergyPilot-owned data is split by purpose:
 
 ```text
@@ -54,9 +68,11 @@ ConfigEntry data/options                   user/integration configuration
 GoodWe registers                           hardware state + inverter settings
 EMHASS configuration/output                optimizer configuration + canonical plan
 gw_energypilot.runtime.<entry_id>          last_success runtime evidence
+gw_energypilot.control.<entry_id>          latest successful EMS setpoint update
 gw_energypilot.accounting.<entry_id>       derived daily grid accounting
 gw_energypilot.optimization_log.<entry_id> newest optimization attempts
 gw_energypilot.plan.<entry_id>             bounded mirror of latest valid EMHASS plan
+gw_energypilot.ev_load_balancing_audit.<entry_id> append-only >16 A acknowledgements
 ```
 
 No Home Assistant Store is a second configuration database or optimizer.
@@ -67,15 +83,26 @@ No Home Assistant Store is a second configuration database or optimizer.
 
 - `GWModbusClient`;
 - `GWEnergyPilotCoordinator`;
+- `GWEnergyPilotControlHistory`;
 - `GWEnergyPilotController` from `controller_v033.py`;
 - `GWEnergyPilotOrchestrator` from `orchestrator_v044.py`;
 - `GWEnergyPilotPlanRuntime`;
 - `GWEnergyPilotAccounting`;
+- `GWEnergyPilotConnectivity`;
 - `GWEnergyPilotDebugRuntime`.
+- `GWEnergyPilotEVLoadBalancer`.
 
 Entity platforms remain sensor, switch, number, select and button.
 
 During setup, the last valid plan mirror is restored before the normal control/orchestration lifecycle starts. A bounded background task then retries the official EMHASS plan endpoint while startup dependencies settle. The initial Modbus refresh also remains a background config-entry task.
+
+### Connectivity runtime
+
+`connectivity.py` derives one canonical status from the existing coordinator poll result and an optional Home Assistant charger-online entity. It never opens a second Modbus connection or starts another polling loop: GoodWe reachability therefore updates on the configured coordinator interval. A configured charger source also updates on its normal Home Assistant state-change signal.
+
+Missing, `unknown` and `unavailable` sources are unreachable. A binary sensor is explicit (`on` online, `off` unreachable); any usable state from another domain means that integration is reporting, so an idle `switch.* = off` remains reachable.
+
+When EV coordination was requested by the user, five continuous minutes of charger unreachability suspend its effective runtime guard. Five continuous minutes online resume it. Either transition timer resets on a flap. The configured `enable_ev_coordination` option is never rewritten, and a user disable during recovery cancels automatic resume. The existing controller remains the only EMS decision and write owner.
 
 ## Modbus boundary
 
@@ -162,6 +189,8 @@ Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 
 The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. EV-stop stale-plan protection remains unchanged.
 
+The optional charger-online guard is evaluated before this override. While that guard is suspended, the controller follows its normal configured Automatic Control strategy and does not infer EV activity from stale charger mode/power entities.
+
 ## Plan-resilient controller layer
 
 `controller_v033.py` also provides source availability resilience for configured `P_batt` / `P_grid` values:
@@ -238,7 +267,7 @@ orchestrator_v044.GWEnergyPilotOrchestrator
 
 Responsibilities are layered deliberately:
 
-- base/v012/v013: existing optimization, publication and runtime-evidence behavior;
+- base/v012/v013: optimization, fixed wall-clock scheduling, active-plan-step publication and runtime-evidence behavior;
 - v026: canonical timestamped price-series support for dashboard/optimizer use;
 - v031: Battery Saver policy ownership, canonical EMHASS runtime-contract application, GoodWe minimum-SOC synchronization before owned solves and runtime final-SOC clamping;
 - v033: refresh the persistent canonical plan after a successful optimize/publish cycle and increment `plan_revision` in a `finally` block after the refresh attempt.
@@ -247,10 +276,19 @@ Responsibilities are layered deliberately:
 The EnergyPilot-required runtime contract is defined once in `emhass_sync.py` and reused by both explicit **Synchronize required config** and automatic pre-solve preparation:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
+
+EnergyPilot is the single scheduling owner. The configured full optimization
+cadence is 15, 30 or 60 minutes (15 recommended) and is anchored to local clock
+boundaries at second 15. The same clock callback publishes the active row when
+the inferred persisted-plan timestep is due. A due full optimization runs first
+and its initial publish suppresses a duplicate timestep publish. The complete
+solve/publish/fresh-output/control transaction is serialized. Controller
+plan-source listeners are deferred until fresh `P_batt` and, for Grid/Hybrid,
+fresh `P_grid` are proven; EV anti-discharge remains higher priority.
 
 This contract deliberately does **not** contain installation/model topology. The following remain EMHASS/operator-owned and are preserved exactly:
 
@@ -364,27 +402,31 @@ Actual bars remain Recorder history from the existing GoodWe battery-power entit
 
 The frontend keeps one canonical Battery · Plan · Price card. A mismatch between the live orchestrator `plan_revision` and the cached API payload forces an immediate refresh; `P_batt.last_updated` remains a compatibility fallback for plan changes outside EnergyPilot. The card is replaced/rebuilt rather than duplicated.
 
+The header reachability pill is also canonical stable DOM. It is created only during structural render, placed between Automatic Control ownership and the version badge, and patched from the connectivity sensor. Hover on fine pointers and focus/tap on touch expose Modbus, charger and effective EV-coordination details.
+
 ## Frontend
 
 Active top-level module:
 
 ```text
-gw-energy-pilot-v047.js
-  -> gw-energy-pilot-v046.js
-       -> gw-energy-pilot-v045.js
-            -> gw-energy-pilot-v044.js
-                 -> gw-energy-pilot-v043.js
-                      -> gw-energy-pilot-v042.js
-                           -> gw-energy-pilot-v041-emhass-settings.js
-                                -> gw-energy-pilot-v041.js
-                                     -> gw-energy-pilot-v039.js
-                                          -> gw-energy-pilot-v038.js
-                                               -> gw-energy-pilot-v038-runtime.js
-                                                    -> gw-energy-pilot-v034.js
-                                                         -> existing v0.34 feature chain
+gw-energy-pilot-v049.js
+  -> gw-energy-pilot-v048.js
+       -> gw-energy-pilot-v047.js
+            -> gw-energy-pilot-v046.js
+                 -> gw-energy-pilot-v045.js
+                      -> gw-energy-pilot-v044.js
+                           -> gw-energy-pilot-v043.js
+                                -> gw-energy-pilot-v042.js
+                                     -> gw-energy-pilot-v041-emhass-settings.js
+                                          -> gw-energy-pilot-v041.js
+                                               -> gw-energy-pilot-v039.js
+                                                    -> gw-energy-pilot-v038.js
+                                                         -> gw-energy-pilot-v038-runtime.js
+                                                              -> gw-energy-pilot-v034.js
+                                                                   -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.47 add only release presentation and cache boundaries.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.49 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 
@@ -442,6 +484,8 @@ Recorder is not part of the live accounting loop. It remains an optional bootstr
 
 `last_success` remains a separate contract in `runtime_store.py`.
 
+`control_history.py` persists the latest successfully completed EMS setpoint update separately. The controller advances it only after `async_set_mode()` completes; skipped matching commands and failed commands retain the previous timestamp. It is diagnostic evidence of a completed write transaction, while coordinator mode/setpoint telemetry remains the hardware read-back source.
+
 `GWEnergyPilotDebugRuntime` is deliberately different: it is bounded, memory-only, disabled by default and observes the existing runtime. It does not add Modbus polling, EMHASS optimization or hardware writes.
 
 ## APIs
@@ -482,6 +526,7 @@ Entity unique IDs remain config-entry based. Host/unit-ID changes must not creat
 ```text
 register/transport problem -> registers.py / client.py / coordinator.py
 controller decision        -> controller.py + bounded controller_v033 availability/EV layer
+EV charger current         -> ev_load_balancing.py only
 EMHASS config ownership    -> emhass_sync.py / emhass_sync_api.py / emhass_config.py
 EMHASS optimization        -> orchestrator*.py
 persistent plan resilience -> plan_runtime.py / battery_plan.py

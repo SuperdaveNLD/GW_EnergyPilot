@@ -1,16 +1,17 @@
-import "./gw-energy-pilot-v026-complete.js?v=0.47-custom-battery1";
+import "./gw-energy-pilot-v026-complete.js?v=0.49-consolidated1";
 import {
   CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartSize,
   formatTime, loadChartData, saveChartSize, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.47-custom-battery1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.49-consolidated1";
 import {
   cardBody, ensureStyles, sizeControlHtml,
-} from "./gw-energy-pilot-v027-battery-plan-view.js?v=0.47-custom-battery1";
+} from "./gw-energy-pilot-v027-battery-plan-view.js?v=0.49-consolidated1";
 
 const V041_PANEL_STYLE_ID = "ep-v041-scoped-no-motion";
 const V041_GLOBAL_STYLE_ID = "ep-v041-scoped-global-no-motion";
 const V041_STATIC_ATTRIBUTE = "data-ep-v041-static";
 const V041_STATIC_SELECTOR = `[${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}][${V041_STATIC_ATTRIBUTE}]`;
+const BOUND_CARD_CONTROLS = new WeakSet();
 
 function freezeV041Element(element) {
   if (!(element instanceof Element)) return;
@@ -160,6 +161,86 @@ function chartRefreshIdle(panel) {
   );
 }
 
+function bindClickOnce(element, listener) {
+  if (!element || BOUND_CARD_CONTROLS.has(element)) return;
+  element.addEventListener("click", listener);
+  BOUND_CARD_CONTROLS.add(element);
+}
+
+function bindCardControls(panel, card) {
+  card.querySelectorAll("[data-chart-size]").forEach((button) => {
+    bindClickOnce(button, () => {
+      saveChartSize(button.dataset.chartSize);
+      if (panel.__epV041StableRuntime) refreshBatteryPlanCard(panel);
+      else panel._queueRender();
+    });
+  });
+  bindClickOnce(card.querySelector(".ep-v027-expand"), () => openModal(panel));
+  bindClickOnce(card.querySelector('[data-action="details"]'), () => openModal(panel));
+  bindClickOnce(
+    card.querySelector('[data-action="refresh"]'),
+    () => void loadChartData(panel, true)
+  );
+}
+
+function preserveInteractiveShell(existingCard, card) {
+  const existingHead = existingCard.querySelector(":scope > .ep-v027-head");
+  const nextHead = card.querySelector(":scope > .ep-v027-head");
+  const existingButtons = [...(existingHead?.querySelectorAll("[data-chart-size]") || [])];
+  const nextButtons = [...(nextHead?.querySelectorAll("[data-chart-size]") || [])];
+  if (!existingHead || !nextHead || existingButtons.length !== nextButtons.length) {
+    return false;
+  }
+
+  const nextBySize = new Map(
+    nextButtons.map((button) => [button.dataset.chartSize, button])
+  );
+  for (const button of existingButtons) {
+    const nextButton = nextBySize.get(button.dataset.chartSize);
+    if (!nextButton) return false;
+    button.className = nextButton.className;
+    button.title = nextButton.title;
+    button.setAttribute("aria-pressed", nextButton.getAttribute("aria-pressed") || "false");
+  }
+
+  for (const selector of [".ep-v027-kicker", ".ep-v027-subtitle"]) {
+    const existingText = existingHead.querySelector(selector);
+    const nextText = nextHead.querySelector(selector);
+    if (existingText && nextText) existingText.textContent = nextText.textContent;
+  }
+  const existingExpand = existingHead.querySelector(".ep-v027-expand");
+  const nextExpand = nextHead.querySelector(".ep-v027-expand");
+  if (existingExpand && nextExpand) {
+    existingExpand.title = nextExpand.title;
+    existingExpand.setAttribute(
+      "aria-label",
+      nextExpand.getAttribute("aria-label") || nextExpand.title
+    );
+  }
+
+  const windowBar = existingCard.querySelector(":scope > .ep-v031-card-windowbar");
+  const preservedClasses = [...existingCard.classList].filter(
+    (className) => className.startsWith("ep-v031-card-")
+  );
+  existingCard.className = card.className;
+  for (const className of preservedClasses) existingCard.classList.add(className);
+  existingCard.dataset.epCard = card.dataset.epCard;
+  existingCard.dataset.epSpan = card.dataset.epSpan;
+  existingCard.dataset.epRenderKey = card.dataset.epRenderKey;
+  existingCard.hidden = card.hidden;
+
+  // Keep the live card and header in the same connected parent throughout a
+  // scoped refresh. Rebuild only the graph body/footer so a native press that
+  // started on S/M/L can still produce its click after the refresh completes.
+  for (const child of [...existingCard.children]) {
+    if (child !== windowBar && child !== existingHead) child.remove();
+  }
+  for (const child of [...card.children]) {
+    if (child !== nextHead) existingCard.appendChild(child);
+  }
+  return true;
+}
+
 function installEnhancedCard(panel, root) {
   const layout = root.querySelector(".ep-dashboard-layout");
   if (!layout) return;
@@ -170,7 +251,7 @@ function installEnhancedCard(panel, root) {
 
   // A cache-busted frontend module can wrap _render more than once during a
   // live upgrade. Keep one canonical card, but do not let the duplicate guard
-  // prevent that card from being replaced when fresh chart data arrives.
+  // prevent that card from being refreshed when fresh chart data arrives.
   const existingCards = [...root.querySelectorAll(".ep-v027-battery-plan-card")];
   const existingCard = existingCards[0] || null;
   for (const duplicate of existingCards.slice(1)) duplicate.remove();
@@ -195,24 +276,18 @@ function installEnhancedCard(panel, root) {
   const updated = data?.at ? t(panel, "updated", { time: formatTime(data.at) }) : t(panel, "waiting");
   card.innerHTML = `<div class="ep-v027-head"><div><div class="ep-v027-kicker">${panel._escape(t(panel, "title"))}</div><div class="ep-v027-subtitle">${panel._escape(t(panel, "subtitle"))}</div></div><div class="ep-v027-head-actions">${sizeControlHtml(panel, size)}<button type="button" class="ep-v027-expand" title="${panel._escape(t(panel, "expand"))}" aria-label="${panel._escape(t(panel, "expand"))}">↗</button></div></div>${cardBody(panel, data, size, false)}<div class="ep-v027-footer"><div class="ep-v027-footer-actions"><button type="button" data-action="details">${panel._escape(t(panel, "details"))}</button><button type="button" data-action="refresh" title="${panel._escape(t(panel, "refresh"))}">↻</button></div><span>${panel._escape(updated)}</span></div>`;
 
-  if (existingCard) existingCard.replaceWith(card);
-  else if (oldCard) oldCard.replaceWith(card);
+  let installedCard = card;
+  if (existingCard) {
+    if (preserveInteractiveShell(existingCard, card)) installedCard = existingCard;
+    else existingCard.replaceWith(card);
+  } else if (oldCard) oldCard.replaceWith(card);
   else {
     const batteryCard = layout.querySelector('[data-ep-card="battery"]') || layout.querySelector(".energy-card.battery");
     if (batteryCard) batteryCard.insertAdjacentElement("afterend", card);
     else layout.appendChild(card);
   }
 
-  card.querySelectorAll("[data-chart-size]").forEach((button) => {
-    button.addEventListener("click", () => {
-      saveChartSize(button.dataset.chartSize);
-      if (panel.__epV041StableRuntime) refreshBatteryPlanCard(panel);
-      else panel._queueRender();
-    });
-  });
-  card.querySelector(".ep-v027-expand")?.addEventListener("click", () => openModal(panel));
-  card.querySelector('[data-action="details"]')?.addEventListener("click", () => openModal(panel));
-  card.querySelector('[data-action="refresh"]')?.addEventListener("click", () => void loadChartData(panel, true));
+  bindCardControls(panel, installedCard);
 
   if (!data && chartRefreshIdle(panel)) void loadChartData(panel);
   else if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) void loadChartData(panel, true);

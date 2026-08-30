@@ -26,13 +26,16 @@ A session starts with a complete baseline and then records existing runtime sign
 - all decoded GoodWe telemetry values from the canonical `registers.py` definitions;
 - canonical register address/type/scale metadata so support can map each decoded value back to its register definition;
 - coordinator poll success/failure, latest exception and Modbus connection state;
-- controller enabled state, configured strategy, command, requested target, expected mode and actual GoodWe mode/setpoint read-back;
+- controller enabled state, configured strategy, command, requested target, expected mode, latest successful EMS-setpoint update timestamp/context and actual GoodWe mode/setpoint read-back;
 - configured `P_batt`, `P_grid`, optimization-status and optional EV source state changes;
+- canonical Modbus/charger reachability, requested/effective EV coordination and one-shot connectivity loss/restoration/suspension/resume transitions;
 - EMHASS/orchestrator status transitions, HTTP result diagnostics already exposed by the orchestrator, pricing/load-forecast metadata and the latest optimizer error;
 - current Home Assistant core state and configured time zone;
 - the existing persistent optimization history when **Copy debug report** is used.
 
 This design deliberately reuses the coordinator, controller dispatcher and orchestrator dispatcher. Debug logging does not poll the inverter separately and does not run an additional control loop.
+
+Connectivity transitions are also written to the normal Home Assistant log even when the opt-in debug session is off. Loss and suspension use warning level; restoration, resume and user cancellation use info level.
 
 ## Storage and limits
 

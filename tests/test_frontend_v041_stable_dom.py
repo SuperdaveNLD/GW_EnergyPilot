@@ -34,10 +34,14 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.manual = (FRONTEND / "gw-energy-pilot-v021.js").read_text(
             encoding="utf-8"
         )
+        self.controller = (INTEGRATION / "controller.py").read_text(
+            encoding="utf-8"
+        )
+        self.sensor = (INTEGRATION / "sensor.py").read_text(encoding="utf-8")
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=0.47-custom-battery1"', self.source
+            'import "./gw-energy-pilot-v039.js?v=0.49-consolidated1"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -79,6 +83,35 @@ class FrontendV041StableDomTests(unittest.TestCase):
             '.ep-battery-action[data-action="resume_auto"]:hover', self.touch_hover
         )
 
+    def test_ems_setpoint_update_is_patched_in_place(self) -> None:
+        base = (FRONTEND / "gw-energy-pilot.js").read_text(encoding="utf-8")
+        browser = (BROWSER / "test_frontend_stability.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("last_ems_setpoint_updated_at", base)
+        self.assertIn("lastEmsSetpointUpdate", self.source)
+        self.assertIn("formatTimestamp(panel", self.source)
+        self.assertIn("def exercise_setpoint_update", browser)
+        self.assertIn("stableMetric", browser)
+
+    def test_ev_protection_banner_is_stable_status_only_ui(self) -> None:
+        self.assertIn("function installEvProtectionBanner(root)", self.source)
+        self.assertIn("function patchEvProtectionBanner(panel, root)", self.source)
+        self.assertIn("patchEvProtectionBanner(panel, root)", self.source)
+        self.assertIn('banner.setAttribute("role", "status")', self.source)
+        self.assertIn('banner.setAttribute("aria-live", "polite")', self.source)
+        self.assertIn("ev_protection_state", self.source)
+        self.assertIn("EV CHARGING · ANTI-DISCHARGE ACTIVE", self.source)
+        self.assertIn("EV LAADT · ONTLAADBEVEILIGING ACTIEF", self.source)
+        self.assertNotIn("ev-override", self.source)
+        self.assertIn("def ev_protection_state(self)", self.controller)
+        self.assertIn('"ev_protection_state": controller.ev_protection_state', self.sensor)
+        self.assertIn("async_dispatcher_connect(", self.sensor)
+        browser_test = (BROWSER / "test_frontend_stability.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("exercise_ev_protection_banner", browser_test)
+
     def test_other_persistent_selectors_use_stable_live_state(self) -> None:
         self.assertIn("function patchCostFunctionSelector", self.source)
         self.assertIn("patchCostFunctionSelector(panel, root)", self.source)
@@ -88,6 +121,33 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("const busyRaw = panel.__epV016CostfunBusy", self.source)
         self.assertIn("requestStableLiveRefresh(panel)", self.manual)
         self.assertIn("const liveAutomaticOn", self.manual)
+
+    def test_connectivity_status_is_structural_once_and_patched_live(self) -> None:
+        browser_test = (BROWSER / "test_frontend_stability.py").read_text(
+            encoding="utf-8"
+        )
+        harness = (BROWSER / "frontend_harness.html").read_text(encoding="utf-8")
+        self.assertIn("function ensureConnectivityStatus(panel, root)", self.source)
+        self.assertIn("ensureConnectivityStatus(this, root)", self.source)
+        self.assertIn("function patchConnectivityStatus(panel, root)", self.source)
+        self.assertIn("patchConnectivityStatus(panel, root)", self.source)
+        self.assertIn("actions.insertBefore(wrap, version || null)", self.source)
+        self.assertIn("@media (hover: hover) and (pointer: fine)", self.source)
+        self.assertNotIn("setPointerCapture", self.source)
+        self.assertIn("exercise_connectivity_status", browser_test)
+        self.assertIn('"connectivity_status"', harness)
+
+    def test_soc_limit_display_falls_back_to_canonical_live_sources(self) -> None:
+        self.assertIn("function socLimitValue(panel, kind)", self.source)
+        self.assertIn(
+            "optimizeAttributes(panel).battery_discharge_depth_on_grid_45356",
+            self.source,
+        )
+        self.assertIn(
+            "diagnosticConfigAttributes(panel).emhass_maximum_soc_pct",
+            self.source,
+        )
+        self.assertIn("const value = socLimitValue(panel, kind)", self.source)
 
     def test_v038_legacy_guards_are_disabled_only_for_v041(self) -> None:
         self.assertIn("function stableRuntimeActive(panel)", self.runtime)
@@ -109,6 +169,11 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("function schedulePlanRefresh(panel)", self.source)
         self.assertIn("void loadChartData(panel, true)", self.source)
         self.assertIn("refreshBatteryPlanCard(this)", self.source)
+        self.assertIn("function preserveInteractiveShell", self.plan_core)
+        self.assertIn("child !== windowBar && child !== existingHead", self.plan_core)
+        self.assertNotIn('addEventListener("pointerdown"', self.plan_core)
+        self.assertNotIn("setPointerCapture", self.plan_core)
+        self.assertNotIn("preventDefault", self.plan_core)
 
     def test_all_dashboard_motion_is_disabled(self) -> None:
         self.assertIn("animation: none !important", self.source)
@@ -125,7 +190,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         browser_test = (BROWSER / "test_frontend_stability.py").read_text(
             encoding="utf-8"
         )
-        wrapper = (BROWSER / "test_frontend_stability_v048.py").read_text(
+        wrapper = (BROWSER / "test_frontend_stability_v049.py").read_text(
             encoding="utf-8"
         )
         harness = (BROWSER / "frontend_harness.html").read_text(
@@ -140,14 +205,16 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("telemetry_identity", browser_test)
         self.assertIn("exercise_plan_refresh", browser_test)
         self.assertIn("animation[\"animations\"] != 0", browser_test)
-        self.assertIn("frontend_harness.html?entry=v048", wrapper)
-        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v048"', wrapper)
-        self.assertIn('"v047", "v048"].includes(requestedEntry)', harness)
+        self.assertIn("frontend_harness.html?entry=v049", wrapper)
+        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v049"', wrapper)
+        self.assertIn('"v048", "v049"].includes(requestedEntry)', harness)
         self.assertIn("exercise_touch_controls", browser_test)
         self.assertIn("exercise_optimize_stability", browser_test)
         self.assertIn("exercise_host_property_press", browser_test)
+        self.assertIn("exercise_chart_size_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
-        self.assertIn("test_frontend_stability_v048.py", workflow)
+        self.assertIn("exercise_soc_limit_fallback", browser_test)
+        self.assertIn("test_frontend_stability_v049.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)
         self.assertFalse((BROWSER / "frontend_harness_v041.html").exists())

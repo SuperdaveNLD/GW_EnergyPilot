@@ -1,7 +1,7 @@
 import {
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=0.47-custom-battery1";
+} from "./gw-energy-pilot-v038-model.js?v=0.49-consolidated1";
 
 const EMS_MODE_TEXT = {
   en: {
@@ -278,7 +278,7 @@ export function localizeV038Controller(panel, root) {
   localizeManualPad(panel, card, t);
 
   const strategyNote = card.querySelector(".ep-v022-strategy-note");
-  if (strategyNote) {
+  if (strategyNote?.dataset.epReleasePresentationOwner !== "v048-hybrid") {
     strategyNote.innerHTML = `<strong>${panel._escape(t.strategyLabel)}:</strong> ${panel._escape(t.strategy)}`;
   }
 }

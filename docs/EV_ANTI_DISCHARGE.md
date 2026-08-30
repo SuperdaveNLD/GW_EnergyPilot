@@ -8,7 +8,10 @@ The EV feature is an **anti-discharge protection**, not an EV charging controlle
 
 While the EV is charging, the home battery must not discharge into the EV. If EMHASS explicitly requests home-battery charging at the same time, GW EnergyPilot must continue that charge request instead of holding the battery.
 
-The EV charger remains responsible for starting, stopping and modulating the EV charging session. GW EnergyPilot only observes the configured EV state/power entities.
+The anti-discharge feature only observes the configured EV state/power entities.
+The separately opt-in EV load balancer may modulate one charger current entity,
+but it is not part of this GoodWe battery-direction controller. See
+`EV_LOAD_BALANCING.md`.
 
 ## Ownership boundary
 
@@ -66,6 +69,16 @@ The stored option key remains `enable_ev_coordination` for backwards compatibili
 
 EV activity can be detected through the configured EV charging-mode entity and/or the configured EV charging-power entity plus activity threshold. These are observation inputs only and do not give EnergyPilot ownership of the charger.
 
+An optional EV online entity separately reports charger reachability. Missing, `unknown` and `unavailable` are unreachable. A binary sensor is explicit (`on` online, `off` unreachable); for other domains every usable state is online, so an idle charging switch that reports `off` is not mistaken for an offline charger.
+
+### Five-minute reachability guard
+
+If EV coordination is enabled and the configured charger-online source remains unreachable for five continuous minutes, EnergyPilot suspends the EV anti-discharge override. It does not overwrite `enable_ev_coordination`: the saved option remains the user's intent, while the runtime exposes requested and effective state separately.
+
+After suspension, five continuous online minutes restore the override only if the user setting is still enabled. An online/offline flap resets the active window. Turning EV coordination off during recovery cancels automatic resume. Connectivity loss/restoration and suspension/resume transitions are recorded in the Home Assistant log and, when enabled, the bounded debug log.
+
+This guard does not poll the charger, control it or add a fast loop. Charger reachability follows the selected Home Assistant entity, while Modbus status follows the configured GoodWe coordinator refresh interval.
+
 ## EV stop behavior
 
 When the native EMHASS orchestrator is enabled and EV charging stops, the existing stale-plan protection remains unchanged:
@@ -75,10 +88,27 @@ When the native EMHASS orchestrator is enabled and EV charging stops, the existi
 3. request/wait for a fresh optimization;
 4. resume normal automatic control from the new plan.
 
+## Dashboard status
+
+The Controller card presents the current EV protection state directly from the
+existing controller command:
+
+- **Anti-discharge active**: EV charging is active and home-battery discharge is
+  blocked with mode `8` (**Battery Hold**).
+- **Battery charge allowed**: EV charging is active and the explicit
+  home-battery charging plan continues.
+- **Fresh plan required**: EV charging has stopped, but Battery Hold remains
+  active until the native orchestrator publishes a fresh EMHASS plan.
+
+The status is presentation-only. It does not add an override, charger control,
+new controller ownership mode or additional Modbus write path. A future
+override would change safety and control ownership semantics and therefore
+requires a separate explicit design decision and review.
+
 ## Safety boundary
 
 GoodWe and the battery BMS remain authoritative for inverter, battery, SOC and electrical limits. This feature does not infer or add GoodWe registers and does not introduce a second fast feedback loop.
 
 ## Non-goals
 
-This feature does not schedule EV charging, choose EV target SOC, change charger current, integrate with charger-cloud APIs, or replace charger-side/GoodWe-side load balancing. Its responsibility is limited to preventing home-battery discharge into an actively charging EV while still allowing a legitimate home-battery charging plan.
+This feature does not schedule EV charging, choose EV target SOC, change charger current, or integrate with charger-cloud APIs. Its responsibility is limited to preventing home-battery discharge into an actively charging EV while still allowing a legitimate home-battery charging plan. The independent EV load balancer is the only EnergyPilot component permitted to change the configured charger-current NumberEntity.

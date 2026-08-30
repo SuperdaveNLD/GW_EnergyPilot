@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v025.js?v=0.47-custom-battery1";
+import "./gw-energy-pilot-v025.js?v=0.49-consolidated1";
 
 const VERSION = "0.26";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -217,6 +217,7 @@ const FIELD_NL = {
   enable_ev_coordination: ["EV-ontlaadbeveiliging", "Voorkomt ontladen van de thuisaccu terwijl de EV actief laadt."],
   ev_mode_entity: ["EV-modusentiteit", "Optionele Home Assistant-entiteit voor de laadstatus van de EV."],
   ev_power_entity: ["EV-vermogensentiteit", "Optionele Home Assistant-vermogensentiteit voor EV-coördinatie."],
+  ev_online_entity: ["EV-online-entiteit", "Optionele Home Assistant-entiteit die aangeeft of de laadpaal bereikbaar is."],
   ev_deadband: ["EV-actiefdrempel", "Vermogensdrempel om actieve EV-lading te herkennen."],
   enable_emhass_orchestrator: ["Ingebouwde EMHASS-orchestrator", "Laat EnergyPilot EMHASS-optimalisaties plannen en publiceren."],
   emhass_url: ["EMHASS-URL", "Adres waarmee Home Assistant Core de EMHASS-webserver bereikt."],
@@ -323,7 +324,10 @@ function localizeControlStrategy(panel, root) {
   select?.addEventListener("change", () => saveStrategy(panel, entryId, select.value, select));
 
   const note = root.querySelector(".ep-v022-strategy-note");
-  if (note) {
+  if (
+    note &&
+    !(note.dataset.epReleasePresentationOwner === "v048-hybrid" && strategy === "hybrid")
+  ) {
     note.innerHTML = `<strong>${panel._escape(t(panel, "strategyNote"))}</strong> ${panel._escape(current.label)} · ${panel._escape(current.description)} ${panel._escape(t(panel, "evOverride"))}`;
   }
 }

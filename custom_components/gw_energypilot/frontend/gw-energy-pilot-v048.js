@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1";
+import "./gw-energy-pilot-v047.js?v=0.49-consolidated1";
 
 const VERSION = "0.48";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -36,7 +36,14 @@ function patchReleasePresentation(panel) {
 
   const cache = panel.__epV022SmartMeter || {};
   const strategy = cache.data?.strategy || panel._stateByKey?.("control_strategy")?.state;
-  if (strategy !== "hybrid") return;
+  const note = root.querySelector(".ep-v022-strategy-note");
+  if (strategy !== "hybrid") {
+    if (note?.dataset.epReleasePresentationOwner === "v048-hybrid") {
+      delete note.dataset.epReleasePresentationOwner;
+      delete note.dataset.epV048PresentationKey;
+    }
+    return;
+  }
 
   const copy = TEXT[language(panel)] || TEXT.en;
   const status = root.querySelector(
@@ -46,9 +53,11 @@ function patchReleasePresentation(panel) {
     status.textContent = copy.hybridDescription;
   }
 
-  const note = root.querySelector(".ep-v022-strategy-note");
-  if (note) {
+  const presentationKey = `${language(panel)}:${strategy}`;
+  if (note && note.dataset.epV048PresentationKey !== presentationKey) {
     note.innerHTML = `<strong>${copy.strategyNote}</strong> ${copy.hybridLabel} · ${copy.hybridDescription} ${copy.evOverride}`;
+    note.dataset.epReleasePresentationOwner = "v048-hybrid";
+    note.dataset.epV048PresentationKey = presentationKey;
   }
 }
 

@@ -454,7 +454,11 @@ class GWEnergyPilotOrchestrator:
             responses.append(await self._async_nordpool_day(entries[0].entry_id, today))
         except HomeAssistantError as err:
             _LOGGER.warning("Unable to retrieve today's Nord Pool prices: %s", err)
-            return {}, {}
+            self.last_price_area = None
+            self.last_price_points = 0
+            raise HomeAssistantError(
+                f"Unable to retrieve today's Nord Pool prices: {err}"
+            ) from err
 
         # The official Nord Pool integration exposes a diagnostic binary sensor
         # when tomorrow is available. After 13:00 we also try proactively, so a
@@ -506,6 +510,12 @@ class GWEnergyPilotOrchestrator:
 
         self.last_price_area = selected_area
         self.last_price_points = len(load_cost)
+        if not load_cost or not prod_price:
+            area_context = f" for area {selected_area}" if selected_area else ""
+            raise HomeAssistantError(
+                "Home Assistant's nordpool.get_prices_for_date service returned "
+                f"no usable prices for today{area_context}"
+            )
         return load_cost, prod_price
 
     async def _async_post_emhass(

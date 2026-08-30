@@ -92,7 +92,7 @@ class PVInsightTests(unittest.TestCase):
         self.assertIn('SECTION_PV = "pv"', settings)
         self.assertIn('"purpose": "display_only"', sensor)
         self.assertIn(
-            'const SECTION_ORDER = ["energypilot", "emhass", "pv", "goodwe"]',
+            'const SECTION_ORDER = ["energypilot", "ev", "emhass", "pv", "goodwe"]',
             settings_frontend,
         )
         self.assertIn('field.type === "entity"', settings_frontend)

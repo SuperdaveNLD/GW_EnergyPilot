@@ -4,6 +4,43 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [0.49] - 2026-08-30
+
+### Added
+
+- Added opt-in soft house-connection load balancing for one three-phase EV
+  charger. It observes one configured phase-current entity, waits for a
+  continuous configurable 1–15 minute overload/headroom window, and adjusts only
+  one configured charger maximum-current NumberEntity (#94).
+- Added an EV settings tab with common Dutch one-/three-phase connection
+  profiles, custom profiles, charger minimum/maximum boundaries and a dedicated
+  diagnostic sensor.
+- Added a second confirmation gate and append-only per-entry audit history for
+  newly configured charger maxima above the normal 16 A boundary.
+- Persist the timestamp and context of the latest successfully completed EMS setpoint write, expose it through existing controller diagnostics and LOG/support output, and show the localized time beneath the live EMS setpoint without rebuilding the Controller card (#96).
+- Added one serialized wall-clock scheduler for 15/30/60-minute full optimizations and due saved-plan publication, with fresh-output gates and Battery Hold failure safety (#98).
+- Added compact Modbus/charger/coordination reachability plus a five-minute stale-charger EV-coordination suspension guard (#95).
+- Added explicit Controller feedback for blocking, charging, waiting and inactive EV anti-discharge decisions (#91).
+
+### Fixed
+
+- Distinguish a configured-but-unavailable Nord Pool price entity from a source that is not configured (#93).
+- Preserve the Battery · Plan · Price card shell, header, S/M/L controls and window bar through scoped graph refresh (#97).
+- Use canonical live Home Assistant minimum/maximum SOC entities when cached EMHASS settings data is absent (#100).
+- Keep the Hybrid strategy explanation node and height stable during ordinary telemetry while still refreshing it for real language/strategy changes (#101).
+
+### Safety and compatibility
+
+- The EV load balancer never calls GoodWe, Modbus EMS, Automatic Control or
+  EMHASS. Invalid measurements fail without a charger write; unrelated settings
+  saves preserve all EV load-balancing options.
+- This is a best-effort soft guard, not a replacement for correctly rated wiring,
+  breakers, charger protection or the main fuse. The first implementation sees
+  one phase and controls all three charger phases together.
+- The EMS timestamp advances only after the established `47512 -> wait -> 47511` command completes without a Modbus error. Read-back-matched no-op evaluations and failed commands do not advance it; EMS mapping, write order, entity unique IDs and controller ownership are unchanged.
+- EMHASS `continual_publish` is synchronized to `false`; EnergyPilot is the sole plan schedule owner and never evaluates a partially published `P_batt`/`P_grid` pair.
+- Issue #99 remains open/on hold and is intentionally excluded because the reported white screen could not be reproduced.
+
 ## [0.48] - 2026-08-30
 
 ### Fixed

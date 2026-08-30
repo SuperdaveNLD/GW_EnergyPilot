@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -43,6 +43,7 @@
       "meter_l2_voltage", "meter_l3_voltage", "meter_l1_current",
       "meter_l2_current", "meter_l3_current", "ems_mode", "ems_setpoint",
       "target_power", "control_command", "automatic_control", "optimize_now",
+      "connectivity_status",
       "manual_mode", "manual_power", "control_strategy",
       "grid_energy_imported_today", "grid_energy_exported_today",
       "grid_energy_import_total", "grid_energy_export_total",
@@ -98,9 +99,10 @@
       control_command: "battery_charge",
       automatic_control: "on",
       optimize_now: "unknown",
+      connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
-      control_strategy: ENTRYPOINT === "v048" ? "hybrid" : "battery",
+      control_strategy: ["v048", "v049"].includes(ENTRYPOINT) ? "hybrid" : "battery",
       grid_energy_imported_today: 3.2,
       grid_energy_exported_today: 7.8,
       grid_energy_import_total: 1234.5,
@@ -148,6 +150,33 @@
         ...(unit ? { unit_of_measurement: unit } : {}),
       };
       if (key === "ems_mode") attributes.mode_name = "Battery charge power";
+      if (key === "connectivity_status") {
+        Object.assign(attributes, {
+          modbus_status: "online",
+          modbus_last_success: new Date().toISOString(),
+          modbus_last_failure: null,
+          modbus_last_error: null,
+          refresh_seconds: 15,
+          ev_online_entity: "binary_sensor.charger_online",
+          ev_status: "online",
+          ev_coordination_requested: true,
+          ev_coordination_effective: true,
+          ev_coordination_suspended: false,
+          ev_transition: null,
+          ev_transition_remaining_seconds: null,
+          ev_grace_seconds: 300,
+        });
+      }
+      if (key === "control_command") {
+        Object.assign(attributes, {
+          last_ems_setpoint_updated_at: "2026-08-29T18:15:30+00:00",
+          last_ems_setpoint: 1200,
+          last_ems_mode: 11,
+          last_ems_setpoint_command: "battery_charge",
+          ev_active: false,
+          ev_protection_state: "inactive",
+        });
+      }
       if (key === "pv_generation_power") {
         Object.assign(attributes, {
           internal_enabled: true,
@@ -169,6 +198,8 @@
       if (key === "emhass_cost_function") {
         Object.assign(attributes, {
           emhass_costfun: "profit",
+          emhass_minimum_soc_pct: 5,
+          emhass_maximum_soc_pct: 95,
           source: "browser harness",
         });
       }
@@ -184,6 +215,10 @@
           controller_command: "battery_charge",
           controller_target_power: -1200,
           controller_expected_mode: 11,
+          last_ems_setpoint_updated_at: "2026-08-29T18:15:30+00:00",
+          last_ems_setpoint: 1200,
+          last_ems_mode: 11,
+          last_ems_setpoint_command: "battery_charge",
           controller_max_power: 15000,
           controller_deadband: 50,
           ems_mode: 11,
@@ -263,6 +298,18 @@
       friendly_name: "Garage roof PV",
       device_class: "power",
     });
+    initialStates["sensor.grid_phase_current"] = makeExternalState("sensor.grid_phase_current", 24.5, "A");
+    Object.assign(initialStates["sensor.grid_phase_current"].attributes, {
+      friendly_name: "Grid phase L1 current",
+      device_class: "current",
+    });
+    initialStates["number.zaptec_max_current"] = makeExternalState("number.zaptec_max_current", 16, "A");
+    Object.assign(initialStates["number.zaptec_max_current"].attributes, {
+      friendly_name: "Zaptec max current",
+      min: 6,
+      max: 32,
+      step: 1,
+    });
 
     function batterySaverPayload() {
       const modes = [
@@ -309,11 +356,43 @@
             description: "Controller and telemetry.",
             fields: [],
           },
+          ev: {
+            title: "EV",
+            short_title: "EV",
+            description: "Soft EV charger load balancing.",
+            fields: [
+              { key: "enable_ev_load_balancing", label: "Load balancing for EV charger", type: "boolean", value: false, readonly: false },
+              { key: "grid_connection_profile", label: "House connection", type: "select", value: "3x25", readonly: false, options: [
+                { value: "3x25", label: "3 × 25 A" },
+                { value: "custom_1_phase", label: "Custom · 1 phase" },
+                { value: "custom_3_phase", label: "Custom · 3 phase" },
+              ] },
+              { key: "grid_custom_current", label: "Custom connection current", type: "number", value: 25, min: 6, max: 100, step: 1, readonly: false },
+              { key: "ev_grid_current_entity", label: "Measured phase current", type: "entity", domains: ["sensor"], units: ["A", "mA"], value: "sensor.grid_phase_current", readonly: false },
+              { key: "ev_charger_current_entity", label: "Charger maximum-current control", type: "entity", domains: ["number"], value: "number.zaptec_max_current", readonly: false },
+              { key: "ev_load_balance_window", label: "Sustained condition window", type: "select", value: 5, readonly: false, options: [1, 5, 15].map((value) => ({ value, label: `${value} min` })) },
+              { key: "ev_charger_min_current", label: "Minimum charger current", type: "number", value: 6, min: 6, max: 16, step: 1, readonly: false },
+              { key: "ev_charger_max_current", label: "Maximum charger current", type: "number", value: 16, min: 6, max: 32, step: 1, readonly: false },
+            ],
+          },
           emhass: {
             title: "EMHASS",
             short_title: "EMHASS",
             description: "EMHASS settings.",
-            fields: [],
+            fields: [
+              {
+                key: "emhass_optimization_interval",
+                label: "Optimization interval",
+                type: "select",
+                value: "15",
+                options: [
+                  { value: "15", label: "15 minutes" },
+                  { value: "30", label: "30 minutes" },
+                  { value: "60", label: "60 minutes" },
+                ],
+                readonly: false,
+              },
+            ],
           },
           pv: {
             title: "PV",
@@ -433,10 +512,14 @@
         return batterySaverPayload();
       }
       if (type === "gw_energypilot/settings/get") return settingsPayload();
+      if (type === "gw_energypilot/settings/update") {
+        await actionDelay();
+        return { require_restart: false, settings: settingsPayload() };
+      }
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ENTRYPOINT === "v048" ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {
@@ -566,6 +649,7 @@
       v046: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v046.js?browser-harness=1",
       v047: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v047.js?browser-harness=1",
       v048: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v048.js?browser-harness=1",
+      v049: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v049.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -698,7 +782,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

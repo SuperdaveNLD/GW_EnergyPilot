@@ -1,8 +1,8 @@
-import "./gw-energy-pilot-v015.js?v=0.47-custom-battery1";
+import "./gw-energy-pilot-v015.js?v=0.49-consolidated1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
-const SECTION_ORDER = ["energypilot", "emhass", "pv", "goodwe"];
+const SECTION_ORDER = ["energypilot", "ev", "emhass", "pv", "goodwe"];
 
 const PV_COPY = Object.freeze({
   en: Object.freeze({
@@ -207,6 +207,7 @@ function ensureStyles(root) {
       line-height: 1.55;
     }
     .ep-v016-goodwe-note,
+    .ep-v016-ev-note,
     .ep-v016-emhass-note,
     .ep-v016-pv-note {
       margin: 0 0 16px;
@@ -219,8 +220,15 @@ function ensureStyles(root) {
       line-height: 1.5;
     }
     .ep-v016-goodwe-note strong,
+    .ep-v016-ev-note strong,
     .ep-v016-emhass-note strong,
     .ep-v016-pv-note strong { color: #ccecf6; }
+    .ep-v016-ev-note.danger {
+      border-color: rgba(255,91,91,.55);
+      color: #ffd3d3;
+      background: rgba(102,20,27,.42);
+      box-shadow: inset 0 0 0 1px rgba(255,91,91,.08);
+    }
 
     .ep-v016-fields {
       display: grid;
@@ -541,14 +549,19 @@ function pvFieldPresentation(panel, sectionId, field) {
   };
 }
 
-function powerEntityOptions(panel) {
+function entityOptions(panel, field) {
   const aggregateId = panel._entityId?.("pv_generation_power");
   const supportedUnits = new Set(["W", "kW", "MW", "mW"]);
+  const domains = new Set(field.domains || []);
+  const units = new Set(field.units || []);
   return Object.entries(panel?._hass?.states || {})
     .filter(([entityId, state]) => {
       if (entityId === aggregateId) return false;
       const attrs = state?.attributes || {};
       if (attrs.purpose === "display_only" && Array.isArray(attrs.sources)) return false;
+      if (domains.size && !domains.has(entityId.split(".")[0])) return false;
+      if (units.size && !units.has(attrs.unit_of_measurement)) return false;
+      if (domains.size || units.size) return true;
       return attrs.device_class === "power" || supportedUnits.has(attrs.unit_of_measurement);
     })
     .sort(([left], [right]) => left.localeCompare(right))
@@ -582,9 +595,18 @@ function fieldHtml(panel, sectionId, field) {
     const step = field.step === undefined ? "" : ` step="${field.step}"`;
     return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="number" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}"${min}${max}${step}${disabled}>${description}</label>`;
   }
+  if (field.type === "select") {
+    const options = (field.options || []).map((option) => {
+      const optionValue = String(option?.value ?? option ?? "");
+      const optionLabel = String(option?.label ?? optionValue);
+      const selected = String(value ?? "") === optionValue ? " selected" : "";
+      return `<option value="${panel._escape(optionValue)}"${selected}>${panel._escape(optionLabel)}</option>`;
+    }).join("");
+    return `<label class="${fieldClass}">${label}<select class="ep-v016-input" data-setting-key="${panel._escape(field.key)}"${disabled}>${options}</select>${description}</label>`;
+  }
   if (field.type === "entity") {
     const listId = `ep-v016-${field.key}-entities`;
-    return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" list="${panel._escape(listId)}" placeholder="sensor…" autocomplete="off"${disabled}><datalist id="${panel._escape(listId)}">${powerEntityOptions(panel)}</datalist>${description}</label>`;
+    return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" list="${panel._escape(listId)}" placeholder="entity…" autocomplete="off"${disabled}><datalist id="${panel._escape(listId)}">${entityOptions(panel, field)}</datalist>${description}</label>`;
   }
   return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" autocomplete="off"${disabled}>${description}</label>`;
 }
@@ -624,6 +646,19 @@ function syncExternalPvFields(form) {
   });
 }
 
+function syncEvSafetyFields(form) {
+  const profile = form?.querySelector('[data-setting-key="grid_connection_profile"]');
+  const custom = form?.querySelector('[data-setting-key="grid_custom_current"]');
+  if (profile && custom) {
+    const enabled = String(profile.value).startsWith("custom_");
+    custom.disabled = !enabled;
+    custom.closest(".ep-v016-field")?.classList.toggle("is-disabled", !enabled);
+  }
+  const maximum = Number(form?.querySelector('[data-setting-key="ev_charger_max_current"]')?.value);
+  const note = form?.closest(".ep-v016-settings-content")?.querySelector("[data-ev-safety-note]");
+  if (note) note.classList.toggle("danger", Number.isFinite(maximum) && maximum > 16);
+}
+
 function collectValues(form) {
   const values = {};
   form.querySelectorAll("[data-setting-key]").forEach((input) => {
@@ -639,6 +674,19 @@ function collectValues(form) {
 async function saveSection(panel, form, sectionId) {
   if (!panel.__epV016SettingsData?.entry_id || panel.__epV016Saving) return;
   const values = collectValues(form);
+  if (sectionId === "ev") {
+    const previous = panel.__epV016SettingsData?.sections?.ev?.fields
+      ?.find((field) => field.key === "ev_charger_max_current")?.value;
+    const maximum = Number(values.ev_charger_max_current);
+    if (Number.isFinite(maximum) && maximum > 16 && Number(previous) !== maximum) {
+      const accepted = window.confirm(
+        `Warning: ${maximum} A can exceed the charger's wiring or protection rating. ` +
+        "Confirm only after verifying the complete charger circuit. This acknowledgement is permanently logged."
+      );
+      if (!accepted) return;
+      values._confirm_high_current = true;
+    }
+  }
   panel.__epV016Saving = true;
   panel.__epV016Message = { tone: "", text: sectionId === "goodwe" ? "Validating GoodWe connection…" : "Saving configuration…" };
   panel._queueRender();
@@ -715,6 +763,8 @@ function renderSettingsPage(panel, root) {
       ? `<div class="ep-v016-emhass-note"><strong>EMHASS:</strong> this page owns EnergyPilot's EMHASS connection, scheduling, output mapping and price-source settings. Live SOC and cost-function controls remain available on the dashboard while they are migrated into this configuration area.</div>`
       : tabId === "pv"
       ? `<div class="ep-v016-pv-note"><strong>PV:</strong> ${panel._escape(pvCopy(panel).note)}</div>`
+      : tabId === "ev"
+      ? `<div class="ep-v016-ev-note" data-ev-safety-note><strong>Safety boundary:</strong> this soft regulator controls only the selected charger number entity and never GoodWe. It is not a substitute for correctly rated wiring, charger protection or the main fuse. A maximum above 16 A requires an extra confirmation and is permanently audited.</div>`
       : "";
     const sectionFields = section.fields || [];
     const fields = tabId === "pv"
@@ -775,6 +825,7 @@ function renderSettingsPage(panel, root) {
   const form = shell.querySelector(".ep-v016-form");
   if (form) {
     syncExternalPvFields(form);
+    syncEvSafetyFields(form);
     form.querySelectorAll("[data-setting-key]").forEach((input) => {
       const remember = () => {
         panel.__epV016Draft = panel.__epV016Draft || {};
@@ -786,6 +837,10 @@ function renderSettingsPage(panel, root) {
       input.addEventListener(input.type === "checkbox" ? "change" : "input", remember);
       if (input.dataset.settingKey === "enable_external_pv") {
         input.addEventListener("change", () => syncExternalPvFields(form));
+      }
+      if (["grid_connection_profile", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
+        input.addEventListener("change", () => syncEvSafetyFields(form));
+        input.addEventListener("input", () => syncEvSafetyFields(form));
       }
     });
     form.querySelector("[data-discard]")?.addEventListener("click", () => {

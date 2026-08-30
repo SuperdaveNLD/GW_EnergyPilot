@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.48 runtime structure
+## Current v0.49 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,18 +17,22 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v0.48 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v0.49 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
+connectivity_model.py   pure charger reachability debounce/state machine
+connectivity.py         coordinator/entity-backed status, five-minute timer and transition logging
 controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
+control_history.py      persistent latest successful EMS-setpoint update evidence
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
 emhass_config.py        safe full EMHASS config read/write helpers
 emhass_sync.py          canonical EnergyPilot runtime contract + safe required-config synchronization
 emhass_sync_api.py      admin sync/readback API using canonical sync ownership keys
 orchestrator.py         base EMHASS orchestration
 orchestrator_v012.py    reliability/startup/price refinements
+wall_clock.py           pure wall-clock cadence/plan-step helpers
 orchestrator_v013.py    G20 load semantics + persistent last_success/optimization log
 orchestrator_v026.py    canonical dashboard price-series cache/read path
 orchestrator_v031.py    Battery Saver policy + canonical runtime contract + min-SOC/final-SOC ownership + fresh-output validation
@@ -46,7 +50,8 @@ accounting_sensor.py    native Today import/export entities
 runtime_store.py        persistent last_success evidence
 optimization_log.py     bounded optimization-attempt history
 optimization_log_api.py read-only optimization history API
-settings_api.py         EP/EMHASS/GoodWe connection settings
+ev_load_balancing.py    isolated one-phase-observed EV charger current control + audit Store
+settings_api.py         EP/EV/EMHASS/PV/GoodWe settings
 smart_meter_api.py      automatic control-strategy API
 beta_soc_api.py         bounded verified 45356/45358 low-level field-test API
 debug_log_runtime.py    bounded memory-only runtime diagnostic capture
@@ -55,6 +60,8 @@ event_triggers.py       event-driven optimization hooks
 frontend/               layered dashboard/settings assets
 tests/                  hardware-independent regressions
 ```
+
+Connectivity must reuse `coordinator.last_update_success` and the configured scan interval. Do not substitute the transport client's socket flag or add a health-check poll. The charger timer may only change whether the existing EV override is effective; it must not write the saved user option or create another EMS owner.
 
 ## Active orchestrator chain
 
@@ -73,6 +80,7 @@ All layers are active runtime code. Check subclasses before changing a base meth
 Ownership by active layer:
 
 - v026: read-only dashboard/optimizer price-series caching;
+- v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries;
 - v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
 - v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup.
@@ -84,12 +92,12 @@ Do not add release inheritance merely to change a label or constant when an exis
 `emhass_sync.py` is the canonical definition for the small EnergyPilot runtime contract used by both explicit **Synchronize required config** and automatic pre-solve preparation:
 
 ```text
-continual_publish = true
+continual_publish = false
 method_ts_round = first
 set_use_battery = true
 ```
 
-The helper `apply_emhass_runtime_contract()` applies only those values to a copy of the complete current EMHASS configuration. `orchestrator_v031.py` must use that helper rather than maintaining a second required-value list.
+The helper `apply_emhass_runtime_contract()` applies only those values to a copy of the complete current EMHASS configuration. `orchestrator_v031.py` must use that helper rather than maintaining a second required-value list. `continual_publish = false` reserves schedule ownership for the v012 wall-clock callback; do not add another periodic publisher.
 
 Installation/model topology is outside this contract:
 
@@ -120,21 +128,22 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v048.js
-    -> gw-energy-pilot-v047.js
-        -> gw-energy-pilot-v046.js
-            -> gw-energy-pilot-v045.js
-                -> gw-energy-pilot-v044.js
-                    -> gw-energy-pilot-v043.js
-                        -> gw-energy-pilot-v042.js
-                            -> gw-energy-pilot-v041-emhass-settings.js
-                                -> gw-energy-pilot-v041.js
-                                    -> gw-energy-pilot-v039.js
-                                        -> gw-energy-pilot-v038.js
-                                            -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v049.js
+    -> gw-energy-pilot-v048.js
+        -> gw-energy-pilot-v047.js
+            -> gw-energy-pilot-v046.js
+                -> gw-energy-pilot-v045.js
+                    -> gw-energy-pilot-v044.js
+                        -> gw-energy-pilot-v043.js
+                            -> gw-energy-pilot-v042.js
+                                -> gw-energy-pilot-v041-emhass-settings.js
+                                    -> gw-energy-pilot-v041.js
+                                        -> gw-energy-pilot-v039.js
+                                            -> gw-energy-pilot-v038.js
+                                                -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.48 is a bounded release/presentation wrapper over v0.47. It owns only current Hybrid operator copy, the v0.48 badge/footer and the `0.48-hybrid-control1` top-level cache boundary. v0.47 retains Custom Battery Saver editing, larger strategy/settings typography and field-tuned profile presentation; v0.46 retains external-PV presentation, v0.44 owns the bounded Optimize listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS.
+v0.49 is a bounded release/presentation wrapper over v0.48. It owns only the v0.49 badge/footer and complete `0.49-consolidated1` cache boundary. v0.48 retains current Hybrid operator copy and stable-note ownership; v0.47 retains Custom Battery Saver editing, larger strategy/settings typography and field-tuned profile presentation; v0.46 retains external-PV presentation, v0.44 owns the bounded Optimize listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
@@ -184,7 +193,12 @@ Grid    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 ```
 
-This override must not control the EV charger or create a second fast feedback loop. EV-stop fresh-plan protection remains unchanged. Manual commands never inherit or reinterpret the automatic strategy.
+This anti-discharge override must not control the EV charger or create a second
+fast feedback loop. The separately owned `ev_load_balancing.py` runtime may call
+only the selected charger NumberEntity after its full minute-scale condition
+window; it never calls this controller or GoodWe. EV-stop fresh-plan protection
+remains unchanged. Manual commands never inherit or reinterpret the automatic
+strategy.
 
 ## Persistent plan availability contract
 
