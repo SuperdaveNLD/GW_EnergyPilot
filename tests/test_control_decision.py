@@ -33,19 +33,28 @@ class ControlDecisionTests(unittest.TestCase):
         self.module = _load_module()
         self.const = importlib.import_module(f"{PACKAGE_NAME}.const")
 
-    def resolve(self, strategy, p_batt, p_grid=None, ev_active=False):
+    def resolve(
+        self,
+        strategy,
+        p_batt,
+        p_grid=None,
+        ev_active=False,
+        battery_deadband=100,
+        grid_deadband=1000,
+    ):
         return self.module.resolve_control_decision(
             strategy=strategy,
             p_batt=p_batt,
             p_grid=p_grid,
-            deadband=300,
+            battery_deadband=battery_deadband,
+            grid_deadband=grid_deadband,
             max_power=10000,
             ev_active=ev_active,
         )
 
     def test_battery_boundaries_and_clamp(self):
         c = self.const
-        for value in (-300, 0, 300):
+        for value in (-100, 0, 100):
             with self.subTest(value=value):
                 decision = self.resolve(c.CONTROL_STRATEGY_BATTERY, value)
                 self.assertEqual((decision.mode, decision.power), (c.MODE_BATTERY_HOLD, 0))
@@ -60,8 +69,8 @@ class ControlDecisionTests(unittest.TestCase):
         exported = self.resolve(c.CONTROL_STRATEGY_GRID, 2000, -3500)
         self.assertEqual((imported.mode, imported.power), (c.MODE_GRID_IMPORT_TARGET, 3500))
         self.assertEqual((exported.mode, exported.power), (c.MODE_GRID_EXPORT_TARGET, 3500))
-        hold = self.resolve(c.CONTROL_STRATEGY_HYBRID, 300, 8000)
-        auto = self.resolve(c.CONTROL_STRATEGY_HYBRID, -2000, -300)
+        hold = self.resolve(c.CONTROL_STRATEGY_HYBRID, 100, 8000)
+        auto = self.resolve(c.CONTROL_STRATEGY_HYBRID, -2000, -1000)
         self.assertEqual((hold.mode, hold.power), (c.MODE_BATTERY_HOLD, 0))
         self.assertEqual((auto.mode, auto.power), (c.MODE_AUTO, 0))
 
@@ -84,6 +93,14 @@ class ControlDecisionTests(unittest.TestCase):
         self.assertEqual((hold.mode, hold.command), (c.MODE_BATTERY_HOLD, "ev_anti_discharge_hold"))
         self.assertEqual((import_charge.mode, import_charge.power), (c.MODE_GRID_IMPORT_TARGET, 3500))
         self.assertEqual((fallback.mode, fallback.command), (c.MODE_CHARGE_BATTERY, "ev_charge_fallback"))
+
+    def test_hybrid_field_example_uses_mode1_between_deadbands(self):
+        c = self.const
+        decision = self.resolve(c.CONTROL_STRATEGY_HYBRID, -231, 0)
+        self.assertEqual(
+            (decision.mode, decision.power, decision.command),
+            (c.MODE_AUTO, 0, "hybrid_grid_zero_auto"),
+        )
 
 
 if __name__ == "__main__":

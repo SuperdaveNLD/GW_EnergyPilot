@@ -29,6 +29,7 @@ from .const import (
     CONF_EV_DEADBAND,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_MAX_POWER,
     CONF_OPTIM_REQUIRED_STATE,
     CONF_OPTIM_STATUS_ENTITY,
@@ -43,6 +44,7 @@ from .const import (
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
     DEFAULT_EV_DEADBAND,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_REQUIRED_STATE,
     DEFAULT_P_BATT_ENTITY,
@@ -94,8 +96,8 @@ class GWEnergyPilotController:
     Hybrid gives an explicit neutral battery plan first priority. For every
     non-neutral battery plan it controls the PCC: GoodWe self-use owns a
     near-zero grid plan, and modes 9/10 own non-zero import/export targets.
-    The configured deadband classifies both neutral battery power and near-zero
-    grid power; it is never subtracted from a non-zero setpoint.
+    Separate configured deadbands classify neutral battery power and near-zero
+    grid power. Neither is subtracted from a non-zero setpoint.
 
     Existing installations without an explicit strategy retain the legacy
     smart-meter boolean mapping for backwards compatibility.
@@ -430,6 +432,15 @@ class GWEnergyPilotController:
                 "deadband_w": float(
                     self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
                 ),
+                "battery_hold_deadband_w": float(
+                    self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
+                ),
+                "goodwe_auto_deadband_w": float(
+                    self.entry.options.get(
+                        CONF_GOODWE_AUTO_DEADBAND,
+                        DEFAULT_GOODWE_AUTO_DEADBAND,
+                    )
+                ),
                 "max_power_w": int(
                     self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)
                 ),
@@ -713,12 +724,15 @@ class GWEnergyPilotController:
                 skip_if_readback_matches=True,
             )
 
-    async def _async_apply_direct_battery_plan(self, p_batt: float, deadband: float, max_power: int) -> None:
+    async def _async_apply_direct_battery_plan(
+        self, p_batt: float, battery_deadband: float, max_power: int
+    ) -> None:
         decision = resolve_control_decision(
             strategy=CONTROL_STRATEGY_BATTERY,
             p_batt=p_batt,
             p_grid=None,
-            deadband=deadband,
+            battery_deadband=battery_deadband,
+            grid_deadband=DEFAULT_GOODWE_AUTO_DEADBAND,
             max_power=max_power,
         )
         await self._async_apply_command(
@@ -728,12 +742,19 @@ class GWEnergyPilotController:
             skip_if_readback_matches=True,
         )
 
-    async def _async_apply_ev_anti_discharge_plan(self, p_batt: float, deadband: float, max_power: int) -> None:
+    async def _async_apply_ev_anti_discharge_plan(
+        self,
+        p_batt: float,
+        battery_deadband: float,
+        grid_deadband: float,
+        max_power: int,
+    ) -> None:
         decision = resolve_control_decision(
             strategy=CONTROL_STRATEGY_BATTERY,
             p_batt=p_batt,
             p_grid=None,
-            deadband=deadband,
+            battery_deadband=battery_deadband,
+            grid_deadband=grid_deadband,
             max_power=max_power,
             ev_active=True,
         )
@@ -749,12 +770,15 @@ class GWEnergyPilotController:
             skip_if_readback_matches=True,
         )
 
-    async def _async_apply_smart_meter_plan(self, p_grid: float, deadband: float, max_power: int) -> None:
+    async def _async_apply_smart_meter_plan(
+        self, p_grid: float, grid_deadband: float, max_power: int
+    ) -> None:
         decision = resolve_control_decision(
             strategy=CONTROL_STRATEGY_GRID,
             p_batt=0,
             p_grid=p_grid,
-            deadband=deadband,
+            battery_deadband=DEFAULT_DEADBAND,
+            grid_deadband=grid_deadband,
             max_power=max_power,
         )
         await self._async_apply_command(
@@ -764,13 +788,21 @@ class GWEnergyPilotController:
             skip_if_readback_matches=True,
         )
 
-    async def _async_apply_hybrid_plan(self, p_batt: float, p_grid: float, deadband: float, max_power: int) -> None:
+    async def _async_apply_hybrid_plan(
+        self,
+        p_batt: float,
+        p_grid: float,
+        battery_deadband: float,
+        grid_deadband: float,
+        max_power: int,
+    ) -> None:
         """Hold neutral battery plans, otherwise execute the signed PCC plan."""
         decision = resolve_control_decision(
             strategy=CONTROL_STRATEGY_HYBRID,
             p_batt=p_batt,
             p_grid=p_grid,
-            deadband=deadband,
+            battery_deadband=battery_deadband,
+            grid_deadband=grid_deadband,
             max_power=max_power,
         )
         await self._async_apply_command(
@@ -794,14 +826,29 @@ class GWEnergyPilotController:
             self._notify_state()
             await self._async_record_waiting(self.last_command)
             return
-        deadband = float(self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
+        battery_deadband = float(
+            self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
+        )
+        grid_deadband = float(
+            self.entry.options.get(
+                CONF_GOODWE_AUTO_DEADBAND,
+                DEFAULT_GOODWE_AUTO_DEADBAND,
+            )
+        )
         max_power = int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
         if self.ev_is_active():
-            await self._async_apply_ev_anti_discharge_plan(p_batt, deadband, max_power)
+            await self._async_apply_ev_anti_discharge_plan(
+                p_batt,
+                battery_deadband,
+                grid_deadband,
+                max_power,
+            )
             return
         strategy = self.control_strategy
         if strategy == CONTROL_STRATEGY_BATTERY:
-            await self._async_apply_direct_battery_plan(p_batt, deadband, max_power)
+            await self._async_apply_direct_battery_plan(
+                p_batt, battery_deadband, max_power
+            )
             return
         p_grid = self._state_float(self._p_grid_entity_id())
         if p_grid is None:
@@ -810,9 +857,15 @@ class GWEnergyPilotController:
             await self._async_record_waiting(self.last_command)
             return
         if strategy == CONTROL_STRATEGY_HYBRID:
-            await self._async_apply_hybrid_plan(p_batt, p_grid, deadband, max_power)
+            await self._async_apply_hybrid_plan(
+                p_batt,
+                p_grid,
+                battery_deadband,
+                grid_deadband,
+                max_power,
+            )
             return
-        await self._async_apply_smart_meter_plan(p_grid, deadband, max_power)
+        await self._async_apply_smart_meter_plan(p_grid, grid_deadband, max_power)
 
     async def async_evaluate(self, *, allow_suspended: bool = False) -> None:
         if self._plan_update_suspensions and not allow_suspended:

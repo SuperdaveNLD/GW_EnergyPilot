@@ -4,6 +4,31 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.0.1-beta.2] - 2026-08-30
+
+### Added
+
+- Add a separate `goodwe_auto_deadband` for `P_grid` mode-1 decisions, with a
+  1000 W fresh default.
+- Add a bilingual Settings → EP panel with two inputs, a central 0 W marker,
+  charge/discharge direction and the mode 10/1/8/1/9 decision bar.
+
+### Changed
+
+- Define the stable legacy `deadband` option exclusively as Battery Hold on
+  `P_batt`; fresh configurations default to 100 W and existing values remain
+  unchanged.
+- Apply both thresholds consistently to live control, EV anti-discharge,
+  future plan projection, diagnostics and execution evidence.
+
+### Validation and compatibility
+
+- Add pure-decision, controller and three-profile browser regressions for exact
+  boundaries, the `-231 W / 0 W` field case, frontend validation and responsive
+  rendering.
+- Preserve all v1.0.1-beta.1 fixes, GoodWe registers/write order, manual
+  ownership, identities, Store schemas, accounting and EMHASS ownership.
+
 ## [1.0.1-beta.1] - 2026-08-30
 
 ### Fixed

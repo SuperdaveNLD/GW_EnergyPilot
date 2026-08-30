@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v1.0.1-beta.1**.
+This document describes the current runtime architecture of **GW EnergyPilot v1.0.1-beta.2**.
 
 ## High-level flow
 
@@ -146,29 +146,29 @@ When OFF, EnergyPilot returns the inverter to mode 1 / 0 W.
 ### Battery strategy
 
 ```text
-P_batt < -deadband -> mode 11
-P_batt > +deadband -> mode 12
-P_batt near 0 W    -> mode 8
+P_batt < -Battery Hold deadband -> mode 11
+P_batt > +Battery Hold deadband -> mode 12
+P_batt inside Battery Hold deadband -> mode 8
 ```
 
 ### Grid strategy
 
 ```text
-P_grid > +deadband -> mode 9
-P_grid < -deadband -> mode 10
-P_grid near 0 W    -> mode 1
+P_grid > +GoodWe Auto deadband -> mode 9
+P_grid < -GoodWe Auto deadband -> mode 10
+P_grid inside GoodWe Auto deadband -> mode 1
 ```
 
 ### Hybrid strategy
 
 ```text
-P_batt near 0 W -> mode 8
-else P_grid near 0 W -> mode 1
-else P_grid > +deadband -> mode 9 using abs(P_grid)
-else P_grid < -deadband -> mode 10 using abs(P_grid)
+abs(P_batt) <= Battery Hold deadband -> mode 8
+else abs(P_grid) <= GoodWe Auto deadband -> mode 1
+else P_grid > +GoodWe Auto deadband -> mode 9 using abs(P_grid)
+else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 ```
 
-Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance around a zero grid target, while modes 9/10 own non-zero planned import/export. The configured deadband is evaluated independently against `P_batt` and `P_grid` in that order; exact boundaries remain neutral and the threshold is never subtracted from the final mode-9/10 setpoint.
+Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance inside the separate GoodWe Auto deadband, while modes 9/10 own non-zero planned import/export outside it. Exact boundaries remain neutral and neither threshold is ever subtracted from the final mode-9/10 setpoint.
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
@@ -179,16 +179,16 @@ The EV feature is a higher-priority directional safety guard, not an EV charger 
 During an active EV charging session:
 
 ```text
-P_batt >= -deadband -> mode 8 Battery Hold
-P_batt < -deadband  -> explicit home-battery charge remains allowed
+P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
+P_batt < -Battery Hold deadband  -> explicit home-battery charge remains allowed
 ```
 
 Charge execution follows the selected strategy as far as safely possible:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 ```
 
 The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. EV-stop stale-plan protection remains unchanged.
@@ -469,7 +469,7 @@ gw-energy-pilot-v101.js
                                                                              -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card and source-attributed detailed plan graph. v1.0.1-beta.1 owns beta presentation and the complete `1.0.1-beta1` active-graph cache boundary.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card and source-attributed detailed plan graph. The existing settings module owns the two-deadband panel and zero-centered explanatory scale while backend config/controller modules own their semantics. v1.0.1-beta.2 owns beta presentation and the complete `1.0.1-beta2` active-graph cache boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 

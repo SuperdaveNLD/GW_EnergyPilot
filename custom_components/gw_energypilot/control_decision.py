@@ -49,7 +49,8 @@ def resolve_control_decision(
     strategy: str,
     p_batt: float | int | None,
     p_grid: float | int | None,
-    deadband: float,
+    battery_deadband: float,
+    grid_deadband: float,
     max_power: int,
     ev_active: bool = False,
 ) -> ControlDecision:
@@ -61,20 +62,21 @@ def resolve_control_decision(
     """
     battery = _finite(p_batt)
     grid = _finite(p_grid)
-    boundary = max(0.0, float(deadband))
+    battery_boundary = max(0.0, float(battery_deadband))
+    grid_boundary = max(0.0, float(grid_deadband))
 
     if battery is None:
         return ControlDecision(None, None, "waiting_for_p_batt")
 
     if ev_active:
-        if battery >= -boundary:
+        if battery >= -battery_boundary:
             return ControlDecision(
                 MODE_BATTERY_HOLD,
                 0,
                 "ev_anti_discharge_hold",
             )
         if strategy in {CONTROL_STRATEGY_GRID, CONTROL_STRATEGY_HYBRID}:
-            if grid is not None and grid > boundary:
+            if grid is not None and grid > grid_boundary:
                 return ControlDecision(
                     MODE_GRID_IMPORT_TARGET,
                     _bounded_power(grid, max_power),
@@ -92,13 +94,13 @@ def resolve_control_decision(
         )
 
     if strategy == CONTROL_STRATEGY_BATTERY:
-        if battery > boundary:
+        if battery > battery_boundary:
             return ControlDecision(
                 MODE_DISCHARGE_BATTERY,
                 _bounded_power(battery, max_power),
                 "battery_discharge",
             )
-        if battery < -boundary:
+        if battery < -battery_boundary:
             return ControlDecision(
                 MODE_CHARGE_BATTERY,
                 _bounded_power(battery, max_power),
@@ -110,15 +112,15 @@ def resolve_control_decision(
         return ControlDecision(None, None, "waiting_for_p_grid")
 
     if strategy == CONTROL_STRATEGY_HYBRID:
-        if abs(battery) <= boundary:
+        if abs(battery) <= battery_boundary:
             return ControlDecision(
                 MODE_BATTERY_HOLD,
                 0,
                 "hybrid_battery_hold",
             )
-        if abs(grid) <= boundary:
+        if abs(grid) <= grid_boundary:
             return ControlDecision(MODE_AUTO, 0, "hybrid_grid_zero_auto")
-        if grid > boundary:
+        if grid > grid_boundary:
             return ControlDecision(
                 MODE_GRID_IMPORT_TARGET,
                 _bounded_power(grid, max_power),
@@ -131,13 +133,13 @@ def resolve_control_decision(
         )
 
     # Explicit Grid and legacy smart-meter control share the PCC mapping.
-    if grid > boundary:
+    if grid > grid_boundary:
         return ControlDecision(
             MODE_GRID_IMPORT_TARGET,
             _bounded_power(grid, max_power),
             "grid_import_target",
         )
-    if grid < -boundary:
+    if grid < -grid_boundary:
         return ControlDecision(
             MODE_GRID_EXPORT_TARGET,
             _bounded_power(grid, max_power),

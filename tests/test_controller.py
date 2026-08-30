@@ -337,12 +337,15 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.last_command, "grid_import_target")
 
     async def test_zero_grid_deadband_uses_goodwe_auto(self):
-        for p_grid in ("-300", "0", "300"):
+        for p_grid in ("-1000", "0", "1000"):
             with self.subTest(p_grid=p_grid):
                 controller, _, client, coordinator = self.make_controller(
                     p_batt="-1800",
                     p_grid=p_grid,
-                    options={const.CONF_DEADBAND: 300},
+                    options={
+                        const.CONF_DEADBAND: 100,
+                        const.CONF_GOODWE_AUTO_DEADBAND: 1000,
+                    },
                 )
                 controller.enabled = True
 

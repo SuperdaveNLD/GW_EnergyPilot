@@ -32,7 +32,8 @@ The active frontend chain is documented in `docs/FRONTEND_STABLE_DOM.md`. The se
 The EP section owns:
 
 - maximum controller/setpoint power;
-- control deadband;
+- Battery Hold deadband for `P_batt` (100 W fresh default);
+- GoodWe Auto deadband for `P_grid` (1000 W fresh default);
 - GoodWe telemetry interval;
 
 ## EV page
@@ -174,29 +175,29 @@ Connection changes are validated with a temporary `GWModbusClient` before the ex
 **Battery control**
 
 ```text
-P_batt < -deadband -> mode 11 Battery charge power
-P_batt > +deadband -> mode 12 Battery discharge power
-P_batt near 0 W    -> mode 8 Battery Hold
+P_batt < -Battery Hold deadband -> mode 11 Battery charge power
+P_batt > +Battery Hold deadband -> mode 12 Battery discharge power
+P_batt inside Battery Hold deadband -> mode 8 Battery Hold
 ```
 
 **Grid control**
 
 ```text
-P_grid > +deadband -> mode 9 Grid import target
-P_grid < -deadband -> mode 10 Grid export target
-P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
+P_grid > +GoodWe Auto deadband -> mode 9 Grid import target
+P_grid < -GoodWe Auto deadband -> mode 10 Grid export target
+P_grid inside GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
 ```
 
 **Hybrid control**
 
 ```text
-P_batt near 0 W -> mode 8 Battery Hold
-else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
-else P_grid > +deadband -> mode 9 Grid import target
-else P_grid < -deadband -> mode 10 Grid export target
+abs(P_batt) <= Battery Hold deadband -> mode 8 Battery Hold
+else abs(P_grid) <= GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
+else P_grid > +GoodWe Auto deadband -> mode 9 Grid import target
+else P_grid < -GoodWe Auto deadband -> mode 10 Grid export target
 ```
 
-Hybrid evaluates the configured deadband against `P_batt` first, so a neutral battery plan always remains mode 8. Every non-neutral plan then follows signed `P_grid`: mode 1 around zero lets GoodWe close the current local balance, while modes 9/10 receive the complete absolute planned import/export magnitude. Exact deadband boundaries remain neutral and the deadband is never subtracted from the setpoint.
+Hybrid evaluates the Battery Hold deadband against `P_batt` first, so a neutral battery plan always remains mode 8. Every non-neutral plan then follows signed `P_grid`: the separate GoodWe Auto deadband selects mode 1, while modes 9/10 receive the complete absolute planned import/export magnitude outside it. Exact boundaries remain neutral and neither threshold is subtracted from the setpoint. Existing stored `deadband` values remain Battery Hold values after upgrade.
 
 When no explicit `control_strategy` exists, backwards compatibility remains:
 

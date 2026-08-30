@@ -48,6 +48,7 @@ from .const import (
     CONF_EV_POWER_ENTITY,
     CONF_GRID_CONNECTION_PROFILE,
     CONF_GRID_CUSTOM_CURRENT,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_NORDPOOL_AREA,
     CONF_NORDPOOL_CURRENCY,
     CONF_OPTIMIZE_ON_TOMORROW_PRICES,
@@ -76,6 +77,7 @@ from .const import (
     DEFAULT_EV_LOAD_BALANCE_WINDOW,
     DEFAULT_GRID_CONNECTION_PROFILE,
     DEFAULT_GRID_CUSTOM_CURRENT,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_NORDPOOL_AREA,
     DEFAULT_NORDPOOL_CURRENCY,
@@ -110,6 +112,7 @@ SECTION_PV = "pv"
 ENERGYPILOT_KEYS = {
     CONF_MAX_POWER_KW,
     CONF_DEADBAND,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_SCAN_INTERVAL,
 }
 EV_KEYS = {
@@ -440,14 +443,31 @@ EP_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": CONF_DEADBAND,
-        "label": "Battery deadband",
+        "label": "Battery Hold deadband · P_batt",
         "type": "number",
         "default": DEFAULT_DEADBAND,
         "unit": "W",
         "min": 0,
         "max": 2000,
         "step": 50,
-        "description": "P_batt values inside this band hold the battery around zero watts.",
+        "description": (
+            "P_batt values inside this band select mode 8 Battery Hold. "
+            "Recommended: 100 W."
+        ),
+    },
+    {
+        "key": CONF_GOODWE_AUTO_DEADBAND,
+        "label": "GoodWe Auto deadband · P_grid",
+        "type": "number",
+        "default": DEFAULT_GOODWE_AUTO_DEADBAND,
+        "unit": "W",
+        "min": 100,
+        "max": 5000,
+        "step": 50,
+        "description": (
+            "Outside Battery Hold, P_grid values inside this band select mode 1 "
+            "GoodWe Auto. Recommended: 1000 W."
+        ),
     },
     {
         "key": CONF_SCAN_INTERVAL,

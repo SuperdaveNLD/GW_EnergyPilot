@@ -17,6 +17,19 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.0.1-beta.2 — Separate Battery Hold and GoodWe Auto deadbands
+
+Automatic Control now has two explicit neutral boundaries. Battery Hold uses
+`P_batt` with a 100 W fresh default; GoodWe Auto uses `P_grid` with a separate
+1000 W default. Hybrid evaluates them in that order before selecting signed
+mode 9/10 PCC control, and exact boundaries remain neutral.
+
+Settings → EP presents both values with a central 0 W marker, charging and
+discharging directions and the mode 10/1/8/1/9 bar. Existing stored `deadband`
+values remain Battery Hold values and are not silently retuned. EV
+anti-discharge remains higher priority. See
+`docs/releases/v1.0.1-beta.2.md`.
+
 # v1.0.1-beta.1 — Mobile click and legacy interval compatibility
 
 The options flow now accepts supported wall-clock cadences that older stored
@@ -97,6 +110,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.0.1-beta.2** | 2026-08-30 | **Beta** | Separates Battery Hold on `P_batt` from GoodWe Auto on `P_grid` and adds the centered decision-zone settings panel. |
 | **1.0.1-beta.1** | 2026-08-30 | **Beta** | Normalizes integral legacy optimization intervals and keeps native mobile clicks connected while unchanged Optimize/strategy copy is patched. |
 | **1.0.0** | 2026-08-30 | **Stable** | First stable v1: execution/read-back history, EV protection underlays, source-attribution estimates, historical wanted SOC, presentation fixes and safe tag-only stable/beta channels. |
 | **0.50** | 2026-08-30 | **Beta** | Reads GoodWe L1/L2/L3 automatically for one-/three-phase EV guarding, separates writable current-limit control from allocated-current feedback, verifies applied requests and fixes Zaptec/online entity pairing. |

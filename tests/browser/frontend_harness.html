@@ -221,7 +221,8 @@
           last_ems_mode: 11,
           last_ems_setpoint_command: "battery_charge",
           controller_max_power: 15000,
-          controller_deadband: 50,
+          controller_deadband: 100,
+          controller_goodwe_auto_deadband: 1000,
           ems_mode: 11,
           ems_mode_name: "Battery charge power",
           ems_setpoint: 1200,
@@ -362,7 +363,12 @@
             title: "EnergyPilot",
             short_title: "EP",
             description: "Controller and telemetry.",
-            fields: [],
+            fields: [
+              { key: "max_power_kw", label: "Maximum control power", type: "number", value: 15, unit: "kW", min: 0.5, max: 15, step: 0.1, readonly: false },
+              { key: "deadband", label: "Battery Hold deadband · P_batt", type: "number", value: 100, unit: "W", min: 0, max: 2000, step: 50, readonly: false },
+              { key: "goodwe_auto_deadband", label: "GoodWe Auto deadband · P_grid", type: "number", value: 1000, unit: "W", min: 100, max: 5000, step: 50, readonly: false },
+              { key: "scan_interval", label: "GoodWe telemetry refresh", type: "number", value: 10, unit: "s", min: 5, max: 60, step: 1, readonly: false },
+            ],
           },
           ev: {
             title: "EV",
@@ -480,7 +486,7 @@
           runtime_session_id: "browser-session",
           owner: "automatic",
           plan: { p_batt_w: -3000, p_grid_w: 3000, soc_opt_pct: soc + 1, revision: planRevision },
-          configuration: { strategy: "hybrid", deadband_w: 300, max_power_w: 15000, ev_active: evActive },
+          configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: evActive },
           actual: {
             battery_soc_pct: soc,
             battery_power_w: -3600,
@@ -507,7 +513,7 @@
         occurred_at: new Date(hour.getTime() + index * 15 * 60 * 1000).toISOString(),
         owner: "automatic",
         plan: { p_batt_w: index < 4 ? -3000 : 0, p_grid_w: index < 4 ? 3000 : 0, soc_opt_pct: 56 + index, revision: planRevision },
-        configuration: { strategy: "hybrid", deadband_w: 300, max_power_w: 15000, ev_active: false },
+        configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: false },
         actual: {},
         outcome: {
           command: index < 4 ? "hybrid_grid_import" : "hybrid_battery_hold",

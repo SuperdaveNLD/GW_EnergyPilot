@@ -11,6 +11,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import (
     CONF_DEADBAND,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
     CONF_EV_MODE_ENTITY,
@@ -23,6 +24,7 @@ from .const import (
     CONF_P_GRID_ENTITY,
     CONF_SCAN_INTERVAL,
     DEFAULT_DEADBAND,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_REQUIRED_STATE,
     DEFAULT_OPTIM_STATUS_ENTITY,
@@ -113,6 +115,15 @@ class GWEnergyPilotDebugRuntime:
             "manual_charge_limit_soc": controller.manual_charge_limit_soc,
             "ev_active": controller.ev_is_active(),
             "deadband": float(options.get(CONF_DEADBAND, DEFAULT_DEADBAND)),
+            "battery_hold_deadband": float(
+                options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
+            ),
+            "goodwe_auto_deadband": float(
+                options.get(
+                    CONF_GOODWE_AUTO_DEADBAND,
+                    DEFAULT_GOODWE_AUTO_DEADBAND,
+                )
+            ),
             "max_power": int(options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)),
             "optim_required_state": str(
                 options.get(CONF_OPTIM_REQUIRED_STATE, DEFAULT_OPTIM_REQUIRED_STATE)

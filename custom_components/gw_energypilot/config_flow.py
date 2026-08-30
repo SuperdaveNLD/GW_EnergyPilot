@@ -39,6 +39,7 @@ from .const import (
     CONF_EV_LOAD_BALANCE_WINDOW,
     CONF_GRID_CONNECTION_PROFILE,
     CONF_GRID_CUSTOM_CURRENT,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_MAX_POWER,
     CONF_NORDPOOL_AREA,
     CONF_NORDPOOL_CURRENCY,
@@ -58,6 +59,7 @@ from .const import (
     DEFAULT_EMHASS_SOC_FINAL,
     DEFAULT_EMHASS_URL,
     DEFAULT_EV_DEADBAND,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_NORDPOOL_AREA,
     DEFAULT_NORDPOOL_CURRENCY,
@@ -164,6 +166,18 @@ def _controller_schema(
                 selector.NumberSelectorConfig(
                     min=0,
                     max=2000,
+                    step=50,
+                    mode=selector.NumberSelectorMode.BOX,
+                    unit_of_measurement="W",
+                )
+            ),
+            vol.Required(
+                CONF_GOODWE_AUTO_DEADBAND,
+                default=DEFAULT_GOODWE_AUTO_DEADBAND,
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=100,
+                    max=5000,
                     step=50,
                     mode=selector.NumberSelectorMode.BOX,
                     unit_of_measurement="W",
@@ -297,6 +311,12 @@ def _controller_schema(
 def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
     """Convert user-facing values to runtime/storage values."""
     options = dict(user_input)
+    if float(options[CONF_DEADBAND]) >= float(
+        options[CONF_GOODWE_AUTO_DEADBAND]
+    ):
+        raise vol.Invalid(
+            "Battery Hold deadband must be smaller than the GoodWe Auto deadband"
+        )
     optimization_interval = int(options[CONF_EMHASS_OPTIMIZATION_INTERVAL])
     if not 5 <= optimization_interval <= 60 or optimization_interval % 5:
         raise vol.Invalid("Optimization interval must be a 5-minute cadence")

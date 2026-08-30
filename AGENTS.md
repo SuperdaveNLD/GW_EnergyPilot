@@ -22,7 +22,7 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v1.0.1-beta.1 Beta prerelease
+v1.0.1-beta.2 Beta prerelease
 ```
 
 Release-channel migration is prepared for v1:
@@ -39,11 +39,11 @@ Follow `docs/RELEASE_WORKFLOW.md`; do not reuse or move published tags.
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v1.0.1-beta.1)
+## Frontend stability contract (v0.41+, active v1.0.1-beta.2)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.0.1-beta.1 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.0.1-beta.2 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -131,40 +131,40 @@ Automatic and manual control must remain explicit.
 Battery:
 
 ```text
-P_batt < -deadband -> mode 11 Battery charge power
-P_batt > +deadband -> mode 12 Battery discharge power
-P_batt near 0 W    -> mode 8 Battery Hold
+P_batt < -Battery Hold deadband -> mode 11 Battery charge power
+P_batt > +Battery Hold deadband -> mode 12 Battery discharge power
+P_batt inside Battery Hold deadband -> mode 8 Battery Hold
 ```
 
 Grid:
 
 ```text
-P_grid > +deadband -> mode 9 Grid import target
-P_grid < -deadband -> mode 10 Grid export target
-P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
+P_grid > +GoodWe Auto deadband -> mode 9 Grid import target
+P_grid < -GoodWe Auto deadband -> mode 10 Grid export target
+P_grid inside GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
 ```
 
 Hybrid:
 
 ```text
-P_batt near 0 W -> mode 8
-else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
-else P_grid > +deadband -> mode 9 using abs(P_grid)
-else P_grid < -deadband -> mode 10 using abs(P_grid)
+abs(P_batt) <= Battery Hold deadband -> mode 8
+else abs(P_grid) <= GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
+else P_grid > +GoodWe Auto deadband -> mode 9 using abs(P_grid)
+else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 ```
 
-Hybrid first preserves an explicit neutral battery plan, then uses PCC control for every non-neutral plan. The configured deadband is variable and is applied to `P_batt` and `P_grid` in that order. Exact boundaries remain neutral. The deadband selects the branch only and must never be subtracted from a mode-9/10 setpoint.
+Hybrid first preserves an explicit neutral battery plan, then uses PCC control for every non-neutral plan. The Battery Hold deadband is applied to `P_batt`; the separate GoodWe Auto deadband is applied to `P_grid`. Exact boundaries remain neutral. Each deadband selects its branch only and must never be subtracted from a mode-9/10 setpoint.
 
 Legacy compatibility remains: missing/false old smart-meter flag -> Battery; explicit true -> Grid.
 
 EV anti-discharge is a higher-priority directional override, but it must only block battery discharge while the EV is charging:
 
 ```text
-EV active + P_batt >= -deadband -> mode 8 Battery Hold
+EV active + P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
 EV active + explicit charge plan:
   Battery strategy -> mode 11 using abs(P_batt)
-  Grid strategy -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
-  Hybrid strategy -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+  Grid strategy -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+  Hybrid strategy -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 ```
 
 The EV feature does not control the charger and must not introduce a second fast power-control loop. EV-stop stale-plan protection remains intact. See `docs/EV_ANTI_DISCHARGE.md`.
@@ -385,7 +385,7 @@ gw-energy-pilot-v101.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.1-beta.1 owns beta release presentation and the complete `1.0.1-beta1` cache boundary. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v1.0.1-beta.2 owns beta release presentation and the complete `1.0.1-beta2` cache boundary. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

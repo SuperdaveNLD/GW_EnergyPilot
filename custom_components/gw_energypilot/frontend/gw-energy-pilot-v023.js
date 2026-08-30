@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v022-flow-direction.js?v=1.0.1-beta1";
+import "./gw-energy-pilot-v022-flow-direction.js?v=1.0.1-beta2";
 
 const VERSION = "0.23";
 const PANEL_NAME = "gw-energypilot-panel";

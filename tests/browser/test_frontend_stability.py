@@ -3464,6 +3464,127 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Verify the beta.2 EP deadband panel, validation and responsive fit."""
+    enabled = EXPECTED_ENTRYPOINT == "v101"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "inputs_present": False,
+        "defaults_correct": False,
+        "zero_centered": False,
+        "directions_present": False,
+        "modes_correct": False,
+        "invalid_blocked": False,
+        "valid_restored": False,
+        "submitted_both": False,
+        "responsive_fit": False,
+        "closed": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        page.wait_for_selector(
+            'gw-energypilot-panel >> .ep-v016-form[data-section="energypilot"]',
+            timeout=10_000,
+        )
+        state = page.evaluate(
+            """
+            async () => {
+              const root = window.__epPanel.shadowRoot;
+              const form = root.querySelector('.ep-v016-form[data-section="energypilot"]');
+              const group = form?.querySelector('.ep-v016-deadband-group');
+              const hold = form?.querySelector('[data-setting-key="deadband"]');
+              const automatic = form?.querySelector(
+                '[data-setting-key="goodwe_auto_deadband"]'
+              );
+              const zero = form?.querySelector('.ep-v016-deadband-zero');
+              const windowBar = form?.querySelector('.ep-v016-deadband-window');
+              const direction = form?.querySelector('.ep-v016-deadband-direction')
+                ?.textContent || '';
+              const modes = [...(windowBar?.querySelectorAll('span') || [])]
+                .map((item) => item.textContent?.trim());
+              const zeroRect = zero?.getBoundingClientRect();
+              const windowRect = windowBar?.getBoundingClientRect();
+              const defaultsCorrect = hold?.value === '100' && automatic?.value === '1000';
+
+              hold.value = '1000';
+              hold.dispatchEvent(new Event('input', { bubbles: true }));
+              const invalidBlocked = Boolean(
+                !form.querySelector('[data-deadband-validation]')?.hidden &&
+                form.querySelector('button[type="submit"]')?.disabled &&
+                !hold.checkValidity()
+              );
+
+              hold.value = '100';
+              hold.dispatchEvent(new Event('input', { bubbles: true }));
+              automatic.value = '1000';
+              automatic.dispatchEvent(new Event('input', { bubbles: true }));
+              const validRestored = Boolean(
+                form.querySelector('[data-deadband-validation]')?.hidden &&
+                !form.querySelector('button[type="submit"]')?.disabled &&
+                hold.checkValidity() && automatic.checkValidity()
+              );
+
+              form.dispatchEvent(new Event('submit', {
+                bubbles: true, composed: true, cancelable: true,
+              }));
+              await new Promise((resolve) => setTimeout(resolve, 120));
+              const call = [...window.__epWsCalls].reverse().find(
+                (item) => item.type === 'gw_energypilot/settings/update' &&
+                  item.section === 'energypilot'
+              );
+              return {
+                inputsPresent: Boolean(hold && automatic),
+                defaultsCorrect,
+                zeroCentered: Boolean(
+                  zero?.textContent?.trim() === '0 W' && zeroRect && windowRect &&
+                  Math.abs(
+                    (zeroRect.left + zeroRect.width / 2) -
+                    (windowRect.left + windowRect.width / 2)
+                  ) <= 2
+                ),
+                directionsPresent:
+                  direction.includes('Charge') && direction.includes('negative P_batt') &&
+                  direction.includes('positive P_batt') && direction.includes('Discharge'),
+                modesCorrect: JSON.stringify(modes) === JSON.stringify([
+                  'mode 10', 'mode 1', 'mode 8', 'mode 1', 'mode 9'
+                ]),
+                invalidBlocked,
+                validRestored,
+                submittedBoth: call?.values?.deadband === 100 &&
+                  call?.values?.goodwe_auto_deadband === 1000,
+                responsiveFit: Boolean(group) && group.scrollWidth <= group.clientWidth + 1,
+              };
+            }
+            """
+        )
+        for key, value in state.items():
+            result[
+                {
+                    "inputsPresent": "inputs_present",
+                    "defaultsCorrect": "defaults_correct",
+                    "zeroCentered": "zero_centered",
+                    "directionsPresent": "directions_present",
+                    "modesCorrect": "modes_correct",
+                    "invalidBlocked": "invalid_blocked",
+                    "validRestored": "valid_restored",
+                    "submittedBoth": "submitted_both",
+                    "responsiveFit": "responsive_fit",
+                }[key]
+            ] = value
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        result["closed"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the EV tab, entity filtering and >16 A acknowledgement path."""
     result: dict[str, object] = {
@@ -3809,6 +3930,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     )
 
     pv_insight = exercise_pv_insight(page)
+    deadband_settings = exercise_deadband_settings(page, profile)
     pv_settings = exercise_pv_settings(page, profile)
     ev_settings = exercise_ev_settings(page, profile)
     host_property_press = exercise_host_property_press(page, profile)
@@ -3842,6 +3964,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "ev_protection": ev_protection,
         "motion": motion,
         "pv_insight": pv_insight,
+        "deadband_settings": deadband_settings,
         "pv_settings": pv_settings,
         "ev_settings": ev_settings,
         "host_property_press": host_property_press,
@@ -3878,6 +4001,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     ev_protection = result["ev_protection"]
     motion = result["motion"]
     pv_insight = result["pv_insight"]
+    deadband_settings = result["deadband_settings"]
     pv_settings = result["pv_settings"]
     ev_settings = result["ev_settings"]
     host_property_press = result["host_property_press"]
@@ -3909,20 +4033,29 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v050": "v0.50 BETA",
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
-        "v101": "v1.0.1-beta.1 BETA",
+        "v101": "v1.0.1-beta.2 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
             f"{name}: release badge is {initial['releaseVersion']!r} instead of {expected_badge}"
         )
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101"} and not all(
-        phrase in initial["hybridNote"]
-        for phrase in (
+    hybrid_phrases = (
+        (
+            "Battery Hold deadband on P_batt",
+            "separate GoodWe Auto deadband",
+            "modes 9/10 outside it",
+            "full grid target as setpoint",
+        )
+        if EXPECTED_ENTRYPOINT == "v101"
+        else (
             "neutral P_batt plan in mode 8",
             "mode 1 inside the configured deadband",
             "modes 9/10 outside it",
             "full grid target as setpoint",
         )
+    )
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101"} and not all(
+        phrase in initial["hybridNote"] for phrase in hybrid_phrases
     ):
         failures.append(f"{name}: active Hybrid operator copy is stale")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and initial["stableMarker"] != "1":
@@ -4064,6 +4197,20 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
+    if EXPECTED_ENTRYPOINT == "v101" and not all(
+        deadband_settings.get(key) is True
+        for key in (
+            "ran", "inputs_present", "defaults_correct", "zero_centered",
+            "directions_present", "modes_correct", "invalid_blocked",
+            "valid_restored", "submitted_both", "responsive_fit", "closed",
+        )
+    ):
+        failures.append(
+            f"{name}: EP deadband settings panel or validation regressed: "
+            f"{deadband_settings}"
+        )
+    if deadband_settings["error"]:
+        failures.append(f"{name}: EP deadband settings interaction error")
     if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v101"}:
         if not all(
             ev_settings[key] is True

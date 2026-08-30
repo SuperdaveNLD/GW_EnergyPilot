@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=1.0.1-beta1";
+import "./gw-energy-pilot-v039.js?v=1.0.1-beta2";
 import {
   FLOW_THRESHOLD_W,
   flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta1";
+} from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta2";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.0.1-beta1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.0.1-beta1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.0.1-beta1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.0.1-beta2";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.0.1-beta2";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.0.1-beta2";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -1494,6 +1494,7 @@ function diagnosticValue(panel, label, attrs, configAttrs) {
   if (key.includes("controller target")) return power(attrs.controller_target_power);
   if (key.includes("expected ems mode")) return text(attrs.controller_expected_mode);
   if (key.includes("maximum power")) return power(attrs.controller_max_power);
+  if (key.includes("goodwe auto deadband")) return power(attrs.controller_goodwe_auto_deadband);
   if (key.includes("deadband")) return power(attrs.controller_deadband);
   if (key === "p_batt") return power(attrs.p_batt_value);
   if (key.includes("p_batt entity")) return text(attrs.p_batt_entity);

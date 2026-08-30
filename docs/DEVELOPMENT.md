@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.0.1-beta.1 runtime structure
+## Current v1.0.1-beta.2 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.0.1-beta.1 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.0.1-beta.2 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -126,7 +126,7 @@ The inherited base still owns normal Battery/Grid/Hybrid execution. The v033 sub
 Do not move either behavior into a second controller or duplicate the EMS write path.
 
 The pure mapping in `control_decision.py` is the one source for translating a
-finite plan plus strategy/deadband/maximum/EV state into an expected mode and
+finite plan plus strategy/two deadbands/maximum/EV state into an expected mode and
 setpoint. Live control and read-only future projections call it. It must remain
 side-effect-free and must not infer missing `P_grid`, future EV state or
 ownership. `execution_history.py` records the live controller context and
@@ -156,8 +156,8 @@ gw-energy-pilot-v101.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.1-beta.1 adds a presentation-only beta wrapper and one complete
-`1.0.1-beta1` active-graph cache boundary. The nested v0.51 feature layer owns
+v1.0.1-beta.2 adds a presentation-only beta wrapper and one complete
+`1.0.1-beta2` active-graph cache boundary. The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
 plan data/view owners implement Recorder attribution,
 wanted-SOC history and verified runtime-session-bounded EV underlays. v0.50 retains
@@ -170,6 +170,10 @@ listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS
 settings overview, and v0.41 ordinary telemetry patching, targeted plan
 refresh, PV presentation and static-flow DOM/CSS.
 
+The existing settings module owns the two-deadband configuration panel and its
+zero-centered explanatory scale. Control behavior remains owned by the backend
+config and controller modules; the beta wrapper does not reinterpret it.
+
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
 ## Automatic-control contract
@@ -177,45 +181,45 @@ refresh, PV presentation and static-flow DOM/CSS.
 Battery strategy:
 
 ```text
-P_batt < -deadband -> mode 11
-P_batt > +deadband -> mode 12
-P_batt near 0 W    -> mode 8
+P_batt < -Battery Hold deadband -> mode 11
+P_batt > +Battery Hold deadband -> mode 12
+P_batt inside Battery Hold deadband -> mode 8
 ```
 
 Grid strategy:
 
 ```text
-P_grid > +deadband -> mode 9
-P_grid < -deadband -> mode 10
-P_grid near 0 W    -> mode 1
+P_grid > +GoodWe Auto deadband -> mode 9
+P_grid < -GoodWe Auto deadband -> mode 10
+P_grid inside GoodWe Auto deadband -> mode 1
 ```
 
 Hybrid strategy:
 
 ```text
-P_batt near 0 W -> mode 8
-else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
-else P_grid > +deadband -> mode 9 using abs(P_grid)
-else P_grid < -deadband -> mode 10 using abs(P_grid)
+abs(P_batt) <= Battery Hold deadband -> mode 8
+else abs(P_grid) <= GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
+else P_grid > +GoodWe Auto deadband -> mode 9 using abs(P_grid)
+else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 ```
 
-The Hybrid neutral-battery branch is evaluated first so ordinary forecast house import/export does not become an active PCC target while EMHASS asked the battery to remain idle. Every non-neutral plan is PCC-controlled: mode 1 owns a near-zero `P_grid`, while modes 9/10 own non-zero import/export targets. The variable configured deadband includes exact boundaries and classifies the branch only; never subtract it from the transmitted setpoint.
+The Hybrid neutral-battery branch is evaluated first so ordinary forecast house import/export does not become an active PCC target while EMHASS asked the battery to remain idle. Every non-neutral plan is PCC-controlled: mode 1 owns `P_grid` inside the separate GoodWe Auto deadband, while modes 9/10 own import/export targets outside it. Both variable boundaries are inclusive and classify the branch only; never subtract either threshold from the transmitted setpoint.
 
 ### EV anti-discharge override
 
 While the configured EV source is actively charging, `P_batt` remains the directional safety guard:
 
 ```text
-P_batt >= -deadband -> mode 8 Battery Hold
-P_batt < -deadband  -> charging remains allowed
+P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
+P_batt < -Battery Hold deadband  -> charging remains allowed
 ```
 
 For an explicit home-battery charge request:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 ```
 
 This anti-discharge override must not control the EV charger or create a second
