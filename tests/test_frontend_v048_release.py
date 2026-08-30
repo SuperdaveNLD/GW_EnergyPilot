@@ -43,6 +43,16 @@ class FrontendV048ReleaseTests(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, self.source)
 
+    def test_hybrid_note_only_rebuilds_for_context_changes(self) -> None:
+        self.assertIn("const presentationKey = `${language(panel)}:${strategy}`", self.source)
+        self.assertIn('note.dataset.epReleasePresentationOwner = "v048-hybrid"', self.source)
+        self.assertIn("note.dataset.epV048PresentationKey !== presentationKey", self.source)
+        self.assertIn("note.dataset.epV048PresentationKey = presentationKey", self.source)
+        for predecessor in ("v024", "v026", "v028", "v038-i18n"):
+            source = (FRONTEND / f"gw-energy-pilot-{predecessor}.js").read_text(encoding="utf-8")
+            with self.subTest(predecessor=predecessor):
+                self.assertIn("epReleasePresentationOwner", source)
+
     def test_release_documentation_exists(self) -> None:
         self.assertTrue((ROOT / "docs" / "RELEASE_NOTES_V048.md").is_file())
         self.assertTrue((ROOT / "docs" / "CHANGELOG_V048.md").is_file())

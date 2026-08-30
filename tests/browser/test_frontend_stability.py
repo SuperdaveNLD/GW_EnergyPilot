@@ -741,6 +741,86 @@ def exercise_automatic_control(page: Page) -> dict[str, object]:
     return result
 
 
+def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
+    """Keep the v0.48 Hybrid explanation stable across telemetry patches."""
+    result: dict[str, object] = {
+        "ran": False,
+        "present": False,
+        "note_stable": False,
+        "strong_stable": False,
+        "height_stable": False,
+        "no_child_rebuilds": False,
+        "dutch_copy": False,
+        "context_refresh": False,
+        "error": None,
+    }
+    if EXPECTED_ENTRYPOINT not in {"v048", "v049"}:
+        return result
+    try:
+        state = page.evaluate(
+            """
+            async () => {
+              window.__epSetLanguage('nl');
+              await new Promise((resolve) => setTimeout(resolve, 180));
+              const root = window.__epPanel.shadowRoot;
+              const note = root.querySelector('.ep-v022-strategy-note');
+              const strong = note?.querySelector('strong');
+              if (!note || !strong) return { present: false };
+              const initialHeight = note.getBoundingClientRect().height;
+              let childRebuilds = 0;
+              const observer = new MutationObserver((mutations) => {
+                childRebuilds += mutations.filter(
+                  (mutation) => mutation.type === 'childList'
+                ).length;
+              });
+              observer.observe(note, { childList: true, subtree: true });
+              await window.__epTelemetryBurst(60, 4);
+              await new Promise((resolve) => setTimeout(resolve, 180));
+              observer.disconnect();
+              const liveRoot = window.__epPanel.shadowRoot;
+              const liveNote = liveRoot.querySelector('.ep-v022-strategy-note');
+              const liveStrong = liveNote?.querySelector('strong');
+              const liveHeight = liveNote?.getBoundingClientRect().height;
+              const dutchCopy = liveNote?.textContent?.includes(
+                'Automatische regelstrategie:'
+              ) && liveNote?.textContent?.includes('Hybride regeling');
+              const stable = {
+                present: true,
+                noteStable: note === liveNote,
+                strongStable: strong === liveStrong,
+                heightStable: Math.abs(initialHeight - liveHeight) <= 0.5,
+                noChildRebuilds: childRebuilds === 0,
+                dutchCopy: Boolean(dutchCopy),
+              };
+              window.__epSetLanguage('en');
+              await new Promise((resolve) => setTimeout(resolve, 180));
+              const englishNote = window.__epPanel.shadowRoot.querySelector(
+                '.ep-v022-strategy-note'
+              );
+              return {
+                ...stable,
+                contextRefresh:
+                  englishNote?.dataset.epV048PresentationKey === 'en:hybrid' &&
+                  englishNote?.textContent?.includes('Automatic control strategy:'),
+              };
+            }
+            """
+        )
+        result.update({
+            "ran": True,
+            "present": state.get("present", False),
+            "note_stable": state.get("noteStable", False),
+            "strong_stable": state.get("strongStable", False),
+            "height_stable": state.get("heightStable", False),
+            "no_child_rebuilds": state.get("noChildRebuilds", False),
+            "dutch_copy": state.get("dutchCopy", False),
+            "context_refresh": state.get("contextRefresh", False),
+        })
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_ev_protection_banner(page: Page) -> dict[str, object]:
     """Verify EV status patches one stable, non-interactive controller banner."""
     result: dict[str, object] = {
@@ -3352,6 +3432,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         """
     )
 
+    strategy_note = exercise_strategy_note_stability(page)
     setpoint_update = exercise_setpoint_update(page)
     static_flow = exercise_static_flow(page)
     connectivity = exercise_connectivity_status(page, profile)
@@ -3414,6 +3495,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "idle_after": idle_after,
         "idle_delta": idle_after - idle_before,
         "telemetry_identity": telemetry_identity,
+        "strategy_note": strategy_note,
         "setpoint_update": setpoint_update,
         "static_flow": static_flow,
         "connectivity": connectivity,
@@ -3447,6 +3529,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     name = profile.name
     initial = result["initial"]
     identity = result["telemetry_identity"]
+    strategy_note = result["strategy_note"]
     setpoint_update = result["setpoint_update"]
     static_flow = result["static_flow"]
     connectivity = result["connectivity"]
@@ -3501,6 +3584,18 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
+    if EXPECTED_ENTRYPOINT in {"v048", "v049"}:
+        required_strategy_note = (
+            "ran", "present", "note_stable", "strong_stable", "height_stable",
+            "no_child_rebuilds", "dutch_copy", "context_refresh",
+        )
+        if not all(strategy_note[key] is True for key in required_strategy_note):
+            failures.append(
+                f"{name}: Hybrid strategy note rebuild/layout regression failed: "
+                f"{strategy_note}"
+            )
+        if strategy_note["error"]:
+            failures.append(f"{name}: Hybrid strategy note interaction error")
     if not all(
         setpoint_update.get(key)
         for key in ("present", "changed", "stableMain", "stableMetric")

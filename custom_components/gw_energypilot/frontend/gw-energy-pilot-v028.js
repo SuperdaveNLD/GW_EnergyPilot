@@ -40,7 +40,7 @@ function clarifyHybridStrategy(panel, root) {
   }
 
   const note = root.querySelector(".ep-v022-strategy-note");
-  if (note) {
+  if (note && note.dataset.epReleasePresentationOwner !== "v048-hybrid") {
     note.innerHTML = `<strong>${copy.strategyNote}</strong> ${copy.hybridLabel} · ${copy.hybridDescription} ${copy.evOverride}`;
   }
 }

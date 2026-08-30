@@ -324,7 +324,10 @@ function localizeControlStrategy(panel, root) {
   select?.addEventListener("change", () => saveStrategy(panel, entryId, select.value, select));
 
   const note = root.querySelector(".ep-v022-strategy-note");
-  if (note) {
+  if (
+    note &&
+    !(note.dataset.epReleasePresentationOwner === "v048-hybrid" && strategy === "hybrid")
+  ) {
     note.innerHTML = `<strong>${panel._escape(t(panel, "strategyNote"))}</strong> ${panel._escape(current.label)} · ${panel._escape(current.description)} ${panel._escape(t(panel, "evOverride"))}`;
   }
 }
