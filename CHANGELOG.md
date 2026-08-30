@@ -4,6 +4,48 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-30
+
+### Added
+
+- Added a bounded per-entry execution-history Store and one stable-DOM
+  EMHASS → GOODWE card with a compact ±6-hour view plus full 48-hour history
+  and conditional 24-hour projection (#108).
+- Added immutable plan/config/actual/write/read-back snapshots and explicit
+  completed, verified, mismatched, unavailable, failed, skipped and waiting
+  outcomes.
+- Added Recorder-based grid/solar charge and battery/solar export attribution
+  in Large/expanded chart views, retaining unknown residuals.
+- Added historical wanted-SOC snapshots to the existing dashed line.
+- Added verified EV anti-discharge blocked/charge-permitted underlays from the
+  same canonical execution ledger, bounded to one Home Assistant runtime
+  session so a restart cannot fabricate a continuous interval.
+
+### Changed
+
+- Shared one pure Battery/Grid/Hybrid/EV decision mapping between live control
+  and future read-only projections without changing its established outputs.
+- Advanced the battery/plan chart payload to schema 6 and added optional
+  dashboard-only official-plan `P_PV`/`P_Load` values.
+- Added `gw-energy-pilot-v051.js` and the complete `0.51-h1` frontend cache
+  boundary beneath the stable `gw-energy-pilot-v100.js` presentation wrapper.
+- Correct generic Battery Strategy copy and keep the connectivity detail
+  popover isolated above surrounding live-dashboard content (#104, #105).
+- Replace branch-push release publication with a tag-only v1 contract: beta
+  releases use `v1.x.x-beta.N` from `beta` and are GitHub prereleases that are
+  never Latest; stable releases use `v1.x.x` from `main` and are normal/latest
+  releases. HACS hides the unversioned default branch, and automated checks
+  enforce tag/manifest/channel/source-branch/release-note consistency.
+
+### Safety and compatibility
+
+- Keep EMHASS as plan owner and preserve GoodWe registers, setpoint-before-mode
+  ordering, controller ownership, entity/device identity, accounting and
+  Battery Saver policy.
+- Treat source attribution as an estimate and execution persistence as
+  non-controlling evidence. Existing installs start with empty history and
+  require no migration.
+
 ## [0.50] - 2026-08-30
 
 ### Changed

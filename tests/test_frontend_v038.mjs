@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   CUSTOM_MODE,
+  canonicalProfiles,
   flowMotionMap,
   flowVisualMap,
   localizedProfile,
@@ -14,6 +15,20 @@ assert.equal(normalizeLanguage("en-GB"), "en");
 assert.equal(localizedProfile("nl", { key: "battery_saver" }).label, "Batterijbesparing");
 assert.equal(localizedProfile("en", { key: "battery_saver" }).label, "Battery Saver");
 assert.equal(localizedProfile("nl", { key: "custom" }).label, "Aangepast");
+assert.equal(
+  localizedProfile("en", { key: "gold_rush" }).description,
+  "Profit first, with anti-churn protection and light battery-preservation costs."
+);
+assert.equal(
+  localizedProfile("nl", { key: "gold_rush" }).description,
+  "Winst voorop, met anti-churnbescherming en lichte kosten voor batterijbehoud."
+);
+for (const language of ["en", "nl"]) {
+  for (const profile of canonicalProfiles(language, [])) {
+    if (profile.key === "custom") continue;
+    assert.doesNotMatch(profile.description, /\d+%|hard maximum|harde bovengrens/i);
+  }
+}
 
 assert.equal(resolveHousePower(-500, 2000, 500, 0), 1500);
 assert.equal(resolveHousePower(null, 2000, 500, -500), 1000);

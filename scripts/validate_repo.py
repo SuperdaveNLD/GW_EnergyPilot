@@ -15,6 +15,7 @@ import sys
 from types import ModuleType
 
 ROOT = Path(__file__).resolve().parents[1]
+CUSTOM_COMPONENTS = ROOT / "custom_components"
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
 REGISTERS = INTEGRATION / "registers.py"
@@ -22,6 +23,7 @@ INIT = INTEGRATION / "__init__.py"
 MANIFEST = INTEGRATION / "manifest.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
 RELEASE_NOTES = ROOT / "docs" / "RELEASE_NOTES.md"
+HACS = ROOT / "hacs.json"
 
 JS_IMPORT_RE = re.compile(
     r"^\s*import\s+[\"'](?P<path>\./[^\"']+)[\"']\s*;?",
@@ -34,8 +36,14 @@ FRONTEND_VERSION_RE = re.compile(
     r"\bconst\s+VERSION\s*=\s*[\"'](?P<version>[^\"']+)[\"']"
 )
 CHANGELOG_VERSION_RE = re.compile(
-    r"^## \[(?P<version>\d+\.\d+(?:\.\d+)?)\]", re.MULTILINE
+    r"^## \[(?P<version>\d+\.\d+(?:\.\d+)?(?:-beta\.[1-9]\d*)?)\]",
+    re.MULTILINE,
 )
+LEGACY_VERSION_RE = re.compile(r"^0\.\d+(?:\.\d+)?$")
+V1_VERSION_RE = re.compile(
+    r"^1\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-beta\.[1-9]\d*)?$"
+)
+DOMAIN_RE = re.compile(r'^DOMAIN\s*=\s*["\'](?P<domain>[^"\']+)["\']', re.MULTILINE)
 
 
 def _load_register_module() -> ModuleType:
@@ -75,12 +83,56 @@ def _validate_registers(errors: list[str]) -> None:
 
 
 def _validate_json(errors: list[str]) -> None:
-    json_files = [ROOT / "hacs.json", *INTEGRATION.rglob("*.json")]
+    json_files = [HACS, *INTEGRATION.rglob("*.json")]
     for path in json_files:
         try:
             json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as err:
             errors.append(f"Invalid JSON in {path.relative_to(ROOT)}: {err}")
+
+
+def _validate_integration_structure(errors: list[str]) -> None:
+    integration_dirs = sorted(
+        path
+        for path in CUSTOM_COMPONENTS.iterdir()
+        if path.is_dir() and not path.name.startswith(".") and path.name != "__pycache__"
+    )
+    if integration_dirs != [INTEGRATION]:
+        names = ", ".join(path.name for path in integration_dirs) or "none"
+        errors.append(
+            "custom_components must contain exactly gw_energypilot; found: " + names
+        )
+        return
+
+    try:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        hacs = json.loads(HACS.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    manifest_domain = str(manifest.get("domain", "")).strip()
+    const_match = DOMAIN_RE.search((INTEGRATION / "const.py").read_text(encoding="utf-8"))
+    const_domain = const_match.group("domain") if const_match is not None else ""
+    if manifest_domain != INTEGRATION.name or const_domain != INTEGRATION.name:
+        errors.append(
+            "Integration directory, manifest domain and const.DOMAIN must all be "
+            f"{INTEGRATION.name!r}"
+        )
+
+    manifest_version = str(manifest.get("version", "")).strip()
+    if not (
+        LEGACY_VERSION_RE.fullmatch(manifest_version)
+        or V1_VERSION_RE.fullmatch(manifest_version)
+    ):
+        errors.append(
+            f"Unsupported manifest version {manifest_version!r}; retain a historical 0.x "
+            "version or use 1.x.x[-beta.N] for the v1 release lines"
+        )
+
+    if hacs.get("hide_default_branch") is not True:
+        errors.append(
+            "hacs.json must set hide_default_branch=true so users install published "
+            "stable/beta releases instead of an unversioned branch"
+        )
 
 
 def _validate_frontend(errors: list[str]) -> None:
@@ -125,6 +177,13 @@ def _release_doc_suffix(version: str) -> str:
     return version.replace(".", "")
 
 
+def _release_doc_path(version: str) -> Path:
+    """Return the canonical release-note path for a manifest version."""
+    if V1_VERSION_RE.fullmatch(version):
+        return ROOT / "docs" / "releases" / f"v{version}.md"
+    return ROOT / "docs" / f"RELEASE_NOTES_V{_release_doc_suffix(version)}.md"
+
+
 def _validate_release_docs(errors: list[str]) -> None:
     """Require central history plus explicit docs for the current release."""
     if not CHANGELOG.is_file():
@@ -152,7 +211,7 @@ def _validate_release_docs(errors: list[str]) -> None:
 
     suffix = _release_doc_suffix(manifest_version)
     dedicated_changelog = ROOT / "docs" / f"CHANGELOG_V{suffix}.md"
-    dedicated_release = ROOT / "docs" / f"RELEASE_NOTES_V{suffix}.md"
+    dedicated_release = _release_doc_path(manifest_version)
     central_marker = f"| **{manifest_version}** |"
     central_line = next(
         (line for line in release_text.splitlines() if line.startswith(central_marker)),
@@ -173,13 +232,16 @@ def _validate_release_docs(errors: list[str]) -> None:
             )
         else:
             dedicated_text = dedicated_release.read_text(encoding="utf-8")
-            if not any(status in dedicated_text for status in ("Beta", "Validated", "Historical")):
+            if not any(
+                status in dedicated_text
+                for status in ("Beta", "Stable", "Validated", "Historical")
+            ):
                 errors.append(
                     f"Dedicated release notes for {manifest_version} have no explicit status"
                 )
     elif not any(
         status in central_line
-        for status in ("**Beta**", "**Validated", "**Historical**")
+        for status in ("**Beta**", "**Stable**", "**Validated", "**Historical**")
     ):
         errors.append(
             f"Current version {manifest_version} release-notes row has no explicit status"
@@ -190,6 +252,7 @@ def main() -> int:
     errors: list[str] = []
     _validate_registers(errors)
     _validate_json(errors)
+    _validate_integration_structure(errors)
     _validate_frontend(errors)
     _validate_release_docs(errors)
 

@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from datetime import datetime, timezone
+import logging
 from math import isfinite
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import (
@@ -16,11 +18,14 @@ from homeassistant.helpers.dispatcher import (
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .client import GWModbusClient
+from .control_decision import resolve_control_decision
 from .const import (
     CONF_CONTROL_STRATEGY,
     CONF_DEADBAND,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
+    CONF_ENABLE_EXTERNAL_PV,
+    CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
@@ -35,6 +40,8 @@ from .const import (
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
     DEFAULT_DEADBAND,
+    DEFAULT_ENABLE_EXTERNAL_PV,
+    DEFAULT_ENABLE_INTERNAL_PV,
     DEFAULT_EV_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_REQUIRED_STATE,
@@ -42,18 +49,25 @@ from .const import (
     DEFAULT_P_GRID_ENTITY,
     DEFAULT_USE_GOODWE_SMART_METER,
     DOMAIN,
+    EXTERNAL_PV_ENTITY_KEYS,
     MODE_AUTO,
     MODE_BATTERY_HOLD,
     MODE_CHARGE_BATTERY,
-    MODE_DISCHARGE_BATTERY,
-    MODE_GRID_EXPORT_TARGET,
-    MODE_GRID_IMPORT_TARGET,
     MODES_ZERO_POWER,
 )
 from .coordinator import GWEnergyPilotCoordinator
+from .pv_insight import (
+    external_sources_enabled,
+    normalize_generation_power_w,
+    sum_generation_power_w,
+)
 
 if TYPE_CHECKING:
     from .control_history import GWEnergyPilotControlHistory
+    from .execution_history import GWEnergyPilotExecutionHistory
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class GWEnergyPilotController:
@@ -94,12 +108,15 @@ class GWEnergyPilotController:
         client: GWModbusClient,
         coordinator: GWEnergyPilotCoordinator,
         control_history: GWEnergyPilotControlHistory | None = None,
+        execution_history: GWEnergyPilotExecutionHistory | None = None,
     ) -> None:
         self.hass = hass
         self.entry = entry
         self.client = client
         self.coordinator = coordinator
         self.control_history = control_history
+        self.execution_history = execution_history
+        self.execution_session_id = uuid4().hex
         self.enabled = False
         self.target_power = 0
         self.expected_mode = MODE_AUTO
@@ -260,7 +277,8 @@ class GWEnergyPilotController:
             "gw-energypilot-max-charge-soc-limit",
         )
 
-    def _state_float(self, entity_id: str | None) -> float | None:
+    def _raw_state_float(self, entity_id: str | None) -> float | None:
+        """Return only the finite live HA state, without plan fallback."""
         if not entity_id:
             return None
         state = self.hass.states.get(entity_id)
@@ -271,6 +289,198 @@ class GWEnergyPilotController:
         except (TypeError, ValueError):
             return None
         return value if isfinite(value) else None
+
+    def _state_float(self, entity_id: str | None) -> float | None:
+        return self._raw_state_float(entity_id)
+
+    @staticmethod
+    def _finite_value(value: object) -> float | None:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if isfinite(number) else None
+
+    def _combined_pv_actual(self, values: dict[str, object]) -> tuple[float | None, dict[str, int | bool]]:
+        """Return the same configured display-only PV aggregate used by the UI."""
+        options = self.entry.options
+        source_values: list[float | None] = []
+        internal_enabled = bool(
+            options.get(CONF_ENABLE_INTERNAL_PV, DEFAULT_ENABLE_INTERNAL_PV)
+        )
+        if internal_enabled:
+            source_values.append(
+                normalize_generation_power_w(values.get("pv_total_power"), "W")
+            )
+
+        external_enabled = external_sources_enabled(
+            options,
+            enable_key=CONF_ENABLE_EXTERNAL_PV,
+            entity_keys=EXTERNAL_PV_ENTITY_KEYS,
+            default=DEFAULT_ENABLE_EXTERNAL_PV,
+        )
+        configured_external = 0
+        available_external = 0
+        if external_enabled:
+            seen: set[str] = set()
+            for key in EXTERNAL_PV_ENTITY_KEYS:
+                entity_id = str(options.get(key, "") or "").strip()
+                if not entity_id or entity_id in seen:
+                    continue
+                seen.add(entity_id)
+                configured_external += 1
+                state = self.hass.states.get(entity_id)
+                attributes = getattr(state, "attributes", {}) if state else {}
+                power = normalize_generation_power_w(
+                    getattr(state, "state", None),
+                    attributes.get("unit_of_measurement"),
+                )
+                if power is not None:
+                    available_external += 1
+                source_values.append(power)
+
+        return sum_generation_power_w(source_values), {
+            "internal_enabled": internal_enabled,
+            "external_enabled": external_enabled,
+            "configured_external_sources": configured_external,
+            "available_external_sources": available_external,
+        }
+
+    def _actual_snapshot(self) -> dict[str, object]:
+        data = self.coordinator.data
+        values = getattr(data, "values", {}) if data is not None else {}
+        values = values if isinstance(values, dict) else {}
+        pv_power, pv_topology = self._combined_pv_actual(values)
+        return {
+            "battery_soc_pct": self._finite_value(values.get("battery_soc")),
+            "battery_power_w": self._finite_value(values.get("battery_power")),
+            "pv_power_w": pv_power,
+            "load_power_w": self._finite_value(values.get("total_load_power")),
+            "grid_power_w": self._finite_value(values.get("meter_total_power_fast")),
+            "ems_mode": getattr(data, "mode", None) if data is not None else None,
+            "ems_setpoint_w": getattr(data, "power", None) if data is not None else None,
+            "pv_topology": pv_topology,
+        }
+
+    @staticmethod
+    def _state_reported_at(state: object | None) -> str | None:
+        if state is None:
+            return None
+        timestamp = getattr(state, "last_reported", None) or getattr(
+            state, "last_updated", None
+        )
+        return timestamp.isoformat() if timestamp is not None else None
+
+    def _execution_context(self) -> dict[str, object]:
+        p_batt_entity = self._p_batt_entity_id()
+        p_grid_entity = self._p_grid_entity_id()
+        p_batt_state = self.hass.states.get(p_batt_entity)
+        p_grid_state = self.hass.states.get(p_grid_entity)
+        live_p_batt = self._raw_state_float(p_batt_entity)
+        live_p_grid = self._raw_state_float(p_grid_entity)
+        p_batt = self._state_float(p_batt_entity)
+        p_grid = self._state_float(p_grid_entity)
+        runtime_data = getattr(self.entry, "runtime_data", None)
+        plan_runtime = getattr(runtime_data, "plan_runtime", None)
+        orchestrator = getattr(runtime_data, "orchestrator", None)
+        diagnostics = (
+            dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
+        )
+        current_soc = getattr(plan_runtime, "current_soc_opt", None)
+        configured_strategy = (getattr(self.entry, "data", {}) or {}).get(
+            CONF_CONTROL_STRATEGY
+        )
+        return {
+            "occurred_at": datetime.now(timezone.utc),
+            "kind": "controller_decision",
+            "runtime_session_id": self.execution_session_id,
+            "owner": "automatic" if self.enabled else "manual",
+            "plan": {
+                "p_batt_w": p_batt,
+                "p_grid_w": p_grid,
+                "soc_opt_pct": current_soc() if callable(current_soc) else None,
+                "p_batt_source": (
+                    "home_assistant"
+                    if live_p_batt is not None
+                    else "persistent_plan"
+                    if p_batt is not None
+                    else None
+                ),
+                "p_grid_source": (
+                    "home_assistant"
+                    if live_p_grid is not None
+                    else "persistent_plan"
+                    if p_grid is not None
+                    else None
+                ),
+                "p_batt_reported_at": self._state_reported_at(p_batt_state),
+                "p_grid_reported_at": self._state_reported_at(p_grid_state),
+                "mirror_source": diagnostics.get("source"),
+                "generated_at": diagnostics.get("generated_at"),
+                "valid_until": diagnostics.get("valid_until"),
+                "revision": int(getattr(orchestrator, "plan_revision", 0) or 0),
+            },
+            "configuration": {
+                "strategy": self.control_strategy,
+                "strategy_source": (
+                    "explicit"
+                    if configured_strategy in CONTROL_STRATEGIES
+                    else "legacy_smart_meter"
+                ),
+                "deadband_w": float(
+                    self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
+                ),
+                "max_power_w": int(
+                    self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)
+                ),
+                "ev_active": self.ev_is_active(),
+            },
+            "actual": self._actual_snapshot(),
+        }
+
+    async def _async_record_execution(
+        self,
+        context: dict[str, object],
+        *,
+        command: str,
+        expected_mode: int | None,
+        expected_power: int | None,
+        write_status: str,
+        verification_status: str,
+        write_completed_at: datetime | None = None,
+        readback_at: datetime | None = None,
+        error_type: str | None = None,
+    ) -> None:
+        if self.execution_history is None:
+            return
+        event = dict(context)
+        event["actual"] = self._actual_snapshot()
+        event["outcome"] = {
+            "command": command,
+            "expected_mode": expected_mode,
+            "expected_setpoint_w": expected_power,
+            "write_status": write_status,
+            "write_completed_at": write_completed_at,
+            "verification_status": verification_status,
+            "readback_at": readback_at,
+            "readback_mode": event["actual"].get("ems_mode"),
+            "readback_setpoint_w": event["actual"].get("ems_setpoint_w"),
+            "error_type": error_type,
+        }
+        try:
+            await self.execution_history.async_append(event)
+        except Exception:  # noqa: BLE001 - history never owns the actuator
+            _LOGGER.exception("Unable to append EnergyPilot execution evidence")
+
+    async def _async_record_waiting(self, command: str) -> None:
+        await self._async_record_execution(
+            self._execution_context(),
+            command=command,
+            expected_mode=None,
+            expected_power=None,
+            write_status="not_attempted",
+            verification_status="not_applicable",
+        )
 
     def _battery_soc(self) -> float | None:
         """Return the latest finite GoodWe battery SOC percentage."""
@@ -340,6 +550,7 @@ class GWEnergyPilotController:
         return actual_power is not None and int(actual_power) == int(power)
 
     async def _async_apply_command(self, mode: int, power: int, command: str, *, skip_if_readback_matches: bool = False) -> None:
+        context = self._execution_context()
         power = max(0, min(int(power), 15000))
         if mode in MODES_ZERO_POWER:
             power = 0
@@ -348,8 +559,31 @@ class GWEnergyPilotController:
         self.last_command = command
         self._notify_state()
         if skip_if_readback_matches and self._actual_command_matches(mode, power):
+            await self._async_record_execution(
+                context,
+                command=command,
+                expected_mode=mode,
+                expected_power=power,
+                write_status="skipped_matching_readback",
+                verification_status="verified",
+                readback_at=datetime.now(timezone.utc),
+            )
+            self._notify_state()
             return
-        await self.client.async_set_mode(mode, power)
+        try:
+            await self.client.async_set_mode(mode, power)
+        except Exception as err:
+            await self._async_record_execution(
+                context,
+                command=command,
+                expected_mode=mode,
+                expected_power=power,
+                write_status="failed",
+                verification_status="not_attempted",
+                error_type=type(err).__name__,
+            )
+            self._notify_state()
+            raise
         timestamp = datetime.now(timezone.utc)
         self.last_ems_setpoint_updated_at = timestamp
         self.last_ems_setpoint = power
@@ -364,7 +598,36 @@ class GWEnergyPilotController:
             )
             await self.control_history.async_save()
         self._notify_state()
-        await self.coordinator.async_request_refresh()
+        refresh_error: Exception | None = None
+        try:
+            await self.coordinator.async_request_refresh()
+        except Exception as err:  # preserve the established propagation contract
+            refresh_error = err
+        readback_at = datetime.now(timezone.utc)
+        actual = self._actual_snapshot()
+        readback_mode = actual.get("ems_mode")
+        readback_power = actual.get("ems_setpoint_w")
+        verification_status = (
+            "verified"
+            if readback_mode == mode and readback_power == power
+            else "unavailable"
+            if readback_mode is None or readback_power is None or refresh_error
+            else "mismatch"
+        )
+        await self._async_record_execution(
+            context,
+            command=command,
+            expected_mode=mode,
+            expected_power=power,
+            write_status="completed",
+            verification_status=verification_status,
+            write_completed_at=timestamp,
+            readback_at=readback_at,
+            error_type=type(refresh_error).__name__ if refresh_error else None,
+        )
+        self._notify_state()
+        if refresh_error is not None:
+            raise refresh_error
 
     async def async_enable(self) -> None:
         self.manual_charge_limit_soc = None
@@ -451,47 +714,71 @@ class GWEnergyPilotController:
             )
 
     async def _async_apply_direct_battery_plan(self, p_batt: float, deadband: float, max_power: int) -> None:
-        power = min(int(abs(p_batt)), max_power)
-        if p_batt > deadband:
-            await self._async_apply_command(MODE_DISCHARGE_BATTERY, power, "battery_discharge", skip_if_readback_matches=True)
-            return
-        if p_batt < -deadband:
-            await self._async_apply_command(MODE_CHARGE_BATTERY, power, "battery_charge", skip_if_readback_matches=True)
-            return
-        await self._async_apply_command(MODE_BATTERY_HOLD, 0, "battery_hold", skip_if_readback_matches=True)
+        decision = resolve_control_decision(
+            strategy=CONTROL_STRATEGY_BATTERY,
+            p_batt=p_batt,
+            p_grid=None,
+            deadband=deadband,
+            max_power=max_power,
+        )
+        await self._async_apply_command(
+            int(decision.mode),
+            int(decision.power),
+            decision.command,
+            skip_if_readback_matches=True,
+        )
 
     async def _async_apply_ev_anti_discharge_plan(self, p_batt: float, deadband: float, max_power: int) -> None:
-        if p_batt < -deadband:
-            power = min(int(abs(p_batt)), max_power)
-            await self._async_apply_command(MODE_CHARGE_BATTERY, power, "ev_charge_allowed", skip_if_readback_matches=True)
-            return
-        await self._async_apply_command(MODE_BATTERY_HOLD, 0, "ev_anti_discharge_hold", skip_if_readback_matches=True)
+        decision = resolve_control_decision(
+            strategy=CONTROL_STRATEGY_BATTERY,
+            p_batt=p_batt,
+            p_grid=None,
+            deadband=deadband,
+            max_power=max_power,
+            ev_active=True,
+        )
+        command = (
+            "ev_charge_allowed"
+            if decision.command == "ev_battery_charge"
+            else decision.command
+        )
+        await self._async_apply_command(
+            int(decision.mode),
+            int(decision.power),
+            command,
+            skip_if_readback_matches=True,
+        )
 
     async def _async_apply_smart_meter_plan(self, p_grid: float, deadband: float, max_power: int) -> None:
-        if p_grid > deadband:
-            power = min(int(abs(p_grid)), max_power)
-            await self._async_apply_command(MODE_GRID_IMPORT_TARGET, power, "grid_import_target", skip_if_readback_matches=True)
-            return
-        if p_grid < -deadband:
-            power = min(int(abs(p_grid)), max_power)
-            await self._async_apply_command(MODE_GRID_EXPORT_TARGET, power, "grid_export_target", skip_if_readback_matches=True)
-            return
-        await self._async_apply_command(MODE_AUTO, 0, "grid_zero_auto", skip_if_readback_matches=True)
+        decision = resolve_control_decision(
+            strategy=CONTROL_STRATEGY_GRID,
+            p_batt=0,
+            p_grid=p_grid,
+            deadband=deadband,
+            max_power=max_power,
+        )
+        await self._async_apply_command(
+            int(decision.mode),
+            int(decision.power),
+            decision.command,
+            skip_if_readback_matches=True,
+        )
 
     async def _async_apply_hybrid_plan(self, p_batt: float, p_grid: float, deadband: float, max_power: int) -> None:
         """Hold neutral battery plans, otherwise execute the signed PCC plan."""
-        if abs(p_batt) <= deadband:
-            await self._async_apply_command(MODE_BATTERY_HOLD, 0, "hybrid_battery_hold", skip_if_readback_matches=True)
-            return
-        if abs(p_grid) <= deadband:
-            await self._async_apply_command(MODE_AUTO, 0, "hybrid_grid_zero_auto", skip_if_readback_matches=True)
-            return
-
-        power = min(int(abs(p_grid)), max_power)
-        if p_grid > deadband:
-            await self._async_apply_command(MODE_GRID_IMPORT_TARGET, power, "hybrid_grid_import", skip_if_readback_matches=True)
-            return
-        await self._async_apply_command(MODE_GRID_EXPORT_TARGET, power, "hybrid_grid_export", skip_if_readback_matches=True)
+        decision = resolve_control_decision(
+            strategy=CONTROL_STRATEGY_HYBRID,
+            p_batt=p_batt,
+            p_grid=p_grid,
+            deadband=deadband,
+            max_power=max_power,
+        )
+        await self._async_apply_command(
+            int(decision.mode),
+            int(decision.power),
+            decision.command,
+            skip_if_readback_matches=True,
+        )
 
     async def _async_evaluate_locked(self) -> None:
         if not self.enabled:
@@ -500,10 +787,12 @@ class GWEnergyPilotController:
         if p_batt is None:
             self.last_command = "waiting_for_p_batt"
             self._notify_state()
+            await self._async_record_waiting(self.last_command)
             return
         if not self._optim_is_ready():
             self.last_command = "waiting_for_optimization"
             self._notify_state()
+            await self._async_record_waiting(self.last_command)
             return
         deadband = float(self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
         max_power = int(self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
@@ -518,6 +807,7 @@ class GWEnergyPilotController:
         if p_grid is None:
             self.last_command = "waiting_for_p_grid"
             self._notify_state()
+            await self._async_record_waiting(self.last_command)
             return
         if strategy == CONTROL_STRATEGY_HYBRID:
             await self._async_apply_hybrid_plan(p_batt, p_grid, deadband, max_power)

@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.50 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v1.0.0 Stable**.
 
 ## High-level flow
 
@@ -74,6 +74,7 @@ gw_energypilot.control.<entry_id>          latest successful EMS setpoint update
 gw_energypilot.accounting.<entry_id>       derived daily grid accounting
 gw_energypilot.optimization_log.<entry_id> newest optimization attempts
 gw_energypilot.plan.<entry_id>             bounded mirror of latest valid EMHASS plan
+gw_energypilot.execution.<entry_id>        bounded plan/decision/write/read-back evidence
 gw_energypilot.ev_load_balancing_audit.<entry_id> append-only >16 A acknowledgements
 ```
 
@@ -89,6 +90,7 @@ No Home Assistant Store is a second configuration database or optimizer.
 - `GWEnergyPilotController` from `controller_v033.py`;
 - `GWEnergyPilotOrchestrator` from `orchestrator_v044.py`;
 - `GWEnergyPilotPlanRuntime`;
+- `GWEnergyPilotExecutionHistory`;
 - `GWEnergyPilotAccounting`;
 - `GWEnergyPilotConnectivity`;
 - `GWEnergyPilotDebugRuntime`.
@@ -221,7 +223,7 @@ Canonical refresh source:
 GET <EMHASS base URL>/api/v1/plan
 ```
 
-EnergyPilot accepts the supported versioned EMHASS schema, normalizes timestamped `P_batt` and `P_grid` points plus optional single-battery `SOC_opt`, infers the plan timestep and calculates:
+EnergyPilot accepts the supported versioned EMHASS schema, normalizes timestamped `P_batt` and `P_grid` points plus optional single-battery `SOC_opt` and dashboard-only `P_PV`/`P_Load`, infers the plan timestep and calculates:
 
 ```text
 valid_until = final P_batt timestamp + inferred timestep
@@ -239,6 +241,7 @@ configured P_batt/P_grid entity IDs
 P_batt horizon
 P_grid horizon
 optional SOC_opt horizon normalized from fraction to percent
+optional P_PV/P_Load horizons for dashboard projection only
 ```
 
 The Store key is:
@@ -252,6 +255,29 @@ If the official endpoint is temporarily unavailable, the existing Home Assistant
 A refresh failure never deletes a still-valid cached plan. Once `valid_until` is passed, current plan values become unavailable; EnergyPilot does not repeat the last command.
 
 See `docs/EMHASS_PLAN_RUNTIME.md` for the detailed lifecycle and validation contract.
+
+## Execution evidence and command verification
+
+`execution_history.py` owns a separate Store of immutable controller snapshots.
+The live controller captures plan source/value/revision, the active strategy and
+limits, EV state and current coordinator actuals before resolving a decision.
+It then appends the expected command plus one explicit outcome:
+
+```text
+not attempted / waiting
+skipped because matching GoodWe read-back already existed
+write failed
+write completed + refreshed read-back verified/mismatched/unavailable
+```
+
+The existing `async_set_mode` transaction remains the only GoodWe write path.
+After a completed write, the controller requests its normal coordinator refresh
+before classifying mode/setpoint read-back. Evidence persistence catches its own
+failures and never changes command/error propagation.
+
+The Store retains seven UTC days with a 4096-event hard cap. It contains no
+configured entity IDs, EMHASS URL/token or arbitrary state attributes. The
+read-only API returns only a 48-hour window. See `docs/RUNTIME_STATE.md`.
 
 ## EMHASS orchestration, runtime contract and output freshness
 
@@ -393,14 +419,25 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes read-only chart data. The payload uses schema `5`, includes `plan_revision`, and uses future-plan source order:
+`battery_price_api.py` exposes read-only chart data. The payload uses schema `6`, includes `plan_revision`, and uses future-plan source order:
 
 ```text
 1. persistent validated official EMHASS plan mirror
 2. existing Home Assistant battery_scheduled_power / forecasts compatibility path
 ```
 
-Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. Forecast SOC uses only exact, validated `SOC_opt` from the official plan mirror; no output-entity fallback or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
+Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. The dashed wanted-SOC line uses immutable execution snapshots for elapsed time and exact validated `SOC_opt` from the current official plan for current/future time; no output-entity fallback or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
+
+The same bounded Recorder request includes combined display-only PV, load and
+fast grid power. Large/expanded views apply a load-first balance and draw
+grid/solar charge plus battery/solar export with an explicit unknown residual.
+This attribution is approximate presentation, never accounting or control.
+
+The schema-6 `execution` section contains the last 48 elapsed hours of exact
+ledger evidence and a 24-hour conditional projection. Future rows reuse the
+pure controller decision resolver against exact current-plan timestamps. They
+state that strategy/ownership remain unchanged and never predict EV/manual
+overrides, write success or read-back.
 
 The frontend keeps one canonical Battery · Plan · Price card. A mismatch between the live orchestrator `plan_revision` and the cached API payload forces an immediate refresh; `P_batt.last_updated` remains a compatibility fallback for plan changes outside EnergyPilot. The card is replaced/rebuilt rather than duplicated.
 
@@ -411,25 +448,28 @@ The header reachability pill is also canonical stable DOM. It is created only du
 Active top-level module:
 
 ```text
-gw-energy-pilot-v050.js
-  -> gw-energy-pilot-v049.js
-       -> gw-energy-pilot-v048.js
-            -> gw-energy-pilot-v047.js
-                 -> gw-energy-pilot-v046.js
-                      -> gw-energy-pilot-v045.js
-                           -> gw-energy-pilot-v044.js
-                                -> gw-energy-pilot-v043.js
-                                     -> gw-energy-pilot-v042.js
-                                          -> gw-energy-pilot-v041-emhass-settings.js
-                                               -> gw-energy-pilot-v041.js
-                                                    -> gw-energy-pilot-v039.js
-                                                         -> gw-energy-pilot-v038.js
-                                                              -> gw-energy-pilot-v038-runtime.js
-                                                                   -> gw-energy-pilot-v034.js
-                                                                        -> existing v0.34 feature chain
+gw-energy-pilot-v100.js
+  -> gw-energy-pilot-v051.js
+       -> gw-energy-pilot-v051-history.js
+       -> gw-energy-pilot-v050.js
+       -> gw-energy-pilot-v049.js
+            -> gw-energy-pilot-v048.js
+                 -> gw-energy-pilot-v047.js
+                      -> gw-energy-pilot-v046.js
+                           -> gw-energy-pilot-v045.js
+                                -> gw-energy-pilot-v044.js
+                                     -> gw-energy-pilot-v043.js
+                                          -> gw-energy-pilot-v042.js
+                                               -> gw-energy-pilot-v041-emhass-settings.js
+                                                    -> gw-energy-pilot-v041.js
+                                                         -> gw-energy-pilot-v039.js
+                                                              -> gw-energy-pilot-v038.js
+                                                                   -> gw-energy-pilot-v038-runtime.js
+                                                                        -> gw-energy-pilot-v034.js
+                                                                             -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card, source-attributed detailed plan graph and complete `0.51-h1` inner cache boundary. v1.0.0 owns only stable release presentation and its `1.0.0-stable1` top-level boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 

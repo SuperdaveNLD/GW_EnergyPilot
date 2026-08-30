@@ -92,6 +92,7 @@ The mirror contains only the latest validated plan evidence:
 - normalized `P_batt` points;
 - normalized `P_grid` points;
 - optional normalized `SOC_opt` percentage points;
+- optional normalized `P_PV` and `P_Load` points for dashboard evidence only;
 - configured Home Assistant publication entity IDs for diagnostics.
 
 This is a resilience cache, not a second optimizer or a second settings database.
@@ -142,9 +143,18 @@ This distinction is intentional:
 
 ## Dashboard
 
-Battery · Plan · Price obtains the future `P_batt` horizon and optional single-battery `SOC_opt` forecast from the same official plan runtime used by control. Recorder remains the source for historical published targets, actual GoodWe battery power and actual GoodWe SOC.
+Battery · Plan · Price obtains the future `P_batt` horizon and optional
+single-battery `SOC_opt`, `P_PV` and `P_Load` points from the same official plan
+runtime used by control. Only `P_batt`/`P_grid` participate in current control;
+`P_PV`/`P_Load` are dashboard-only. Recorder remains the source for historical
+published targets and actual GoodWe battery/PV/load/grid/SOC values.
 
-The Home Assistant schedule fallback intentionally fills only `P_batt`/`P_grid`. EnergyPilot does not have a configured SOC-forecast output entity, so it does not guess EMHASS's default or a custom runtime ID. Multi-battery plans expose only per-battery SOC columns and remain unavailable in the aggregate chart.
+The separate v0.51 execution Store snapshots the wanted `SOC_opt` and plan
+source used at decision time. It is immutable history, not another plan mirror.
+A newer plan replaces current/future intent but never rewrites those elapsed
+decision snapshots.
+
+The Home Assistant schedule fallback intentionally fills only `P_batt`/`P_grid`. EnergyPilot does not have configured SOC/PV/load forecast output entities, so it does not guess EMHASS defaults or custom runtime IDs. Multi-battery plans expose only per-battery SOC columns and remain unavailable in the aggregate chart.
 
 This removes the previous split where the controller and chart could disagree about whether a valid plan existed.
 

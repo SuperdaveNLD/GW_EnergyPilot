@@ -17,7 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}
 
 
 @dataclass(frozen=True)
@@ -285,6 +285,9 @@ def exercise_connectivity_status(page: Page, profile: Profile) -> dict[str, obje
         "placed": False,
         "initial_ok": False,
         "details_open": False,
+        "above_card_controls": False,
+        "pointer_isolated": False,
+        "hit_isolated": False,
         "issue_visible": False,
         "unknown_visible": False,
         "countdown_visible": False,
@@ -336,12 +339,33 @@ def exercise_connectivity_status(page: Page, profile: Profile) -> dict[str, obje
               const root = window.__epPanel.shadowRoot;
               const button = root.querySelector('.ep-connectivity-status');
               const popover = root.querySelector('.ep-connectivity-popover');
-              return button?.getAttribute('aria-expanded') === 'true' &&
-                popover && getComputedStyle(popover).display === 'block';
+              const cardControls = root.querySelector('.ep-v031-card-windowbar');
+              const popoverStyle = popover ? getComputedStyle(popover) : null;
+              const controlsStyle = cardControls ? getComputedStyle(cardControls) : null;
+              const rect = popover?.getBoundingClientRect();
+              const hit = rect
+                ? root.elementFromPoint(
+                    rect.left + rect.width / 2,
+                    rect.top + rect.height / 2
+                  )
+                : null;
+              return {
+                open: button?.getAttribute('aria-expanded') === 'true' &&
+                  popoverStyle?.display === 'block',
+                aboveCardControls:
+                  Number(popoverStyle?.zIndex) > Number(controlsStyle?.zIndex),
+                pointerIsolated: popoverStyle?.pointerEvents !== 'none',
+                hitIsolated: Boolean(
+                  hit && popover && (hit === popover || popover.contains(hit))
+                ),
+              };
             }
             """
         )
-        result["details_open"] = opened
+        result["details_open"] = opened["open"]
+        result["above_card_controls"] = opened["aboveCardControls"]
+        result["pointer_isolated"] = opened["pointerIsolated"]
+        result["hit_isolated"] = opened["hitIsolated"]
 
         page.evaluate(
             """
@@ -754,7 +778,7 @@ def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
         "context_refresh": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050"}:
+    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050", "v051", "v100"}:
         return result
     try:
         state = page.evaluate(
@@ -1231,7 +1255,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, object]:
     """Emulate Home Assistant host assignments during one physical press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}
     result: dict[str, object] = {
         "ran": enabled,
         "no_full_render": False,
@@ -1446,7 +1470,7 @@ def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, obje
 
 def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, object]:
     """Prove split HA state events patch one unambiguous stable selection."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}
     result: dict[str, object] = {
         "ran": enabled,
         "event_ordering": False,
@@ -1650,7 +1674,7 @@ def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Keep EMHASS and manual selectors live without rebuilding the dashboard."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}
     result: dict[str, object] = {
         "ran": enabled,
         "costfun_delayed": False,
@@ -1904,7 +1928,7 @@ def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -2464,7 +2488,7 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050"}
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -2715,7 +2739,7 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]:
     """Refresh the plan card during one physical S/M/L press."""
-    enabled = EXPECTED_ENTRYPOINT == "v047"
+    enabled = EXPECTED_ENTRYPOINT in {"v047", "v051", "v100"}
     result: dict[str, object] = {
         "ran": enabled,
         "refresh_during_press": False,
@@ -3077,11 +3101,14 @@ def exercise_structural_rerender(page: Page) -> dict[str, object]:
             """
             () => Boolean(
               window.__epPanel.shadowRoot.querySelector('main[data-ep-v041-stable-dom="1"]') &&
+              window.__epPanel.shadowRoot.querySelector('main') !==
+                window.__epBeforeNarrowMain &&
               window.__epPanel.shadowRoot.querySelectorAll('[data-ep-card]').length >= 8
             )
             """,
             timeout=10_000,
         )
+        wait_render_idle(page)
         result["cards"] = page.evaluate(
             "window.__epPanel.shadowRoot.querySelectorAll('[data-ep-card]').length"
         )
@@ -3370,6 +3397,145 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object]:
+    result: dict[str, object] = {
+        "ran": False,
+        "single_card": False,
+        "compact_rows": False,
+        "future_rows": False,
+        "wanted_soc_history": False,
+        "source_bars": False,
+        "ev_charge_underlay": False,
+        "ev_hold_underlay": False,
+        "modal_open": False,
+        "modal_rows": False,
+        "modal_no_filter": False,
+        "card_stable": False,
+        "main_stable": False,
+        "modal_closed": False,
+        "error": None,
+    }
+    if EXPECTED_ENTRYPOINT not in {"v051", "v100"}:
+        return result
+    try:
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.__epV027BatteryPlanData?.payload?.execution &&
+              !window.__epPanel.__epV027BatteryPlanPromise &&
+              window.__epPanel.shadowRoot.querySelector('.ep-v051-history-card')
+            )
+            """,
+            timeout=15_000,
+        )
+        initial = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              window.__epV051HistoryIdentity = {
+                main: root.querySelector('main'),
+                card: root.querySelector('.ep-v051-history-card'),
+              };
+              return {
+                cards: root.querySelectorAll('.ep-v051-history-card').length,
+                rows: root.querySelectorAll('.ep-v051-history-card tbody tr').length,
+                futureRows: root.querySelectorAll(
+                  '.ep-v051-history-card tbody tr[data-kind="projection"]'
+                ).length,
+                wantedHistory: Number(
+                  root.querySelector('[data-series="forecast-soc"]')?.dataset.historyPoints || 0
+                ),
+                evChargeUnderlay: Boolean(root.querySelector(
+                  '[data-series="ev-protection"][data-ev-kind="battery_charge_allowed"]'
+                )),
+                evHoldUnderlay: Boolean(root.querySelector(
+                  '[data-series="ev-protection"][data-ev-kind="discharge_blocked"]'
+                )),
+              };
+            }
+            """
+        )
+        result.update(
+            {
+                "single_card": initial["cards"] == 1,
+                "compact_rows": initial["rows"] >= 4,
+                "future_rows": initial["futureRows"] >= 1,
+                "wanted_soc_history": initial["wantedHistory"] >= 1,
+                "ev_charge_underlay": initial["evChargeUnderlay"],
+                "ev_hold_underlay": initial["evHoldUnderlay"],
+            }
+        )
+
+        activate(page, profile, '.ep-v027-battery-plan-card [data-chart-size="large"]')
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.shadowRoot.querySelector(
+                '.ep-v027-battery-plan-card [data-source-series]'
+              )
+            )
+            """,
+            timeout=10_000,
+        )
+        result["source_bars"] = True
+        activate(page, profile, '.ep-v027-battery-plan-card [data-chart-size="normal"]')
+
+        activate(page, profile, '.ep-v051-history-card [data-action="full-history"]')
+        page.wait_for_function(
+            "() => Boolean(window.__epPanel.shadowRoot.querySelector('.ep-v051-history-modal'))",
+            timeout=10_000,
+        )
+        modal = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const modal = root.querySelector('.ep-v051-history-modal');
+              return {
+                open: Boolean(modal),
+                rows: modal?.querySelectorAll('tbody tr').length || 0,
+                filter: modal ? getComputedStyle(modal).backdropFilter : '',
+              };
+            }
+            """
+        )
+        result["modal_open"] = modal["open"]
+        result["modal_rows"] = modal["rows"] >= 40
+        result["modal_no_filter"] = modal["filter"] in {"", "none"}
+        activate(page, profile, '.ep-v051-history-modal [data-action="close"]')
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v051-history-modal')",
+            timeout=10_000,
+        )
+        result["modal_closed"] = True
+
+        page.evaluate(
+            "window.__epSetEntityByKey('control_command', 'hybrid_grid_import')"
+        )
+        page.wait_for_function(
+            "() => !window.__epPanel.__epV027BatteryPlanPromise",
+            timeout=15_000,
+        )
+        stability = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              return {
+                card: window.__epV051HistoryIdentity.card === root.querySelector(
+                  '.ep-v051-history-card'
+                ),
+                main: window.__epV051HistoryIdentity.main === root.querySelector('main'),
+              };
+            }
+            """
+        )
+        result["card_stable"] = stability["card"]
+        result["main_stable"] = stability["main"]
+        result["ran"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
@@ -3497,6 +3663,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     strategy = exercise_strategy(page)
     chart_size_press = exercise_chart_size_press(page, profile)
     plan = exercise_plan_refresh(page)
+    execution_history = exercise_execution_history(page, profile)
     language_result = exercise_language(page)
     structural = exercise_structural_rerender(page)
 
@@ -3528,6 +3695,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "strategy": strategy,
         "chart_size_press": chart_size_press,
         "plan": plan,
+        "execution_history": execution_history,
         "language": language_result,
         "structural": structural,
         "animation": animation_summary(page),
@@ -3562,6 +3730,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     strategy = result["strategy"]
     chart_size_press = result["chart_size_press"]
     plan = result["plan"]
+    execution_history = result["execution_history"]
     language_result = result["language"]
     structural = result["structural"]
     animation = result["animation"]
@@ -3575,12 +3744,14 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v048": "v0.48 BETA",
         "v049": "v0.49 BETA",
         "v050": "v0.50 BETA",
+        "v051": "v0.51 BETA",
+        "v100": "v1.0.0 STABLE",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
             f"{name}: release badge is {initial['releaseVersion']!r} instead of {expected_badge}"
         )
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100"} and not all(
         phrase in initial["hybridNote"]
         for phrase in (
             "neutral P_batt plan in mode 8",
@@ -3598,7 +3769,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050"}:
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100"}:
         required_strategy_note = (
             "ran", "present", "note_stable", "strong_stable", "height_stable",
             "no_child_rebuilds", "dutch_copy", "context_refresh",
@@ -3682,7 +3853,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         required_connectivity = (
             "ran", "placed", "initial_ok", "details_open", "issue_visible",
             "unknown_visible", "countdown_visible", "main_stable",
-            "button_stable", "restored",
+            "button_stable", "restored", "above_card_controls",
+            "pointer_isolated", "hit_isolated",
         )
         if not all(connectivity[key] is True for key in required_connectivity):
             failures.append(f"{name}: connectivity status stable-DOM regression failed")
@@ -3728,7 +3900,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050"}:
+    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100"}:
         if not all(
             ev_settings[key] is True
             for key in (
@@ -3741,7 +3913,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: EV load-balancing settings safety regression failed")
         if ev_settings["error"]:
             failures.append(f"{name}: EV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}:
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}:
         required_host_press = (
             "ran", "no_full_render", "main_stable", "controls_stable",
             "native_click", "touch_click",
@@ -3771,7 +3943,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: stable selector feedback regression failed")
         if selector_stability["error"]:
             failures.append(f"{name}: stable selector feedback interaction error")
-    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"}:
+    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -3781,7 +3953,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050"}:
+    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -3843,7 +4015,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: Battery Strategy button did not apply")
     if strategy["error"]:
         failures.append(f"{name}: Battery Strategy interaction error")
-    if EXPECTED_ENTRYPOINT == "v047" and not all(
+    if EXPECTED_ENTRYPOINT in {"v047", "v051", "v100"} and not all(
         chart_size_press[key] is True
         for key in (
             "ran", "refresh_during_press", "click_delivered", "size_selected",
@@ -3869,6 +4041,21 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
     if plan["error"]:
         failures.append(f"{name}: battery-plan refresh interaction error")
+    if EXPECTED_ENTRYPOINT in {"v051", "v100"} and not all(
+        execution_history.get(key) is True
+        for key in (
+            "ran", "single_card", "compact_rows", "future_rows",
+            "wanted_soc_history", "source_bars", "ev_charge_underlay",
+            "ev_hold_underlay", "modal_open", "modal_rows",
+            "modal_no_filter", "card_stable", "main_stable", "modal_closed",
+        )
+    ):
+        failures.append(
+            f"{name}: EMHASS-to-GoodWe history/source UI regression failed: "
+            f"{execution_history}"
+        )
+    if execution_history["error"]:
+        failures.append(f"{name}: execution-history interaction error")
     if (
         language_result["localized"] is not True
         or language_result["manual_summary_localized"] is not True
@@ -3885,11 +4072,6 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: deliberate narrow-layout structural render failed")
     if structural["menu_open"] is not True or structural["menu_close"] is not True:
         failures.append(f"{name}: controls failed after a structural layout render")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"} and not all(
-        structural.get(key) is True
-        for key in ("settings_open", "optimize_in_settings", "settings_close")
-    ):
-        failures.append(f"{name}: Optimize now was not reachable in Settings")
     if structural["error"]:
         failures.append(f"{name}: post-structure menu interaction error")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and (

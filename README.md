@@ -10,15 +10,35 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.50 · Beta**
+**v1.0.0 · Stable**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
-In this project, **Beta** means functionality is intentionally available before broad field testing across installations and firmware versions is complete.
+Stable releases are the production default in HACS. Beta builds remain an
+explicit per-repository opt-in for testers.
+
+### Release channels from v1
+
+GW EnergyPilot keeps one Home Assistant integration/domain and exposes two HACS
+release channels:
+
+- stable production releases use `v1.x.x`, are normal GitHub Releases and are
+  the default for HACS users;
+- opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
+- branch pushes never publish a release; only a validated tag can do so.
+
+`v0.50` remains the final published historical 0.x Beta. `v1.0.0` is the first
+stable production release under the new contract. Normal users keep the HACS
+prerelease switch off. Testers explicitly enable the
+HACS prerelease switch for GW EnergyPilot and can then select a published beta.
+See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
-- `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.0.0.md` — first stable v1 release notes;
+- `docs/RELEASE_NOTES_V051.md` — development notes for the v0.51 feature layer promoted in v1.0.0;
+- `docs/RELEASE_WORKFLOW.md` — v1 stable/beta branches, tags, gates and HACS selection;
 - `docs/RELEASE_NOTES_V050.md` — v0.50 GoodWe phase-aware EV charger control and feedback;
 - `docs/RELEASE_NOTES_V049.md` — v0.49 wall-clock plans, EV coordination and dashboard reliability;
 - `docs/RELEASE_NOTES_V048.md` — v0.48 neutral-safe signed Hybrid PCC control;
@@ -49,6 +69,19 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v1.0.0 highlights
+
+- One new **EMHASS → GOODWE** card shows the nearest decisions around ±6 hours and opens a full 48-hour history plus 24-hour conditional projection.
+- Every automatic decision snapshots its EMHASS plan source, wanted SOC, strategy/config, actual SOC/power, expected GoodWe command, write result and refreshed mode/setpoint read-back.
+- Execution evidence is UTC-aware, retained for seven days with a 4096-event cap and stored separately from configuration; existing installations start with an empty history without migration.
+- Large/expanded Battery · Plan · Price charts estimate grid-versus-solar battery charging and battery-versus-solar export from Recorder battery/PV/load/grid actuals, preserving unknown residuals instead of inventing a source.
+- The dashed wanted-SOC line remains and now uses immutable historical decision snapshots before continuing with the current official EMHASS plan.
+- Verified EV anti-discharge blocking and charge-permitted intervals are shown on the same execution timeline without inventing spans across Home Assistant restarts.
+- Generic Battery Strategy wording and connectivity-detail layering are corrected without changing controller behavior.
+- Attribution is dashboard-only and approximate: GoodWe control, EMHASS inputs, financial accounting, registers, identities and write ordering are unchanged.
+- Tag-only release automation keeps normal HACS users on stable while testers can explicitly select published prereleases.
+- The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the stable v1 entrypoint and its `0.51-h1` feature graph.
 
 ## v0.50 highlights
 

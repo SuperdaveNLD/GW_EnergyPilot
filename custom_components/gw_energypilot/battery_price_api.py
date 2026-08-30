@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import voluptuous as vol
@@ -16,11 +17,22 @@ from .battery_plan import (
     finite_number,
     nonnegative_number,
     normalize_emhass_forecasts,
+    normalized_timestamp,
 )
+from .control_decision import resolve_control_decision
 from .const import (
+    CONF_DEADBAND,
+    CONF_MAX_POWER,
     CONF_P_BATT_ENTITY,
+    DEFAULT_DEADBAND,
+    DEFAULT_MAX_POWER,
     DEFAULT_P_BATT_ENTITY,
     DOMAIN,
+    MODE_NAMES,
+)
+from .execution_history import (
+    EXECUTION_HISTORY_LIMIT,
+    EXECUTION_HISTORY_RETENTION_DAYS,
 )
 
 
@@ -125,6 +137,137 @@ def _battery_soc_plan_payload(entry: ConfigEntry) -> dict[str, Any]:
     }
 
 
+def _points_by_start(
+    points: list[dict[str, Any]],
+    value_key: str,
+) -> dict[float, tuple[str, float]]:
+    result: dict[float, tuple[str, float]] = {}
+    for point in points:
+        parsed = normalized_timestamp(point.get("start"))
+        value = finite_number(point.get(value_key))
+        if parsed is not None and value is not None:
+            result[parsed[1]] = (parsed[0], value)
+    return result
+
+
+def _future_execution_rows(
+    entry: ConfigEntry,
+    *,
+    now: datetime,
+    end: datetime,
+) -> list[dict[str, Any]]:
+    """Project future plan rows through the same pure controller mapping."""
+    runtime_data = getattr(entry, "runtime_data", None)
+    plan_runtime = getattr(runtime_data, "plan_runtime", None)
+    controller = getattr(runtime_data, "controller", None)
+    orchestrator = getattr(runtime_data, "orchestrator", None)
+    if plan_runtime is None or controller is None:
+        return []
+
+    p_batt = _points_by_start(plan_runtime.points("p_batt"), "value_w")
+    p_grid = _points_by_start(plan_runtime.points("p_grid"), "value_w")
+    p_pv = _points_by_start(plan_runtime.points("p_pv"), "value_w")
+    p_load = _points_by_start(plan_runtime.points("p_load"), "value_w")
+    soc_opt = _points_by_start(plan_runtime.points("soc_opt"), "value_pct")
+    deadband = float(entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
+    max_power = int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
+    start_seconds = now.timestamp()
+    end_seconds = end.timestamp()
+    diagnostics = dict(plan_runtime.diagnostics)
+    rows: list[dict[str, Any]] = []
+    for timestamp in sorted(p_batt):
+        if timestamp < start_seconds or timestamp >= end_seconds:
+            continue
+        start, battery = p_batt[timestamp]
+        grid = p_grid.get(timestamp, (start, None))[1]
+        decision = resolve_control_decision(
+            strategy=controller.control_strategy,
+            p_batt=battery,
+            p_grid=grid,
+            deadband=deadband,
+            max_power=max_power,
+            # EV/manual/failsafe state is intentionally not forecast.
+            ev_active=False,
+        )
+        rows.append(
+            {
+                "kind": "projection",
+                "occurred_at": start,
+                "owner": "automatic" if controller.enabled else "manual",
+                "plan": {
+                    "p_batt_w": battery,
+                    "p_grid_w": grid,
+                    "p_pv_w": p_pv.get(timestamp, (start, None))[1],
+                    "p_load_w": p_load.get(timestamp, (start, None))[1],
+                    "soc_opt_pct": soc_opt.get(timestamp, (start, None))[1],
+                    "mirror_source": diagnostics.get("source"),
+                    "generated_at": diagnostics.get("generated_at"),
+                    "valid_until": diagnostics.get("valid_until"),
+                    "revision": int(
+                        getattr(orchestrator, "plan_revision", 0) or 0
+                    ),
+                },
+                "configuration": {
+                    "strategy": controller.control_strategy,
+                    "deadband_w": deadband,
+                    "max_power_w": max_power,
+                    "ev_active": False,
+                },
+                "actual": {},
+                "outcome": {
+                    "command": decision.command,
+                    "expected_mode": decision.mode,
+                    "expected_mode_name": MODE_NAMES.get(
+                        decision.mode, "Waiting"
+                    ),
+                    "expected_setpoint_w": decision.power,
+                    "write_status": "projected",
+                    "verification_status": "future",
+                },
+            }
+        )
+    return rows
+
+
+async def _execution_payload(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> dict[str, Any]:
+    """Return exact 48-hour history plus a conditional 24-hour projection."""
+    now = datetime.now(timezone.utc)
+    history_start = now - timedelta(hours=48)
+    future_end = now + timedelta(hours=24)
+    runtime_data = getattr(entry, "runtime_data", None)
+    execution_history = getattr(runtime_data, "execution_history", None)
+    history = (
+        await execution_history.async_history(start=history_start, end=now)
+        if execution_history is not None
+        else []
+    )
+    return {
+        "schema_version": 1,
+        "available": execution_history is not None,
+        "history_start": history_start.isoformat(),
+        "now": now.isoformat(),
+        "future_end": future_end.isoformat(),
+        "time_zone": getattr(hass.config, "time_zone", "UTC"),
+        "retention_days": EXECUTION_HISTORY_RETENTION_DAYS,
+        "event_limit": EXECUTION_HISTORY_LIMIT,
+        "revision": execution_history.revision if execution_history is not None else 0,
+        "runtime_session_id": (
+            getattr(getattr(runtime_data, "controller", None), "execution_session_id", None)
+        ),
+        "history": history,
+        "future": _future_execution_rows(entry, now=now, end=future_end),
+        "future_assumptions": {
+            "configuration_unchanged": True,
+            "control_ownership_unchanged": True,
+            "ev_override_not_predicted": True,
+            "readback_not_predicted": True,
+        },
+    }
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "gw_energypilot/battery_price/get",
@@ -172,12 +315,13 @@ async def websocket_get_battery_price(
         msg["id"],
         {
             "entry_id": entry.entry_id,
-            "chart_schema_version": 5,
+            "chart_schema_version": 6,
             "plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0),
             **price_payload,
             "battery_energy": _battery_energy_payload(runtime_data),
             "battery_plan": _battery_plan_payload(hass, entry),
             "battery_soc_plan": _battery_soc_plan_payload(entry),
+            "execution": await _execution_payload(hass, entry),
         },
     )
 

@@ -65,6 +65,18 @@ class BatterySaverTests(unittest.TestCase):
         self.assertEqual(payloads[1]["maximum_soc_pct"], 100)
         self.assertEqual(payloads[2]["maximum_soc_pct"], 100)
         self.assertEqual(payloads[3]["maximum_soc_pct"], 100)
+        self.assertEqual(
+            [item["description"] for item in payloads],
+            [
+                "Maximum economic freedom, with anti-churn protection and the lightest battery-preservation costs.",
+                "Profit first, with anti-churn protection and light battery-preservation costs.",
+                "Balances trading value and battery preservation with moderate battery-preservation costs.",
+                "Prioritizes battery preservation with the strongest low-SOC, high-SOC and high-power costs.",
+            ],
+        )
+        for payload in payloads:
+            self.assertNotIn("%", payload["description"])
+            self.assertNotIn("hard maximum", payload["description"].lower())
         for payload in payloads:
             self.assertEqual(payload["surplus_threshold_pct"], 95)
         self.assertEqual(payloads[0]["anti_churn_cost_factor_pct"], 2.25)

@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "0.50-ev1"
+CACHE_KEY = "0.51-h1"
 
 
 class FrontendV050ReleaseTests(unittest.TestCase):
@@ -16,14 +16,19 @@ class FrontendV050ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_manifest_panel_and_presentation_are_v050(self) -> None:
+    def test_v050_presentation_remains_below_active_v051_panel(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "0.50")
-        self.assertIn(f"gw-energy-pilot-v050.js?v={CACHE_KEY}", init_source)
+        self.assertEqual(manifest["version"], "1.0.0")
+        active = (FRONTEND / "gw-energy-pilot-v051.js").read_text(encoding="utf-8")
+        self.assertIn("gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source)
+        self.assertIn(
+            f'import "./gw-energy-pilot-v050.js?v={CACHE_KEY}"',
+            active,
+        )
         self.assertIn(
             f'import "./gw-energy-pilot-v049.js?v={CACHE_KEY}"',
             self.source,

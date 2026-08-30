@@ -133,24 +133,45 @@ def normalize_emhass_api_plan(
     """Normalize the official ``GET /api/v1/plan`` battery/grid horizon.
 
     EMHASS schema 1.x defines ``timestamp``, ``P_batt``, ``P_grid`` and
-    ``SOC_opt`` as canonical plan columns. ``SOC_opt`` is a fraction in the
-    persisted plan, unlike the percentage published to Home Assistant, so it
-    is accepted only inside the documented 0..1 range and normalized here.
-    Unknown/missing rows are ignored rather than guessed from unrelated
-    numeric columns.
+    ``SOC_opt`` as canonical control columns. Its persisted plan can also
+    expose the exact ``P_PV`` and ``P_Load`` forecast columns. They remain
+    dashboard-only evidence and never feed the GoodWe controller. ``SOC_opt``
+    is a fraction in the persisted plan, unlike the percentage published to
+    Home Assistant, so it is accepted only inside the documented 0..1 range
+    and normalized here. Unknown/missing rows are ignored rather than guessed
+    from unrelated numeric columns.
     """
     if not isinstance(payload, Mapping) or payload.get("status") != "ok":
-        return {"p_batt": [], "p_grid": [], "soc_opt": []}
+        return {
+            "p_batt": [],
+            "p_grid": [],
+            "p_pv": [],
+            "p_load": [],
+            "soc_opt": [],
+        }
     rows = payload.get("plan")
     if not isinstance(rows, list):
-        return {"p_batt": [], "p_grid": [], "soc_opt": []}
+        return {
+            "p_batt": [],
+            "p_grid": [],
+            "p_pv": [],
+            "p_load": [],
+            "soc_opt": [],
+        }
 
     result: dict[str, list[dict[str, Any]]] = {
         "p_batt": [],
         "p_grid": [],
+        "p_pv": [],
+        "p_load": [],
         "soc_opt": [],
     }
-    for result_key, column in (("p_batt", "P_batt"), ("p_grid", "P_grid")):
+    for result_key, column in (
+        ("p_batt", "P_batt"),
+        ("p_grid", "P_grid"),
+        ("p_pv", "P_PV"),
+        ("p_load", "P_Load"),
+    ):
         by_timestamp: dict[float, dict[str, Any]] = {}
         for row in rows:
             if not isinstance(row, Mapping):
@@ -234,6 +255,35 @@ def plan_value_at(
         parsed = normalized_timestamp(point.get("start"))
         value = finite_number(point.get("value_w"))
         if parsed is not None and value is not None:
+            parsed_points.append((parsed[1], value))
+    parsed_points.sort(key=lambda item: item[0])
+    for index, (start, value) in enumerate(parsed_points):
+        next_start = (
+            parsed_points[index + 1][0]
+            if index + 1 < len(parsed_points)
+            else start + step_seconds
+            if step_seconds is not None and step_seconds > 0
+            else None
+        )
+        if next_start is not None and start <= target < next_start:
+            return value
+    return None
+
+
+def plan_percentage_at(
+    points: list[dict[str, Any]],
+    when: datetime,
+    step_seconds: int | None,
+) -> float | None:
+    """Return the active validated percentage point without extrapolation."""
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    target = when.timestamp()
+    parsed_points: list[tuple[float, float]] = []
+    for point in points:
+        parsed = normalized_timestamp(point.get("start"))
+        value = finite_number(point.get("value_pct"))
+        if parsed is not None and value is not None and 0.0 <= value <= 100.0:
             parsed_points.append((parsed[1], value))
     parsed_points.sort(key=lambda item: item[0])
     for index, (start, value) in enumerate(parsed_points):

@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=0.50-ev1";
+import "./gw-energy-pilot-v039.js?v=0.51-h1";
 import {
   FLOW_THRESHOLD_W,
   flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=0.50-ev1";
+} from "./gw-energy-pilot-v038-model.js?v=0.51-h1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=0.50-ev1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.50-ev1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.50-ev1";
+} from "./gw-energy-pilot-v038-i18n.js?v=0.51-h1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.51-h1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=0.51-h1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -424,7 +424,7 @@ const NO_MOTION_CSS = `
   }
   :host .ep-connectivity-popover {
     position: absolute;
-    z-index: 30;
+    z-index: 100;
     top: calc(100% + 8px);
     right: 0;
     display: none;
@@ -436,7 +436,7 @@ const NO_MOTION_CSS = `
     background: #081d34;
     box-shadow: 0 16px 38px rgba(0, 0, 0, .34);
     text-align: left;
-    pointer-events: none;
+    pointer-events: auto;
   }
   :host .ep-connectivity-wrap.open .ep-connectivity-popover,
   :host .ep-connectivity-wrap:focus-within .ep-connectivity-popover {
@@ -1733,6 +1733,15 @@ function planSignature(panel, hass = panel?._hass) {
   });
 }
 
+function executionHistorySignature(panel, hass = panel?._hass) {
+  const entityId = panel?._entityId?.("control_command");
+  const state = entityId ? hass?.states?.[entityId] : null;
+  return JSON.stringify({
+    entityId: entityId || null,
+    revision: state?.attributes?.execution_history_revision ?? null,
+  });
+}
+
 function scheduleLivePatch(panel) {
   if (panel.__epV041LivePatchTimer) return;
   panel.__epV041LivePatchTimer = globalThis.setTimeout(() => {
@@ -1741,11 +1750,16 @@ function scheduleLivePatch(panel) {
   }, LIVE_PATCH_DELAY_MS);
 }
 
-function schedulePlanRefresh(panel) {
+function schedulePlanRefresh(panel, backendForce = true) {
+  panel.__epV041PlanPatchBackendForce = Boolean(
+    panel.__epV041PlanPatchBackendForce || backendForce
+  );
   if (panel.__epV041PlanPatchTimer) return;
   panel.__epV041PlanPatchTimer = globalThis.setTimeout(() => {
     panel.__epV041PlanPatchTimer = null;
-    void loadChartData(panel, true).catch((err) => {
+    const forceBackend = Boolean(panel.__epV041PlanPatchBackendForce);
+    panel.__epV041PlanPatchBackendForce = false;
+    void loadChartData(panel, true, forceBackend).catch((err) => {
       console.error("GW EnergyPilot: v0.41 battery plan refresh failed", err);
     });
   }, PLAN_PATCH_DELAY_MS);
@@ -1845,6 +1859,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     this.__epV041ContextSignature = contextSignature(this._hass);
     this.__epV041StructureSignature = structureSignature(this);
     this.__epV041PlanSignature = planSignature(this);
+    this.__epV041ExecutionHistorySignature = executionHistorySignature(this);
     installFreshDiagnosticsCopy(this, root);
     patchLiveDom(this);
     return result;
@@ -1872,9 +1887,15 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
         }
 
         const nextPlanSignature = planSignature(this, value);
-        if (nextPlanSignature !== this.__epV041PlanSignature) {
+        const planChanged = nextPlanSignature !== this.__epV041PlanSignature;
+        if (planChanged) {
           this.__epV041PlanSignature = nextPlanSignature;
           schedulePlanRefresh(this);
+        }
+        const nextExecutionHistorySignature = executionHistorySignature(this, value);
+        if (nextExecutionHistorySignature !== this.__epV041ExecutionHistorySignature) {
+          this.__epV041ExecutionHistorySignature = nextExecutionHistorySignature;
+          if (!planChanged) schedulePlanRefresh(this, false);
         }
 
         if (this.__epV016SettingsOpen) {

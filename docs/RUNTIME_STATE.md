@@ -9,12 +9,13 @@ GW EnergyPilot keeps configuration and runtime history separate.
 - EMHASS remains the source of optimizer configuration and published plan outputs.
 - Small EnergyPilot-owned runtime history that must survive an integration reload or Home Assistant restart is stored with Home Assistant's `Store` helper.
 
-Three per-config-entry stores are used for controller/orchestrator runtime evidence:
+Four per-config-entry stores are used for controller/orchestrator runtime evidence:
 
 ```text
 gw_energypilot.runtime.<config_entry_id>
 gw_energypilot.control.<config_entry_id>
 gw_energypilot.optimization_log.<config_entry_id>
+gw_energypilot.execution.<config_entry_id>
 ```
 
 They are not configuration databases and must not contain user settings that belong in the config entry.
@@ -84,6 +85,55 @@ error
 The history is chronological, oldest first, and automatically drops the oldest entry when the 51st record is written. A failure to write diagnostic history is logged but must never turn an otherwise successful optimization into a control failure.
 
 The optimization log is deliberately separate from `last_success`: failed runs are valuable diagnostic evidence, while `last_success` must continue to represent the most recent completed optimize + publish cycle only.
+
+## EMHASS-to-GoodWe execution history
+
+The v0.51 feature layer, promoted in v1.0.0, adds a bounded evidence ledger for issue #108. It is not a command queue
+and never becomes a control input. Each event snapshots the information that
+was available when Automatic Control evaluated a plan:
+
+```text
+UTC instant + monotonic sequence
+Home Assistant runtime session ID
+automatic/manual ownership
+P_batt / P_grid / wanted SOC + live-or-mirror source
+plan generation / validity / revision
+strategy + legacy/explicit source + deadband + maximum + EV state
+actual battery SOC/power, combined PV, load, grid, EMS mode/setpoint
+expected command/mode/setpoint
+write status + post-refresh verification/read-back
+```
+
+The ledger retains seven elapsed days and at most 4096 oldest-first records.
+The public chart API returns only the last 48 elapsed hours. UTC persistence
+keeps repeated DST wall-clock hours distinct; the dashboard formats instants
+using Home Assistant's configured timezone.
+
+Completed writes are followed by the established coordinator refresh. Matching
+mode and setpoint become `verified`; a finite disagreement becomes `mismatch`;
+missing/failing refresh evidence becomes `unavailable`. A matching pre-write
+read-back is stored as `skipped_matching_readback` and `verified`. Write and
+Store failures are distinct: execution-history persistence is best-effort and
+must never change whether a GoodWe transaction succeeds or propagates its
+existing error.
+
+History is immutable snapshot evidence. A later plan, strategy, deadband,
+maximum-power or PV-source configuration change affects only future records.
+There is intentionally no retroactive reconstruction because Recorder does not
+contain the exact decision, ownership and verification context.
+
+The Store omits configured entity IDs, EMHASS URLs/tokens and arbitrary Home
+Assistant attributes. It does retain local power/SOC/strategy evidence and
+therefore remains private installation data. Existing installations need no
+migration: the new Store starts empty. Malformed/out-of-retention records are
+ignored or pruned on restore.
+
+The in-memory sequence is exposed as an execution-history revision so the
+dashboard can refresh only the affected evidence/chart regions. The revision
+is not persistent control state. A random controller runtime session ID is
+stored with every new event so verified EV protection spans never bridge a
+Home Assistant restart merely because two retained records have compatible
+commands.
 
 ## Scope
 

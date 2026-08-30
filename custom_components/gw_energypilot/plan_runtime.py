@@ -21,6 +21,7 @@ from .battery_plan import (
     normalize_emhass_api_plan,
     normalize_emhass_forecasts,
     normalized_timestamp,
+    plan_percentage_at,
     plan_valid_until,
     plan_value_at,
 )
@@ -117,6 +118,8 @@ class GWEnergyPilotPlanRuntime:
         emhass_schema_version: str | None,
         p_batt: list[dict[str, Any]],
         p_grid: list[dict[str, Any]],
+        p_pv: list[dict[str, Any]],
+        p_load: list[dict[str, Any]],
         soc_opt: list[dict[str, Any]],
     ) -> dict[str, Any] | None:
         if not p_batt:
@@ -149,6 +152,8 @@ class GWEnergyPilotPlanRuntime:
             "p_grid_entity_id": self._p_grid_entity_id(),
             "p_batt": [dict(point) for point in p_batt],
             "p_grid": [dict(point) for point in p_grid],
+            "p_pv": [dict(point) for point in p_pv],
+            "p_load": [dict(point) for point in p_load],
             "soc_opt": validated_soc,
         }
 
@@ -157,10 +162,14 @@ class GWEnergyPilotPlanRuntime:
             return None
         p_batt = value.get("p_batt")
         p_grid = value.get("p_grid", [])
+        p_pv = value.get("p_pv", [])
+        p_load = value.get("p_load", [])
         soc_opt = value.get("soc_opt", [])
         if (
             not isinstance(p_batt, list)
             or not isinstance(p_grid, list)
+            or not isinstance(p_pv, list)
+            or not isinstance(p_load, list)
             or not isinstance(soc_opt, list)
         ):
             return None
@@ -174,6 +183,8 @@ class GWEnergyPilotPlanRuntime:
             ),
             p_batt=[dict(point) for point in p_batt if isinstance(point, Mapping)],
             p_grid=[dict(point) for point in p_grid if isinstance(point, Mapping)],
+            p_pv=[dict(point) for point in p_pv if isinstance(point, Mapping)],
+            p_load=[dict(point) for point in p_load if isinstance(point, Mapping)],
             soc_opt=[dict(point) for point in soc_opt if isinstance(point, Mapping)],
         )
         return snapshot
@@ -250,6 +261,8 @@ class GWEnergyPilotPlanRuntime:
             emhass_schema_version=schema_version,
             p_batt=normalized["p_batt"],
             p_grid=normalized["p_grid"],
+            p_pv=normalized["p_pv"],
+            p_load=normalized["p_load"],
             soc_opt=normalized["soc_opt"],
         )
         if snapshot is None:
@@ -285,6 +298,8 @@ class GWEnergyPilotPlanRuntime:
             emhass_schema_version=None,
             p_batt=p_batt,
             p_grid=p_grid,
+            p_pv=[],
+            p_load=[],
             # The HA fallback does not expose a configured SOC-forecast entity.
             # Do not guess the default/custom EMHASS output entity here.
             soc_opt=[],
@@ -339,6 +354,20 @@ class GWEnergyPilotPlanRuntime:
         """Return the current persisted P_grid target."""
         return self.current_value("p_grid")
 
+    def current_soc_opt(self) -> float | None:
+        """Return the current persisted desired SOC percentage."""
+        snapshot = self._snapshot
+        if snapshot is None:
+            return None
+        points = snapshot.get("soc_opt")
+        if not isinstance(points, list):
+            return None
+        try:
+            step = int(snapshot.get("step_seconds"))
+        except (TypeError, ValueError):
+            return None
+        return plan_percentage_at(points, dt_util.utcnow(), step)
+
     def current_step_seconds(self) -> int | None:
         """Return the inferred timestep for a plan that is valid now."""
         if not self.has_current_plan() or self._snapshot is None:
@@ -372,6 +401,8 @@ class GWEnergyPilotPlanRuntime:
             "step_seconds": snapshot.get("step_seconds"),
             "p_batt_points": len(snapshot.get("p_batt") or []),
             "p_grid_points": len(snapshot.get("p_grid") or []),
+            "p_pv_points": len(snapshot.get("p_pv") or []),
+            "p_load_points": len(snapshot.get("p_load") or []),
             "soc_opt_points": len(snapshot.get("soc_opt") or []),
             "restored_from_store": self.restored_from_store,
             "last_error": self.last_error,
