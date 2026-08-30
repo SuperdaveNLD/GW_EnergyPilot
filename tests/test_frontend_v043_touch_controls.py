@@ -13,7 +13,7 @@ class FrontendV043TouchControlsTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_v048_active_entrypoint_retains_v043_touch_fix(self) -> None:
+    def test_v049_active_entrypoint_retains_v043_touch_fix(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
         v047 = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
@@ -21,16 +21,16 @@ class FrontendV043TouchControlsTests(unittest.TestCase):
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         v044 = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v048.js?v=0.48-hybrid-control1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.48-hybrid-control1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.47-custom-battery1"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.47-custom-battery1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.47-custom-battery1"', v045)
+        self.assertIn("gw-energy-pilot-v049.js?v=0.49-consolidated1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.49-consolidated1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.49-consolidated1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.49-consolidated1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.49-consolidated1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.47-custom-battery1"',
+            'import "./gw-energy-pilot-v043.js?v=0.49-consolidated1"',
             v044,
         )
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.47-custom-battery1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.49-consolidated1"', self.source)
         self.assertIn('const VERSION = "0.43"', self.source)
 
     def test_touch_hover_cannot_impersonate_selected_state(self) -> None:

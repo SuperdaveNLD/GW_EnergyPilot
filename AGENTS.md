@@ -22,16 +22,16 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.48 Beta
+v0.49 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v0.48)
+## Frontend stability contract (v0.41+, active v0.49)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v0.48 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v0.49 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -346,28 +346,29 @@ orchestrator_v044
 
 Inspect all active subclasses before changing orchestration behavior.
 
-v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup when native orchestration is enabled. Transient failures retry after 15, 30 and 60 seconds. Any successful optimization after setup cancels the remaining startup sequence; the normal periodic schedule remains authoritative after exhaustion.
+v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup when native orchestration is enabled. Transient failures retry after 15, 30 and 60 seconds. Any successful optimization after setup cancels the remaining startup sequence; the normal wall-clock schedule remains authoritative after exhaustion.
 
 ## Active frontend chain
 
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v048.js
-  -> gw-energy-pilot-v047.js
-       -> gw-energy-pilot-v046.js
-            -> gw-energy-pilot-v045.js
-                 -> gw-energy-pilot-v044.js
-                      -> gw-energy-pilot-v043.js
-                           -> gw-energy-pilot-v042.js
-                                -> gw-energy-pilot-v041-emhass-settings.js
-                                     -> gw-energy-pilot-v041.js
-                                          -> gw-energy-pilot-v039.js
-                                               -> gw-energy-pilot-v038.js
-                                                    -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v049.js
+  -> gw-energy-pilot-v048.js
+       -> gw-energy-pilot-v047.js
+            -> gw-energy-pilot-v046.js
+                 -> gw-energy-pilot-v045.js
+                      -> gw-energy-pilot-v044.js
+                           -> gw-energy-pilot-v043.js
+                                -> gw-energy-pilot-v042.js
+                                     -> gw-energy-pilot-v041-emhass-settings.js
+                                          -> gw-energy-pilot-v041.js
+                                               -> gw-energy-pilot-v039.js
+                                                    -> gw-energy-pilot-v038.js
+                                                         -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.48 owns current Hybrid operator copy and release presentation. v0.47 retains the Custom Battery Saver presentation/cache boundary; the existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v0.49 owns only release presentation and the complete `0.49-consolidated1` cache boundary. v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

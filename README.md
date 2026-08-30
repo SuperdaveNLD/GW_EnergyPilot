@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.48 · Beta**
+**v0.49 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V049.md` — v0.49 wall-clock plans, EV coordination and dashboard reliability;
 - `docs/RELEASE_NOTES_V048.md` — v0.48 neutral-safe signed Hybrid PCC control;
 - `docs/RELEASE_NOTES_V047.md` — v0.47 editable Custom battery costs and profile tuning;
 - `docs/RELEASE_NOTES_V046.md` — v0.46 grouped external-PV controls and master switch;
@@ -47,6 +48,16 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v0.49 highlights
+
+- One serialized scheduler owns full EMHASS optimization and active saved-plan publication on local wall-clock boundaries; new choices are 15/30/60 minutes with 15 recommended.
+- Optional soft EV load balancing adjusts one configured charger-current entity after sustained overload/headroom without writing GoodWe, Automatic Control or EMHASS.
+- Compact connectivity status covers Modbus, charger and effective EV coordination, including a five-minute stale-charger suspension guard.
+- Controller diagnostics show the active EV protection decision and persist the latest successfully completed EMS setpoint transaction.
+- Plan S/M/L controls survive scoped graph refresh, SOC targets retain canonical live fallbacks, and the Hybrid explanation no longer changes height during telemetry.
+- The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the consolidated `0.49-consolidated1` frontend graph.
+- Issue #99 remains open/on hold without a speculative fix because its white-screen report could not be reproduced.
 
 ## v0.48 highlights
 

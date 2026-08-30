@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.48 Beta**.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.49 Beta**.
 
 ## Purpose
 
@@ -173,9 +173,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v0.48 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v0.49 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v0.48 loads its current wrapper and v0.47 dependency through `0.48-hybrid-control1`; the unchanged nested v0.47 graph retains its complete `0.47-custom-battery1` cache boundary. The older v0.33 plan-refresh mechanism remains historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v0.49 loads every import in the active graph through `0.49-consolidated1`, including the scoped plan-refresh owner. The older v0.33 plan-refresh mechanism remains historical compatibility context.
 
 The optimization revision and `P_batt` freshness checks are independent of ordinary five-minute chart-data cache expiry, so a newly published plan does not intentionally remain stale for that full interval.
 

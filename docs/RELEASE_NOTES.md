@@ -11,6 +11,16 @@ This page is the user-facing release index for GW EnergyPilot.
 - **Validated + beta diagnostics** — release behavior is validated while optional diagnostics still need field correlation.
 - **Historical** — older development milestone retained for release history.
 
+# v0.49 — Wall-clock plans, EV coordination and stable operator feedback
+
+EnergyPilot now owns one serialized wall-clock schedule for full EMHASS optimization and due active-plan publication. New installations select 15, 30 or 60 minutes, with 15 recommended; due plan rows are published only after fresh finite outputs are proven. Nord Pool unavailable-state classification is also corrected.
+
+Optional soft EV load balancing adjusts one configured charger limit after sustained current conditions without writing GoodWe or invoking Automatic Control/EMHASS. A compact reachability control, stale-charger coordination guard and explicit EV anti-discharge feedback make the active safety state visible.
+
+Controller diagnostics persist the latest successful EMS setpoint transaction. Plan S/M/L controls, live SOC target fallbacks and the Hybrid explanation now remain stable through their respective refresh paths. Issue #99 remains open/on hold without a speculative fix because the white-screen report could not be reproduced.
+
+See `docs/RELEASE_NOTES_V049.md` and `docs/CHANGELOG_V049.md`.
+
 # v0.48 — Neutral-safe signed Hybrid PCC control
 
 Hybrid Automatic Control now preserves a neutral `P_batt` plan through mode 8 before considering grid flow. For every non-neutral battery plan, signed `P_grid` selects mode 1 around zero, mode 9 for planned import and mode 10 for planned export. Exact configured deadband boundaries remain neutral, and mode-9/10 setpoints keep the complete absolute grid target without deadband subtraction.
@@ -37,6 +47,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.49** | 2026-08-30 | **Beta** | Consolidates wall-clock EMHASS plan execution, isolated soft EV load balancing, connectivity/EV safety visibility, persisted EMS evidence and stable graph/SOC/Hybrid presentation fixes. |
 | **0.48** | 2026-08-30 | **Beta** | Makes Hybrid neutral-safe and signed-PCC based: mode 8 for a neutral battery plan, mode 1 around zero grid target, and complete mode-9/10 import/export targets outside the configured variable deadband. |
 | **0.47** | 2026-08-29 | **Beta** | Adds administrator-editable Custom EMHASS battery costs, field-tuned anti-churn/power-stress policy and a shared soft 95–100% high-SOC red zone while preserving installation-owned settings and all GoodWe control semantics. |
 | **0.46** | 2026-08-29 | **Beta** | Adds an independent external-PV master switch and groups the four entity selectors in one enabled/disabled panel while preserving existing v0.45 configurations. |
