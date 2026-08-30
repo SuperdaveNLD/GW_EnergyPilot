@@ -23,55 +23,61 @@ class V039ReleaseTests(unittest.TestCase):
             self.assertIn('import "./gw-energy-pilot-v038.js?v=0.39-v0381"', release)
         elif version == "0.40":
             self.assertIn("gw-energy-pilot-v040.js?v=0.40-mobile-scroll1", init_source)
-        elif version in {"0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50"}:
+        elif version in {"0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51"}:
             settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
             v041 = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
-            if version in {"0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50"}:
+            if version in {"0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51"}:
                 v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-                if version in {"0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50"}:
+                if version in {"0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51"}:
                     v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
-                    if version in {"0.46", "0.47", "0.48", "0.49", "0.50"}:
-                        if version in {"0.47", "0.48", "0.49", "0.50"}:
-                            if version in {"0.48", "0.49", "0.50"}:
-                                if version == "0.50":
+                    if version in {"0.46", "0.47", "0.48", "0.49", "0.50", "0.51"}:
+                        if version in {"0.47", "0.48", "0.49", "0.50", "0.51"}:
+                            if version in {"0.48", "0.49", "0.50", "0.51"}:
+                                if version in {"0.50", "0.51"}:
                                     v050 = (FRONTEND / "gw-energy-pilot-v050.js").read_text(encoding="utf-8")
                                     self.assertIn(
-                                        "gw-energy-pilot-v050.js?v=0.50-ev1",
-                                        init_source,
-                                    )
-                                    self.assertIn(
-                                        'import "./gw-energy-pilot-v049.js?v=0.50-ev1"',
+                                        'import "./gw-energy-pilot-v049.js?v=0.51-h1"',
                                         v050,
                                     )
-                                if version in {"0.49", "0.50"}:
+                                    if version == "0.51":
+                                        v051 = (FRONTEND / "gw-energy-pilot-v051.js").read_text(encoding="utf-8")
+                                        self.assertIn(
+                                            "gw-energy-pilot-v051.js?v=0.51-h1",
+                                            init_source,
+                                        )
+                                        self.assertIn(
+                                            'import "./gw-energy-pilot-v050.js?v=0.51-h1"',
+                                            v051,
+                                        )
+                                if version in {"0.49", "0.50", "0.51"}:
                                     v049 = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
                                     if version == "0.49":
                                         self.assertIn(
-                                            "gw-energy-pilot-v049.js?v=0.50-ev1",
+                                            "gw-energy-pilot-v049.js?v=0.51-h1",
                                             init_source,
                                         )
                                     self.assertIn(
-                                        'import "./gw-energy-pilot-v048.js?v=0.50-ev1"',
+                                        'import "./gw-energy-pilot-v048.js?v=0.51-h1"',
                                         v049,
                                     )
                                 v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
                                 if version == "0.48":
                                     self.assertIn(
-                                        "gw-energy-pilot-v048.js?v=0.50-ev1",
+                                        "gw-energy-pilot-v048.js?v=0.51-h1",
                                         init_source,
                                     )
                                 self.assertIn(
-                                    'import "./gw-energy-pilot-v047.js?v=0.50-ev1"',
+                                    'import "./gw-energy-pilot-v047.js?v=0.51-h1"',
                                     v048,
                                 )
                             v047 = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
                             if version == "0.47":
                                 self.assertIn(
-                                    "gw-energy-pilot-v047.js?v=0.50-ev1",
+                                    "gw-energy-pilot-v047.js?v=0.51-h1",
                                     init_source,
                                 )
                             self.assertIn(
-                                'import "./gw-energy-pilot-v046.js?v=0.50-ev1"',
+                                'import "./gw-energy-pilot-v046.js?v=0.51-h1"',
                                 v047,
                             )
                         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
@@ -79,23 +85,23 @@ class V039ReleaseTests(unittest.TestCase):
                         v044 = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
                         if version == "0.46":
                             self.assertIn(
-                                "gw-energy-pilot-v046.js?v=0.50-ev1",
+                                "gw-energy-pilot-v046.js?v=0.51-h1",
                                 init_source,
                             )
                         self.assertIn(
-                            'import "./gw-energy-pilot-v045.js?v=0.50-ev1"',
+                            'import "./gw-energy-pilot-v045.js?v=0.51-h1"',
                             v046,
                         )
                         self.assertIn(
-                            'import "./gw-energy-pilot-v044.js?v=0.50-ev1"',
+                            'import "./gw-energy-pilot-v044.js?v=0.51-h1"',
                             v045,
                         )
                         self.assertIn(
-                            'import "./gw-energy-pilot-v043.js?v=0.50-ev1"',
+                            'import "./gw-energy-pilot-v043.js?v=0.51-h1"',
                             v044,
                         )
                         self.assertIn(
-                            'import "./gw-energy-pilot-v042.js?v=0.50-ev1"',
+                            'import "./gw-energy-pilot-v042.js?v=0.51-h1"',
                             v043,
                         )
                     elif version == "0.45":
@@ -114,14 +120,14 @@ class V039ReleaseTests(unittest.TestCase):
                         self.assertIn("gw-energy-pilot-v043.js?v=0.43-touch1", init_source)
                 else:
                     self.assertIn("gw-energy-pilot-v042.js?v=0.42-release1", init_source)
-                expected_key = "0.50-ev1" if version in {"0.46", "0.47", "0.48", "0.49", "0.50"} else "0.42-emhass1"
+                expected_key = "0.51-h1" if version in {"0.46", "0.47", "0.48", "0.49", "0.50", "0.51"} else "0.42-emhass1"
                 self.assertIn(
                     f'import "./gw-energy-pilot-v041-emhass-settings.js?v={expected_key}"',
                     v042,
                 )
             else:
                 self.assertIn("gw-energy-pilot-v041-emhass-settings.js?v=0.41-emhass1", init_source)
-            stable_key = "0.50-ev1" if version in {"0.46", "0.47", "0.48", "0.49", "0.50"} else "0.41-stable1"
+            stable_key = "0.51-h1" if version in {"0.46", "0.47", "0.48", "0.49", "0.50", "0.51"} else "0.41-stable1"
             self.assertIn(f'import "./gw-energy-pilot-v041.js?v={stable_key}"', settings)
             self.assertIn(f'import "./gw-energy-pilot-v039.js?v={stable_key}"', v041)
             self.assertNotIn('import "./gw-energy-pilot-v040.js', v041)
@@ -133,7 +139,7 @@ class V039ReleaseTests(unittest.TestCase):
         self.assertIn('const VERSION = "0.39"', release)
         self.assertIn("__epV039Installed", release)
         self.assertIn("energyPilotV039Render", release)
-        i18n_key = "0.50-ev1" if version in {"0.46", "0.47", "0.48", "0.49", "0.50"} else "0.38-i18n1"
+        i18n_key = "0.51-h1" if version in {"0.46", "0.47", "0.48", "0.49", "0.50", "0.51"} else "0.38-i18n1"
         self.assertIn(f'gw-energy-pilot-v038-i18n.js?v={i18n_key}', v038)
         self.assertIn("localizeV038Controller(this, root)", v038)
         self.assertIn('const VERSION = "0.38"', runtime)

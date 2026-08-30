@@ -1,6 +1,6 @@
 # Battery plan chart field validation
 
-For the current **v0.50** line, validate on a live installation:
+For the current **v0.51** line, validate on a live installation:
 
 1. Select S, M and L and confirm the selected size survives a browser refresh.
 2. Confirm the red Battery · Plan · Price window control hides the card immediately and that the card can be restored from Dashboard layout / visibility.
@@ -29,5 +29,13 @@ For the current **v0.50** line, validate on a live installation:
 25. Confirm a Home Assistant restart/integration reload restores the still-valid `gw_energypilot.plan.<entry_id>` mirror before the external plan entities recover, then refreshes it from EMHASS in the bounded startup background path.
 26. Confirm missing/expired plan data degrades to an explanatory unavailable state without suppressing actual bars or prices.
 27. Confirm Battery/Grid/Hybrid mode mappings, manual EMS commands and support diagnostics remain unaffected by chart reads, plan recovery and window controls.
+28. In Large and expanded views, compare grid/solar charge and battery/solar export colors with simultaneous Recorder battery/PV/load/grid means. Confirm a missing or inconsistent source becomes hatched **Unknown** rather than being assigned to solar or grid.
+29. Confirm Compact and Normal retain the familiar actual battery bars while only Large/expanded views replace them with source-attributed flows.
+30. Confirm the dashed Wanted SOC line uses older execution snapshots for elapsed time and the current official plan for current/future time. Re-optimize and verify the historical segment does not change.
+31. Confirm one `.ep-v051-history-card` shows nearest ±6-hour rows and that **Full 48h + 24h table** opens a scrollable table with one row per retained/projected event.
+32. Exercise completed+verified, matching-readback skip, mismatch/unavailable, write-failure and waiting cases where safely reproducible; confirm their labels do not imply a write or verification that did not occur.
+33. Change Battery/Grid/Hybrid strategy or deadband and confirm earlier table rows keep their snapshotted configuration while future projections use the current configuration and remain labelled projected.
+34. Around a DST transition, confirm the full table uses Home Assistant timezone abbreviations, repeated local times remain distinct and no nonexistent spring-forward row is fabricated.
+35. Confirm upgrade starts with an empty execution history, then survives integration reload/restart, prunes beyond seven days and never contains entity IDs or EMHASS credentials.
 
 This checklist is read-only with respect to the chart. Do not change Automatic Control or EMS mode solely to manufacture visualization data. Plan-resilience testing may intentionally hide/reload publication entities, but must not invent or rewrite GoodWe register semantics.

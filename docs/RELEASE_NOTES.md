@@ -11,6 +11,26 @@ This page is the user-facing release index for GW EnergyPilot.
 - **Validated + beta diagnostics** — release behavior is validated while optional diagnostics still need field correlation.
 - **Historical** — older development milestone retained for release history.
 
+# v0.51 — EMHASS-to-GoodWe history and actual source estimates
+
+The dashboard now links each EnergyPilot controller decision to its plan,
+strategy, wanted and actual SOC, expected GoodWe command, write result and
+refreshed GoodWe mode/setpoint read-back. The compact card covers the nearest
+±6 hours; its full table presents 48 hours of retained evidence and a
+conditional 24-hour projection.
+
+Large and expanded Battery · Plan · Price views estimate which actual charge
+came from the grid or solar and which grid export came from battery or solar.
+Unknown residuals remain visible and the normal/compact graph keeps its
+familiar charge/discharge bars. The dashed wanted-SOC line now preserves its
+historical snapshots instead of rewriting elapsed time with a newer plan.
+
+History is stored per config entry for seven days with a 4096-event cap. It
+starts empty after upgrade, stores UTC instants without entity IDs or EMHASS
+credentials, and never owns controller success. Source labels are estimates,
+not settlement-grade accounting. See `docs/RELEASE_NOTES_V051.md` and
+`docs/CHANGELOG_V051.md`.
+
 # v0.50 — GoodWe phase-aware EV charger control and feedback
 
 EV load balancing now reads L1/L2/L3 directly from the linked GoodWe coordinator. One-phase chargers use their configured phase; three-phase chargers guard the highest live phase and fail without a write when complete phase telemetry is unavailable.
@@ -55,6 +75,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.51** | 2026-08-30 | **Beta** | Adds immutable EMHASS-to-GoodWe execution/read-back history, a compact/full decision table, Recorder source-attribution estimates and historical wanted SOC. |
 | **0.50** | 2026-08-30 | **Beta** | Reads GoodWe L1/L2/L3 automatically for one-/three-phase EV guarding, separates writable current-limit control from allocated-current feedback, verifies applied requests and fixes Zaptec/online entity pairing. |
 | **0.49** | 2026-08-30 | **Beta** | Consolidates wall-clock EMHASS plan execution, isolated soft EV load balancing, connectivity/EV safety visibility, persisted EMS evidence and stable graph/SOC/Hybrid presentation fixes. |
 | **0.48** | 2026-08-30 | **Beta** | Makes Hybrid neutral-safe and signed-PCC based: mode 8 for a neutral battery plan, mode 1 around zero grid target, and complete mode-9/10 import/export targets outside the configured variable deadband. |

@@ -180,6 +180,15 @@ class FakeCoordinator:
         self.refresh_count += 1
 
 
+class FakeExecutionHistory:
+    def __init__(self):
+        self.events = []
+
+    async def async_append(self, event):
+        self.events.append(event)
+        return event
+
+
 class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
     """Protect PCC target mapping and automatic/manual ownership."""
 
@@ -192,6 +201,7 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         coordinator_power=None,
         options=None,
         states=None,
+        execution_history=None,
     ):
         merged_options = {
             const.CONF_P_BATT_ENTITY: "sensor.p_batt",
@@ -215,6 +225,7 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
             entry,
             client,
             coordinator,
+            execution_history=execution_history,
         )
         return controller, hass, client, coordinator
 
@@ -611,6 +622,72 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(controller.last_ems_setpoint_updated_at)
         self.assertEqual(coordinator.refresh_count, 0)
+
+    async def test_execution_history_separates_write_from_verified_readback(self):
+        history = FakeExecutionHistory()
+        controller, _, client, coordinator = self.make_controller(
+            coordinator_mode=const.MODE_GRID_IMPORT_TARGET,
+            coordinator_power=3000,
+            execution_history=history,
+        )
+
+        await controller.async_manual_command(
+            const.MODE_GRID_IMPORT_TARGET,
+            3000,
+            "manual_grid_import",
+        )
+
+        self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 3000)])
+        self.assertEqual(coordinator.refresh_count, 1)
+        self.assertEqual(len(history.events), 1)
+        outcome = history.events[0]["outcome"]
+        self.assertEqual(outcome["write_status"], "completed")
+        self.assertEqual(outcome["verification_status"], "verified")
+        self.assertEqual(outcome["readback_mode"], const.MODE_GRID_IMPORT_TARGET)
+
+    async def test_matching_readback_is_logged_as_verified_without_write(self):
+        history = FakeExecutionHistory()
+        controller, _, client, _ = self.make_controller(
+            p_batt="-3000",
+            p_grid="2400",
+            coordinator_mode=const.MODE_GRID_IMPORT_TARGET,
+            coordinator_power=2400,
+            execution_history=history,
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(
+            history.events[0]["outcome"]["write_status"],
+            "skipped_matching_readback",
+        )
+        self.assertEqual(
+            history.events[0]["outcome"]["verification_status"],
+            "verified",
+        )
+
+    async def test_failed_write_is_logged_without_claiming_readback(self):
+        history = FakeExecutionHistory()
+        controller, _, client, _ = self.make_controller(
+            p_batt="-3000",
+            p_grid="2400",
+            execution_history=history,
+        )
+        controller.enabled = True
+
+        async def fail_write(_mode, _power):
+            raise RuntimeError("write failed")
+
+        client.async_set_mode = fail_write
+        with self.assertRaises(RuntimeError):
+            await controller.async_evaluate()
+
+        outcome = history.events[0]["outcome"]
+        self.assertEqual(outcome["write_status"], "failed")
+        self.assertEqual(outcome["verification_status"], "not_attempted")
+        self.assertEqual(outcome["error_type"], "RuntimeError")
 
     async def test_ev_stop_waits_for_fresh_native_optimization(self):
         controller, hass, client, coordinator = self.make_controller(

@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.50 Beta**.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.51 Beta**.
 
 ## Purpose
 
@@ -9,7 +9,9 @@ The dashboard shows, on one local-day timeline:
 - actual GoodWe battery charging and discharging;
 - the EMHASS battery-power target that was active historically;
 - the latest validated EMHASS future battery schedule;
-- actual GoodWe battery SOC and the latest validated EMHASS SOC forecast;
+- actual GoodWe battery SOC and the historical/current wanted EMHASS SOC;
+- estimated solar/grid origin for battery charge and solar/battery origin for
+  grid export in the detailed view;
 - the direction-neutral market-price series.
 
 The chart is visualization only. It does not own GoodWe control, EMHASS optimization or persistent financial accounting.
@@ -26,6 +28,35 @@ battery_power > 0 W = discharging
 The dashboard requests Recorder 5-minute mean statistics. A solid turquoise/orange bar represents the actual mean battery power in that interval. Near-zero values below the chart display threshold are not drawn as charge/discharge bars.
 
 No duplicate battery-power entity, Modbus definition or poll is added.
+
+## Actual-flow source attribution
+
+v0.51 requests Recorder 5-minute means for the existing `battery_power`,
+combined display-only `pv_generation_power`, `total_load_power` and
+`meter_total_power_fast` entities in one statistics request. Large and expanded
+views use a load-first balance estimate:
+
+```text
+charge = max(-battery_power, 0)
+solar surplus = max(PV - load, 0)
+solar -> battery = min(charge, solar surplus)
+grid -> battery = min(remaining charge, measured grid import)
+
+grid export = max(measured grid export, 0)
+solar -> grid = min(grid export, solar surplus remaining after charge)
+battery -> grid = min(remaining export, battery discharge)
+```
+
+Any remaining flow is drawn with a hatched unknown source. Missing PV, load or
+grid samples reduce confidence and are never replaced with a fabricated source.
+The colors are green for grid → battery, ochre for solar → battery, orange for
+battery → grid and yellow/ochre for solar → grid. Compact and Normal retain the
+existing battery charge/discharge bars.
+
+This is an instantaneous visualization estimate. It is not settlement-grade
+energy allocation and does not feed grid accounting, EMHASS, Automatic Control
+or financial totals. Recorder remains optional; missing statistics suppress
+only attribution.
 
 ## Actual and forecast SOC
 
@@ -44,7 +75,16 @@ EMHASS stores `SOC_opt` as a fraction in the plan and scales it by 100 only when
 
 For `number_of_batteries > 1`, EMHASS intentionally has no meaningful bare/fleet `SOC_opt`; it exposes per-battery `SOC_opt_<k>` values. EnergyPilot does not select a battery or fabricate an aggregate. Planned SOC therefore remains unavailable until an explicit battery-selection contract is designed.
 
-The actual SOC line is solid and the forecast SOC line dashed. Both use a fixed `0..100%` axis independent of the power and price axes. Missing Recorder statistics, a failed SOC-only history request, missing `SOC_opt` or an out-of-range point suppresses only the affected SOC line.
+The actual SOC line is solid and the **Wanted SOC** line remains dashed. For
+elapsed time v0.51 uses the `SOC_opt` snapshot stored with each execution event;
+the current/future segment uses the latest validated official plan. This keeps
+historical intent immutable when a later optimization changes the horizon. On
+an upgraded installation before execution events exist, the previous current
+plan fallback remains available.
+
+Both lines use a fixed `0..100%` axis independent of the power and price axes.
+Missing Recorder statistics, missing execution history, missing `SOC_opt` or
+an out-of-range point suppresses only the affected segment.
 
 ## Historical active plan
 
@@ -150,13 +190,22 @@ The existing command remains:
 gw_energypilot/battery_price/get
 ```
 
-The current command uses chart schema version **`5`** and includes:
+The current command uses chart schema version **`6`** and includes:
 
 - `plan_revision` — the EnergyPilot optimization generation currently owning the mirrored plan;
 - `battery_energy` — current GoodWe charged/discharged day counters;
 - `battery_plan` — configured entity id, current target/source, future points, persistent-plan source, `generated_at`, `valid_until` and restore diagnostics;
 - `battery_soc_plan` — optional normalized `value_pct` points, `%` unit and exact official source-column/unit evidence;
 - timestamped market/effective-price data from the existing EnergyPilot price runtime.
+- `execution` — UTC boundaries, Home Assistant timezone, retention metadata,
+  exact 48-hour decision evidence, a conditional 24-hour projection and its
+  explicit assumptions.
+
+The future projection joins exact timestamped `P_batt`, `P_grid`, optional
+`P_PV`, optional `P_Load` and `SOC_opt` rows from the current validated plan.
+It uses the shared controller strategy mapping but does not predict manual/EV
+ownership changes, write success or GoodWe read-back. Optional `P_PV` and
+`P_Load` are dashboard-only and are never control sources.
 
 When `force=true`, or no current plan mirror exists, the read-only API may request a bounded refresh from the official EMHASS plan endpoint. It does not run an optimization, write an inverter register or modify controller ownership.
 
@@ -173,9 +222,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v0.50 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v0.51 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v0.50 loads every import in the active graph through `0.50-ev1`, including the scoped plan-refresh owner. The older v0.33 plan-refresh mechanism remains historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v0.51 loads every import in the active graph through `0.51-h1`, including the scoped plan-refresh and execution-history owners. The older v0.33 plan-refresh mechanism remains historical compatibility context.
 
 The optimization revision and `P_batt` freshness checks are independent of ordinary five-minute chart-data cache expiry, so a newly published plan does not intentionally remain stale for that full interval.
 

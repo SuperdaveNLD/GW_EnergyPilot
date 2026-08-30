@@ -30,6 +30,7 @@ from .debug_log_runtime import GWEnergyPilotDebugRuntime
 from .emhass_sync_api import async_register_emhass_sync_api
 from .event_triggers import async_setup_event_triggers
 from .ev_load_balancing import GWEnergyPilotEVLoadBalancer
+from .execution_history import GWEnergyPilotExecutionHistory
 from .optimization_log_api import async_register_optimization_log_api
 from .orchestrator_v044 import GWEnergyPilotOrchestrator
 from .plan_runtime import GWEnergyPilotPlanRuntime
@@ -47,7 +48,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v050.js?v=0.50-ev1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v051.js?v=0.51-h1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -65,6 +66,7 @@ class GWRuntimeData:
     ev_load_balancer: GWEnergyPilotEVLoadBalancer
     connectivity: GWEnergyPilotConnectivity
     control_history: GWEnergyPilotControlHistory
+    execution_history: GWEnergyPilotExecutionHistory
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -140,12 +142,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     )
     control_history = GWEnergyPilotControlHistory(hass, entry.entry_id)
     await control_history.async_restore()
+    execution_history = GWEnergyPilotExecutionHistory(hass, entry.entry_id)
+    await execution_history.async_restore()
     controller = GWEnergyPilotController(
         hass,
         entry,
         client,
         coordinator,
         control_history,
+        execution_history,
     )
     orchestrator = GWEnergyPilotOrchestrator(hass, entry, coordinator)
     accounting = GWEnergyPilotAccounting(hass, entry.entry_id, coordinator)
@@ -169,6 +174,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         ev_load_balancer=ev_load_balancer,
         connectivity=connectivity,
         control_history=control_history,
+        execution_history=execution_history,
     )
 
     await plan_runtime.async_restore()

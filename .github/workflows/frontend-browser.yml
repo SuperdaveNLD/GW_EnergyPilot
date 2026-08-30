@@ -9,6 +9,7 @@ on:
       - codex/release-v0.48
       - codex/release-v0.49
       - codex/release-v0.50
+      - codex/release-v0.51
   pull_request:
     paths:
       - "custom_components/gw_energypilot/frontend/**"
@@ -41,7 +42,7 @@ jobs:
           python -m playwright install --with-deps chromium webkit
 
       - name: Run desktop, iPad and iPhone touch-control diagnostics
-        run: python tests/browser/test_frontend_stability_v050.py
+        run: python tests/browser/test_frontend_stability_v051.py
 
       - name: Upload browser results
         if: always()

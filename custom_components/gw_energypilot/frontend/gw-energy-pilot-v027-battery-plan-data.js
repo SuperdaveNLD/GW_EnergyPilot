@@ -13,7 +13,10 @@ const TEXT = {
     socAxis: "SOC (%)",
     actualCharge: "Actual charging", actualDischarge: "Actual discharging",
     actual: "Actual", plan: "EMHASS plan", marketPrice: "Market price",
-    actualSoc: "Actual SOC", forecastSoc: "Forecast SOC",
+    actualSoc: "Actual SOC", forecastSoc: "Forecast SOC", wantedSoc: "Wanted SOC",
+    gridToBattery: "Grid → Battery", solarToBattery: "Solar → Battery",
+    unknownSource: "Unknown", batteryToGrid: "Battery → Grid", solarToGrid: "Solar → Grid",
+    sourceEstimate: "Source split is estimated from Recorder PV, load, battery and grid actuals.",
     chargedToday: "Charged today", dischargedToday: "Discharged today",
     plannedCharge: "Plan charge", plannedDischarge: "Plan discharge",
     currentPrice: "Current price", goodweCounter: "GoodWe day counter",
@@ -39,7 +42,10 @@ const TEXT = {
     socAxis: "SOC (%)",
     actualCharge: "Werkelijk laden", actualDischarge: "Werkelijk ontladen",
     actual: "Werkelijk", plan: "EMHASS-plan", marketPrice: "Marktprijs",
-    actualSoc: "Werkelijke SOC", forecastSoc: "Verwachte SOC",
+    actualSoc: "Werkelijke SOC", forecastSoc: "Verwachte SOC", wantedSoc: "Gewenste SOC",
+    gridToBattery: "Net → accu", solarToBattery: "Zon → accu",
+    unknownSource: "Onbekend", batteryToGrid: "Accu → net", solarToGrid: "Zon → net",
+    sourceEstimate: "De bronverdeling is geschat uit Recorder-actuals voor PV, belasting, accu en net.",
     chargedToday: "Vandaag geladen", dischargedToday: "Vandaag ontladen",
     plannedCharge: "Gepland laden", plannedDischarge: "Gepland ontladen",
     currentPrice: "Huidige prijs", goodweCounter: "GoodWe-dagteller",
@@ -111,6 +117,53 @@ function normalizeStatisticRows(rows, startMs, endMs) {
     .sort((a, b) => a.t - b.t);
 }
 
+function statisticRowMap(rows) {
+  return new Map((rows || []).map((row) => [row.t, row.w]));
+}
+
+export function attributeActualRows(batteryRows, pvRows, loadRows, gridRows) {
+  const pvByTime = statisticRowMap(pvRows);
+  const loadByTime = statisticRowMap(loadRows);
+  const gridByTime = statisticRowMap(gridRows);
+  return (batteryRows || []).map((batteryPoint) => {
+    const battery = finiteNumber(batteryPoint.w);
+    const pv = finiteNumber(pvByTime.get(batteryPoint.t));
+    const load = finiteNumber(loadByTime.get(batteryPoint.t));
+    const grid = finiteNumber(gridByTime.get(batteryPoint.t));
+    const charge = Math.max(-(battery ?? 0), 0);
+    const discharge = Math.max(battery ?? 0, 0);
+    const gridImport = grid === null ? 0 : Math.max(-grid, 0);
+    const gridExport = grid === null ? 0 : Math.max(grid, 0);
+    const solarSurplus = pv === null || load === null ? 0 : Math.max(pv - load, 0);
+    const solarToBattery = Math.min(charge, solarSurplus);
+    const gridToBattery = Math.min(Math.max(charge - solarToBattery, 0), gridImport);
+    const unknownCharge = Math.max(charge - solarToBattery - gridToBattery, 0);
+    const remainingSolar = Math.max(solarSurplus - solarToBattery, 0);
+    const solarToGrid = Math.min(gridExport, remainingSolar);
+    const batteryToGrid = Math.min(Math.max(gridExport - solarToGrid, 0), discharge);
+    const unknownExport = Math.max(gridExport - solarToGrid - batteryToGrid, 0);
+    const complete = pv !== null && load !== null && grid !== null && battery !== null;
+    return {
+      t: batteryPoint.t,
+      batteryW: battery,
+      pvW: pv,
+      loadW: load,
+      gridW: grid,
+      gridToBatteryW: gridToBattery,
+      solarToBatteryW: solarToBattery,
+      unknownChargeW: unknownCharge,
+      batteryToGridW: batteryToGrid,
+      solarToGridW: solarToGrid,
+      unknownExportW: unknownExport,
+      confidence: !complete
+        ? "partial"
+        : unknownCharge + unknownExport > Math.max(100, (charge + gridExport) * 0.1)
+          ? "residual"
+          : "high",
+    };
+  });
+}
+
 export function normalizeSocStatisticRows(rows, startMs, endMs) {
   return (rows || [])
     .map((row) => ({ t: timestampMs(row.start), pct: finiteNumber(row.mean) }))
@@ -146,6 +199,18 @@ export function normalizeSocPlanPoints(points, startMs, endMs) {
       p.t >= startMs && p.t < endMs
     ))
     .sort((a, b) => a.t - b.t);
+}
+
+export function normalizeExecutionSocHistory(events, startMs, endMs) {
+  const byTimestamp = new Map();
+  for (const event of events || []) {
+    const t = timestampMs(event?.occurred_at);
+    const pct = finiteNumber(event?.plan?.soc_opt_pct);
+    if (t === null || pct === null || pct < 0 || pct > 100) continue;
+    if (t < startMs || t >= endMs) continue;
+    byTimestamp.set(t, { t, pct });
+  }
+  return [...byTimestamp.values()].sort((left, right) => left.t - right.t);
 }
 
 function normalizeHistoryRows(payload, entityId, startMs, endMs) {
@@ -289,6 +354,9 @@ export async function loadChartData(panel, force = false) {
 
   const batteryId = panel._entityId?.("battery_power");
   const batterySocId = panel._entityId?.("battery_soc");
+  const pvId = panel._entityId?.("pv_generation_power");
+  const loadId = panel._entityId?.("total_load_power");
+  const gridId = panel._entityId?.("meter_total_power_fast");
   if (!batteryId || !panel._hass?.callWS) return null;
 
   const bounds = localDayBounds();
@@ -302,18 +370,14 @@ export async function loadChartData(panel, force = false) {
   panel.__epV027BatteryPlanPromise = panel._hass.callWS(request)
     .then(async (payload) => {
       const planEntityId = payload?.battery_plan?.entity_id || null;
+      const statisticIds = [...new Set([
+        batteryId, batterySocId, pvId, loadId, gridId,
+      ].filter(Boolean))];
       const actualRequest = panel._hass.callWS({
         type: "recorder/statistics_during_period",
         start_time: bounds.start.toISOString(), end_time: bounds.now.toISOString(),
-        statistic_ids: [batteryId], period: "5minute", types: ["mean"],
+        statistic_ids: statisticIds, period: "5minute", types: ["mean"],
       });
-      const actualSocRequest = batterySocId
-        ? panel._hass.callWS({
-            type: "recorder/statistics_during_period",
-            start_time: bounds.start.toISOString(), end_time: bounds.now.toISOString(),
-            statistic_ids: [batterySocId], period: "5minute", types: ["mean"],
-          })
-        : Promise.resolve({});
       const planRequest = planEntityId
         ? panel._hass.callWS({
             type: "history/history_during_period",
@@ -323,27 +387,36 @@ export async function loadChartData(panel, force = false) {
           })
         : Promise.resolve({});
 
-      const [actualResult, actualSocResult, planResult] = await Promise.allSettled([
-        actualRequest, actualSocRequest, planRequest,
+      const [actualResult, planResult] = await Promise.allSettled([
+        actualRequest, planRequest,
       ]);
       const actualStats = actualResult.status === "fulfilled" ? actualResult.value : {};
-      const actualSocStats = actualSocResult.status === "fulfilled" ? actualSocResult.value : {};
       const planHistory = planResult.status === "fulfilled" ? planResult.value : {};
       const errors = [
         actualResult.status === "rejected" ? actualResult.reason?.message || String(actualResult.reason) : null,
-        actualSocResult.status === "rejected" ? actualSocResult.reason?.message || String(actualSocResult.reason) : null,
         planResult.status === "rejected" ? planResult.reason?.message || String(planResult.reason) : null,
       ].filter(Boolean);
       const inherited = panel.__epV026BatteryPriceData;
       const startMs = bounds.start.getTime();
       const endMs = bounds.end.getTime();
+      const actualRows = normalizeStatisticRows(
+        actualStats?.[batteryId] || inherited?.batteryRows || [], startMs, endMs
+      );
+      const pvRows = normalizeStatisticRows(actualStats?.[pvId] || [], startMs, endMs);
+      const loadRows = normalizeStatisticRows(actualStats?.[loadId] || [], startMs, endMs);
+      const gridRows = normalizeStatisticRows(actualStats?.[gridId] || [], startMs, endMs);
       const data = {
         at: Date.now(), startMs, endMs, nowMs: bounds.now.getTime(),
-        actualRows: normalizeStatisticRows(actualStats?.[batteryId] || inherited?.batteryRows || [], startMs, endMs),
-        actualSocRows: normalizeSocStatisticRows(actualSocStats?.[batterySocId] || [], startMs, endMs),
+        actualRows,
+        actualSocRows: normalizeSocStatisticRows(actualStats?.[batterySocId] || [], startMs, endMs),
+        pvRows, loadRows, gridRows,
+        attributionRows: attributeActualRows(actualRows, pvRows, loadRows, gridRows),
         historicalPlanRows: normalizeHistoryRows(planHistory, planEntityId, startMs, bounds.now.getTime()),
         futurePlanPoints: normalizeFuturePlan(payload?.battery_plan?.points || [], startMs, endMs),
         socPlanPoints: normalizeSocPlanPoints(payload?.battery_soc_plan?.points || [], startMs, endMs),
+        historicalSocWantedRows: normalizeExecutionSocHistory(
+          payload?.execution?.history || [], startMs, bounds.now.getTime()
+        ),
         pricePoints: normalizePricePoints(payload?.points || inherited?.pricePoints || [], startMs, endMs),
         payload, statisticsError: errors.join(" · ") || null,
       };
@@ -355,7 +428,9 @@ export async function loadChartData(panel, force = false) {
       const data = {
         at: Date.now(), startMs: bounds.start.getTime(), endMs: bounds.end.getTime(),
         nowMs: bounds.now.getTime(), actualRows: inherited?.batteryRows || [],
-        actualSocRows: [], historicalPlanRows: [], futurePlanPoints: [], socPlanPoints: [],
+        actualSocRows: [], pvRows: [], loadRows: [], gridRows: [], attributionRows: [],
+        historicalPlanRows: [], futurePlanPoints: [], socPlanPoints: [],
+        historicalSocWantedRows: [],
         pricePoints: inherited?.pricePoints || [],
         payload: inherited?.pricePayload || null, statisticsError: err?.message || String(err),
       };
@@ -376,6 +451,12 @@ export function nicePowerPeak(data) {
     ...(data?.actualRows || []), ...(data?.historicalPlanRows || []),
     ...(data?.futurePlanPoints || []),
   ].map((p) => Math.abs(p.w) / 1000);
+  for (const row of data?.attributionRows || []) {
+    values.push(
+      (row.gridToBatteryW + row.solarToBatteryW + row.unknownChargeW) / 1000,
+      (row.batteryToGridW + row.solarToGridW + row.unknownExportW) / 1000,
+    );
+  }
   const maximum = Math.max(0, ...values);
   if (maximum <= 1) return 1;
   if (maximum <= 2) return 2;

@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -102,7 +102,7 @@
       connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
-      control_strategy: ["v048", "v049", "v050"].includes(ENTRYPOINT) ? "hybrid" : "battery",
+      control_strategy: ["v048", "v049", "v050", "v051"].includes(ENTRYPOINT) ? "hybrid" : "battery",
       grid_energy_imported_today: 3.2,
       grid_energy_exported_today: 7.8,
       grid_energy_import_total: 1234.5,
@@ -460,8 +460,52 @@
         value_pct: Math.min(95, 54 + index * 1.25),
       }));
       const pBattState = window.__epHass?.states?.["sensor.p_batt_forecast"];
+      const executionHistory = Array.from({ length: 20 }, (_, index) => {
+        const occurred = new Date(hour.getTime() - (20 - index) * 15 * 60 * 1000);
+        const soc = 48 + index * 2;
+        return {
+          kind: "controller_decision",
+          occurred_at: occurred.toISOString(),
+          owner: "automatic",
+          plan: { p_batt_w: -3000, p_grid_w: 3000, soc_opt_pct: soc + 1, revision: planRevision },
+          configuration: { strategy: "hybrid", deadband_w: 300, max_power_w: 15000, ev_active: false },
+          actual: {
+            battery_soc_pct: soc,
+            battery_power_w: -3600,
+            pv_power_w: index > 1 ? 5200 : 800,
+            load_power_w: 2400,
+            grid_power_w: index > 1 ? -800 : -3200,
+            ems_mode: 9,
+            ems_setpoint_w: 3000,
+          },
+          outcome: {
+            command: "hybrid_grid_import",
+            expected_mode: 9,
+            expected_setpoint_w: 3000,
+            write_status: index === 3 ? "skipped_matching_readback" : "completed",
+            verification_status: "verified",
+            readback_mode: 9,
+            readback_setpoint_w: 3000,
+          },
+        };
+      });
+      const executionFuture = Array.from({ length: 32 }, (_, index) => ({
+        kind: "projection",
+        occurred_at: new Date(hour.getTime() + index * 15 * 60 * 1000).toISOString(),
+        owner: "automatic",
+        plan: { p_batt_w: index < 4 ? -3000 : 0, p_grid_w: index < 4 ? 3000 : 0, soc_opt_pct: 56 + index, revision: planRevision },
+        configuration: { strategy: "hybrid", deadband_w: 300, max_power_w: 15000, ev_active: false },
+        actual: {},
+        outcome: {
+          command: index < 4 ? "hybrid_grid_import" : "hybrid_battery_hold",
+          expected_mode: index < 4 ? 9 : 8,
+          expected_setpoint_w: index < 4 ? 3000 : 0,
+          write_status: "projected",
+          verification_status: "future",
+        },
+      }));
       return {
-        chart_schema_version: 5,
+        chart_schema_version: 6,
         entry_id: ENTRY_ID,
         generated_at: new Date().toISOString(),
         plan_revision: planRevision,
@@ -479,6 +523,18 @@
           source_column: "SOC_opt",
           source_unit: "fraction_0_1",
           points: [...socPlan, { start: hour.toISOString(), value_pct: 156 }],
+        },
+        execution: {
+          schema_version: 1,
+          available: true,
+          history_start: new Date(hour.getTime() - 48 * 60 * 60 * 1000).toISOString(),
+          now: new Date().toISOString(),
+          future_end: new Date(hour.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+          time_zone: "Europe/Amsterdam",
+          retention_days: 7,
+          event_limit: 4096,
+          history: executionHistory,
+          future: executionFuture,
         },
         actual: [],
         historical_plan: [],
@@ -529,7 +585,7 @@
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {
@@ -550,6 +606,21 @@
               })),
               { start: start.toISOString(), mean: 140 },
             ];
+          } else if (statisticId === entityIdForKey("pv_generation_power")) {
+            result[statisticId] = Array.from({ length: 24 }, (_, index) => ({
+              start: new Date(start.getTime() + index * 5 * 60 * 1000).toISOString(),
+              mean: index < 12 ? 900 : 5200,
+            }));
+          } else if (statisticId === entityIdForKey("total_load_power")) {
+            result[statisticId] = Array.from({ length: 24 }, (_, index) => ({
+              start: new Date(start.getTime() + index * 5 * 60 * 1000).toISOString(),
+              mean: 2400 + index * 10,
+            }));
+          } else if (statisticId === entityIdForKey("meter_total_power_fast")) {
+            result[statisticId] = Array.from({ length: 24 }, (_, index) => ({
+              start: new Date(start.getTime() + index * 5 * 60 * 1000).toISOString(),
+              mean: index < 8 ? -1800 : index > 18 ? 1400 : -300,
+            }));
           }
         }
         return result;
@@ -661,6 +732,7 @@
       v048: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v048.js?browser-harness=1",
       v049: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v049.js?browser-harness=1",
       v050: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v050.js?browser-harness=1",
+      v051: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v051.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -793,7 +865,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

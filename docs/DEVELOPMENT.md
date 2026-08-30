@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.50 runtime structure
+## Current v0.51 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v0.50 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v0.51 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -25,7 +25,9 @@ connectivity_model.py   pure charger reachability debounce/state machine
 connectivity.py         coordinator/entity-backed status, five-minute timer and transition logging
 controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
+control_decision.py     pure shared Battery/Grid/Hybrid/EV command mapping
 control_history.py      persistent latest successful EMS-setpoint update evidence
+execution_history.py    bounded plan/decision/write/read-back evidence Store
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
 emhass_config.py        safe full EMHASS config read/write helpers
 emhass_sync.py          canonical EnergyPilot runtime contract + safe required-config synchronization
@@ -123,28 +125,48 @@ The inherited base still owns normal Battery/Grid/Hybrid execution. The v033 sub
 
 Do not move either behavior into a second controller or duplicate the EMS write path.
 
+The pure mapping in `control_decision.py` is the one source for translating a
+finite plan plus strategy/deadband/maximum/EV state into an expected mode and
+setpoint. Live control and read-only future projections call it. It must remain
+side-effect-free and must not infer missing `P_grid`, future EV state or
+ownership. `execution_history.py` records the live controller context and
+post-refresh read-back but can never own or retry a command.
+
 ## Active frontend chain
 
 Top level:
 
 ```text
-gw-energy-pilot-v050.js
-    -> gw-energy-pilot-v049.js
-        -> gw-energy-pilot-v048.js
-            -> gw-energy-pilot-v047.js
-                -> gw-energy-pilot-v046.js
-                    -> gw-energy-pilot-v045.js
-                        -> gw-energy-pilot-v044.js
-                            -> gw-energy-pilot-v043.js
-                                -> gw-energy-pilot-v042.js
-                                    -> gw-energy-pilot-v041-emhass-settings.js
-                                        -> gw-energy-pilot-v041.js
-                                            -> gw-energy-pilot-v039.js
-                                                -> gw-energy-pilot-v038.js
-                                                    -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v051.js
+    -> gw-energy-pilot-v051-history.js
+    -> gw-energy-pilot-v050.js
+        -> gw-energy-pilot-v049.js
+            -> gw-energy-pilot-v048.js
+                -> gw-energy-pilot-v047.js
+                    -> gw-energy-pilot-v046.js
+                        -> gw-energy-pilot-v045.js
+                            -> gw-energy-pilot-v044.js
+                                -> gw-energy-pilot-v043.js
+                                    -> gw-energy-pilot-v042.js
+                                        -> gw-energy-pilot-v041-emhass-settings.js
+                                            -> gw-energy-pilot-v041.js
+                                                -> gw-energy-pilot-v039.js
+                                                    -> gw-energy-pilot-v038.js
+                                                        -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.50 is a bounded release/presentation wrapper over v0.49. It owns only the v0.50 badge/footer and complete `0.50-ev1` cache boundary. The settings/backend modules own the EV phase, control and feedback behavior. v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and stable-note ownership; v0.47 retains Custom Battery Saver editing, larger strategy/settings typography and field-tuned profile presentation; v0.46 retains external-PV presentation, v0.44 owns the bounded Optimize listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS.
+v0.51 is a bounded presentation wrapper plus one scoped history-card module. It
+owns the v0.51 badge/footer, `0.51-h1` cache boundary, one canonical
+EMHASS-to-GoodWe card and targeted history refresh. The nested plan data/view
+owners implement Recorder attribution and wanted-SOC history. v0.50 retains
+its release presentation and EV settings ownership; v0.49 retains its release
+presentation; v0.48 retains current Hybrid operator copy and stable-note
+ownership; v0.47 retains Custom Battery Saver editing, larger
+strategy/settings typography and field-tuned profile presentation; v0.46
+retains external-PV presentation, v0.44 owns the bounded Optimize
+listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS
+settings overview, and v0.41 ordinary telemetry patching, targeted plan
+refresh, PV presentation and static-flow DOM/CSS.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
@@ -427,14 +449,27 @@ SOC visualization:
 actual: registry-resolved GoodWe battery_soc (%)
         -> separate Recorder 5-minute means
 
-forecast: official schema-1.x SOC_opt fraction 0..1
-          -> plan_runtime validates and normalizes to value_pct
-          -> battery_soc_plan payload
+wanted history: execution Store SOC_opt snapshot at decision time
+
+current/future: official schema-1.x SOC_opt fraction 0..1
+                -> plan_runtime validates and normalizes to value_pct
+                -> battery_soc_plan payload
 ```
 
 Do not reuse the power-schedule fallback for SOC. EnergyPilot has no configured EMHASS SOC-output entity, and multi-battery plans have no meaningful bare/fleet `SOC_opt`.
 
 Historical active plan still uses configured `P_batt` Home Assistant history so the displayed past reflects the target that was actually published then.
+
+Detailed actual-flow attribution uses the same Recorder request for combined
+PV, load and fast-grid means. It is a load-first estimate with an explicit
+unknown residual, not a new accounting source. Optional official `P_PV` and
+`P_Load` mirror points are dashboard-only and must never enter the controller.
+
+The execution table uses exact Store events for the last 48 elapsed hours. Its
+24-hour future rows run exact plan timestamps through `control_decision.py` and
+must remain visibly conditional: do not predict EV/manual ownership, write
+success or read-back. UTC is the persistence/range identity; the frontend uses
+the Home Assistant timezone and includes an abbreviation in the full table.
 
 Price line:
 
@@ -445,7 +480,12 @@ existing EnergyPilot runtime price-source path
 -> frontend visualization
 ```
 
-The chart API uses schema `5` and includes `plan_revision`. The frontend should force-refresh the one canonical card when the live orchestrator revision differs from the cached payload. `P_batt.last_updated` remains the compatibility fallback for changes outside EnergyPilot. Do not solve refresh bugs by allowing duplicate cards.
+The chart API uses schema `6` and includes `plan_revision` plus bounded
+`execution` history/projection. The frontend should force-refresh the one
+canonical plan card and one canonical execution card when live evidence differs
+from the cached payload. `P_batt.last_updated` remains the compatibility
+fallback for changes outside EnergyPilot. Do not solve refresh bugs by allowing
+duplicate cards.
 
 Do not discover Nord Pool independently in the browser. Chart energy summaries are visualization only; persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
 

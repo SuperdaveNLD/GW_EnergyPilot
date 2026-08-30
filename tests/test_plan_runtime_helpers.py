@@ -30,12 +30,16 @@ class PersistentPlanHelperTests(unittest.TestCase):
                     "timestamp": "2026-08-25T04:00:00Z",
                     "P_batt": -4200,
                     "P_grid": 1800,
+                    "P_PV": 3600,
+                    "P_Load": 1200,
                     "SOC_opt": 0.563,
                 },
                 {
                     "timestamp": "2026-08-25T04:15:00Z",
                     "P_batt": 2500,
                     "P_grid": -1200,
+                    "P_PV": 900,
+                    "P_Load": 2100,
                     "SOC_opt": 0.5,
                 },
             ],
@@ -44,6 +48,8 @@ class PersistentPlanHelperTests(unittest.TestCase):
         result = module.normalize_emhass_api_plan(payload)
         self.assertEqual(result["p_batt"][0]["value_w"], -4200.0)
         self.assertEqual(result["p_grid"][1]["value_w"], -1200.0)
+        self.assertEqual(result["p_pv"][0]["value_w"], 3600.0)
+        self.assertEqual(result["p_load"][1]["value_w"], 2100.0)
         self.assertEqual(result["soc_opt"][0]["value_pct"], 56.3)
         self.assertEqual(result["soc_opt"][1]["value_pct"], 50.0)
         self.assertEqual(result["p_batt"][0]["start"], "2026-08-25T04:00:00+00:00")
@@ -137,6 +143,27 @@ class PersistentPlanHelperTests(unittest.TestCase):
         self.assertEqual(
             valid_until,
             datetime(2026, 8, 25, 4, 30, tzinfo=timezone.utc),
+        )
+
+    def test_selects_desired_soc_without_extrapolating(self):
+        points = [
+            {"start": "2026-08-25T04:00:00Z", "value_pct": 42},
+            {"start": "2026-08-25T04:15:00Z", "value_pct": 55},
+        ]
+        self.assertEqual(
+            module.plan_percentage_at(
+                points,
+                datetime(2026, 8, 25, 4, 20, tzinfo=timezone.utc),
+                900,
+            ),
+            55.0,
+        )
+        self.assertIsNone(
+            module.plan_percentage_at(
+                points,
+                datetime(2026, 8, 25, 4, 31, tzinfo=timezone.utc),
+                900,
+            )
         )
 
 

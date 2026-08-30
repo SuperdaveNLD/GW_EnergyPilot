@@ -4,6 +4,38 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [0.51] - 2026-08-30
+
+### Added
+
+- Added a bounded per-entry execution-history Store and one stable-DOM
+  EMHASS → GOODWE card with a compact ±6-hour view plus full 48-hour history
+  and conditional 24-hour projection (#108).
+- Added immutable plan/config/actual/write/read-back snapshots and explicit
+  completed, verified, mismatched, unavailable, failed, skipped and waiting
+  outcomes.
+- Added Recorder-based grid/solar charge and battery/solar export attribution
+  in Large/expanded chart views, retaining unknown residuals.
+- Added historical wanted-SOC snapshots to the existing dashed line.
+
+### Changed
+
+- Shared one pure Battery/Grid/Hybrid/EV decision mapping between live control
+  and future read-only projections without changing its established outputs.
+- Advanced the battery/plan chart payload to schema 6 and added optional
+  dashboard-only official-plan `P_PV`/`P_Load` values.
+- Added `gw-energy-pilot-v051.js` and the complete `0.51-h1` frontend cache
+  boundary.
+
+### Safety and compatibility
+
+- Keep EMHASS as plan owner and preserve GoodWe registers, setpoint-before-mode
+  ordering, controller ownership, entity/device identity, accounting and
+  Battery Saver policy.
+- Treat source attribution as an estimate and execution persistence as
+  non-controlling evidence. Existing installs start with empty history and
+  require no migration.
+
 ## [0.50] - 2026-08-30
 
 ### Changed

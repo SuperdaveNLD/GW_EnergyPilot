@@ -22,16 +22,16 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v0.50 Beta
+v0.51 Beta
 ```
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v0.50)
+## Frontend stability contract (v0.41+, active v0.51)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v0.50 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v0.51 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -313,6 +313,7 @@ gw_energypilot.control.<config_entry_id>
 gw_energypilot.accounting.<config_entry_id>
 gw_energypilot.optimization_log.<config_entry_id>
 gw_energypilot.plan.<config_entry_id>
+gw_energypilot.execution.<config_entry_id>
 ```
 
 The debug session is deliberately memory-only and is not persisted.
@@ -353,23 +354,25 @@ v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v050.js
-  -> gw-energy-pilot-v049.js
-       -> gw-energy-pilot-v048.js
-            -> gw-energy-pilot-v047.js
-                 -> gw-energy-pilot-v046.js
-                      -> gw-energy-pilot-v045.js
-                           -> gw-energy-pilot-v044.js
-                                -> gw-energy-pilot-v043.js
-                                     -> gw-energy-pilot-v042.js
-                                          -> gw-energy-pilot-v041-emhass-settings.js
-                                               -> gw-energy-pilot-v041.js
-                                                    -> gw-energy-pilot-v039.js
-                                                         -> gw-energy-pilot-v038.js
-                                                              -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v051.js
+  -> gw-energy-pilot-v051-history.js
+  -> gw-energy-pilot-v050.js
+       -> gw-energy-pilot-v049.js
+            -> gw-energy-pilot-v048.js
+                 -> gw-energy-pilot-v047.js
+                      -> gw-energy-pilot-v046.js
+                           -> gw-energy-pilot-v045.js
+                                -> gw-energy-pilot-v044.js
+                                     -> gw-energy-pilot-v043.js
+                                          -> gw-energy-pilot-v042.js
+                                               -> gw-energy-pilot-v041-emhass-settings.js
+                                                    -> gw-energy-pilot-v041.js
+                                                         -> gw-energy-pilot-v039.js
+                                                              -> gw-energy-pilot-v038.js
+                                                                   -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.50 owns only release presentation and the complete `0.50-ev1` cache boundary. v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v0.51 owns release presentation, the complete `0.51-h1` cache boundary and the scoped EMHASS-to-GoodWe history card. The nested plan data/view modules own Recorder source attribution and immutable wanted-SOC history. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 
