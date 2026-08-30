@@ -183,11 +183,11 @@ class FrontendDashboardCardTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            'gw-energy-pilot-v031-battery-saver.js?v=0.49-consolidated1',
+            'gw-energy-pilot-v031-battery-saver.js?v=0.50-ev1',
             release_v034,
         )
         self.assertIn(
-            'gw-energy-pilot-v027-battery-plan-core.js?v=0.49-consolidated1',
+            'gw-energy-pilot-v027-battery-plan-core.js?v=0.50-ev1',
             release_v034,
         )
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)

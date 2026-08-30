@@ -113,11 +113,29 @@ class FakeHass:
         self.services = FakeServices()
 
 
+class FakeCoordinator:
+    def __init__(self, values):
+        self.data = types.SimpleNamespace(values=values)
+
+    def async_add_listener(self, _listener):
+        return lambda: None
+
+
 class FakeEntry:
     entry_id = "entry-ev"
 
-    def __init__(self, options):
+    def __init__(self, options, currents=None):
         self.options = options
+        self.runtime_data = types.SimpleNamespace(
+            coordinator=FakeCoordinator(
+                currents
+                or {
+                    "meter_l1_current": 24,
+                    "meter_l2_current": 24,
+                    "meter_l3_current": 24,
+                }
+            )
+        )
 
     def async_create_background_task(self, *_args):
         raise AssertionError("background task not expected in direct evaluation tests")
@@ -128,8 +146,10 @@ def options(**overrides):
         "enable_ev_load_balancing": True,
         "grid_connection_profile": "3x25",
         "grid_custom_current": 25,
-        "ev_grid_current_entity": "sensor.grid_l1",
+        "ev_charger_phases": 3,
+        "ev_charger_phase": "l1",
         "ev_charger_current_entity": "number.charger_limit",
+        "ev_charger_allocated_current_entity": "sensor.charger_allocated",
         "ev_charger_min_current": 6,
         "ev_charger_max_current": 16,
         "ev_load_balance_window": 5,
@@ -168,10 +188,18 @@ class EVLoadBalancingTests(unittest.IsolatedAsyncioTestCase):
     async def test_sustained_overload_reduces_only_charger_number(self):
         module, scheduled = _load_module()
         hass = FakeHass({
-            "sensor.grid_l1": FakeState(28),
             "number.charger_limit": FakeState(16, min=6, max=32, step=1),
+            "sensor.charger_allocated": FakeState(16, device_class="current"),
         })
-        balancer = module.GWEnergyPilotEVLoadBalancer(hass, FakeEntry(options()))
+        entry = FakeEntry(
+            options(),
+            {
+                "meter_l1_current": 22,
+                "meter_l2_current": 28,
+                "meter_l3_current": 24,
+            },
+        )
+        balancer = module.GWEnergyPilotEVLoadBalancer(hass, entry)
 
         await balancer.async_evaluate()
         self.assertEqual(scheduled[0][0], 300)
@@ -187,10 +215,18 @@ class EVLoadBalancingTests(unittest.IsolatedAsyncioTestCase):
     async def test_headroom_uses_same_window_before_increasing(self):
         module, scheduled = _load_module()
         hass = FakeHass({
-            "sensor.grid_l1": FakeState(20),
             "number.charger_limit": FakeState(10, min=6, max=32, step=1),
+            "sensor.charger_allocated": FakeState(10, device_class="current"),
         })
-        balancer = module.GWEnergyPilotEVLoadBalancer(hass, FakeEntry(options()))
+        entry = FakeEntry(
+            options(),
+            {
+                "meter_l1_current": 20,
+                "meter_l2_current": 19,
+                "meter_l3_current": 18,
+            },
+        )
+        balancer = module.GWEnergyPilotEVLoadBalancer(hass, entry)
         await balancer.async_evaluate()
         await scheduled[0][1](datetime.now(timezone.utc))
         self.assertEqual(hass.services.calls[0][2]["value"], 15.0)
@@ -198,48 +234,145 @@ class EVLoadBalancingTests(unittest.IsolatedAsyncioTestCase):
     async def test_external_limit_above_configured_maximum_is_clamped_immediately(self):
         module, scheduled = _load_module()
         hass = FakeHass({
-            "sensor.grid_l1": FakeState(24),
             "number.charger_limit": FakeState(20, min=6, max=32, step=1),
+            "sensor.charger_allocated": FakeState(20, device_class="current"),
         })
         balancer = module.GWEnergyPilotEVLoadBalancer(hass, FakeEntry(options()))
         await balancer.async_evaluate()
-        self.assertEqual(scheduled, [])
+        self.assertEqual(scheduled[0][0], 60)
         self.assertEqual(hass.services.calls[0][2]["value"], 16.0)
         self.assertEqual(balancer.last_action, "clamped_to_configured_maximum")
 
     async def test_unavailable_measurement_never_writes(self):
         module, scheduled = _load_module()
         hass = FakeHass({
-            "sensor.grid_l1": FakeState("unavailable"),
             "number.charger_limit": FakeState(16, min=6, max=32, step=1),
+            "sensor.charger_allocated": FakeState(16, device_class="current"),
         })
-        balancer = module.GWEnergyPilotEVLoadBalancer(hass, FakeEntry(options()))
+        balancer = module.GWEnergyPilotEVLoadBalancer(
+            hass,
+            FakeEntry(
+                options(),
+                {
+                    "meter_l1_current": 24,
+                    "meter_l2_current": 24,
+                },
+            ),
+        )
         await balancer.async_evaluate()
         self.assertEqual(balancer.status, "unavailable")
         self.assertEqual(scheduled, [])
         self.assertEqual(hass.services.calls, [])
 
-    async def test_non_current_units_never_write(self):
+    async def test_one_phase_charger_uses_only_the_configured_goodwe_phase(self):
         module, scheduled = _load_module()
         hass = FakeHass({
-            "sensor.grid_l1": FakeState(2800, unit="W"),
             "number.charger_limit": FakeState(16, min=6, max=32, step=1),
+            "sensor.charger_allocated": FakeState(16, device_class="current"),
         })
-        balancer = module.GWEnergyPilotEVLoadBalancer(hass, FakeEntry(options()))
+        balancer = module.GWEnergyPilotEVLoadBalancer(
+            hass,
+            FakeEntry(
+                options(ev_charger_phases=1, ev_charger_phase="l2"),
+                {
+                    "meter_l1_current": 31,
+                    "meter_l2_current": 24,
+                    "meter_l3_current": 30,
+                },
+            ),
+        )
         await balancer.async_evaluate()
-        self.assertEqual(balancer.status, "unavailable")
+        self.assertEqual(balancer.status, "balanced")
+        self.assertEqual(balancer.measured_current, 24)
         self.assertEqual(scheduled, [])
         self.assertEqual(hass.services.calls, [])
 
     async def test_configured_maximum_is_enforced_when_measurement_is_unavailable(self):
         module, _scheduled = _load_module()
         hass = FakeHass({
-            "sensor.grid_l1": FakeState("unavailable"),
             "number.charger_limit": FakeState(20, min=6, max=32, step=1),
+            "sensor.charger_allocated": FakeState(20, device_class="current"),
         })
-        balancer = module.GWEnergyPilotEVLoadBalancer(hass, FakeEntry(options()))
+        balancer = module.GWEnergyPilotEVLoadBalancer(
+            hass,
+            FakeEntry(
+                options(),
+                {
+                    "meter_l1_current": 24,
+                    "meter_l2_current": 24,
+                },
+            ),
+        )
         await balancer.async_evaluate()
         self.assertEqual(hass.services.calls[0][2]["value"], 16.0)
+
+    async def test_allocated_current_confirms_requested_limit_with_tolerance(self):
+        module, scheduled = _load_module()
+        states = {
+            "number.charger_limit": FakeState(16, min=6, max=32, step=1),
+            "sensor.charger_allocated": FakeState(16, device_class="current"),
+        }
+        hass = FakeHass(states)
+        entry = FakeEntry(
+            options(),
+            {
+                "meter_l1_current": 28,
+                "meter_l2_current": 24,
+                "meter_l3_current": 24,
+            },
+        )
+        balancer = module.GWEnergyPilotEVLoadBalancer(hass, entry)
+
+        await balancer.async_evaluate()
+        await scheduled[0][1](datetime.now(timezone.utc))
+        self.assertEqual(balancer.status, "awaiting_feedback")
+        self.assertEqual(balancer.pending_target, 13)
+
+        states["number.charger_limit"] = FakeState(13, min=6, max=32, step=1)
+        states["sensor.charger_allocated"] = FakeState(
+            12.984, device_class="current"
+        )
+        entry.runtime_data.coordinator.data.values.update(
+            {
+                "meter_l1_current": 25,
+                "meter_l2_current": 25,
+                "meter_l3_current": 25,
+            }
+        )
+        await balancer.async_evaluate()
+        self.assertEqual(balancer.status, "balanced")
+        self.assertIsNone(balancer.pending_target)
+        self.assertEqual(balancer.diagnostics["last_feedback_status"], "applied")
+        self.assertAlmostEqual(balancer.allocated_current, 12.984)
+
+    async def test_feedback_timeout_reports_unapplied_limit(self):
+        module, scheduled = _load_module()
+        hass = FakeHass(
+            {
+                "number.charger_limit": FakeState(16, min=6, max=32, step=1),
+                "sensor.charger_allocated": FakeState(16, device_class="current"),
+            }
+        )
+        balancer = module.GWEnergyPilotEVLoadBalancer(
+            hass,
+            FakeEntry(
+                options(),
+                {
+                    "meter_l1_current": 28,
+                    "meter_l2_current": 24,
+                    "meter_l3_current": 24,
+                },
+            ),
+        )
+
+        await balancer.async_evaluate()
+        await scheduled[0][1](datetime.now(timezone.utc))
+        self.assertEqual(scheduled[1][0], 60)
+        await scheduled[1][1](datetime.now(timezone.utc))
+
+        self.assertEqual(balancer.status, "feedback_mismatch")
+        self.assertEqual(balancer.diagnostics["last_feedback_status"], "mismatch")
+        self.assertIn("Requested 13 A", balancer.last_error)
 
     async def test_high_current_audit_never_truncates_earlier_confirmations(self):
         module, _scheduled = _load_module()

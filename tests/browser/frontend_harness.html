@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -102,7 +102,7 @@
       connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
-      control_strategy: ["v048", "v049"].includes(ENTRYPOINT) ? "hybrid" : "battery",
+      control_strategy: ["v048", "v049", "v050"].includes(ENTRYPOINT) ? "hybrid" : "battery",
       grid_energy_imported_today: 3.2,
       grid_energy_exported_today: 7.8,
       grid_energy_import_total: 1234.5,
@@ -310,6 +310,13 @@
       max: 32,
       step: 1,
     });
+    initialStates["sensor.zorro_de_zaptec_laadpaal_toegewezen_laadstroom"] = makeExternalState(
+      "sensor.zorro_de_zaptec_laadpaal_toegewezen_laadstroom", 15.984, "A"
+    );
+    Object.assign(initialStates["sensor.zorro_de_zaptec_laadpaal_toegewezen_laadstroom"].attributes, {
+      friendly_name: "Zorro de Zaptec Laadpaal Toegewezen laadstroom",
+      device_class: "current",
+    });
 
     function batterySaverPayload() {
       const modes = [
@@ -368,9 +375,12 @@
                 { value: "custom_3_phase", label: "Custom · 3 phase" },
               ] },
               { key: "grid_custom_current", label: "Custom connection current", type: "number", value: 25, min: 6, max: 100, step: 1, readonly: false },
-              { key: "ev_grid_current_entity", label: "Measured phase current", type: "entity", domains: ["sensor"], units: ["A", "mA"], value: "sensor.grid_phase_current", readonly: false },
-              { key: "ev_charger_current_entity", label: "Charger maximum-current control", type: "entity", domains: ["number"], value: "number.zaptec_max_current", readonly: false },
-              { key: "ev_load_balance_window", label: "Sustained condition window", type: "select", value: 5, readonly: false, options: [1, 5, 15].map((value) => ({ value, label: `${value} min` })) },
+              { key: "ev_charger_phases", label: "Charger phase mode", type: "select", value: 3, readonly: false, options: [{ value: 1, label: "1 phase" }, { value: 3, label: "3 phases" }] },
+              { key: "ev_charger_phase", label: "Charger phase", type: "select", value: "l1", readonly: false, options: ["l1", "l2", "l3"].map((value) => ({ value, label: value.toUpperCase() })) },
+              { key: "ev_grid_current_source", label: "Grid-current measurement", type: "text", value: "Automatic · GoodWe meter L1/L2/L3", readonly: true },
+              { key: "ev_charger_current_entity", label: "Charger current-limit control", type: "entity", domains: ["number"], units: ["A"], value: "number.zaptec_max_current", readonly: false },
+              { key: "ev_charger_allocated_current_entity", label: "Charger allocated-current feedback", type: "entity", domains: ["sensor"], units: ["A"], device_classes: ["current"], value: "sensor.zorro_de_zaptec_laadpaal_toegewezen_laadstroom", readonly: false },
+              { key: "ev_load_balance_window", label: "Sustained condition window", type: "select", value: 15, readonly: false, options: [1, 5, 15].map((value) => ({ value, label: `${value} min${value === 15 ? " · recommended" : ""}` })) },
               { key: "ev_charger_min_current", label: "Minimum charger current", type: "number", value: 6, min: 6, max: 16, step: 1, readonly: false },
               { key: "ev_charger_max_current", label: "Maximum charger current", type: "number", value: 16, min: 6, max: 32, step: 1, readonly: false },
             ],
@@ -519,7 +529,7 @@
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {
@@ -650,6 +660,7 @@
       v047: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v047.js?browser-harness=1",
       v048: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v048.js?browser-harness=1",
       v049: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v049.js?browser-harness=1",
+      v050: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v050.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -782,7 +793,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

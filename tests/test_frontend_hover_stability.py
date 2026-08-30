@@ -50,7 +50,7 @@ class FrontendHoverStabilityTests(unittest.TestCase):
             settings = (FRONTEND / "gw-energy-pilot-v041-emhass-settings.js").read_text(encoding="utf-8")
             self.assertIn('import "./gw-energy-pilot-v041.js?v=', settings)
         else:
-            self.assertTrue(any(name in init_source for name in ("gw-energy-pilot-v049.js?v=", "gw-energy-pilot-v048.js?v=", "gw-energy-pilot-v047.js?v=", "gw-energy-pilot-v046.js?v=", "gw-energy-pilot-v045.js?v=", "gw-energy-pilot-v042.js?v=", "gw-energy-pilot-v041.js?v=", "gw-energy-pilot-v040.js?v=", "gw-energy-pilot-v039.js?v=", "gw-energy-pilot-v038.js?v=")))
+            self.assertTrue(any(name in init_source for name in ("gw-energy-pilot-v050.js?v=", "gw-energy-pilot-v049.js?v=", "gw-energy-pilot-v048.js?v=", "gw-energy-pilot-v047.js?v=", "gw-energy-pilot-v046.js?v=", "gw-energy-pilot-v045.js?v=", "gw-energy-pilot-v042.js?v=", "gw-energy-pilot-v041.js?v=", "gw-energy-pilot-v040.js?v=", "gw-energy-pilot-v039.js?v=", "gw-energy-pilot-v038.js?v=")))
 
 
 if __name__ == "__main__":

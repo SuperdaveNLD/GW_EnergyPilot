@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v015.js?v=0.49-consolidated1";
+import "./gw-energy-pilot-v015.js?v=0.50-ev1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -554,6 +554,7 @@ function entityOptions(panel, field) {
   const supportedUnits = new Set(["W", "kW", "MW", "mW"]);
   const domains = new Set(field.domains || []);
   const units = new Set(field.units || []);
+  const deviceClasses = new Set(field.device_classes || []);
   return Object.entries(panel?._hass?.states || {})
     .filter(([entityId, state]) => {
       if (entityId === aggregateId) return false;
@@ -561,7 +562,8 @@ function entityOptions(panel, field) {
       if (attrs.purpose === "display_only" && Array.isArray(attrs.sources)) return false;
       if (domains.size && !domains.has(entityId.split(".")[0])) return false;
       if (units.size && !units.has(attrs.unit_of_measurement)) return false;
-      if (domains.size || units.size) return true;
+      if (deviceClasses.size && !deviceClasses.has(attrs.device_class)) return false;
+      if (domains.size || units.size || deviceClasses.size) return true;
       return attrs.device_class === "power" || supportedUnits.has(attrs.unit_of_measurement);
     })
     .sort(([left], [right]) => left.localeCompare(right))
@@ -653,6 +655,13 @@ function syncEvSafetyFields(form) {
     const enabled = String(profile.value).startsWith("custom_");
     custom.disabled = !enabled;
     custom.closest(".ep-v016-field")?.classList.toggle("is-disabled", !enabled);
+  }
+  const phaseMode = form?.querySelector('[data-setting-key="ev_charger_phases"]');
+  const phase = form?.querySelector('[data-setting-key="ev_charger_phase"]');
+  if (phaseMode && phase) {
+    const enabled = Number(phaseMode.value) === 1;
+    phase.disabled = !enabled;
+    phase.closest(".ep-v016-field")?.classList.toggle("is-disabled", !enabled);
   }
   const maximum = Number(form?.querySelector('[data-setting-key="ev_charger_max_current"]')?.value);
   const note = form?.closest(".ep-v016-settings-content")?.querySelector("[data-ev-safety-note]");
@@ -764,7 +773,7 @@ function renderSettingsPage(panel, root) {
       : tabId === "pv"
       ? `<div class="ep-v016-pv-note"><strong>PV:</strong> ${panel._escape(pvCopy(panel).note)}</div>`
       : tabId === "ev"
-      ? `<div class="ep-v016-ev-note" data-ev-safety-note><strong>Safety boundary:</strong> this soft regulator controls only the selected charger number entity and never GoodWe. It is not a substitute for correctly rated wiring, charger protection or the main fuse. A maximum above 16 A requires an extra confirmation and is permanently audited.</div>`
+      ? `<div class="ep-v016-ev-note" data-ev-safety-note><strong>Safety boundary:</strong> grid current is read automatically from the linked GoodWe meter. This soft regulator writes only the selected charger current-limit number and verifies it with the allocated-current sensor; it never controls GoodWe. A maximum above 16 A requires an extra confirmation and is permanently audited.</div>`
       : "";
     const sectionFields = section.fields || [];
     const fields = tabId === "pv"
@@ -838,7 +847,7 @@ function renderSettingsPage(panel, root) {
       if (input.dataset.settingKey === "enable_external_pv") {
         input.addEventListener("change", () => syncExternalPvFields(form));
       }
-      if (["grid_connection_profile", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
+      if (["grid_connection_profile", "ev_charger_phases", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
         input.addEventListener("change", () => syncEvSafetyFields(form));
         input.addEventListener("input", () => syncEvSafetyFields(form));
       }

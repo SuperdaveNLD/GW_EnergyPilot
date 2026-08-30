@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.49 · Beta**
+**v0.50 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V050.md` — v0.50 GoodWe phase-aware EV charger control and feedback;
 - `docs/RELEASE_NOTES_V049.md` — v0.49 wall-clock plans, EV coordination and dashboard reliability;
 - `docs/RELEASE_NOTES_V048.md` — v0.48 neutral-safe signed Hybrid PCC control;
 - `docs/RELEASE_NOTES_V047.md` — v0.47 editable Custom battery costs and profile tuning;
@@ -48,6 +49,16 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v0.50 highlights
+
+- EV load balancing reads L1/L2/L3 automatically from the linked GoodWe coordinator; the manual `Measured phase current` entity is removed.
+- One-phase chargers use their configured L1/L2/L3 phase, while three-phase chargers guard the highest live phase and require complete three-phase telemetry.
+- The writable charger current-limit control is separated from the read-only allocated-current feedback sensor.
+- Applied charger requests are verified for up to 60 seconds with a 0.25 A tolerance, so a Zaptec feedback value such as 15.984 A confirms a 16 A request.
+- The EV Online binary sensor is accepted by the EV settings API, and unambiguous Zaptec control/feedback candidates can be proposed from Home Assistant device and config-entry relations.
+- New or unset regulator windows default to 15 minutes; explicitly stored existing values remain unchanged.
+- The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the `0.50-ev1` frontend graph.
 
 ## v0.49 highlights
 
@@ -311,17 +322,21 @@ This prevents the home battery from feeding the EV while avoiding the previous b
 
 ### EV charger load balancing
 
-Settings → **EV** can optionally guard the house connection by observing one
-phase-current entity and adjusting one charger maximum-current NumberEntity that
-applies to all three phases. The default connection is `3 × 25 A`; common Dutch
-connection profiles and custom one-/three-phase profiles are available. A
-continuous `1–15` minute window is used for both reducing and restoring current;
-`5` minutes is recommended.
+Settings → **EV** can optionally guard the house connection using the linked
+GoodWe meter currents. A one-phase charger observes its configured L1, L2 or L3;
+a three-phase charger guards the highest live current across all three phases.
+EnergyPilot adjusts one writable charger current-limit NumberEntity and uses a
+separate read-only allocated-current sensor to confirm that the requested value
+was applied. The default connection is `3 × 25 A`; common Dutch connection
+profiles and custom one-/three-phase profiles are available. A continuous
+`1–15` minute window is used for both reducing and restoring current; `15`
+minutes is recommended.
 
-This is a soft, best-effort guard, not fuse protection. It never writes GoodWe,
-does nothing on invalid measurements, and cannot protect an unmeasured phase. The
-normal maximum is `16 A`; a newly selected value above `16 A` requires an extra
-warning/confirmation and is permanently recorded in the per-entry audit Store.
+This is a soft, best-effort guard, not fuse protection. It never writes GoodWe
+and does nothing when the required GoodWe phase telemetry is incomplete or
+invalid. The normal maximum is `16 A`; a newly selected value above `16 A`
+requires an extra warning/confirmation and is permanently recorded in the
+per-entry audit Store.
 See `docs/EV_LOAD_BALANCING.md`.
 
 An optional charger-online entity can protect this feature against stale EV state. Five stable minutes unreachable temporarily suspend effective EV coordination; five stable minutes online restore it only when the user setting remained enabled. The saved setting is not overwritten. The dashboard header summarizes Modbus, charger and EV-coordination status; its Modbus state follows the configured telemetry refresh interval.
