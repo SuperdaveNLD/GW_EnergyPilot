@@ -1269,6 +1269,23 @@ function patchCostFunctionSelector(panel, root) {
   }
 }
 
+function socLimitValue(panel, kind) {
+  const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
+  const entityValue = finite(panel, key);
+  if (Number.isFinite(entityValue)) return entityValue;
+
+  // The SOC NumberEntities initialize asynchronously and can remain unknown
+  // after a transient startup read failure. Keep the presentation usable from
+  // sources that already follow the same ownership contract: GoodWe 45356 is
+  // canonical for Minimum SOC, while the periodically refreshed EMHASS config
+  // diagnostics are canonical for Maximum SOC.
+  const fallback = kind === "min"
+    ? optimizeAttributes(panel).battery_discharge_depth_on_grid_45356
+    : diagnosticConfigAttributes(panel).emhass_maximum_soc_pct;
+  const value = finiteValue(fallback);
+  return value !== null && value >= 0 && value <= 100 ? value : null;
+}
+
 function patchEmhass(panel, root) {
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
@@ -1317,8 +1334,7 @@ function patchEmhass(panel, root) {
 
   for (const input of card.querySelectorAll("input[data-soc-slider]")) {
     const kind = input.dataset.socSlider;
-    const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
-    const value = finite(panel, key);
+    const value = socLimitValue(panel, kind);
     if (!Number.isFinite(value)) continue;
     const draft = finiteValue(input.dataset.epSocDraft);
     const acknowledged = Number.isFinite(draft) && value === draft;
@@ -1339,8 +1355,7 @@ function patchStrategy(panel, root) {
   if (!strategy) return;
   for (const input of strategy.querySelectorAll("input[data-ep-v038-soc]")) {
     const kind = input.dataset.epV038Soc;
-    const key = kind === "min" ? "emhass_minimum_soc" : "emhass_maximum_soc";
-    const value = finite(panel, key);
+    const value = socLimitValue(panel, kind);
     if (!Number.isFinite(value)) continue;
     const draft = finiteValue(input.dataset.epSocDraft);
     const acknowledged = Number.isFinite(draft) && value === draft;

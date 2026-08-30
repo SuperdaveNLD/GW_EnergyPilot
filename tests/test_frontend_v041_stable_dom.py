@@ -137,6 +137,18 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("exercise_connectivity_status", browser_test)
         self.assertIn('"connectivity_status"', harness)
 
+    def test_soc_limit_display_falls_back_to_canonical_live_sources(self) -> None:
+        self.assertIn("function socLimitValue(panel, kind)", self.source)
+        self.assertIn(
+            "optimizeAttributes(panel).battery_discharge_depth_on_grid_45356",
+            self.source,
+        )
+        self.assertIn(
+            "diagnosticConfigAttributes(panel).emhass_maximum_soc_pct",
+            self.source,
+        )
+        self.assertIn("const value = socLimitValue(panel, kind)", self.source)
+
     def test_v038_legacy_guards_are_disabled_only_for_v041(self) -> None:
         self.assertIn("function stableRuntimeActive(panel)", self.runtime)
         self.assertIn("!stableRuntime && interactionActive(this)", self.runtime)
@@ -201,6 +213,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("exercise_host_property_press", browser_test)
         self.assertIn("exercise_chart_size_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
+        self.assertIn("exercise_soc_limit_fallback", browser_test)
         self.assertIn("test_frontend_stability_v048.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)

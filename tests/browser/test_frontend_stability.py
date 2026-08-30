@@ -1058,6 +1058,44 @@ def exercise_soc_slider_draft(page: Page) -> dict[str, object]:
     return result
 
 
+def exercise_soc_limit_fallback(page: Page) -> dict[str, object]:
+    """Keep canonical SOC limits visible while NumberEntity startup is unknown."""
+    return page.evaluate(
+        """
+        async () => {
+          const panel = window.__epPanel;
+          const root = panel.shadowRoot;
+          const originalNarrow = panel.narrow;
+          window.__epSetEntityByKey('emhass_minimum_soc', 'unknown');
+          window.__epSetEntityByKey('emhass_maximum_soc', 'unknown');
+
+          // A genuine context change rebuilds the legacy v0.11 card. This
+          // reproduces startup with registered NumberEntities whose states have
+          // not become numeric yet, while the canonical GoodWe/config sources
+          // are already exposed by the runtime diagnostics.
+          panel.narrow = !originalNarrow;
+          await new Promise((resolve) => setTimeout(resolve, 220));
+          const read = (kind) => ({
+            label: root.querySelector('.panel-card.emhass')
+              ?.querySelector(`[data-soc-value="${kind}"]`)?.textContent?.trim() || '',
+            value: root.querySelector('.panel-card.emhass')
+              ?.querySelector(`input[data-soc-slider="${kind}"]`)?.value || '',
+          });
+          const unknownEntity = { min: read('min'), max: read('max') };
+
+          window.__epSetEntityByKey('emhass_minimum_soc', 5);
+          window.__epSetEntityByKey('emhass_maximum_soc', 95);
+          panel.narrow = originalNarrow;
+          await new Promise((resolve) => setTimeout(resolve, 220));
+          return {
+            unknownEntity,
+            restored: { min: read('min'), max: read('max') },
+          };
+        }
+        """
+    )
+
+
 def control_style(page: Page, selector: str) -> dict[str, str]:
     return page.evaluate(
         """
@@ -3361,6 +3399,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     optimize_stability = exercise_optimize_stability(page, profile)
     menu = open_and_close_menu(page)
     automatic = exercise_automatic_control(page)
+    soc_limit_fallback = exercise_soc_limit_fallback(page)
     soc_slider = exercise_soc_slider_draft(page)
     strategy = exercise_strategy(page)
     chart_size_press = exercise_chart_size_press(page, profile)
@@ -3390,6 +3429,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "optimize_stability": optimize_stability,
         "menu": menu,
         "automatic": automatic,
+        "soc_limit_fallback": soc_limit_fallback,
         "soc_slider": soc_slider,
         "strategy": strategy,
         "chart_size_press": chart_size_press,
@@ -3422,6 +3462,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     optimize_stability = result["optimize_stability"]
     menu = result["menu"]
     automatic = result["automatic"]
+    soc_limit_fallback = result["soc_limit_fallback"]
     soc_slider = result["soc_slider"]
     strategy = result["strategy"]
     chart_size_press = result["chart_size_press"]
@@ -3663,6 +3704,19 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if automatic["error"]:
         failures.append(f"{name}: Automatic Control interaction error")
+    if soc_limit_fallback != {
+        "unknownEntity": {
+            "min": {"label": "5%", "value": "5"},
+            "max": {"label": "95%", "value": "95"},
+        },
+        "restored": {
+            "min": {"label": "5%", "value": "5"},
+            "max": {"label": "95%", "value": "95"},
+        },
+    }:
+        failures.append(
+            f"{name}: canonical SOC-limit fallback did not replace unknown NumberEntity state"
+        )
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and not all(
         soc_slider[key] is True
         for key in (
