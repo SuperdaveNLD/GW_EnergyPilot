@@ -103,6 +103,19 @@ P_batt near 0 W    -> mode 8  -> Battery Hold
 
 This fallback does not require a valid `P_grid` entity.
 
+### Hybrid control
+
+Hybrid evaluates the configured per-entry deadband in two stages:
+
+```text
+abs(P_batt) <= deadband -> mode 8  -> Battery Hold
+else abs(P_grid) <= deadband -> mode 1 -> GoodWe Auto / self-use
+else P_grid > deadband -> mode 9  -> import target = abs(P_grid)
+else P_grid < -deadband -> mode 10 -> export target = abs(P_grid)
+```
+
+The neutral battery branch is evaluated first so ordinary forecast house import or PV export cannot turn an idle EMHASS battery plan into active buying or selling. Every non-neutral plan then follows the signed PCC target. Exact positive and negative deadband boundaries remain neutral. The deadband only selects the branch and is never subtracted from the transmitted mode-9/10 setpoint; maximum-power clamping remains the only reduction.
+
 ## Why mode 1 is used around zero grid target
 
 On the reference GW15K-ETA-G20, mode 1 was observed naturally consuming available PV surplus into the battery while holding grid flow close to zero. That behavior avoids maintaining a second slow EnergyPilot meter-feedback loop around mode 11.

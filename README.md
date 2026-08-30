@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v0.47 · Beta**
+**v0.48 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -19,6 +19,7 @@ In this project, **Beta** means functionality is intentionally available before 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and Beta scope;
+- `docs/RELEASE_NOTES_V048.md` — v0.48 neutral-safe signed Hybrid PCC control;
 - `docs/RELEASE_NOTES_V047.md` — v0.47 editable Custom battery costs and profile tuning;
 - `docs/RELEASE_NOTES_V046.md` — v0.46 grouped external-PV controls and master switch;
 - `docs/RELEASE_NOTES_V045.md` — consolidated v0.45 PV, SOC, live-flow and Optimize release;
@@ -45,6 +46,15 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v0.48 highlights
+
+- A neutral Hybrid `P_batt` plan always selects mode 8 Hold, even while actual house load imports from the grid or PV exports.
+- Every non-neutral Hybrid plan follows signed `P_grid`: mode 1 around zero, mode 9 for planned import and mode 10 for planned export.
+- The configured per-entry deadband is applied to `P_batt` and `P_grid` in that order; exact boundaries remain neutral.
+- Mode-9/10 setpoints use the complete absolute `P_grid` target, capped only by the configured maximum power.
+- EV anti-discharge, Battery/Grid strategies, manual EMS ownership, registers and write ordering remain unchanged.
+- The active dashboard explains the current Hybrid 8/1/9/10 behavior in English and Dutch.
 
 ## v0.47 highlights
 
@@ -249,15 +259,15 @@ This requires a working/validated GoodWe smart meter.
 ### Hybrid control
 
 ```text
-P_grid > +deadband -> mode 9 Grid import target (buy/import)
-else P_batt > +deadband -> mode 12 Battery discharge power (sell/discharge)
-else P_batt near 0 W -> mode 8 Battery Hold
-otherwise -> mode 1 GoodWe Auto / self-use
+P_batt near 0 W -> mode 8 Battery Hold
+else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
+else P_grid > +deadband -> mode 9 Grid import target
+else P_grid < -deadband -> mode 10 Grid export target
 ```
 
-Hybrid is deliberately asymmetric. Buying is controlled at the PCC through mode 9 and the EMHASS `P_grid` magnitude. Selling is controlled through direct battery discharge mode 12 and the EMHASS `P_batt` magnitude.
+Hybrid first preserves an explicit neutral battery plan. This prevents ordinary site import or PV export from becoming an active target while EMHASS asks the battery to remain idle.
 
-A Hybrid charging plan with no planned grid import normally falls back to GoodWe self-use. That lets locally available PV flow to the battery according to the inverter's own fast control instead of forcing the battery to the forecast-sized EMHASS charging value. A neutral EMHASS battery plan remains neutral through mode 8.
+For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around zero grid target, mode 1 lets GoodWe close the actual local balance for internal or AC-coupled PV. Outside the configured deadband, modes 9/10 receive the complete absolute `P_grid` magnitude, limited only by maximum power. Exact positive and negative deadband boundaries remain neutral.
 
 ### EV anti-discharge override
 

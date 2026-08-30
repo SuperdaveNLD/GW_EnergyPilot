@@ -4,6 +4,20 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [0.48] - 2026-08-30
+
+### Fixed
+
+- Corrected Hybrid Automatic Control so a neutral `P_batt` plan is evaluated first and always selects mode `8` Hold, regardless of ordinary forecast/actual grid import or PV export.
+- Corrected every non-neutral Hybrid plan to follow signed `P_grid`: mode `1` inside the configured deadband, mode `9` for import and mode `10` for export.
+- Kept the control deadband fully variable per config entry. Exact positive/negative boundaries remain neutral, and the deadband selects the branch without being subtracted from the mode-9/10 setpoint.
+- Added regressions for neutral-plan import/export, zero-grid self-use, signed mode-9/10 targets, configurable exact boundaries, complete setpoint magnitude and maximum-power clamping.
+- Replaced the inherited 9/12 Hybrid operator text with current English and Dutch 8/1/9/10 guidance.
+
+### Safety and compatibility
+
+- EV anti-discharge remains a higher-priority override. Battery/Grid strategies, manual EMS commands, GoodWe registers, non-negative setpoints, write ordering, entity identity, Store keys, EMHASS policy and v0.47 Battery Saver behavior are unchanged.
+
 ## [0.47] - 2026-08-29
 
 ### Added

@@ -3,7 +3,7 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.47 Beta**. v0.47 retains the full v0.46 stable behavior and adds Custom Battery Saver editing and larger strategy/settings typography through the existing functional owners.
+This document is the canonical frontend render/interaction decision for **GW EnergyPilot v0.48 Beta**. v0.48 retains the complete v0.47 stable behavior and adds only current Hybrid operator copy plus release presentation through a bounded top-level wrapper.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,7 +17,8 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v047.js?v=0.47-custom-battery1
+  -> gw-energy-pilot-v048.js?v=0.48-hybrid-control1
+  -> gw-energy-pilot-v047.js?v=0.48-hybrid-control1
   -> gw-energy-pilot-v046.js?v=0.47-custom-battery1
   -> gw-energy-pilot-v045.js?v=0.47-custom-battery1
   -> gw-energy-pilot-v044.js?v=0.47-custom-battery1
@@ -31,7 +32,7 @@ Home Assistant PANEL_MODULE
   -> gw-energy-pilot-v038-strategy.js?v=0.47-custom-battery1
 ```
 
-Every local import reachable from the v0.47 entrypoint uses `0.47-custom-battery1`. This reloads the modified Battery Saver, strategy and settings modules after upgrade while preserving the behavioral ownership of historical layers.
+The v0.48 entrypoint and its v0.47 dependency use the fresh `0.48-hybrid-control1` boundary, guaranteeing that upgraded sessions load the corrected operator copy. The unchanged v0.47 dependency graph retains `0.47-custom-battery1`, which already reloads its Battery Saver, strategy and settings modules while preserving their historical ownership.
 
 ## Render ownership
 
@@ -93,7 +94,7 @@ A normal telemetry burst must preserve `main`, Dashboard layout-button, Automati
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.47 by `tests/browser/test_frontend_stability_v047.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also require one external-PV group with four fields and correct switch/value preservation; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; editable Custom costs with stable main-node identity and larger typography; combined PV and bounded SOC telemetry; all static flow states; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after the plan-card refresh.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v0.48 by `tests/browser/test_frontend_stability_v048.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also require one external-PV group with four fields and correct switch/value preservation; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; editable Custom costs with stable main-node identity and larger typography; combined PV and bounded SOC telemetry; all static flow states; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after the plan-card refresh.
 
 ## Contributor rules
 

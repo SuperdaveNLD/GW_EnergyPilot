@@ -63,15 +63,16 @@ class GWEnergyPilotController:
       P_grid ~= 0 = mode 1 GoodWe Auto / self-use balancing
 
     Hybrid control:
-      P_grid > 0 = mode 9 import target at the PCC
-      P_batt > 0 = mode 12 direct battery discharge target
       P_batt ~= 0 = mode 8 Battery Hold
-      otherwise = mode 1 GoodWe Auto / self-use balancing
+      otherwise P_grid ~= 0 = mode 1 GoodWe Auto / self-use balancing
+      otherwise P_grid > 0 = mode 9 import target at the PCC
+      otherwise P_grid < 0 = mode 10 export target at the PCC
 
-    Hybrid intentionally combines GoodWe's PCC import controller for buying
-    energy with direct battery-power discharge for selling energy. A charging
-    plan without planned grid import falls back to GoodWe self-use so locally
-    available PV can be absorbed without forcing a forecast-sized charge.
+    Hybrid gives an explicit neutral battery plan first priority. For every
+    non-neutral battery plan it controls the PCC: GoodWe self-use owns a
+    near-zero grid plan, and modes 9/10 own non-zero import/export targets.
+    The configured deadband classifies both neutral battery power and near-zero
+    grid power; it is never subtracted from a non-zero setpoint.
 
     Existing installations without an explicit strategy retain the legacy
     smart-meter boolean mapping for backwards compatibility.
@@ -340,19 +341,19 @@ class GWEnergyPilotController:
         await self._async_apply_command(MODE_AUTO, 0, "grid_zero_auto", skip_if_readback_matches=True)
 
     async def _async_apply_hybrid_plan(self, p_batt: float, p_grid: float, deadband: float, max_power: int) -> None:
-        """Buy through PCC mode 9 and sell through direct battery mode 12."""
-        if p_grid > deadband:
-            power = min(int(abs(p_grid)), max_power)
-            await self._async_apply_command(MODE_GRID_IMPORT_TARGET, power, "hybrid_grid_import", skip_if_readback_matches=True)
-            return
-        if p_batt > deadband:
-            power = min(int(abs(p_batt)), max_power)
-            await self._async_apply_command(MODE_DISCHARGE_BATTERY, power, "hybrid_battery_discharge", skip_if_readback_matches=True)
-            return
+        """Hold neutral battery plans, otherwise execute the signed PCC plan."""
         if abs(p_batt) <= deadband:
             await self._async_apply_command(MODE_BATTERY_HOLD, 0, "hybrid_battery_hold", skip_if_readback_matches=True)
             return
-        await self._async_apply_command(MODE_AUTO, 0, "hybrid_pv_self_use", skip_if_readback_matches=True)
+        if abs(p_grid) <= deadband:
+            await self._async_apply_command(MODE_AUTO, 0, "hybrid_grid_zero_auto", skip_if_readback_matches=True)
+            return
+
+        power = min(int(abs(p_grid)), max_power)
+        if p_grid > deadband:
+            await self._async_apply_command(MODE_GRID_IMPORT_TARGET, power, "hybrid_grid_import", skip_if_readback_matches=True)
+            return
+        await self._async_apply_command(MODE_GRID_EXPORT_TARGET, power, "hybrid_grid_export", skip_if_readback_matches=True)
 
     async def _async_evaluate_locked(self) -> None:
         if not self.enabled:
