@@ -85,7 +85,7 @@ The separate Hybrid strategy explanation is owned by v0.48 presentation while Hy
 
 ### Plan graph refresh
 
-A changed `plan_revision` or configured `P_batt` state invalidates graph data. Only the non-interactive body and footer of `.ep-v027-battery-plan-card` are rebuilt. The connected card shell, S/M/L selector, expand action and window bar retain their DOM identity so a concurrent scoped refresh cannot cancel a native press. Actual and forecast SOC are part of this same canonical scoped card.
+A changed `plan_revision` or configured `P_batt` state invalidates graph data. Only the non-interactive body and footer of `.ep-v027-battery-plan-card` are rebuilt. The connected card shell, 12h/24h/36h range selector, S/M/L selector, expand action and window bar retain their DOM identity so a concurrent scoped refresh cannot cancel a native press. Range changes filter the existing cached dataset and must not trigger a Recorder request. Actual and forecast SOC are part of this same canonical scoped card.
 
 ### Execution-history refresh
 

@@ -1,10 +1,11 @@
 import "./gw-energy-pilot-v026-complete.js?v=1.1.0-beta.1-charge1";
 import {
-  CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartSize,
-  formatTime, loadChartData, saveChartSize, t,
+  CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartRange,
+  chartSize, chartSubtitle, chartWindowData, formatTime, loadChartData,
+  saveChartRange, saveChartSize, t,
 } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.1-charge1";
 import {
-  cardBody, ensureStyles, sizeControlHtml,
+  cardBody, ensureStyles, rangeControlHtml, sizeControlHtml,
 } from "./gw-energy-pilot-v027-battery-plan-view.js?v=1.1.0-beta.1-charge1";
 
 const V041_PANEL_STYLE_ID = "ep-v041-scoped-no-motion";
@@ -99,7 +100,8 @@ export function freezeV041Motion(panel) {
 
 function openModal(panel) {
   document.querySelector(".ep-v027-backdrop")?.remove();
-  const data = panel.__epV027BatteryPlanData;
+  const range = chartRange();
+  const data = chartWindowData(panel.__epV027BatteryPlanData, range);
   const backdrop = document.createElement("div");
   backdrop.className = "ep-v027-backdrop";
   backdrop.innerHTML = `<style>
@@ -108,7 +110,7 @@ function openModal(panel) {
     .ep-v027-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:8px}.ep-v027-modal-head small{display:block;color:#67e6f8;font-size:10px;letter-spacing:.15em;font-weight:850}.ep-v027-modal-head h2{margin:5px 0 0;font-size:25px;letter-spacing:-.02em}.ep-v027-modal-head p{margin:5px 0 0;color:#829caf;font-size:11px}.ep-v027-close{width:37px;height:37px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);color:#e0f0f7;font-size:20px;cursor:pointer}
     .ep-v027-modal .ep-v027-chart{border-radius:17px;background:rgba(1,11,27,.31)}.ep-v027-modal .ep-v027-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:12px 24px;margin:7px 0 14px;color:#91a9ba;font-size:10px}.ep-v027-modal .ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-modal .ep-v027-legend i{display:inline-block}.ep-v027-modal .actual-charge,.ep-v027-modal .actual-discharge{width:10px;height:10px;border-radius:3px;background:#27dfc2}.ep-v027-modal .actual-discharge{background:#ffa52f}.ep-v027-modal .plan{width:18px;height:9px;border:1px dashed #9cbcc8;border-radius:3px}.ep-v027-modal .ev-charge-allowed,.ep-v027-modal .ev-discharge-blocked{width:16px;height:9px;border:1px solid rgba(140,242,155,.46);border-radius:2px}.ep-v027-modal .ev-charge-allowed{background:repeating-linear-gradient(135deg,rgba(162,242,173,.42) 0 2px,rgba(121,230,140,.06) 2px 6px)}.ep-v027-modal .ev-discharge-blocked{background:rgba(121,230,140,.32)}.ep-v027-modal .actual-soc{width:18px;height:2px;background:#f472b6}.ep-v027-modal .forecast-soc{width:18px;height:0;border-top:2px dashed #c4b5fd}.ep-v027-modal .price{width:20px;height:2px;background:#55e8ff}.ep-v027-modal .ep-v027-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}.ep-v027-modal .ep-v027-chip{display:flex;align-items:center;gap:9px;padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.025)}.ep-v027-modal .ep-v027-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;border:1px solid rgba(39,224,193,.6);color:#42ebce}.ep-v027-modal .discharge .ep-v027-icon{border-color:rgba(255,165,47,.65);color:#ffb34a}.ep-v027-modal .price .ep-v027-icon{border-color:rgba(85,232,255,.62);color:#64e9fb}.ep-v027-modal small{display:block;color:#849dae;font-size:8px}.ep-v027-modal strong{display:block;margin-top:2px}.ep-v027-modal em{display:block;margin-top:2px;color:#647f92;font-size:7px;font-style:normal}.ep-v027-modal .ep-v027-notes{margin-top:12px;color:#69879b;font-size:9px;line-height:1.55}
     @media(max-width:850px){.ep-v027-modal{padding:15px;border-radius:20px}.ep-v027-modal .ep-v027-summary{grid-template-columns:1fr}.ep-v027-modal-head h2{font-size:21px}}
-  </style><section class="ep-v027-modal"><div class="ep-v027-modal-head"><div><small>${panel._escape(t(panel, "actual"))} + ${panel._escape(t(panel, "future"))}</small><h2>${panel._escape(t(panel, "title"))}</h2><p>${panel._escape(t(panel, "subtitle"))}</p></div><button type="button" class="ep-v027-close" aria-label="${panel._escape(t(panel, "close"))}">×</button></div>${cardBody(panel, data, "large", true)}</section>`;
+  </style><section class="ep-v027-modal"><div class="ep-v027-modal-head"><div><small>${panel._escape(t(panel, "actual"))} + ${panel._escape(t(panel, "future"))}</small><h2>${panel._escape(t(panel, "title"))}</h2><p>${panel._escape(chartSubtitle(panel, range))}</p></div><button type="button" class="ep-v027-close" aria-label="${panel._escape(t(panel, "close"))}">×</button></div>${cardBody(panel, data, "large", true)}</section>`;
 
   const close = () => {
     document.removeEventListener("keydown", escape);
@@ -188,6 +190,13 @@ function bindClickOnce(element, listener) {
 }
 
 function bindCardControls(panel, card) {
+  card.querySelectorAll("[data-chart-range]").forEach((button) => {
+    bindClickOnce(button, () => {
+      saveChartRange(button.dataset.chartRange);
+      if (panel.__epV041StableRuntime) refreshBatteryPlanCard(panel);
+      else panel._queueRender();
+    });
+  });
   card.querySelectorAll("[data-chart-size]").forEach((button) => {
     bindClickOnce(button, () => {
       saveChartSize(button.dataset.chartSize);
@@ -208,7 +217,12 @@ function preserveInteractiveShell(existingCard, card) {
   const nextHead = card.querySelector(":scope > .ep-v027-head");
   const existingButtons = [...(existingHead?.querySelectorAll("[data-chart-size]") || [])];
   const nextButtons = [...(nextHead?.querySelectorAll("[data-chart-size]") || [])];
-  if (!existingHead || !nextHead || existingButtons.length !== nextButtons.length) {
+  const existingRanges = [...(existingHead?.querySelectorAll("[data-chart-range]") || [])];
+  const nextRanges = [...(nextHead?.querySelectorAll("[data-chart-range]") || [])];
+  if (
+    !existingHead || !nextHead || existingButtons.length !== nextButtons.length ||
+    existingRanges.length !== nextRanges.length
+  ) {
     return false;
   }
 
@@ -217,6 +231,16 @@ function preserveInteractiveShell(existingCard, card) {
   );
   for (const button of existingButtons) {
     const nextButton = nextBySize.get(button.dataset.chartSize);
+    if (!nextButton) return false;
+    button.className = nextButton.className;
+    button.title = nextButton.title;
+    button.setAttribute("aria-pressed", nextButton.getAttribute("aria-pressed") || "false");
+  }
+  const nextByRange = new Map(
+    nextRanges.map((button) => [button.dataset.chartRange, button])
+  );
+  for (const button of existingRanges) {
+    const nextButton = nextByRange.get(button.dataset.chartRange);
     if (!nextButton) return false;
     button.className = nextButton.className;
     button.title = nextButton.title;
@@ -266,7 +290,9 @@ function installEnhancedCard(panel, root) {
   if (!layout) return;
 
   const size = chartSize();
+  const range = chartRange();
   const data = panel.__epV027BatteryPlanData;
+  const viewData = chartWindowData(data, range);
   const hidden = chartHidden();
 
   // A cache-busted frontend module can wrap _render more than once during a
@@ -276,7 +302,7 @@ function installEnhancedCard(panel, root) {
   const existingCard = existingCards[0] || null;
   for (const duplicate of existingCards.slice(1)) duplicate.remove();
 
-  const renderKey = `${data?.at || 0}:${size}:${hidden ? 1 : 0}`;
+  const renderKey = `${data?.at || 0}:${size}:${range}:${hidden ? 1 : 0}`;
   if (existingCard?.dataset.epRenderKey === renderKey) {
     if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) {
       void loadChartData(panel, true);
@@ -296,7 +322,7 @@ function installEnhancedCard(panel, root) {
   card.dataset.epRenderKey = renderKey;
   card.hidden = hidden;
   const updated = data?.at ? t(panel, "updated", { time: formatTime(data.at) }) : t(panel, "waiting");
-  card.innerHTML = `<div class="ep-v027-head"><div><div class="ep-v027-kicker">${panel._escape(t(panel, "title"))}</div><div class="ep-v027-subtitle">${panel._escape(t(panel, "subtitle"))}</div></div><div class="ep-v027-head-actions">${sizeControlHtml(panel, size)}<button type="button" class="ep-v027-expand" title="${panel._escape(t(panel, "expand"))}" aria-label="${panel._escape(t(panel, "expand"))}">↗</button></div></div>${cardBody(panel, data, size, false)}<div class="ep-v027-footer"><div class="ep-v027-footer-actions"><button type="button" data-action="details">${panel._escape(t(panel, "details"))}</button><button type="button" data-action="refresh" title="${panel._escape(t(panel, "refresh"))}">↻</button></div><span>${panel._escape(updated)}</span></div>`;
+  card.innerHTML = `<div class="ep-v027-head"><div><div class="ep-v027-kicker">${panel._escape(t(panel, "title"))}</div><div class="ep-v027-subtitle">${panel._escape(chartSubtitle(panel, range))}</div></div><div class="ep-v027-head-actions">${rangeControlHtml(panel, range)}${sizeControlHtml(panel, size)}<button type="button" class="ep-v027-expand" title="${panel._escape(t(panel, "expand"))}" aria-label="${panel._escape(t(panel, "expand"))}">↗</button></div></div>${cardBody(panel, viewData, size, false)}<div class="ep-v027-footer"><div class="ep-v027-footer-actions"><button type="button" data-action="details">${panel._escape(t(panel, "details"))}</button><button type="button" data-action="refresh" title="${panel._escape(t(panel, "refresh"))}">↻</button></div><span>${panel._escape(updated)}</span></div>`;
 
   let installedCard = card;
   if (existingCard) {

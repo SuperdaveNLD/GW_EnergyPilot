@@ -464,7 +464,7 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes read-only chart data. The payload uses schema `6`, includes `plan_revision`, and uses future-plan source order:
+`battery_price_api.py` exposes read-only chart data. The payload uses schema `6`, includes `plan_revision` plus authoritative Home Assistant-timezone chart windows, and uses future-plan source order:
 
 ```text
 1. persistent validated official EMHASS plan mirror
@@ -484,7 +484,9 @@ pure controller decision resolver against exact current-plan timestamps. They
 state that strategy/ownership remain unchanged and never predict EV/manual
 overrides, write success or read-back.
 
-The frontend keeps one canonical Battery · Plan · Price card. A mismatch between the live orchestrator `plan_revision` and the cached API payload forces an immediate refresh; `P_batt.last_updated` remains a compatibility fallback for plan changes outside EnergyPilot. The card is replaced/rebuilt rather than duplicated.
+The frontend retains one shared cached dataset and selects a rolling `NOW - 6h .. NOW + 6h`, fixed local today, or fixed today-through-tomorrow-12:00 view. Range changes are local and add no Recorder request. The initial history request reaches at most six hours before local midnight; fixed windows and ticks come from `hass.config.time_zone`, so 23/25-hour DST days retain their local-day meaning.
+
+The frontend keeps one canonical Battery · Plan · Price card. A mismatch between the live orchestrator `plan_revision` and the cached API payload forces an immediate refresh; `P_batt.last_updated` remains a compatibility fallback for plan changes outside EnergyPilot. The card is replaced/rebuilt rather than duplicated, while its range/size controls remain connected.
 
 The header reachability pill is also canonical stable DOM. It is created only during structural render, placed between Automatic Control ownership and the version badge, and patched from the connectivity sensor. Hover on fine pointers and focus/tap on touch expose Modbus, charger and effective EV-coordination details.
 

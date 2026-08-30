@@ -557,7 +557,9 @@ The chart is read-only.
 - every successful EnergyPilot-owned optimization advances `plan_revision`, allowing the frontend to force-refresh the canonical card immediately after the persistent plan refresh attempt;
 - `P_batt.last_updated` remains a compatibility invalidation fallback for plans changed outside EnergyPilot;
 - the market-price series comes from the same EnergyPilot runtime price source used for EMHASS and is rendered as interval steps;
-- the card supports S/M/L layouts and an expanded detail view;
+- `12h` is a rolling zoom from six hours before through six hours after now, `24h` remains fixed today, and `36h` runs from today 00:00 through tomorrow 12:00 in the configured Home Assistant timezone;
+- range clicks reuse one cached dataset without another Recorder query, while unavailable future plan/price coverage remains visibly unavailable rather than extrapolated;
+- the card supports persistent browser-local 12h/24h/36h and S/M/L choices plus an expanded detail view;
 - native GoodWe day counters `35208` / `35211` are preferred for the headline charged/discharged totals;
 - Recorder-integrated battery power remains a separate visualization comparison and is not calibrated to force a match with the native inverter counter;
 - if no usable plan exists, planned-energy summaries display `—` rather than a fabricated zero.

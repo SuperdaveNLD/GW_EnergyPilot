@@ -520,9 +520,12 @@ existing EnergyPilot runtime price-source path
 The chart API uses schema `6` and includes `plan_revision` plus bounded
 `execution` history/projection. The frontend should force-refresh the one
 canonical plan card and one canonical execution card when live evidence differs
-from the cached payload. `P_batt.last_updated` remains the compatibility
-fallback for changes outside EnergyPilot. Do not solve refresh bugs by allowing
-duplicate cards.
+from the cached payload. It also includes backend-derived Home Assistant-timezone
+windows for rolling 12h, fixed-today 24h and fixed-today-through-tomorrow-noon
+36h views. The frontend filters one shared cached dataset when the range changes.
+`P_batt.last_updated` remains the compatibility fallback for changes outside
+EnergyPilot. Do not solve range/refresh bugs by adding Recorder calls per click
+or allowing duplicate cards.
 
 Do not discover Nord Pool independently in the browser. Chart energy summaries are visualization only; persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
 

@@ -468,17 +468,39 @@
     function batteryPricePayload() {
       const now = new Date();
       const hour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
-      const points = Array.from({ length: 24 }, (_, index) => ({
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const extendedEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12);
+      const rollingStart = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+      const rollingEnd = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+      const dayNumber = (value) => Date.UTC(
+        value.getFullYear(), value.getMonth(), value.getDate()
+      ) / (24 * 60 * 60 * 1000);
+      const tick = (value) => ({
+        at: value.toISOString(), day_offset: dayNumber(value) - dayNumber(dayStart),
+      });
+      const fixedTicks = (lastHour) => {
+        const ticks = [0, 6, 12, 18].map((tickHour) => tick(new Date(
+          dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), tickHour
+        )));
+        for (let tickHour = 0; tickHour <= lastHour; tickHour += 6) {
+          ticks.push(tick(new Date(
+            dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1, tickHour
+          )));
+        }
+        return ticks;
+      };
+      const points = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         market_price: 0.12 + index * 0.001,
         buy_price: 0.22 + index * 0.001,
         sell_price: 0.08 + index * 0.001,
       }));
-      const plan = Array.from({ length: 24 }, (_, index) => ({
+      const plan = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         value_w: index % 4 === 0 ? -1600 : index % 5 === 0 ? 1100 : 0,
       }));
-      const socPlan = Array.from({ length: 24 }, (_, index) => ({
+      const socPlan = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         value_pct: Math.min(95, 54 + index * 1.25),
       }));
@@ -541,6 +563,28 @@
       }));
       return {
         chart_schema_version: 6,
+        chart_time: {
+          time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          now: now.toISOString(),
+          day_start: dayStart.toISOString(),
+          day_end: dayEnd.toISOString(),
+          history_start: new Date(Math.min(dayStart.getTime(), rollingStart.getTime())).toISOString(),
+          max_end: extendedEnd.toISOString(),
+          windows: {
+            "12h": {
+              start: rollingStart.toISOString(), end: rollingEnd.toISOString(),
+              ticks: Array.from({ length: 5 }, (_, index) => tick(new Date(
+                rollingStart.getTime() + index * 3 * 60 * 60 * 1000
+              ))),
+            },
+            "24h": {
+              start: dayStart.toISOString(), end: dayEnd.toISOString(), ticks: fixedTicks(0),
+            },
+            "36h": {
+              start: dayStart.toISOString(), end: extendedEnd.toISOString(), ticks: fixedTicks(12),
+            },
+          },
+        },
         entry_id: ENTRY_ID,
         generated_at: new Date().toISOString(),
         plan_revision: planRevision,

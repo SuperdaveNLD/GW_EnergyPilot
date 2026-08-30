@@ -3134,6 +3134,211 @@ def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]
     return result
 
 
+def exercise_chart_range_press(page: Page, profile: Profile) -> dict[str, object]:
+    """Switch 12/24/36-hour views without reloading Recorder or replacing controls."""
+    enabled = EXPECTED_ENTRYPOINT == "v050"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "refresh_during_press": False,
+        "click_delivered": False,
+        "range12_selected": False,
+        "rolling_window": False,
+        "preference_saved": False,
+        "no_recorder_reload": False,
+        "range36_selected": False,
+        "fixed_36_window": False,
+        "restored_24": False,
+        "single_card": False,
+        "main_stable": False,
+        "card_stable": False,
+        "header_stable": False,
+        "button_stable": False,
+        "window_bar_stable": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.__epV027BatteryPlanData?.chartTime &&
+              !window.__epPanel.__epV027BatteryPlanPromise &&
+              Number(window.__epPanel.__epV027BatteryPlanData?.payload?.plan_revision) ===
+                Number(window.__epHass.states[
+                  window.__epPanel._entityId('optimize_now')
+                ]?.attributes?.plan_revision) &&
+              window.__epPanel.shadowRoot.querySelector('[data-chart-range="12h"]')
+            )
+            """,
+            timeout=15_000,
+        )
+        button = shadow(page, '[data-chart-range="12h"]')
+        button.scroll_into_view_if_needed(timeout=5_000)
+        box = button.bounding_box()
+        if box is None:
+            raise RuntimeError("12-hour range button has no hit area")
+
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const card = root.querySelector('.ep-v027-battery-plan-card');
+              const button = root.querySelector('[data-chart-range="12h"]');
+              window.__epIssue102Identity = {
+                main: root.querySelector('main'),
+                card,
+                header: card.querySelector(':scope > .ep-v027-head'),
+                button,
+                windowBar: card.querySelector(':scope > .ep-v031-card-windowbar'),
+                renderKey: card.dataset.epRenderKey || '',
+                recorderCalls: window.__epWsCalls.filter(
+                  call => call.type === 'recorder/statistics_during_period' ||
+                    call.type === 'history/history_during_period'
+                ).length,
+                clicks: 0,
+              };
+              button.addEventListener('click', () => {
+                window.__epIssue102Identity.clicks += 1;
+              });
+              root.addEventListener('pointerdown', () => {
+                panel.__epV027BatteryPlanData = {
+                  ...panel.__epV027BatteryPlanData,
+                  at: panel.__epV027BatteryPlanData.at + 1,
+                };
+                panel.__epV041RefreshBatteryPlan();
+              }, {capture: true, once: true});
+            }
+            """
+        )
+
+        x = box["x"] + box["width"] / 2
+        y = box["y"] + box["height"] / 2
+        if profile.touch:
+            page.touchscreen.tap(x, y)
+        else:
+            page.mouse.move(x, y)
+            page.mouse.down()
+            page.wait_for_timeout(80)
+            page.mouse.up()
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '[data-chart-range="12h"]'
+            )?.getAttribute('aria-pressed') === 'true'
+            """,
+            timeout=10_000,
+        )
+        first = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const card = root.querySelector('.ep-v027-battery-plan-card');
+              const button = root.querySelector('[data-chart-range="12h"]');
+              const chartTime = window.__epPanel.__epV027BatteryPlanData.chartTime;
+              const rolling = chartTime.windows['12h'];
+              let stored = null;
+              try {
+                stored = JSON.parse(
+                  localStorage.getItem('gw_energypilot_dashboard_v008') || '{}'
+                )?.ranges?.['battery-price'] || null;
+              } catch (_err) {
+                stored = null;
+              }
+              return {
+                refreshDuringPress:
+                  card.dataset.epRenderKey !== window.__epIssue102Identity.renderKey,
+                clickDelivered: window.__epIssue102Identity.clicks === 1,
+                selected: button?.getAttribute('aria-pressed') === 'true',
+                rollingWindow:
+                  rolling.endMs - rolling.startMs === 12 * 60 * 60 * 1000 &&
+                  Math.abs((rolling.startMs + rolling.endMs) / 2 - chartTime.nowMs) < 2,
+                stored,
+              };
+            }
+            """
+        )
+        result["refresh_during_press"] = first["refreshDuringPress"]
+        result["click_delivered"] = first["clickDelivered"]
+        result["range12_selected"] = first["selected"]
+        result["rolling_window"] = first["rollingWindow"]
+        result["preference_saved"] = first["stored"] == "12h"
+
+        activate(page, profile, '[data-chart-range="36h"]')
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '[data-chart-range="36h"]'
+            )?.getAttribute('aria-pressed') === 'true'
+            """,
+            timeout=10_000,
+        )
+        second = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const card = root.querySelector('.ep-v027-battery-plan-card');
+              const chartTime = window.__epPanel.__epV027BatteryPlanData.chartTime;
+              const fixed = chartTime.windows['36h'];
+              const recorderCalls = window.__epWsCalls.filter(
+                call => call.type === 'recorder/statistics_during_period' ||
+                  call.type === 'history/history_during_period'
+              ).length;
+              return {
+                range36Selected: card.querySelector(
+                  '[data-chart-range="36h"]'
+                )?.getAttribute('aria-pressed') === 'true',
+                fixed36:
+                  fixed.startMs === chartTime.dayStartMs &&
+                  fixed.endMs === chartTime.maxEndMs,
+                noRecorderReload:
+                  recorderCalls === window.__epIssue102Identity.recorderCalls,
+                singleCard:
+                  root.querySelectorAll('.ep-v027-battery-plan-card').length === 1,
+                mainStable:
+                  window.__epIssue102Identity.main === root.querySelector('main'),
+                cardStable: window.__epIssue102Identity.card === card,
+                headerStable:
+                  window.__epIssue102Identity.header ===
+                    card.querySelector(':scope > .ep-v027-head'),
+                buttonStable:
+                  window.__epIssue102Identity.button ===
+                    card.querySelector('[data-chart-range="12h"]') &&
+                  window.__epIssue102Identity.button.isConnected === true,
+                windowBarStable:
+                  window.__epIssue102Identity.windowBar ===
+                    card.querySelector(':scope > .ep-v031-card-windowbar'),
+              };
+            }
+            """
+        )
+        result["range36_selected"] = second["range36Selected"]
+        result["fixed_36_window"] = second["fixed36"]
+        result["no_recorder_reload"] = second["noRecorderReload"]
+        result["single_card"] = second["singleCard"]
+        result["main_stable"] = second["mainStable"]
+        result["card_stable"] = second["cardStable"]
+        result["header_stable"] = second["headerStable"]
+        result["button_stable"] = second["buttonStable"]
+        result["window_bar_stable"] = second["windowBarStable"]
+
+        activate(page, profile, '[data-chart-range="24h"]')
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '[data-chart-range="24h"]'
+            )?.getAttribute('aria-pressed') === 'true'
+            """,
+            timeout=10_000,
+        )
+        result["restored_24"] = True
+    except (PlaywrightError, RuntimeError) as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_plan_refresh(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "ready": False,
@@ -4065,6 +4270,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     soc_slider = exercise_soc_slider_draft(page)
     strategy = exercise_strategy(page)
     chart_size_press = exercise_chart_size_press(page, profile)
+    chart_range_press = exercise_chart_range_press(page, profile)
     plan = exercise_plan_refresh(page)
     execution_history = exercise_execution_history(page, profile)
     language_result = exercise_language(page)
@@ -4100,6 +4306,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "soc_slider": soc_slider,
         "strategy": strategy,
         "chart_size_press": chart_size_press,
+        "chart_range_press": chart_range_press,
         "plan": plan,
         "execution_history": execution_history,
         "language": language_result,
@@ -4138,6 +4345,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     soc_slider = result["soc_slider"]
     strategy = result["strategy"]
     chart_size_press = result["chart_size_press"]
+    chart_range_press = result["chart_range_press"]
     plan = result["plan"]
     execution_history = result["execution_history"]
     language_result = result["language"]
@@ -4494,6 +4702,21 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh interrupted an S/M/L chart-size press")
     if chart_size_press["error"]:
         failures.append(f"{name}: chart-size press interaction error")
+    if EXPECTED_ENTRYPOINT == "v050" and not all(
+        chart_range_press[key] is True
+        for key in (
+            "ran", "refresh_during_press", "click_delivered",
+            "range12_selected", "rolling_window", "preference_saved",
+            "no_recorder_reload", "range36_selected", "fixed_36_window",
+            "restored_24", "single_card", "main_stable", "card_stable",
+            "header_stable", "button_stable", "window_bar_stable",
+        )
+    ):
+        failures.append(
+            f"{name}: 12/24/36-hour chart range or stable-DOM regression failed"
+        )
+    if chart_range_press["error"]:
+        failures.append(f"{name}: chart-range press interaction error")
     if not all(
         plan[key] is True
         for key in (

@@ -15,6 +15,11 @@ All notable changes to GW EnergyPilot are documented here.
   Saver and read-only hard-range/comfort/cost summaries to the Controller card.
 - Added shared verified GoodWe minimum-SOC helpers so Custom writes and managed
   profile selection use the same canonical register-45356 read-back path.
+- Added persistent 12h/24h/36h Battery · Plan · Price ranges (#102): a rolling
+  six-hours-before/after-now zoom, fixed local today, and fixed today through
+  tomorrow 12:00. Home Assistant timezone/DST boundaries come from the backend;
+  range clicks reuse one cache without additional Recorder queries and preserve
+  the connected card/header controls.
 
 ### Changed
 
