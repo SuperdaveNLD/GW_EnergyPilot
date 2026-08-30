@@ -12,22 +12,22 @@ const PROFILE_TEXT = {
     mad_steve: {
       label: "Mad-Steve",
       description:
-        "Maximum economic freedom up to 100% SOC with anti-churn protection and no extra SOC or power-stress penalty.",
+        "Maximum economic freedom, with anti-churn protection and the lightest battery-preservation costs.",
     },
     gold_rush: {
       label: "Gold Rush",
       description:
-        "Profit first with a 96% hard maximum, anti-churn protection and light power stress.",
+        "Profit first, with anti-churn protection and light battery-preservation costs.",
     },
     balanced: {
       label: "Balanced",
       description:
-        "Balances trading value and battery preservation with a 95% hard maximum and moderate power stress.",
+        "Balances trading value and battery preservation with moderate battery-preservation costs.",
     },
     battery_saver: {
       label: "Battery Saver",
       description:
-        "Uses a 90% hard maximum and the strongest low-SOC and high-power preservation penalties.",
+        "Prioritizes battery preservation with the strongest low-SOC, high-SOC and high-power costs.",
     },
     custom: {
       label: "Custom",
@@ -39,22 +39,22 @@ const PROFILE_TEXT = {
     mad_steve: {
       label: "Mad-Steve",
       description:
-        "Maximale economische vrijheid tot 100% SOC, met anti-churnbescherming en zonder extra SOC- of vermogensstraf.",
+        "Maximale economische vrijheid, met anti-churnbescherming en de lichtste kosten voor batterijbehoud.",
     },
     gold_rush: {
       label: "Gold Rush",
       description:
-        "Winst voorop met een harde bovengrens van 96%, anti-churnbescherming en lichte vermogensstress.",
+        "Winst voorop, met anti-churnbescherming en lichte kosten voor batterijbehoud.",
     },
     balanced: {
       label: "Gebalanceerd",
       description:
-        "Balanceert handelswaarde en batterijbehoud met een harde bovengrens van 95% en gematigde vermogensstress.",
+        "Balanceert handelswaarde en batterijbehoud met gematigde kosten voor batterijbehoud.",
     },
     battery_saver: {
       label: "Batterijbesparing",
       description:
-        "Gebruikt een harde bovengrens van 90% en de sterkste bescherming tegen lage SOC en hoog vermogen.",
+        "Geeft batterijbehoud prioriteit met de sterkste kosten voor lage SOC, hoge SOC en hoog vermogen.",
     },
     custom: {
       label: "Aangepast",

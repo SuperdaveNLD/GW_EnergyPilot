@@ -73,7 +73,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_MAD_STEVE,
         label="Mad-Steve",
         short_description=(
-            "Maximum economic freedom up to 100% SOC, with the lightest hourly cost above the 95% red-zone threshold."
+            "Maximum economic freedom, with anti-churn protection and the lightest battery-preservation costs."
         ),
         maximum_soc=1.00,
         deficit_threshold=0.05,
@@ -87,7 +87,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_GOLD_RUSH,
         label="Gold Rush",
         short_description=(
-            "Profit first up to 100% SOC, with a priced red zone above 95% and light power stress."
+            "Profit first, with anti-churn protection and light battery-preservation costs."
         ),
         maximum_soc=1.00,
         deficit_threshold=0.05,
@@ -101,7 +101,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_BALANCED,
         label="Balanced",
         short_description=(
-            "Balances trading value and preservation up to 100% SOC, with moderate red-zone and power stress."
+            "Balances trading value and battery preservation with moderate battery-preservation costs."
         ),
         maximum_soc=1.00,
         deficit_threshold=0.10,
@@ -115,7 +115,7 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_BATTERY_SAVER,
         label="Battery Saver",
         short_description=(
-            "Keeps 100% available for exceptional value, with the strongest red-zone, low-SOC and power penalties."
+            "Prioritizes battery preservation with the strongest low-SOC, high-SOC and high-power costs."
         ),
         maximum_soc=1.00,
         deficit_threshold=0.15,
