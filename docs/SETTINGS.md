@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.49 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v0.50 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -42,11 +42,14 @@ The EV section owns two independent feature groups:
 - the existing observation-based battery anti-discharge coordination;
 - opt-in soft house-connection load balancing through one charger NumberEntity.
 
-Load balancing configures the house-connection profile, a one-phase current
-sensor, the three-phase charger current control, the shared `1–15` minute
-condition window, and charger minimum/maximum boundaries. `3 × 25 A`, `5 min`,
-`6 A` minimum and `16 A` maximum are the defaults. Custom one-phase and
-three-phase connection profiles accept a per-phase current value.
+Load balancing configures the house-connection profile, charger phase mode,
+writable charger current-limit NumberEntity, read-only allocated-current
+feedback sensor, shared `1–15` minute condition window, and charger
+minimum/maximum boundaries. GoodWe meter currents are linked automatically: a
+one-phase charger uses the selected L1/L2/L3 phase and a three-phase charger uses
+the highest current across all three. `3 × 25 A`, `15 min`, `6 A` minimum and
+`16 A` maximum are the defaults. Custom one-phase and three-phase connection
+profiles accept a per-phase current value.
 
 The load balancer never calls the GoodWe client or EMS controller. A new charger
 maximum above `16 A` requires explicit frontend and backend confirmation and
@@ -54,7 +57,11 @@ appends a durable operational acknowledgement to
 `gw_energypilot.ev_load_balancing_audit.<entry_id>`. See
 `docs/EV_LOAD_BALANCING.md`.
 
-The anti-discharge EV mode/power inputs remain observation-only.
+The anti-discharge EV mode/power/online inputs remain observation-only. The
+settings API accepts `binary_sensor` connectivity entities such as a Zaptec
+Online sensor. When the selected EV entities share one unambiguous Home Assistant
+device or config-entry relation, EnergyPilot proposes the matching Zaptec
+Available-current control and allocated-current feedback sensor.
 
 During active EV charging:
 

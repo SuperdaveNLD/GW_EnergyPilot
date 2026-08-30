@@ -11,6 +11,14 @@ This page is the user-facing release index for GW EnergyPilot.
 - **Validated + beta diagnostics** — release behavior is validated while optional diagnostics still need field correlation.
 - **Historical** — older development milestone retained for release history.
 
+# v0.50 — GoodWe phase-aware EV charger control and feedback
+
+EV load balancing now reads L1/L2/L3 directly from the linked GoodWe coordinator. One-phase chargers use their configured phase; three-phase chargers guard the highest live phase and fail without a write when complete phase telemetry is unavailable.
+
+The writable charger current-limit NumberEntity and read-only allocated-current sensor are separate fields. EnergyPilot verifies each request for up to 60 seconds with a 0.25 A tolerance, accepts the EV Online binary sensor, and proposes unambiguous Zaptec control/feedback pairs from Home Assistant registry relations. New or unset condition windows default to 15 minutes while explicitly stored existing values remain unchanged.
+
+The regulator still never writes GoodWe or invokes Automatic Control/EMHASS. See `docs/RELEASE_NOTES_V050.md` and `docs/CHANGELOG_V050.md`.
+
 # v0.49 — Wall-clock plans, EV coordination and stable operator feedback
 
 EnergyPilot now owns one serialized wall-clock schedule for full EMHASS optimization and due active-plan publication. New installations select 15, 30 or 60 minutes, with 15 recommended; due plan rows are published only after fresh finite outputs are proven. Nord Pool unavailable-state classification is also corrected.
@@ -47,6 +55,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **0.50** | 2026-08-30 | **Beta** | Reads GoodWe L1/L2/L3 automatically for one-/three-phase EV guarding, separates writable current-limit control from allocated-current feedback, verifies applied requests and fixes Zaptec/online entity pairing. |
 | **0.49** | 2026-08-30 | **Beta** | Consolidates wall-clock EMHASS plan execution, isolated soft EV load balancing, connectivity/EV safety visibility, persisted EMS evidence and stable graph/SOC/Hybrid presentation fixes. |
 | **0.48** | 2026-08-30 | **Beta** | Makes Hybrid neutral-safe and signed-PCC based: mode 8 for a neutral battery plan, mode 1 around zero grid target, and complete mode-9/10 import/export targets outside the configured variable deadband. |
 | **0.47** | 2026-08-29 | **Beta** | Adds administrator-editable Custom EMHASS battery costs, field-tuned anti-churn/power-stress policy and a shared soft 95–100% high-SOC red zone while preserving installation-owned settings and all GoodWe control semantics. |

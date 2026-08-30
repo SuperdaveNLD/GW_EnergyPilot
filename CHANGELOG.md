@@ -4,6 +4,24 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [0.50] - 2026-08-30
+
+### Changed
+
+- EV load balancing now reads GoodWe meter L1/L2/L3 automatically. One-phase
+  chargers use the configured phase and three-phase chargers guard the highest
+  phase, removing the former manual phase-current entity.
+- Charger current-limit control and allocated-current feedback are separate.
+  Applied commands are checked with a tolerance and report a feedback mismatch
+  after the bounded confirmation window.
+- New/unset load-balancing windows default to 15 minutes to respect Zaptec's
+  recommended maximum update frequency; existing stored windows are unchanged.
+
+### Fixed
+
+- Accept `ev_online_entity` in the EV settings API and auto-link unambiguous
+  Zaptec control/feedback entities through Home Assistant registry relations.
+
 ## [0.49] - 2026-08-30
 
 ### Added

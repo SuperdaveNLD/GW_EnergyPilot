@@ -35,7 +35,10 @@ from .const import (
     CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
+    CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
     CONF_EV_CHARGER_CURRENT_ENTITY,
+    CONF_EV_CHARGER_PHASE,
+    CONF_EV_CHARGER_PHASES,
     CONF_EV_CHARGER_MAX_CURRENT,
     CONF_EV_CHARGER_MIN_CURRENT,
     CONF_EV_GRID_CURRENT_ENTITY,
@@ -65,6 +68,8 @@ from .const import (
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
     DEFAULT_EV_DEADBAND,
+    DEFAULT_EV_CHARGER_PHASE,
+    DEFAULT_EV_CHARGER_PHASES,
     DEFAULT_ENABLE_EV_LOAD_BALANCING,
     DEFAULT_EV_CHARGER_MAX_CURRENT,
     DEFAULT_EV_CHARGER_MIN_CURRENT,
@@ -86,6 +91,7 @@ from .const import (
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
     EMHASS_OPTIMIZATION_INTERVALS,
+    EV_CHARGER_PHASE_OPTIONS,
     EXTERNAL_PV_ENTITY_KEYS,
     EV_LOAD_BALANCE_WINDOW_OPTIONS,
     GRID_CONNECTION_CUSTOM_PROFILES,
@@ -110,12 +116,16 @@ EV_KEYS = {
     CONF_ENABLE_EV_COORDINATION,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
     CONF_EV_DEADBAND,
     CONF_ENABLE_EV_LOAD_BALANCING,
     CONF_GRID_CONNECTION_PROFILE,
     CONF_GRID_CUSTOM_CURRENT,
     CONF_EV_GRID_CURRENT_ENTITY,
     CONF_EV_CHARGER_CURRENT_ENTITY,
+    CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
+    CONF_EV_CHARGER_PHASES,
+    CONF_EV_CHARGER_PHASE,
     CONF_EV_CHARGER_MIN_CURRENT,
     CONF_EV_CHARGER_MAX_CURRENT,
     CONF_EV_LOAD_BALANCE_WINDOW,
@@ -202,7 +212,13 @@ EV_SCHEMA = vol.Schema(
         vol.Required(
             CONF_GRID_CUSTOM_CURRENT, default=DEFAULT_GRID_CUSTOM_CURRENT
         ): vol.All(vol.Coerce(float), vol.Range(min=6, max=100)),
-        vol.Optional(CONF_EV_GRID_CURRENT_ENTITY): vol.All(
+        vol.Required(
+            CONF_EV_CHARGER_PHASES, default=DEFAULT_EV_CHARGER_PHASES
+        ): vol.All(vol.Coerce(int), vol.In((1, 3))),
+        vol.Required(
+            CONF_EV_CHARGER_PHASE, default=DEFAULT_EV_CHARGER_PHASE
+        ): vol.In(EV_CHARGER_PHASE_OPTIONS),
+        vol.Optional(CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY): vol.All(
             ENTITY_ID, vol.Match(r"^sensor\.")
         ),
         vol.Optional(CONF_EV_CHARGER_CURRENT_ENTITY): vol.All(
@@ -223,6 +239,7 @@ EV_SCHEMA = vol.Schema(
         vol.Required(CONF_ENABLE_EV_COORDINATION, default=False): bool,
         vol.Optional(CONF_EV_MODE_ENTITY): ENTITY_ID,
         vol.Optional(CONF_EV_POWER_ENTITY): ENTITY_ID,
+        vol.Optional(CONF_EV_ONLINE_ENTITY): ENTITY_ID,
         vol.Required(CONF_EV_DEADBAND, default=DEFAULT_EV_DEADBAND): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=3000)
         ),
@@ -233,6 +250,10 @@ EV_SCHEMA = vol.Schema(
 
 def _validate_ev_values(values: dict[str, Any]) -> dict[str, Any]:
     """Validate the dedicated EV ownership and safety settings."""
+    values = dict(values)
+    # The grid-current sensor was removed in favour of the linked GoodWe meter
+    # telemetry. Accept and discard the legacy key from a stale browser form.
+    values.pop(CONF_EV_GRID_CURRENT_ENTITY, None)
     cleaned = {
         key: value
         for key, value in values.items()
@@ -240,8 +261,9 @@ def _validate_ev_values(values: dict[str, Any]) -> dict[str, Any]:
         not in {
             CONF_EV_MODE_ENTITY,
             CONF_EV_POWER_ENTITY,
-            CONF_EV_GRID_CURRENT_ENTITY,
+            CONF_EV_ONLINE_ENTITY,
             CONF_EV_CHARGER_CURRENT_ENTITY,
+            CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
         }
         or value not in (None, "")
     }
@@ -254,21 +276,25 @@ def _validate_ev_values(values: dict[str, Any]) -> dict[str, Any]:
             "Minimum charger current cannot exceed maximum charger current"
         )
     if validated[CONF_ENABLE_EV_LOAD_BALANCING]:
-        if not validated.get(CONF_EV_GRID_CURRENT_ENTITY):
-            raise vol.Invalid("A measured phase-current entity is required")
         if not validated.get(CONF_EV_CHARGER_CURRENT_ENTITY):
             raise vol.Invalid("A charger maximum-current number entity is required")
+        if not validated.get(CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY):
+            raise vol.Invalid("A charger allocated-current feedback sensor is required")
     return validated
 
 
 def _validate_ev_entity_contract(hass: HomeAssistant, values: dict[str, Any]) -> None:
     """Reject known entities whose units/ranges do not match current control."""
-    source = hass.states.get(values.get(CONF_EV_GRID_CURRENT_ENTITY, ""))
-    if source is not None and source.attributes.get("unit_of_measurement") not in {
-        "A",
-        "mA",
-    }:
-        raise vol.Invalid("The measured phase-current entity must use A or mA")
+    feedback = hass.states.get(
+        values.get(CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY, "")
+    )
+    if feedback is not None:
+        if feedback.attributes.get("unit_of_measurement") != "A":
+            raise vol.Invalid("The charger allocated-current sensor must use A")
+        if feedback.attributes.get("device_class") != "current":
+            raise vol.Invalid(
+                "The charger allocated-current entity must be a current sensor"
+            )
 
     charger = hass.states.get(values.get(CONF_EV_CHARGER_CURRENT_ENTITY, ""))
     if charger is None:
@@ -288,6 +314,117 @@ def _validate_ev_entity_contract(hass: HomeAssistant, values: dict[str, Any]) ->
         raise vol.Invalid(
             f"Charger maximum cannot exceed the entity maximum of {entity_maximum:g} A"
         )
+
+
+def _auto_link_ev_charger_entities(
+    hass: HomeAssistant, values: dict[str, Any]
+) -> dict[str, Any]:
+    """Fill an unambiguous charger control/feedback pair from registry relations."""
+    linked = dict(values)
+    registry = er.async_get(hass)
+    anchors = [
+        linked.get(key)
+        for key in (
+            CONF_EV_CHARGER_CURRENT_ENTITY,
+            CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
+            CONF_EV_MODE_ENTITY,
+            CONF_EV_POWER_ENTITY,
+            CONF_EV_ONLINE_ENTITY,
+        )
+        if linked.get(key)
+    ]
+    anchor_entries = [registry.async_get(str(entity_id)) for entity_id in anchors]
+    config_entry_ids = {
+        entry.config_entry_id
+        for entry in anchor_entries
+        if entry is not None and entry.config_entry_id
+    }
+    if len(config_entry_ids) != 1:
+        return linked
+    config_entry_id = next(iter(config_entry_ids))
+    anchor_device_ids = {
+        entry.device_id
+        for entry in anchor_entries
+        if entry is not None and entry.device_id
+    }
+
+    def candidate_score(entry: Any, *, feedback: bool) -> int | None:
+        entity_id = str(entry.entity_id)
+        domain = entity_id.split(".", 1)[0]
+        if domain != ("sensor" if feedback else "number"):
+            return None
+        state = hass.states.get(entity_id)
+        if state is None or state.attributes.get("unit_of_measurement") != "A":
+            return None
+        if feedback:
+            if state.attributes.get("device_class") != "current":
+                return None
+            keywords = (
+                "allocated_current",
+                "toegewezen_laadstroom",
+                "assigned_current",
+                "allocated",
+                "toegewezen",
+            )
+        else:
+            try:
+                float(state.attributes["min"])
+                float(state.attributes["max"])
+            except (KeyError, TypeError, ValueError):
+                return None
+            keywords = (
+                "available_current",
+                "beschikbare_laadstroom",
+                "beschikbare_stroom",
+                "maximum_current",
+                "max_current",
+                "current_limit",
+                "charge_limit",
+            )
+        searchable = " ".join(
+            str(value or "").lower()
+            for value in (
+                entity_id,
+                getattr(entry, "unique_id", ""),
+                getattr(entry, "translation_key", ""),
+                state.attributes.get("friendly_name"),
+            )
+        ).replace(" ", "_")
+        keyword_score = max(
+            (
+                30 - index
+                for index, keyword in enumerate(keywords)
+                if keyword in searchable
+            ),
+            default=0,
+        )
+        if keyword_score == 0:
+            return None
+        relation_score = 20 if entry.device_id in anchor_device_ids else 10
+        return relation_score + keyword_score
+
+    def pick(*, feedback: bool) -> str | None:
+        ranked: list[tuple[int, str]] = []
+        for entry in registry.entities.values():
+            if entry.config_entry_id != config_entry_id:
+                continue
+            score = candidate_score(entry, feedback=feedback)
+            if score is not None:
+                ranked.append((score, str(entry.entity_id)))
+        ranked.sort(reverse=True)
+        if not ranked or (len(ranked) > 1 and ranked[0][0] == ranked[1][0]):
+            return None
+        return ranked[0][1]
+
+    if not linked.get(CONF_EV_CHARGER_CURRENT_ENTITY):
+        control = pick(feedback=False)
+        if control:
+            linked[CONF_EV_CHARGER_CURRENT_ENTITY] = control
+    if not linked.get(CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY):
+        feedback = pick(feedback=True)
+        if feedback:
+            linked[CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY] = feedback
+    return linked
 
 EP_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     {
@@ -332,8 +469,8 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
         "type": "boolean",
         "default": DEFAULT_ENABLE_EV_LOAD_BALANCING,
         "description": (
-            "Adjust only the charger's current limit; GoodWe is never controlled "
-            "by this regulator."
+            "Use GoodWe meter currents to adjust only the charger's writable "
+            "current limit."
         ),
     },
     {
@@ -348,7 +485,7 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
             {"value": "custom_1_phase", "label": "Custom · 1 phase"},
             {"value": "custom_3_phase", "label": "Custom · 3 phase"},
         ],
-        "description": "The selected ampere value is the limit for the measured phase.",
+        "description": "The selected ampere value is the fuse limit per phase.",
     },
     {
         "key": CONF_GRID_CUSTOM_CURRENT,
@@ -362,23 +499,64 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
         "description": "Used only for a custom one-phase or three-phase connection.",
     },
     {
-        "key": CONF_EV_GRID_CURRENT_ENTITY,
-        "label": "Measured phase current",
-        "type": "entity",
-        "domains": ["sensor"],
-        "units": ["A", "mA"],
-        "default": "",
-        "description": "Current measurement for the one phase that guards the connection.",
+        "key": CONF_EV_CHARGER_PHASES,
+        "label": "Charger phase mode",
+        "type": "select",
+        "default": DEFAULT_EV_CHARGER_PHASES,
+        "options": [
+            {"value": 1, "label": "1 phase"},
+            {"value": 3, "label": "3 phases"},
+        ],
+        "description": (
+            "Three-phase monitoring guards the highest GoodWe L1/L2/L3 current."
+        ),
+    },
+    {
+        "key": CONF_EV_CHARGER_PHASE,
+        "label": "Charger phase",
+        "type": "select",
+        "default": DEFAULT_EV_CHARGER_PHASE,
+        "options": [
+            {"value": phase, "label": phase.upper()}
+            for phase in EV_CHARGER_PHASE_OPTIONS
+        ],
+        "description": "Used only when the charger is connected to one phase.",
+    },
+    {
+        "key": "ev_grid_current_source",
+        "label": "Grid-current measurement",
+        "type": "text",
+        "default": "Automatic · GoodWe meter L1/L2/L3",
+        "description": (
+            "Read directly from this EnergyPilot entry's linked GoodWe telemetry; "
+            "no Home Assistant current sensor is required."
+        ),
+        "readonly": True,
     },
     {
         "key": CONF_EV_CHARGER_CURRENT_ENTITY,
-        "label": "Charger maximum-current control",
+        "label": "Charger current-limit control",
         "type": "entity",
         "domains": ["number"],
+        "units": ["A"],
         "default": "",
         "description": (
-            "One Home Assistant number entity that sets all three charger phases "
-            "together."
+            "Writable Home Assistant number entity. For Zaptec, use the "
+            "installation's Available current control."
+        ),
+    },
+    {
+        "key": CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
+        "label": "Charger allocated-current feedback",
+        "type": "entity",
+        "domains": ["sensor"],
+        "units": ["A"],
+        "device_classes": ["current"],
+        "default": "",
+        "description": (
+            "Read-only current sensor used to verify that the charger applied the "
+            "requested limit; Zaptec control and feedback are auto-matched when "
+            "their device/config-entry relation is unambiguous."
         ),
     },
     {
@@ -390,7 +568,11 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
             {
                 "value": value,
                 "label": f"{value} min"
-                + (" · recommended" if value == 5 else ""),
+                + (
+                    " · recommended"
+                    if value == DEFAULT_EV_LOAD_BALANCE_WINDOW
+                    else ""
+                ),
             }
             for value in EV_LOAD_BALANCE_WINDOW_OPTIONS
         ],
@@ -451,12 +633,13 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": CONF_EV_ONLINE_ENTITY,
-        "label": "EV online entity",
-        "type": "text",
+        "label": "Charger online status",
+        "type": "entity",
+        "domains": ["binary_sensor"],
         "default": "",
         "description": (
-            "Optional Home Assistant entity whose availability reports whether "
-            "the charger is reachable. Binary sensors use on/off explicitly."
+            "Optional connectivity entity. A binary sensor uses on for online "
+            "and off for unreachable."
         ),
     },
     {
@@ -656,7 +839,7 @@ def _fields_from_specs(
                 }
                 for value in _optimization_interval_options(current)
             ]
-        field["readonly"] = False
+        field["readonly"] = bool(spec.get("readonly", False))
         fields.append(field)
     return fields
 
@@ -664,6 +847,7 @@ def _fields_from_specs(
 def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Return all settings required by the dedicated frontend pages."""
     options = _options_for_form(dict(entry.options))
+    options = _auto_link_ev_charger_entities(hass, options)
     # v0.45 stored external entity IDs without a separate master switch. Keep
     # those existing installations enabled until the operator explicitly saves
     # the new v0.46 switch; fresh configurations remain disabled by default.
@@ -909,6 +1093,7 @@ async def websocket_update_settings(
                 f"Unsupported EV settings: {', '.join(sorted(unknown))}",
             )
             return
+        values = _auto_link_ev_charger_entities(hass, values)
         try:
             validated = _validate_ev_values(values)
             _validate_ev_entity_contract(hass, validated)

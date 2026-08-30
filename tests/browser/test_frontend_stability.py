@@ -17,7 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"}
 
 
 @dataclass(frozen=True)
@@ -754,7 +754,7 @@ def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
         "context_refresh": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v048", "v049"}:
+    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050"}:
         return result
     try:
         state = page.evaluate(
@@ -1231,7 +1231,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, object]:
     """Emulate Home Assistant host assignments during one physical press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}
     result: dict[str, object] = {
         "ran": enabled,
         "no_full_render": False,
@@ -1446,7 +1446,7 @@ def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, obje
 
 def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, object]:
     """Prove split HA state events patch one unambiguous stable selection."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}
     result: dict[str, object] = {
         "ran": enabled,
         "event_ordering": False,
@@ -1650,7 +1650,7 @@ def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Keep EMHASS and manual selectors live without rebuilding the dashboard."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}
     result: dict[str, object] = {
         "ran": enabled,
         "costfun_delayed": False,
@@ -1904,7 +1904,7 @@ def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -2464,7 +2464,7 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049"}
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -3284,7 +3284,9 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
         "tab_present": False,
         "profiles_present": False,
         "recommended_window": False,
-        "current_entity_present": False,
+        "feedback_entity_present": False,
+        "manual_grid_current_removed": False,
+        "goodwe_source_present": False,
         "charger_entity_present": False,
         "warning_prominent": False,
         "confirmation_sent": False,
@@ -3328,8 +3330,16 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
                 profilesPresent: [...profile.options].some((option) => option.value === '3x25') &&
                   [...profile.options].some((option) => option.value === 'custom_1_phase') &&
                   [...profile.options].some((option) => option.value === 'custom_3_phase'),
-                recommendedWindow: windowSelect.value === '5',
-                currentEntityPresent: datalistValues.includes('sensor.grid_phase_current'),
+                recommendedWindow: windowSelect.value === '15',
+                feedbackEntityPresent: datalistValues.includes(
+                  'sensor.zorro_de_zaptec_laadpaal_toegewezen_laadstroom'
+                ),
+                manualGridCurrentRemoved: !form.querySelector(
+                  '[data-setting-key="ev_grid_current_entity"]'
+                ),
+                goodweSourcePresent: root.textContent.includes(
+                  'Automatic · GoodWe meter L1/L2/L3'
+                ),
                 chargerEntityPresent: datalistValues.includes('number.zaptec_max_current'),
                 warningProminent,
                 confirmationSent: call?.values?.ev_charger_max_current === 20 &&
@@ -3341,7 +3351,9 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
         result.update({
             "profiles_present": state["profilesPresent"],
             "recommended_window": state["recommendedWindow"],
-            "current_entity_present": state["currentEntityPresent"],
+            "feedback_entity_present": state["feedbackEntityPresent"],
+            "manual_grid_current_removed": state["manualGridCurrentRemoved"],
+            "goodwe_source_present": state["goodweSourcePresent"],
             "charger_entity_present": state["chargerEntityPresent"],
             "warning_prominent": state["warningProminent"],
             "confirmation_sent": state["confirmationSent"],
@@ -3562,12 +3574,13 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v047": "v0.47 BETA",
         "v048": "v0.48 BETA",
         "v049": "v0.49 BETA",
+        "v050": "v0.50 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
             f"{name}: release badge is {initial['releaseVersion']!r} instead of {expected_badge}"
         )
-    if EXPECTED_ENTRYPOINT in {"v048", "v049"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050"} and not all(
         phrase in initial["hybridNote"]
         for phrase in (
             "neutral P_batt plan in mode 8",
@@ -3585,7 +3598,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
-    if EXPECTED_ENTRYPOINT in {"v048", "v049"}:
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050"}:
         required_strategy_note = (
             "ran", "present", "note_stable", "strong_stable", "height_stable",
             "no_child_rebuilds", "dutch_copy", "context_refresh",
@@ -3715,19 +3728,20 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049"}:
+    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050"}:
         if not all(
             ev_settings[key] is True
             for key in (
                 "ran", "tab_present", "profiles_present", "recommended_window",
-                "current_entity_present", "charger_entity_present",
+                "feedback_entity_present", "manual_grid_current_removed",
+                "goodwe_source_present", "charger_entity_present",
                 "warning_prominent", "confirmation_sent", "closed",
             )
         ):
             failures.append(f"{name}: EV load-balancing settings safety regression failed")
         if ev_settings["error"]:
             failures.append(f"{name}: EV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049"}:
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"}:
         required_host_press = (
             "ran", "no_full_render", "main_stable", "controls_stable",
             "native_click", "touch_click",
@@ -3757,7 +3771,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: stable selector feedback regression failed")
         if selector_stability["error"]:
             failures.append(f"{name}: stable selector feedback interaction error")
-    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049"}:
+    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -3767,7 +3781,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049"}:
+    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -3871,7 +3885,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: deliberate narrow-layout structural render failed")
     if structural["menu_open"] is not True or structural["menu_close"] is not True:
         failures.append(f"{name}: controls failed after a structural layout render")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050"} and not all(
         structural.get(key) is True
         for key in ("settings_open", "optimize_in_settings", "settings_close")
     ):

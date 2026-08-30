@@ -1,25 +1,37 @@
 # EV charger load balancing
 
-This document defines the first load-balancing actuator for GW EnergyPilot. It is
-an opt-in, soft guard for one three-phase EV charger. It does not control GoodWe.
+This document defines the load-balancing actuator for GW EnergyPilot. It is an
+opt-in, soft guard for a one- or three-phase EV charger. It reads GoodWe but does
+not control it.
 
 ## Ownership
 
 ```text
-selected Home Assistant current sensor (one phase)
-    -> observation input
+linked GoodWe meter_l1_current / meter_l2_current / meter_l3_current
+    -> one-phase charger: configured L1, L2 or L3
+    -> three-phase charger: max(L1, L2, L3)
 
 GWEnergyPilotEVLoadBalancer
     -> waits for one continuous configured window
-    -> calls number.set_value for one selected charger entity
+    -> calls number.set_value for one writable charger entity
+    -> checks one separate read-only allocated-current sensor
 
 GoodWe controller / Modbus EMS path
     -> separate owner; never called by the EV load balancer
 ```
 
-The selected charger `number` must represent one maximum-current setting that the
-charger applies to all three phases together. Per-phase charger actuators, charge
-session scheduling and vehicle target SOC are outside this first scope.
+The selected charger `number` must represent a real writable current-limit
+setting. For Zaptec this is normally the installation-level **Available current**
+NumberEntity, which applies one value to all three phases. The allocated-current
+feedback must be a `sensor` with `device_class: current` and unit `A`, such as
+`sensor.zorro_de_zaptec_laadpaal_toegewezen_laadstroom`. A read-only sensor is
+never accepted as the actuator.
+
+When a selected EV mode, power, online, control or feedback entity identifies one
+Home Assistant config entry, EnergyPilot tries to pair Zaptec control and
+feedback automatically. Same-device candidates are preferred. A unique
+config-entry match is accepted for Zaptec's installation-level control and
+charger-level feedback; tied candidates remain explicit user choices.
 
 ## House connection
 
@@ -34,14 +46,16 @@ meter-cabinet documentation; EnergyPilot cannot discover the fuse rating.
 
 ## Soft rule
 
-The condition window can be `1`, `2`, `3`, `5`, `10`, or `15` minutes. Five
-minutes is recommended.
+The condition window can be `1`, `2`, `3`, `5`, `10`, or `15` minutes. Fifteen
+minutes is recommended, matching Zaptec's guidance not to update Available
+current more frequently than every 15 minutes. Existing explicitly saved window
+values remain unchanged.
 
 ```text
-measured phase > connection limit + 0.5 A for the full window
+selected/highest GoodWe phase > connection limit + 0.5 A for the full window
     -> reduce charger limit by the rounded-up overload
 
-measured phase < connection limit - 0.5 A for the full window
+selected/highest GoodWe phase < connection limit - 0.5 A for the full window
     -> increase charger limit by the whole-amp headroom
 
 measurement returns inside the band or becomes unavailable
@@ -56,8 +70,18 @@ protection.
 The regulator respects the configured charger minimum and maximum and the
 selected NumberEntity's `min`, `max`, and `step`. If overload remains when the
 minimum is reached, it reports `minimum_reached`; it cannot remove non-EV load.
-Unknown, unavailable, non-finite or missing source/actuator values fail without a
-write.
+For a three-phase charger all three GoodWe meter currents must be finite and
+available; otherwise the controller cannot prove that every phase is guarded and
+fails without a write. For a one-phase charger only its configured phase is
+required. Unknown, unavailable, non-finite or missing actuator values also fail
+without a write.
+
+After `number.set_value` returns, EnergyPilot waits up to 60 seconds for the
+allocated-current sensor to match the target within 0.25 A. This accommodates
+values such as `15.984 A` for a `16 A` request. Diagnostics retain the last
+`applied` or `mismatch` result. A mismatch is reported and is not treated as
+proof that Zaptec accepted the limit; the normal sustained window prevents a
+fast retry loop.
 
 ## Maximum-current safety acknowledgement
 
@@ -88,9 +112,9 @@ own configured maximum.
 
 This feature is best-effort software control. Correct cable sizing, phase layout,
 breaker/fuse selection, charger configuration and charger-side safety remain
-authoritative. Measuring only one phase is safe only when that chosen phase is the
-intended limiting observation for the installation. Unequal phase loading can
-overload another phase without this first implementation seeing it.
+authoritative. A one-phase charger must be assigned to its actual connected
+phase. Three-phase mode watches the highest measured phase so unequal household
+loading is included in the decision.
 
 EV anti-discharge remains a separate controller feature documented in
 `EV_ANTI_DISCHARGE.md`; it may influence GoodWe battery direction but does not

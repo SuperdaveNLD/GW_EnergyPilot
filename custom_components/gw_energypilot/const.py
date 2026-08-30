@@ -32,8 +32,13 @@ CONF_EV_DEADBAND = "ev_deadband"
 CONF_ENABLE_EV_LOAD_BALANCING = "enable_ev_load_balancing"
 CONF_GRID_CONNECTION_PROFILE = "grid_connection_profile"
 CONF_GRID_CUSTOM_CURRENT = "grid_custom_current"
+# Kept as a legacy option key so an EV settings save can remove the former
+# manually selected grid-current sensor from existing config entries.
 CONF_EV_GRID_CURRENT_ENTITY = "ev_grid_current_entity"
 CONF_EV_CHARGER_CURRENT_ENTITY = "ev_charger_current_entity"
+CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY = "ev_charger_allocated_current_entity"
+CONF_EV_CHARGER_PHASES = "ev_charger_phases"
+CONF_EV_CHARGER_PHASE = "ev_charger_phase"
 CONF_EV_CHARGER_MIN_CURRENT = "ev_charger_min_current"
 CONF_EV_CHARGER_MAX_CURRENT = "ev_charger_max_current"
 CONF_EV_LOAD_BALANCE_WINDOW = "ev_load_balance_window"
@@ -74,14 +79,19 @@ DEFAULT_EV_DEADBAND = 500
 DEFAULT_ENABLE_EV_LOAD_BALANCING = False
 DEFAULT_GRID_CONNECTION_PROFILE = "3x25"
 DEFAULT_GRID_CUSTOM_CURRENT = 25
+DEFAULT_EV_CHARGER_PHASES = 3
+DEFAULT_EV_CHARGER_PHASE = "l1"
 DEFAULT_EV_CHARGER_MIN_CURRENT = 6
 DEFAULT_EV_CHARGER_MAX_CURRENT = 16
-DEFAULT_EV_LOAD_BALANCE_WINDOW = 5
+DEFAULT_EV_LOAD_BALANCE_WINDOW = 15
 EV_LOAD_BALANCE_WINDOW_OPTIONS = (1, 2, 3, 5, 10, 15)
 EV_LOAD_BALANCE_HYSTERESIS = 0.5
+EV_FEEDBACK_TOLERANCE = 0.25
+EV_FEEDBACK_TIMEOUT_SECONDS = 60
+EV_CHARGER_PHASE_OPTIONS = ("l1", "l2", "l3")
 
-# Per-phase current limits. The phase count is presentation/configuration
-# metadata; the first controller deliberately measures and controls one phase.
+# Per-phase current limits. Grid-current observation comes directly from the
+# GoodWe meter L1/L2/L3 telemetry owned by this config entry.
 GRID_CONNECTION_PROFILES = {
     "1x25": (1, 25),
     "1x35": (1, 35),

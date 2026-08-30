@@ -155,10 +155,12 @@ See `docs/ACCOUNTING.md` for the full accounting and future financial-accounting
 
 When EV load balancing is enabled, one diagnostic sensor with stable unique-ID
 suffix `ev_load_balancing` reports states such as `balanced`,
-`waiting_overload`, `waiting_headroom`, `command_sent`, `minimum_reached`,
-`unavailable`, and `write_failed`. Attributes expose the configured connection
-phases/per-phase limit, measured phase current, charger current boundary, last
-action/error and the explicit `goodwe_control: false` ownership marker.
+`waiting_overload`, `waiting_headroom`, `awaiting_feedback`, `applied`,
+`feedback_mismatch`, `minimum_reached`, `unavailable`, and `write_failed`.
+Attributes expose all three GoodWe meter currents, the selected/highest measured
+current, charger current boundary, allocated-current feedback, pending target,
+last feedback result, last action/error and the explicit
+`goodwe_control: false` ownership marker.
 
 The sensor is diagnostic only. The sole actuator is the external NumberEntity
 selected in Settings → EV; EnergyPilot does not create a duplicate charger

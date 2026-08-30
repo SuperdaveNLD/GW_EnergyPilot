@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.49 runtime structure
+## Current v0.50 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v0.49 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v0.50 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -50,7 +50,7 @@ accounting_sensor.py    native Today import/export entities
 runtime_store.py        persistent last_success evidence
 optimization_log.py     bounded optimization-attempt history
 optimization_log_api.py read-only optimization history API
-ev_load_balancing.py    isolated one-phase-observed EV charger current control + audit Store
+ev_load_balancing.py    GoodWe phase-aware EV charger control/feedback + audit Store
 settings_api.py         EP/EV/EMHASS/PV/GoodWe settings
 smart_meter_api.py      automatic control-strategy API
 beta_soc_api.py         bounded verified 45356/45358 low-level field-test API
@@ -128,22 +128,23 @@ Do not move either behavior into a second controller or duplicate the EMS write 
 Top level:
 
 ```text
-gw-energy-pilot-v049.js
-    -> gw-energy-pilot-v048.js
-        -> gw-energy-pilot-v047.js
-            -> gw-energy-pilot-v046.js
-                -> gw-energy-pilot-v045.js
-                    -> gw-energy-pilot-v044.js
-                        -> gw-energy-pilot-v043.js
-                            -> gw-energy-pilot-v042.js
-                                -> gw-energy-pilot-v041-emhass-settings.js
-                                    -> gw-energy-pilot-v041.js
-                                        -> gw-energy-pilot-v039.js
-                                            -> gw-energy-pilot-v038.js
-                                                -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v050.js
+    -> gw-energy-pilot-v049.js
+        -> gw-energy-pilot-v048.js
+            -> gw-energy-pilot-v047.js
+                -> gw-energy-pilot-v046.js
+                    -> gw-energy-pilot-v045.js
+                        -> gw-energy-pilot-v044.js
+                            -> gw-energy-pilot-v043.js
+                                -> gw-energy-pilot-v042.js
+                                    -> gw-energy-pilot-v041-emhass-settings.js
+                                        -> gw-energy-pilot-v041.js
+                                            -> gw-energy-pilot-v039.js
+                                                -> gw-energy-pilot-v038.js
+                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.49 is a bounded release/presentation wrapper over v0.48. It owns only the v0.49 badge/footer and complete `0.49-consolidated1` cache boundary. v0.48 retains current Hybrid operator copy and stable-note ownership; v0.47 retains Custom Battery Saver editing, larger strategy/settings typography and field-tuned profile presentation; v0.46 retains external-PV presentation, v0.44 owns the bounded Optimize listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS.
+v0.50 is a bounded release/presentation wrapper over v0.49. It owns only the v0.50 badge/footer and complete `0.50-ev1` cache boundary. The settings/backend modules own the EV phase, control and feedback behavior. v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and stable-note ownership; v0.47 retains Custom Battery Saver editing, larger strategy/settings typography and field-tuned profile presentation; v0.46 retains external-PV presentation, v0.44 owns the bounded Optimize listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 ordinary telemetry patching, targeted plan refresh, PV presentation and static-flow DOM/CSS.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
