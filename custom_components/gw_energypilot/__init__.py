@@ -20,6 +20,7 @@ from .battery_price_api import async_register_battery_price_api
 from .battery_saver_api import async_register_battery_saver_api
 from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
+from .connectivity import GWEnergyPilotConnectivity
 from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .controller_v033 import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
@@ -61,6 +62,7 @@ class GWRuntimeData:
     debug_log: GWEnergyPilotDebugRuntime
     plan_runtime: GWEnergyPilotPlanRuntime
     ev_load_balancer: GWEnergyPilotEVLoadBalancer
+    connectivity: GWEnergyPilotConnectivity
     event_unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -140,6 +142,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     debug_log = GWEnergyPilotDebugRuntime(hass, entry.entry_id)
     plan_runtime = GWEnergyPilotPlanRuntime(hass, entry)
     ev_load_balancer = GWEnergyPilotEVLoadBalancer(hass, entry)
+    connectivity = GWEnergyPilotConnectivity(
+        hass,
+        entry,
+        coordinator,
+        debug_log,
+    )
     entry.runtime_data = GWRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -149,6 +157,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         debug_log=debug_log,
         plan_runtime=plan_runtime,
         ev_load_balancer=ev_load_balancer,
+        connectivity=connectivity,
     )
 
     await plan_runtime.async_restore()
@@ -158,6 +167,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         f"GW EnergyPilot EMHASS plan refresh ({entry.entry_id})",
     )
     await debug_log.async_start(entry)
+    await connectivity.async_start()
     await accounting.async_prepare()
     await controller.async_setup()
     await ev_load_balancer.async_setup()
@@ -180,6 +190,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     if unload_ok:
         while entry.runtime_data.event_unsubs:
             entry.runtime_data.event_unsubs.pop()()
+        await entry.runtime_data.connectivity.async_unload()
         await entry.runtime_data.debug_log.async_unload()
         await entry.runtime_data.accounting.async_unload()
         await entry.runtime_data.orchestrator.async_unload()

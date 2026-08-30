@@ -64,6 +64,7 @@ def _load_controller():
 
     dispatcher = _module(
         "homeassistant.helpers.dispatcher",
+        async_dispatcher_connect=lambda *_args, **_kwargs: (lambda: None),
         async_dispatcher_send=lambda *_args, **_kwargs: None,
     )
     helpers.dispatcher = dispatcher

@@ -69,6 +69,16 @@ The stored option key remains `enable_ev_coordination` for backwards compatibili
 
 EV activity can be detected through the configured EV charging-mode entity and/or the configured EV charging-power entity plus activity threshold. These are observation inputs only and do not give EnergyPilot ownership of the charger.
 
+An optional EV online entity separately reports charger reachability. Missing, `unknown` and `unavailable` are unreachable. A binary sensor is explicit (`on` online, `off` unreachable); for other domains every usable state is online, so an idle charging switch that reports `off` is not mistaken for an offline charger.
+
+### Five-minute reachability guard
+
+If EV coordination is enabled and the configured charger-online source remains unreachable for five continuous minutes, EnergyPilot suspends the EV anti-discharge override. It does not overwrite `enable_ev_coordination`: the saved option remains the user's intent, while the runtime exposes requested and effective state separately.
+
+After suspension, five continuous online minutes restore the override only if the user setting is still enabled. An online/offline flap resets the active window. Turning EV coordination off during recovery cancels automatic resume. Connectivity loss/restoration and suspension/resume transitions are recorded in the Home Assistant log and, when enabled, the bounded debug log.
+
+This guard does not poll the charger, control it or add a fast loop. Charger reachability follows the selected Home Assistant entity, while Modbus status follows the configured GoodWe coordinator refresh interval.
+
 ## EV stop behavior
 
 When the native EMHASS orchestrator is enabled and EV charging stops, the existing stale-plan protection remains unchanged:

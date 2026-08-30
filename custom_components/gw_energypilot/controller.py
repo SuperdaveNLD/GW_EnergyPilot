@@ -7,7 +7,10 @@ from collections.abc import Callable
 from math import isfinite
 
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .client import GWModbusClient
@@ -91,6 +94,7 @@ class GWEnergyPilotController:
         self.manual_charge_limit_soc: float | None = None
         self._unsubs: list[Callable[[], None]] = []
         self._ev_was_active = False
+        self._ev_coordination_was_effective = True
         self._control_lock = asyncio.Lock()
         self._plan_update_suspensions = 0
         self.grid_neutral_active = False
@@ -136,6 +140,7 @@ class GWEnergyPilotController:
         return {str(entity_id) for entity_id in entity_ids}
 
     async def async_setup(self) -> None:
+        self._ev_coordination_was_effective = self._ev_coordination_effective()
         self._ev_was_active = self.ev_is_active()
         entity_ids = {self._p_batt_entity_id(), self._p_grid_entity_id(), self.entry.options.get(CONF_OPTIM_STATUS_ENTITY), *self._ev_source_ids()}
         entity_ids.discard(None)
@@ -145,6 +150,16 @@ class GWEnergyPilotController:
         add_listener = getattr(self.coordinator, "async_add_listener", None)
         if add_listener is not None:
             self._unsubs.append(add_listener(self._async_coordinator_updated))
+        runtime_data = getattr(self.entry, "runtime_data", None)
+        connectivity = getattr(runtime_data, "connectivity", None)
+        if connectivity is not None:
+            self._unsubs.append(
+                async_dispatcher_connect(
+                    self.hass,
+                    connectivity.signal,
+                    self._async_connectivity_updated,
+                )
+            )
 
     async def async_unload(self) -> None:
         while self._unsubs:
@@ -213,8 +228,17 @@ class GWEnergyPilotController:
             return None
         return value
 
-    def ev_is_active(self) -> bool:
+    def _ev_coordination_effective(self) -> bool:
         if not self.entry.options.get(CONF_ENABLE_EV_COORDINATION, False):
+            return False
+        runtime_data = getattr(self.entry, "runtime_data", None)
+        connectivity = getattr(runtime_data, "connectivity", None)
+        if connectivity is None:
+            return True
+        return bool(connectivity.ev_coordination_effective)
+
+    def ev_is_active(self) -> bool:
+        if not self._ev_coordination_effective():
             return False
         mode_entity = self.entry.options.get(CONF_EV_MODE_ENTITY)
         power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
@@ -225,6 +249,21 @@ class GWEnergyPilotController:
             mode_active = state is not None and state.state.lower() == "connected_charging"
         ev_power = self._state_float(power_entity)
         return mode_active or (ev_power is not None and ev_power > ev_deadband)
+
+    @callback
+    def _async_connectivity_updated(self) -> None:
+        """Re-evaluate only when effective EV coordination changes."""
+        effective = self._ev_coordination_effective()
+        if effective == self._ev_coordination_was_effective:
+            return
+        self._ev_coordination_was_effective = effective
+        self._ev_was_active = self.ev_is_active()
+        self._notify_state()
+        if self.enabled:
+            self.hass.async_create_task(
+                self.async_evaluate(),
+                "gw-energypilot-ev-connectivity-change",
+            )
 
     def _optim_is_ready(self) -> bool:
         entity_id = self.entry.options.get(CONF_OPTIM_STATUS_ENTITY)

@@ -175,6 +175,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - Battery plan / actual / price visualization;
 - EV anti-discharge protection;
 - optional soft load balancing for one three-phase EV charger without GoodWe writes;
+- compact Modbus/charger reachability status with an optional five-minute EV-coordination suspension guard;
 - synchronized normal on-grid minimum SOC between EMHASS and GoodWe `45356`;
 - low-level Beta SOC API retained for diagnostics/backwards-compatible tooling;
 - built-in EnergyPilot dashboard and support diagnostics.
@@ -310,6 +311,8 @@ does nothing on invalid measurements, and cannot protect an unmeasured phase. Th
 normal maximum is `16 A`; a newly selected value above `16 A` requires an extra
 warning/confirmation and is permanently recorded in the per-entry audit Store.
 See `docs/EV_LOAD_BALANCING.md`.
+
+An optional charger-online entity can protect this feature against stale EV state. Five stable minutes unreachable temporarily suspend effective EV coordination; five stable minutes online restore it only when the user setting remained enabled. The saved setting is not overwritten. The dashboard header summarizes Modbus, charger and EV-coordination status; its Modbus state follows the configured telemetry refresh interval.
 
 ## EMS / sign conventions
 

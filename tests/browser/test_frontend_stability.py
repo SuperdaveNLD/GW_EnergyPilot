@@ -277,6 +277,148 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
     )
 
 
+def exercise_connectivity_status(page: Page, profile: Profile) -> dict[str, object]:
+    """Verify header placement, details, state changes and stable node identity."""
+    enabled = EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS
+    result: dict[str, object] = {
+        "ran": enabled,
+        "placed": False,
+        "initial_ok": False,
+        "details_open": False,
+        "issue_visible": False,
+        "unknown_visible": False,
+        "countdown_visible": False,
+        "main_stable": False,
+        "button_stable": False,
+        "restored": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        initial = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const actions = root.querySelector('.header-actions');
+              const wrap = root.querySelector('.ep-connectivity-wrap');
+              const button = wrap?.querySelector('.ep-connectivity-status');
+              window.__epConnectivityIdentity = {
+                main: root.querySelector('main'),
+                button,
+              };
+              const children = [...(actions?.children || [])];
+              const index = children.indexOf(wrap);
+              return {
+                placed: index > 0 && children[index - 1]?.classList.contains('status') &&
+                  children[index + 1]?.classList.contains('version'),
+                label: button?.textContent?.trim() || '',
+                ok: button?.classList.contains('ok') || false,
+                aria: button?.getAttribute('aria-label') || '',
+                rows: wrap?.querySelectorAll('.ep-connectivity-row').length || 0,
+              };
+            }
+            """
+        )
+        result["placed"] = initial["placed"]
+        result["initial_ok"] = (
+            initial["label"] == "ALL OK"
+            and initial["ok"]
+            and "System status" in initial["aria"]
+            and initial["rows"] == 3
+        )
+
+        activate(page, profile, ".ep-connectivity-status")
+        opened = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const button = root.querySelector('.ep-connectivity-status');
+              const popover = root.querySelector('.ep-connectivity-popover');
+              return button?.getAttribute('aria-expanded') === 'true' &&
+                popover && getComputedStyle(popover).display === 'block';
+            }
+            """
+        )
+        result["details_open"] = opened
+
+        page.evaluate(
+            """
+            () => window.__epSetEntityByKey('connectivity_status', 'issue', {
+              modbus_status: 'online',
+              refresh_seconds: 15,
+              ev_status: 'unreachable',
+              ev_coordination_requested: true,
+              ev_coordination_effective: true,
+              ev_coordination_suspended: false,
+              ev_transition: 'suspend_pending',
+              ev_transition_remaining_seconds: 165,
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-connectivity-status'
+            )?.classList.contains('issue')
+            """,
+            timeout=5_000,
+        )
+        issue = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const button = root.querySelector('.ep-connectivity-status');
+              const ev = root.querySelector('[data-connectivity-row="ev"]');
+              const coordination = root.querySelector(
+                '[data-connectivity-row="coordination"]'
+              );
+              return {
+                label: button?.textContent?.trim() || '',
+                issue: button?.classList.contains('issue') || false,
+                unknown: ev?.textContent?.includes('Unknown / unreachable') || false,
+                countdown: coordination?.textContent?.includes('pauses in 2m 45s') || false,
+                main: window.__epConnectivityIdentity.main === root.querySelector('main'),
+                buttonStable: window.__epConnectivityIdentity.button === button,
+              };
+            }
+            """
+        )
+        result["issue_visible"] = issue["label"] == "ISSUE" and issue["issue"]
+        result["unknown_visible"] = issue["unknown"]
+        result["countdown_visible"] = issue["countdown"]
+        result["main_stable"] = issue["main"]
+        result["button_stable"] = issue["buttonStable"]
+
+        page.evaluate(
+            """
+            () => window.__epSetEntityByKey('connectivity_status', 'all_ok', {
+              modbus_status: 'online',
+              refresh_seconds: 15,
+              ev_status: 'online',
+              ev_coordination_requested: true,
+              ev_coordination_effective: true,
+              ev_coordination_suspended: false,
+              ev_transition: null,
+              ev_transition_remaining_seconds: null,
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-connectivity-status'
+            )?.classList.contains('ok')
+            """,
+            timeout=5_000,
+        )
+        result["restored"] = True
+    except (PlaywrightError, RuntimeError) as err:
+        result["error"] = str(err)
+    return result
+
+
 def open_and_close_menu(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "open": False,
@@ -2819,6 +2961,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     )
 
     static_flow = exercise_static_flow(page)
+    connectivity = exercise_connectivity_status(page, profile)
 
     motion = page.evaluate(
         """
@@ -2876,6 +3019,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "idle_delta": idle_after - idle_before,
         "telemetry_identity": telemetry_identity,
         "static_flow": static_flow,
+        "connectivity": connectivity,
         "motion": motion,
         "pv_insight": pv_insight,
         "pv_settings": pv_settings,
@@ -2904,6 +3048,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     initial = result["initial"]
     identity = result["telemetry_identity"]
     static_flow = result["static_flow"]
+    connectivity = result["connectivity"]
     motion = result["motion"]
     pv_insight = result["pv_insight"]
     pv_settings = result["pv_settings"]
@@ -3013,6 +3158,16 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: flow telemetry replaced stable DOM nodes")
     if not static_flow["responsive"]:
         failures.append(f"{name}: flow overview overflows its responsive container")
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS:
+        required_connectivity = (
+            "ran", "placed", "initial_ok", "details_open", "issue_visible",
+            "unknown_visible", "countdown_visible", "main_stable",
+            "button_stable", "restored",
+        )
+        if not all(connectivity[key] is True for key in required_connectivity):
+            failures.append(f"{name}: connectivity status stable-DOM regression failed")
+        if connectivity["error"]:
+            failures.append(f"{name}: connectivity status interaction error")
     for key, stable in identity.items():
         if stable is not True:
             failures.append(f"{name}: telemetry replaced the {key} DOM node")

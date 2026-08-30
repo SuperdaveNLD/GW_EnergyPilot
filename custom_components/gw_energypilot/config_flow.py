@@ -28,6 +28,7 @@ from .const import (
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
     CONF_EV_MODE_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
     CONF_EV_POWER_ENTITY,
     CONF_EV_CHARGER_CURRENT_ENTITY,
     CONF_EV_CHARGER_MAX_CURRENT,
@@ -261,6 +262,9 @@ def _controller_schema(
                 selector.EntitySelectorConfig(multiple=False)
             ),
             vol.Optional(CONF_EV_POWER_ENTITY): selector.EntitySelector(
+                selector.EntitySelectorConfig(multiple=False)
+            ),
+            vol.Optional(CONF_EV_ONLINE_ENTITY): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=False)
             ),
             vol.Required(

@@ -77,6 +77,23 @@ const COPY = Object.freeze({
     noPvSources: "No sources configured",
     internalPvTelemetry: "Internal GoodWe telemetry",
     externalPvEntity: "External PV entity",
+    connectivityTitle: "System status",
+    connectivityOk: "ALL OK",
+    connectivityIssue: "ISSUE",
+    connectivityChecking: "CHECKING",
+    modbus: "Modbus",
+    evCharger: "EV charger",
+    evCoordination: "EV coordination",
+    online: "Online",
+    unreachable: "Unknown / unreachable",
+    checkingStatus: "Waiting for first poll",
+    refreshEvery: "refresh every",
+    notConfigured: "Online check not configured",
+    active: "Active",
+    offByUser: "Off by user",
+    temporarilyPaused: "Temporarily paused",
+    pausesIn: "pauses in",
+    resumesIn: "resumes in",
   }),
   nl: Object.freeze({
     autoActive: "AUTO ACTIEF",
@@ -122,6 +139,23 @@ const COPY = Object.freeze({
     noPvSources: "Geen bronnen geconfigureerd",
     internalPvTelemetry: "Interne GoodWe-telemetrie",
     externalPvEntity: "Externe PV-entiteit",
+    connectivityTitle: "Systeemstatus",
+    connectivityOk: "ALLES OK",
+    connectivityIssue: "STORING",
+    connectivityChecking: "CONTROLEREN",
+    modbus: "Modbus",
+    evCharger: "Laadpaal",
+    evCoordination: "EV-regeling",
+    online: "Online",
+    unreachable: "Onbekend / niet bereikbaar",
+    checkingStatus: "Wachten op eerste poll",
+    refreshEvery: "verversing iedere",
+    notConfigured: "Onlinecontrole niet ingesteld",
+    active: "Actief",
+    offByUser: "Uit door gebruiker",
+    temporarilyPaused: "Tijdelijk gepauzeerd",
+    pausesIn: "pauzeert over",
+    resumesIn: "hervat over",
   }),
 });
 
@@ -330,6 +364,106 @@ const NO_MOTION_CSS = `
     width: 18px;
     height: 10px;
   }
+  :host .ep-connectivity-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  :host .ep-connectivity-status {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 31px;
+    padding: 7px 11px;
+    border: 1px solid rgba(145, 167, 189, .17);
+    border-radius: 999px;
+    color: #c4d2df;
+    background: rgba(145, 167, 189, .09);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  :host .ep-connectivity-status.ok {
+    color: #dffff4;
+    border-color: rgba(24, 239, 163, .25);
+    background: rgba(24, 239, 163, .11);
+  }
+  :host .ep-connectivity-status.issue {
+    color: #ffd1cc;
+    border-color: rgba(241, 101, 89, .36);
+    background: rgba(149, 43, 36, .25);
+  }
+  :host .ep-connectivity-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 12px currentColor;
+  }
+  :host .ep-connectivity-popover {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 8px);
+    right: 0;
+    display: none;
+    width: min(310px, calc(100vw - 28px));
+    padding: 11px;
+    border: 1px solid rgba(86, 174, 218, .20);
+    border-radius: 13px;
+    color: #dcecf5;
+    background: #081d34;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .34);
+    text-align: left;
+    pointer-events: none;
+  }
+  :host .ep-connectivity-wrap.open .ep-connectivity-popover,
+  :host .ep-connectivity-wrap:focus-within .ep-connectivity-popover {
+    display: block;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :host .ep-connectivity-wrap:hover .ep-connectivity-popover {
+      display: block;
+    }
+  }
+  :host .ep-connectivity-popover-title {
+    margin: 0 0 6px;
+    color: #f0f9fd;
+    font-size: 10px;
+    font-weight: 850;
+  }
+  :host .ep-connectivity-row {
+    display: grid;
+    grid-template-columns: 9px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 2px;
+    border-top: 1px solid rgba(102, 165, 199, .09);
+  }
+  :host .ep-connectivity-row:first-of-type { border-top: 0; }
+  :host .ep-connectivity-row-marker {
+    width: 7px;
+    height: 7px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: #7891a1;
+  }
+  :host .ep-connectivity-row.good .ep-connectivity-row-marker { background: #55dfaa; }
+  :host .ep-connectivity-row.bad .ep-connectivity-row-marker { background: #f1786d; }
+  :host .ep-connectivity-row strong {
+    display: block;
+    color: #d8e9f1;
+    font-size: 9px;
+  }
+  :host .ep-connectivity-row span:last-child {
+    display: block;
+    margin-top: 2px;
+    color: #86a4b5;
+    font-size: 8px;
+    line-height: 1.35;
+  }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
       top: calc(74px + env(safe-area-inset-top)) !important;
@@ -463,6 +597,115 @@ function setStatus(node, active, text) {
   const trailing = [...node.childNodes].find((child) => child.nodeType === 3);
   if (trailing) trailing.textContent = text;
   else node.append(document.createTextNode(text));
+}
+
+function formatConnectivityDuration(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(value / 60);
+  const remainder = value % 60;
+  return minutes > 0 ? `${minutes}m ${String(remainder).padStart(2, "0")}s` : `${remainder}s`;
+}
+
+function ensureConnectivityStatus(panel, root) {
+  const actions = root?.querySelector(".header-actions");
+  if (!actions || actions.querySelector(".ep-connectivity-wrap")) return;
+  const wrap = document.createElement("div");
+  wrap.className = "ep-connectivity-wrap";
+  wrap.innerHTML = `
+    <button type="button" class="ep-connectivity-status checking" aria-expanded="false" aria-controls="ep-connectivity-popover">
+      <span class="ep-connectivity-dot" aria-hidden="true"></span>
+      <span class="ep-connectivity-label"></span>
+    </button>
+    <div class="ep-connectivity-popover" id="ep-connectivity-popover" role="tooltip">
+      <div class="ep-connectivity-popover-title"></div>
+      ${["modbus", "ev", "coordination"].map((key) => `
+        <div class="ep-connectivity-row" data-connectivity-row="${key}">
+          <span class="ep-connectivity-row-marker" aria-hidden="true"></span>
+          <div><strong></strong><span></span></div>
+        </div>`).join("")}
+    </div>`;
+  const version = actions.querySelector(".version");
+  actions.insertBefore(wrap, version || null);
+  const button = wrap.querySelector(".ep-connectivity-status");
+  button?.addEventListener("click", () => {
+    const open = !wrap.classList.contains("open");
+    wrap.classList.toggle("open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  button?.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    wrap.classList.remove("open");
+    button.setAttribute("aria-expanded", "false");
+    button.focus();
+  });
+}
+
+function patchConnectivityRow(root, key, tone, label, detail) {
+  const row = root.querySelector(`[data-connectivity-row="${key}"]`);
+  if (!row) return;
+  row.classList.remove("good", "bad", "neutral");
+  row.classList.add(tone);
+  setText(row, "strong", label);
+  setText(row, "span:last-child", detail);
+}
+
+function patchConnectivityStatus(panel, root) {
+  const wrap = root.querySelector(".ep-connectivity-wrap");
+  const button = wrap?.querySelector(".ep-connectivity-status");
+  if (!wrap || !button) return;
+  const t = copy(panel);
+  const state = panel._stateByKey?.("connectivity_status");
+  const attrs = state?.attributes || {};
+  const status = String(state?.state || "checking");
+  const label = status === "all_ok"
+    ? t.connectivityOk
+    : status === "issue" ? t.connectivityIssue : t.connectivityChecking;
+  button.classList.remove("ok", "issue", "checking");
+  button.classList.add(status === "all_ok" ? "ok" : status === "issue" ? "issue" : "checking");
+  setText(button, ".ep-connectivity-label", label);
+  button.setAttribute("aria-label", `${t.connectivityTitle}: ${label}`);
+  setText(wrap, ".ep-connectivity-popover-title", t.connectivityTitle);
+
+  const modbus = String(attrs.modbus_status || "checking");
+  const refresh = finiteValue(attrs.refresh_seconds);
+  patchConnectivityRow(
+    root,
+    "modbus",
+    modbus === "online" ? "good" : modbus === "unreachable" ? "bad" : "neutral",
+    t.modbus,
+    modbus === "online"
+      ? `${t.online}${refresh === null ? "" : ` · ${t.refreshEvery} ${Math.round(refresh)}s`}`
+      : modbus === "unreachable" ? t.unreachable : t.checkingStatus
+  );
+
+  const ev = String(attrs.ev_status || "not_configured");
+  patchConnectivityRow(
+    root,
+    "ev",
+    ev === "online" ? "good" : ev === "unreachable" ? "bad" : "neutral",
+    t.evCharger,
+    ev === "online" ? t.online : ev === "unreachable" ? t.unreachable : t.notConfigured
+  );
+
+  const requested = attrs.ev_coordination_requested === true;
+  const effective = attrs.ev_coordination_effective === true;
+  const transition = String(attrs.ev_transition || "");
+  const remaining = finiteValue(attrs.ev_transition_remaining_seconds);
+  let coordinationDetail = !requested
+    ? t.offByUser
+    : effective ? t.active : t.temporarilyPaused;
+  if (transition === "suspend_pending" && remaining !== null) {
+    coordinationDetail = `${t.active} · ${t.pausesIn} ${formatConnectivityDuration(remaining)}`;
+  } else if (transition === "resume_pending" && remaining !== null) {
+    coordinationDetail = `${t.temporarilyPaused} · ${t.resumesIn} ${formatConnectivityDuration(remaining)}`;
+  }
+  patchConnectivityRow(
+    root,
+    "coordination",
+    !requested ? "neutral" : effective ? "good" : "bad",
+    t.evCoordination,
+    coordinationDetail
+  );
 }
 
 function replaceTrailingButtonText(button, text) {
@@ -1151,6 +1394,7 @@ function patchLiveDom(panel) {
 
   const headerStatus = root.querySelector("header .status");
   setStatus(headerStatus, automaticOn, automaticOn ? t.autoActive : t.goodweAuto);
+  patchConnectivityStatus(panel, root);
 
   const solar = root.querySelector(".energy-card.solar");
   setText(solar, ".hero-value", panel._formatPower(pv));
@@ -1388,6 +1632,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
       patchLiveDom(this);
     };
     const root = this.shadowRoot;
+    ensureConnectivityStatus(this, root);
     const versionBadge = root?.querySelector(".version");
     if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
     const footerItems = root?.querySelectorAll("footer span") || [];

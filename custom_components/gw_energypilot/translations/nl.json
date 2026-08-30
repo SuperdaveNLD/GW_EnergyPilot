@@ -41,6 +41,7 @@
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
           "ev_mode_entity": "Entiteit voor EV-laadmodus",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
+          "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
         },
         "data_description": {
@@ -65,6 +66,7 @@
           "enable_ev_coordination": "Voorkomt ontladen van de thuisaccu tijdens actief EV-laden en optimaliseert opnieuw wanneer het laden stopt.",
           "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
           "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
       }
@@ -103,6 +105,7 @@
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
           "ev_mode_entity": "Entiteit voor EV-laadmodus",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
+          "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
         },
         "data_description": {
@@ -127,6 +130,7 @@
           "enable_ev_coordination": "Optionele EV-ontlaadbeveiliging en heroptimalisatie na stoppen met laden.",
           "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
           "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
       }
@@ -138,6 +142,14 @@
       "ems_setpoint": {"name": "EMS-setpoint"},
       "control_command": {"name": "Regelcommando"},
       "target_power": {"name": "Doelvermogen"},
+      "connectivity_status": {
+        "name": "Verbindingsstatus",
+        "state": {
+          "checking": "Controleren",
+          "all_ok": "Alles oké",
+          "issue": "Storing"
+        }
+      },
       "ev_status": {"name": "EV-laadstatus"},
       "ev_load_balancing": {"name": "EV-loadbalancing"},
       "pv_generation_power": {"name": "PV-opwekkingsvermogen"}

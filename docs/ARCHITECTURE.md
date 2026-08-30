@@ -15,6 +15,7 @@ GWModbusClient
 GWEnergyPilotCoordinator
     |----------------------> Home Assistant telemetry/entities
     |----------------------> GWEnergyPilotAccounting
+    |----------------------> GWEnergyPilotConnectivity
     |----------------------> GWEnergyPilotController (controller_v033)
     `----------------------> GWEnergyPilotOrchestrator (orchestrator_v044)
                                   |
@@ -85,12 +86,21 @@ No Home Assistant Store is a second configuration database or optimizer.
 - `GWEnergyPilotOrchestrator` from `orchestrator_v044.py`;
 - `GWEnergyPilotPlanRuntime`;
 - `GWEnergyPilotAccounting`;
+- `GWEnergyPilotConnectivity`;
 - `GWEnergyPilotDebugRuntime`.
 - `GWEnergyPilotEVLoadBalancer`.
 
 Entity platforms remain sensor, switch, number, select and button.
 
 During setup, the last valid plan mirror is restored before the normal control/orchestration lifecycle starts. A bounded background task then retries the official EMHASS plan endpoint while startup dependencies settle. The initial Modbus refresh also remains a background config-entry task.
+
+### Connectivity runtime
+
+`connectivity.py` derives one canonical status from the existing coordinator poll result and an optional Home Assistant charger-online entity. It never opens a second Modbus connection or starts another polling loop: GoodWe reachability therefore updates on the configured coordinator interval. A configured charger source also updates on its normal Home Assistant state-change signal.
+
+Missing, `unknown` and `unavailable` sources are unreachable. A binary sensor is explicit (`on` online, `off` unreachable); any usable state from another domain means that integration is reporting, so an idle `switch.* = off` remains reachable.
+
+When EV coordination was requested by the user, five continuous minutes of charger unreachability suspend its effective runtime guard. Five continuous minutes online resume it. Either transition timer resets on a flap. The configured `enable_ev_coordination` option is never rewritten, and a user disable during recovery cancels automatic resume. The existing controller remains the only EMS decision and write owner.
 
 ## Modbus boundary
 
@@ -176,6 +186,8 @@ Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
 ```
 
 The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. EV-stop stale-plan protection remains unchanged.
+
+The optional charger-online guard is evaluated before this override. While that guard is suspended, the controller follows its normal configured Automatic Control strategy and does not infer EV activity from stale charger mode/power entities.
 
 ## Plan-resilient controller layer
 
@@ -387,6 +399,8 @@ market - sell deduction = effective prod_price
 Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. Forecast SOC uses only exact, validated `SOC_opt` from the official plan mirror; no output-entity fallback or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
 
 The frontend keeps one canonical Battery · Plan · Price card. A mismatch between the live orchestrator `plan_revision` and the cached API payload forces an immediate refresh; `P_batt.last_updated` remains a compatibility fallback for plan changes outside EnergyPilot. The card is replaced/rebuilt rather than duplicated.
+
+The header reachability pill is also canonical stable DOM. It is created only during structural render, placed between Automatic Control ownership and the version badge, and patched from the connectivity sensor. Hover on fine pointers and focus/tap on touch expose Modbus, charger and effective EV-coordination details.
 
 ## Frontend
 

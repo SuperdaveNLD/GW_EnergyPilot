@@ -71,8 +71,13 @@ def _load_controller():
     def async_dispatcher_send(hass, signal, *args):
         hass.dispatched.append((signal, args))
 
+    def async_dispatcher_connect(hass, signal, callback_func):
+        hass.dispatcher_listeners.append((signal, callback_func))
+        return lambda: None
+
     dispatcher = _module(
         "homeassistant.helpers.dispatcher",
+        async_dispatcher_connect=async_dispatcher_connect,
         async_dispatcher_send=async_dispatcher_send,
     )
     helpers.dispatcher = dispatcher
@@ -130,6 +135,7 @@ class FakeHass:
     def __init__(self, states=None):
         self.states = FakeStates(states)
         self.dispatched = []
+        self.dispatcher_listeners = []
         self.tracked_state_changes = []
         self.tasks = []
 
@@ -430,6 +436,31 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
         self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
+        self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_suspended_ev_coordination_does_not_apply_ev_override(self):
+        controller, _, client, coordinator = self.make_controller(
+            p_batt="2500",
+            p_grid="4000",
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+                const.CONF_EV_DEADBAND: 500,
+            },
+            states={"sensor.ev_power": "1200"},
+        )
+        controller.entry.runtime_data = types.SimpleNamespace(
+            connectivity=types.SimpleNamespace(
+                ev_coordination_effective=False,
+                signal="test_connectivity",
+            )
+        )
+        controller.enabled = True
+
+        await controller.async_evaluate()
+
+        self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 4000)])
+        self.assertEqual(controller.last_command, "grid_import_target")
         self.assertEqual(coordinator.refresh_count, 1)
 
     async def test_ev_charging_allows_explicit_battery_charge(self):

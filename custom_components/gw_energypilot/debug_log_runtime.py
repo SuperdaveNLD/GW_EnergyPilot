@@ -14,6 +14,7 @@ from .const import (
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
     CONF_EV_MODE_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
     CONF_EV_POWER_ENTITY,
     CONF_MAX_POWER,
     CONF_OPTIM_REQUIRED_STATE,
@@ -71,7 +72,11 @@ class GWEnergyPilotDebugRuntime:
                 or DEFAULT_OPTIM_STATUS_ENTITY
             ),
         }
-        for key in (CONF_EV_MODE_ENTITY, CONF_EV_POWER_ENTITY):
+        for key in (
+            CONF_EV_MODE_ENTITY,
+            CONF_EV_POWER_ENTITY,
+            CONF_EV_ONLINE_ENTITY,
+        ):
             value = options.get(key)
             if value:
                 entity_ids.add(str(value))
@@ -162,6 +167,11 @@ class GWEnergyPilotDebugRuntime:
                 ),
             },
             "controller": self._controller_snapshot(),
+            "connectivity": dict(
+                getattr(runtime, "connectivity", None).attributes
+                if getattr(runtime, "connectivity", None) is not None
+                else {}
+            ),
             "orchestrator": self._orchestrator_snapshot(),
             "coordinator": self._coordinator_snapshot(),
             "sources": self._sources_snapshot(),

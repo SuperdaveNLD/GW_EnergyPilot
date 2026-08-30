@@ -41,6 +41,7 @@ from .const import (
     CONF_EV_GRID_CURRENT_ENTITY,
     CONF_EV_LOAD_BALANCE_WINDOW,
     CONF_EV_MODE_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
     CONF_EV_POWER_ENTITY,
     CONF_GRID_CONNECTION_PROFILE,
     CONF_GRID_CUSTOM_CURRENT,
@@ -123,6 +124,7 @@ EV_LOAD_BALANCING_KEYS = EV_KEYS - {
     CONF_ENABLE_EV_COORDINATION,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
     CONF_EV_DEADBAND,
 }
 EMHASS_KEYS = {
@@ -142,7 +144,11 @@ EMHASS_KEYS = {
     CONF_BUY_PRICE_ADDER,
     CONF_SELL_PRICE_DEDUCTION,
 }
-OPTIONAL_ENTITY_KEYS = {CONF_EV_MODE_ENTITY, CONF_EV_POWER_ENTITY}
+OPTIONAL_ENTITY_KEYS = {
+    CONF_EV_MODE_ENTITY,
+    CONF_EV_POWER_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
+}
 PV_KEYS = {
     CONF_ENABLE_INTERNAL_PV,
     CONF_ENABLE_EXTERNAL_PV,
@@ -442,6 +448,16 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
         "domains": ["sensor"],
         "default": "",
         "description": "Optional Home Assistant power entity for EV coordination.",
+    },
+    {
+        "key": CONF_EV_ONLINE_ENTITY,
+        "label": "EV online entity",
+        "type": "text",
+        "default": "",
+        "description": (
+            "Optional Home Assistant entity whose availability reports whether "
+            "the charger is reachable. Binary sensors use on/off explicitly."
+        ),
     },
     {
         "key": CONF_EV_DEADBAND,

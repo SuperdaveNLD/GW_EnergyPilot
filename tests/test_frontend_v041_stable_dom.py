@@ -89,6 +89,21 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("requestStableLiveRefresh(panel)", self.manual)
         self.assertIn("const liveAutomaticOn", self.manual)
 
+    def test_connectivity_status_is_structural_once_and_patched_live(self) -> None:
+        browser_test = (BROWSER / "test_frontend_stability.py").read_text(
+            encoding="utf-8"
+        )
+        harness = (BROWSER / "frontend_harness.html").read_text(encoding="utf-8")
+        self.assertIn("function ensureConnectivityStatus(panel, root)", self.source)
+        self.assertIn("ensureConnectivityStatus(this, root)", self.source)
+        self.assertIn("function patchConnectivityStatus(panel, root)", self.source)
+        self.assertIn("patchConnectivityStatus(panel, root)", self.source)
+        self.assertIn("actions.insertBefore(wrap, version || null)", self.source)
+        self.assertIn("@media (hover: hover) and (pointer: fine)", self.source)
+        self.assertNotIn("setPointerCapture", self.source)
+        self.assertIn("exercise_connectivity_status", browser_test)
+        self.assertIn('"connectivity_status"', harness)
+
     def test_v038_legacy_guards_are_disabled_only_for_v041(self) -> None:
         self.assertIn("function stableRuntimeActive(panel)", self.runtime)
         self.assertIn("!stableRuntime && interactionActive(this)", self.runtime)

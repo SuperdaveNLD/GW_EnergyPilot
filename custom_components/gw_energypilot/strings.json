@@ -41,6 +41,7 @@
           "enable_ev_coordination": "Enable EV coordination",
           "ev_mode_entity": "EV charging mode entity",
           "ev_power_entity": "EV charging power entity",
+          "ev_online_entity": "EV online entity",
           "ev_deadband": "EV active power threshold"
         },
         "data_description": {
@@ -65,6 +66,7 @@
           "enable_ev_coordination": "Holds the battery while EV charging is active and re-optimizes when charging stops.",
           "ev_mode_entity": "Optional EV charging-state entity.",
           "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_online_entity": "Optional entity that reports whether the EV charger is reachable.",
           "ev_deadband": "Power above this threshold is considered active EV charging."
         }
       }
@@ -103,6 +105,7 @@
           "enable_ev_coordination": "Enable EV coordination",
           "ev_mode_entity": "EV charging mode entity",
           "ev_power_entity": "EV charging power entity",
+          "ev_online_entity": "EV online entity",
           "ev_deadband": "EV active power threshold"
         },
         "data_description": {
@@ -127,6 +130,7 @@
           "enable_ev_coordination": "Optional EV hold and stop-triggered re-optimization.",
           "ev_mode_entity": "Optional EV charging-state entity.",
           "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_online_entity": "Optional entity that reports whether the EV charger is reachable.",
           "ev_deadband": "Power above this threshold is considered active EV charging."
         }
       }
@@ -138,6 +142,14 @@
       "ems_setpoint": {"name": "EMS setpoint"},
       "control_command": {"name": "Control command"},
       "target_power": {"name": "Target power"},
+      "connectivity_status": {
+        "name": "Connectivity status",
+        "state": {
+          "checking": "Checking",
+          "all_ok": "All OK",
+          "issue": "Issue"
+        }
+      },
       "ev_status": {"name": "EV charging status"},
       "ev_load_balancing": {"name": "EV load balancing"},
       "pv_generation_power": {"name": "PV generation power"}

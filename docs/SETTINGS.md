@@ -66,6 +66,8 @@ P_batt requests charge    -> mode 11 charge allowed
 
 When native orchestration is enabled, EV stop waits for a fresh optimization before normal Automatic Control resumes.
 
+When an online entity is configured, missing, `unknown` and `unavailable` mean unreachable. A `binary_sensor` uses `on`/`off` explicitly; another available entity state means the charger integration is reporting. If the charger remains unreachable for five minutes, EnergyPilot temporarily suspends effective EV coordination without changing the saved user setting. Five stable online minutes resume it only when the setting is still enabled. Both transitions and connectivity changes are written to the Home Assistant log and the opt-in debug session.
+
 ## EMHASS page
 
 The EMHASS section owns EnergyPilot's EMHASS integration settings:

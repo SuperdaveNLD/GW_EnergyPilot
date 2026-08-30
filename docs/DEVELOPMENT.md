@@ -21,6 +21,8 @@ __init__.py             config-entry setup, APIs, v0.48 panel and v0.44 orchestr
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
+connectivity_model.py   pure charger reachability debounce/state machine
+connectivity.py         coordinator/entity-backed status, five-minute timer and transition logging
 controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
@@ -57,6 +59,8 @@ event_triggers.py       event-driven optimization hooks
 frontend/               layered dashboard/settings assets
 tests/                  hardware-independent regressions
 ```
+
+Connectivity must reuse `coordinator.last_update_success` and the configured scan interval. Do not substitute the transport client's socket flag or add a health-check poll. The charger timer may only change whether the existing EV override is effective; it must not write the saved user option or create another EMS owner.
 
 ## Active orchestrator chain
 

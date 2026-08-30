@@ -217,6 +217,7 @@ const FIELD_NL = {
   enable_ev_coordination: ["EV-ontlaadbeveiliging", "Voorkomt ontladen van de thuisaccu terwijl de EV actief laadt."],
   ev_mode_entity: ["EV-modusentiteit", "Optionele Home Assistant-entiteit voor de laadstatus van de EV."],
   ev_power_entity: ["EV-vermogensentiteit", "Optionele Home Assistant-vermogensentiteit voor EV-coördinatie."],
+  ev_online_entity: ["EV-online-entiteit", "Optionele Home Assistant-entiteit die aangeeft of de laadpaal bereikbaar is."],
   ev_deadband: ["EV-actiefdrempel", "Vermogensdrempel om actieve EV-lading te herkennen."],
   enable_emhass_orchestrator: ["Ingebouwde EMHASS-orchestrator", "Laat EnergyPilot EMHASS-optimalisaties plannen en publiceren."],
   emhass_url: ["EMHASS-URL", "Adres waarmee Home Assistant Core de EMHASS-webserver bereikt."],

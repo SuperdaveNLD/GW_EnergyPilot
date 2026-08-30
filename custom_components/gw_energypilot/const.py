@@ -13,6 +13,7 @@ CONF_OPTIM_REQUIRED_STATE = "optim_required_state"
 CONF_ENABLE_EV_COORDINATION = "enable_ev_coordination"
 CONF_EV_MODE_ENTITY = "ev_mode_entity"
 CONF_EV_POWER_ENTITY = "ev_power_entity"
+CONF_EV_ONLINE_ENTITY = "ev_online_entity"
 CONF_ENABLE_INTERNAL_PV = "enable_internal_pv"
 CONF_ENABLE_EXTERNAL_PV = "enable_external_pv"
 CONF_EXTERNAL_PV_ENTITY_1 = "external_pv_entity_1"
@@ -93,6 +94,7 @@ GRID_CONNECTION_PROFILES = {
     "3x80": (3, 80),
 }
 GRID_CONNECTION_CUSTOM_PROFILES = {"custom_1_phase": 1, "custom_3_phase": 3}
+EV_CONNECTIVITY_GRACE_SECONDS = 300
 DEFAULT_ENABLE_INTERNAL_PV = True
 DEFAULT_ENABLE_EXTERNAL_PV = False
 DEFAULT_SCAN_INTERVAL = 10

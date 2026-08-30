@@ -43,6 +43,7 @@
       "meter_l2_voltage", "meter_l3_voltage", "meter_l1_current",
       "meter_l2_current", "meter_l3_current", "ems_mode", "ems_setpoint",
       "target_power", "control_command", "automatic_control", "optimize_now",
+      "connectivity_status",
       "manual_mode", "manual_power", "control_strategy",
       "grid_energy_imported_today", "grid_energy_exported_today",
       "grid_energy_import_total", "grid_energy_export_total",
@@ -98,6 +99,7 @@
       control_command: "battery_charge",
       automatic_control: "on",
       optimize_now: "unknown",
+      connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
       control_strategy: ENTRYPOINT === "v048" ? "hybrid" : "battery",
@@ -148,6 +150,23 @@
         ...(unit ? { unit_of_measurement: unit } : {}),
       };
       if (key === "ems_mode") attributes.mode_name = "Battery charge power";
+      if (key === "connectivity_status") {
+        Object.assign(attributes, {
+          modbus_status: "online",
+          modbus_last_success: new Date().toISOString(),
+          modbus_last_failure: null,
+          modbus_last_error: null,
+          refresh_seconds: 15,
+          ev_online_entity: "binary_sensor.charger_online",
+          ev_status: "online",
+          ev_coordination_requested: true,
+          ev_coordination_effective: true,
+          ev_coordination_suspended: false,
+          ev_transition: null,
+          ev_transition_remaining_seconds: null,
+          ev_grace_seconds: 300,
+        });
+      }
       if (key === "pv_generation_power") {
         Object.assign(attributes, {
           internal_enabled: true,

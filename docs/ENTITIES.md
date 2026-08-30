@@ -53,6 +53,18 @@ Important enabled-by-default telemetry includes concepts such as:
 
 A number of raw or diagnostic values are intentionally disabled by default.
 
+## Connectivity status sensor
+
+The enabled diagnostic enum sensor uses stable unique-ID suffix:
+
+```text
+{config_entry_id}_connectivity_status
+```
+
+Its states are `checking`, `all_ok` and `issue`. It remains available when a GoodWe poll fails so it can report Modbus unreachability rather than disappearing with coordinator-backed telemetry. Attributes expose the coordinator-derived Modbus status and configured refresh interval, optional charger reachability, requested/effective EV coordination, five-minute transition state/countdown and last Modbus success/failure/error evidence.
+
+The sensor does not poll or control either device. The dashboard header pill consumes this single entity and patches its existing DOM node on state changes.
+
 ## Combined PV insight sensor
 
 The read-only PV insight feature adds one aggregate entity with stable unique-ID suffix:
