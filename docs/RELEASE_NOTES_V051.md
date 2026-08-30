@@ -1,5 +1,8 @@
 # GW EnergyPilot v0.51 Beta
 
+> Development feature-layer notes. This candidate was promoted into the first
+> public stable v1 release; see `docs/releases/v1.0.0.md`.
+
 v0.51 adds an auditable EMHASS-to-GoodWe execution history and extends the
 Battery · Plan · Price chart with estimated solar/grid flow attribution. It is
 the release implementation of issue #108.
@@ -113,7 +116,8 @@ without those arrays continue to restore. No entity or device identity,
 register definition, accounting source, Battery Saver ownership or EMHASS
 runtime policy changes.
 
-The active dashboard is `gw-energy-pilot-v051.js` over the complete v0.50
-chain. Every active import uses the fresh `0.51-h1` cache boundary. The release
+The v1.0.0 dashboard loads `gw-energy-pilot-v051.js` as its feature layer over
+the complete v0.50 chain. Every inner feature import uses the fresh `0.51-h1`
+cache boundary. The release
 is covered by unit tests and the desktop Chromium, iPad WebKit and iPhone
 WebKit stable-DOM/touch matrix.

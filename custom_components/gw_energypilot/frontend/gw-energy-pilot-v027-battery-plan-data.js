@@ -34,6 +34,9 @@ const TEXT = {
     expand: "Open large graph", details: "Open detailed graph", close: "Close",
     compact: "Compact", normal: "Normal", large: "Large",
     refresh: "Refresh chart data", future: "Forecast",
+    evChargeAllowed: "EV active · battery charging allowed",
+    evDischargeBlocked: "EV anti-discharge · Battery Hold",
+    evHistory: "Striped green = verified charging while the EV is active; solid green = verified mode 8 Battery Hold that blocks discharge.",
   },
   nl: {
     title: "ACCU · PLAN · PRIJS",
@@ -63,6 +66,9 @@ const TEXT = {
     expand: "Open grote grafiek", details: "Open gedetailleerde grafiek", close: "Sluiten",
     compact: "Klein", normal: "Normaal", large: "Groot",
     refresh: "Grafiekgegevens verversen", future: "Forecast",
+    evChargeAllowed: "EV actief · thuisaccu laden toegestaan",
+    evDischargeBlocked: "EV-ontlaadbeveiliging · Battery Hold",
+    evHistory: "Gestreept groen = geverifieerd laden terwijl de EV actief is; effen groen = geverifieerde modus 8 Battery Hold die ontladen blokkeert.",
   },
 };
 
@@ -213,6 +219,70 @@ export function normalizeExecutionSocHistory(events, startMs, endMs) {
   return [...byTimestamp.values()].sort((left, right) => left.t - right.t);
 }
 
+export function normalizeExecutionEvIntervals(execution, startMs, endMs) {
+  const chargeCommands = new Set([
+    "ev_charge_allowed",
+    "ev_battery_charge",
+    "ev_grid_import_charge",
+    "ev_charge_fallback",
+  ]);
+  const currentSession = String(execution?.runtime_session_id || "");
+  const executionNow = timestampMs(execution?.now);
+  const history = (execution?.history || [])
+    .filter((event) => timestampMs(event?.occurred_at) !== null)
+    .sort((left, right) => (
+      timestampMs(left.occurred_at) - timestampMs(right.occurred_at)
+    ));
+  const intervals = [];
+
+  for (let index = 0; index < history.length; index += 1) {
+    const event = history[index];
+    const outcome = event?.outcome || {};
+    const session = String(event?.runtime_session_id || "");
+    const command = String(outcome.command || "");
+    const kind = command === "ev_anti_discharge_hold"
+      ? "discharge_blocked"
+      : chargeCommands.has(command)
+        ? "battery_charge_allowed"
+        : null;
+    if (
+      !kind || !session || event?.configuration?.ev_active !== true ||
+      outcome.verification_status !== "verified"
+    ) {
+      continue;
+    }
+
+    const start = timestampMs(
+      outcome.readback_at || outcome.write_completed_at || event.occurred_at
+    );
+    const next = history[index + 1];
+    const sameSessionNext = next && String(next?.runtime_session_id || "") === session;
+    const end = sameSessionNext
+      ? timestampMs(next.occurred_at)
+      : index === history.length - 1 && session === currentSession
+        ? executionNow
+        : null;
+    if (
+      start === null || end === null || end <= start ||
+      end <= startMs || start >= endMs
+    ) {
+      continue;
+    }
+    intervals.push({
+      start: Math.max(startMs, start),
+      end: Math.min(endMs, end),
+      kind,
+      command,
+      mode: finiteNumber(outcome.readback_mode ?? outcome.expected_mode),
+      setpointW: finiteNumber(
+        outcome.readback_setpoint_w ?? outcome.expected_setpoint_w
+      ),
+      execution: String(outcome.write_status || ""),
+    });
+  }
+  return intervals;
+}
+
 function normalizeHistoryRows(payload, entityId, startMs, endMs) {
   const rows = entityId ? payload?.[entityId] || [] : [];
   const byTimestamp = new Map();
@@ -346,7 +416,7 @@ export function saveChartSize(size) {
   savePrefs(prefs);
 }
 
-export async function loadChartData(panel, force = false) {
+export async function loadChartData(panel, force = false, backendForce = force) {
   const nowMs = Date.now();
   const cached = panel.__epV027BatteryPlanData;
   if (!force && cached && nowMs - cached.at < DATA_CACHE_MS) return cached;
@@ -363,7 +433,7 @@ export async function loadChartData(panel, force = false) {
   panel.__epV027BatteryPlanLoading = true;
   requestPanelRefresh(panel);
 
-  const request = { type: "gw_energypilot/battery_price/get", force };
+  const request = { type: "gw_energypilot/battery_price/get", force: backendForce };
   const entryId = panel.__epV016SettingsData?.entry_id;
   if (entryId) request.entry_id = entryId;
 
@@ -417,6 +487,9 @@ export async function loadChartData(panel, force = false) {
         historicalSocWantedRows: normalizeExecutionSocHistory(
           payload?.execution?.history || [], startMs, bounds.now.getTime()
         ),
+        evProtectionIntervals: normalizeExecutionEvIntervals(
+          payload?.execution, startMs, endMs
+        ),
         pricePoints: normalizePricePoints(payload?.points || inherited?.pricePoints || [], startMs, endMs),
         payload, statisticsError: errors.join(" · ") || null,
       };
@@ -430,7 +503,7 @@ export async function loadChartData(panel, force = false) {
         nowMs: bounds.now.getTime(), actualRows: inherited?.batteryRows || [],
         actualSocRows: [], pvRows: [], loadRows: [], gridRows: [], attributionRows: [],
         historicalPlanRows: [], futurePlanPoints: [], socPlanPoints: [],
-        historicalSocWantedRows: [],
+        historicalSocWantedRows: [], evProtectionIntervals: [],
         pricePoints: inherited?.pricePoints || [],
         payload: inherited?.pricePayload || null, statisticsError: err?.message || String(err),
       };

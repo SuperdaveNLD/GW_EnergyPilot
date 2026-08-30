@@ -349,6 +349,11 @@ last_ems_mode
 last_ems_setpoint_command
 ```
 
+The same entity exposes `execution_history_revision`, a monotonic per-runtime
+cache-invalidation value. It lets the stable dashboard refresh scoped
+execution/chart content after a new evidence record without rebuilding the
+dashboard. It is diagnostic only and is never a controller input.
+
 The timestamp changes only after an actual `47512 -> wait -> 47511` command succeeds. A controller evaluation that skips a duplicate write because live read-back already matches does not change it. The dashboard shows the localized timestamp below the live EMS setpoint, while Diagnose/LOG retains the raw ISO timestamp and command context.
 
 Raw inverter, operating-mode, warning/error, meter-status, and similar sensors may be disabled by default.

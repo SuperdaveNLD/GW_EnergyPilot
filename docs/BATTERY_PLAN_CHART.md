@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v0.51 Beta**.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.0.0 Stable**.
 
 ## Purpose
 
@@ -12,7 +12,9 @@ The dashboard shows, on one local-day timeline:
 - actual GoodWe battery SOC and the historical/current wanted EMHASS SOC;
 - estimated solar/grid origin for battery charge and solar/battery origin for
   grid export in the detailed view;
-- the direction-neutral market-price series.
+- the direction-neutral market-price series;
+- verified EV anti-discharge blocked and charge-permitted intervals derived
+  from the canonical execution ledger.
 
 The chart is visualization only. It does not own GoodWe control, EMHASS optimization or persistent financial accounting.
 
@@ -31,7 +33,7 @@ No duplicate battery-power entity, Modbus definition or poll is added.
 
 ## Actual-flow source attribution
 
-v0.51 requests Recorder 5-minute means for the existing `battery_power`,
+The v0.51 feature layer requests Recorder 5-minute means for the existing `battery_power`,
 combined display-only `pv_generation_power`, `total_load_power` and
 `meter_total_power_fast` entities in one statistics request. Large and expanded
 views use a load-first balance estimate:
@@ -76,7 +78,7 @@ EMHASS stores `SOC_opt` as a fraction in the plan and scales it by 100 only when
 For `number_of_batteries > 1`, EMHASS intentionally has no meaningful bare/fleet `SOC_opt`; it exposes per-battery `SOC_opt_<k>` values. EnergyPilot does not select a battery or fabricate an aggregate. Planned SOC therefore remains unavailable until an explicit battery-selection contract is designed.
 
 The actual SOC line is solid and the **Wanted SOC** line remains dashed. For
-elapsed time v0.51 uses the `SOC_opt` snapshot stored with each execution event;
+elapsed time the v0.51 feature layer uses the `SOC_opt` snapshot stored with each execution event;
 the current/future segment uses the latest validated official plan. This keeps
 historical intent immutable when a later optimization changes the horizon. On
 an upgraded installation before execution events exist, the previous current
@@ -222,9 +224,25 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v0.51 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v1.0.0 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v0.51 loads every import in the active graph through `0.51-h1`, including the scoped plan-refresh and execution-history owners. The older v0.33 plan-refresh mechanism remains historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.0.0 uses `1.0.0-stable1` for its presentation wrapper/direct feature import; v0.51 loads every inner feature import through `0.51-h1`, including the scoped plan-refresh and execution-history owners. The older v0.33 plan-refresh mechanism remains historical compatibility context.
+
+## EV protection underlays
+
+The graph reuses `gw_energypilot.execution.<entry_id>`; it does not add a
+second EV timeline Store or API. A solid underlay represents a verified
+`ev_anti_discharge_hold` decision. A striped underlay represents a verified
+explicit charging decision (`ev_charge_allowed`, `ev_battery_charge`,
+`ev_grid_import_charge` or `ev_charge_fallback`). Unverified, mismatched,
+waiting and failed records produce no interval.
+
+Each record includes the current `runtime_session_id`. Adjacent events form an
+interval only inside the same Home Assistant runtime session, and only the
+current session can extend to the API response time. This deliberately leaves
+a gap across restart instead of presenting an EV protection state that was not
+observed. `execution_history_revision` is cache invalidation evidence only; it
+does not affect control or Recorder data.
 
 The optimization revision and `P_batt` freshness checks are independent of ordinary five-minute chart-data cache expiry, so a newly published plan does not intentionally remain stale for that full interval.
 

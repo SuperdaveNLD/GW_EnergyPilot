@@ -25,8 +25,8 @@ class FrontendV047ReleaseTests(unittest.TestCase):
         v049 = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "0.51")
-        self.assertIn("gw-energy-pilot-v051.js?v=0.51-h1", init_source)
+        self.assertEqual(manifest["version"], "1.0.0")
+        self.assertIn("gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source)
         self.assertIn('import "./gw-energy-pilot-v048.js?v=0.51-h1"', v049)
         self.assertIn(
             'import "./gw-energy-pilot-v047.js?v=0.51-h1"',

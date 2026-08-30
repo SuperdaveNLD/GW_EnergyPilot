@@ -508,6 +508,11 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
             "last_ems_setpoint_command": controller.last_ems_setpoint_command,
             "ev_active": controller.ev_is_active(),
             "ev_protection_state": controller.ev_protection_state,
+            "execution_history_revision": (
+                controller.execution_history.revision
+                if controller.execution_history is not None
+                else 0
+            ),
         }
 
 

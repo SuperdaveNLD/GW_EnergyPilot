@@ -17,8 +17,9 @@ bad release by preparing the next beta number or stable patch version.
 
 The historical `0.x` tags and release notes remain untouched. In particular,
 `0.50` is the last legacy Beta published as a normal GitHub Release. The new
-contract begins with `v1.0.0-beta.1`; that release must be a GitHub prerelease.
-The first production promotion is `v1.0.0`.
+contract begins with the production `v1.0.0` release. Any subsequent
+`v1.x.x-beta.N` candidate is always a GitHub prerelease before its stable
+promotion.
 
 ## Why normal users cannot receive a new beta accidentally
 
@@ -125,8 +126,8 @@ a normal/latest GitHub Release only after every gate succeeds.
 
 Normal users leave the GW EnergyPilot prerelease switch disabled or off. Their
 HACS update entity ignores GitHub prereleases and follows the latest stable
-`v1.x.x` release. During the migration, before `v1.0.0` exists, they remain on
-the last legacy normal release (`0.50`) and still ignore every new v1 beta.
+`v1.x.x` release. During a migration they remain on the last normal release and
+still ignore every new v1 beta until a newer stable is published.
 
 Testers opt in per repository:
 

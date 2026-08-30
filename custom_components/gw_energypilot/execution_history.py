@@ -127,6 +127,11 @@ class GWEnergyPilotExecutionHistory:
         async with self._lock:
             await self._async_ensure_loaded()
 
+    @property
+    def revision(self) -> int:
+        """Return the latest accepted sequence for cache invalidation only."""
+        return self._sequence
+
     async def async_append(self, record: Mapping[str, Any]) -> dict[str, Any] | None:
         """Append one event; persistence failure must never break EMS control."""
         occurred = _timestamp(record.get("occurred_at")) or self._now()

@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v0.51 Beta**.
+This document describes the current runtime architecture of **GW EnergyPilot v1.0.0 Stable**.
 
 ## High-level flow
 
@@ -448,9 +448,10 @@ The header reachability pill is also canonical stable DOM. It is created only du
 Active top-level module:
 
 ```text
-gw-energy-pilot-v051.js
-  -> gw-energy-pilot-v051-history.js
-  -> gw-energy-pilot-v050.js
+gw-energy-pilot-v100.js
+  -> gw-energy-pilot-v051.js
+       -> gw-energy-pilot-v051-history.js
+       -> gw-energy-pilot-v050.js
        -> gw-energy-pilot-v049.js
             -> gw-energy-pilot-v048.js
                  -> gw-energy-pilot-v047.js
@@ -468,7 +469,7 @@ gw-energy-pilot-v051.js
                                                                              -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card, source-attributed detailed plan graph and complete `0.51-h1` cache boundary.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card, source-attributed detailed plan graph and complete `0.51-h1` inner cache boundary. v1.0.0 owns only stable release presentation and its `1.0.0-stable1` top-level boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 

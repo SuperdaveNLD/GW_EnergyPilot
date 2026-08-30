@@ -22,9 +22,9 @@ class FrontendV050ReleaseTests(unittest.TestCase):
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "0.51")
+        self.assertEqual(manifest["version"], "1.0.0")
         active = (FRONTEND / "gw-energy-pilot-v051.js").read_text(encoding="utf-8")
-        self.assertIn(f"gw-energy-pilot-v051.js?v={CACHE_KEY}", init_source)
+        self.assertIn("gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source)
         self.assertIn(
             f'import "./gw-energy-pilot-v050.js?v={CACHE_KEY}"',
             active,

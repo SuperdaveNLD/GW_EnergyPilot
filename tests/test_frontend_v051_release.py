@@ -1,5 +1,4 @@
 from pathlib import Path
-import json
 import re
 import unittest
 
@@ -19,13 +18,7 @@ class FrontendV051ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_manifest_panel_and_presentation_are_v051(self) -> None:
-        manifest = json.loads(
-            (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
-        )
-        init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.51")
-        self.assertIn(f"gw-energy-pilot-v051.js?v={CACHE_KEY}", init_source)
+    def test_v051_feature_layer_and_presentation_remain_intact(self) -> None:
         self.assertIn(
             f'import "./gw-energy-pilot-v050.js?v={CACHE_KEY}"', self.release
         )

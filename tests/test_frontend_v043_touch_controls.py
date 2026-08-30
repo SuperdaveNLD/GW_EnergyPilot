@@ -21,7 +21,7 @@ class FrontendV043TouchControlsTests(unittest.TestCase):
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
         v044 = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v051.js?v=0.51-h1", init_source)
+        self.assertIn("gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source)
         self.assertIn('import "./gw-energy-pilot-v047.js?v=0.51-h1"', v048)
         self.assertIn('import "./gw-energy-pilot-v046.js?v=0.51-h1"', v047)
         self.assertIn('import "./gw-energy-pilot-v045.js?v=0.51-h1"', v046)

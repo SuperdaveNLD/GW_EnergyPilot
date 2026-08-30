@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v0.51 runtime structure
+## Current v1.0.0 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v0.51 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.0.0 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -137,28 +137,30 @@ post-refresh read-back but can never own or retry a command.
 Top level:
 
 ```text
-gw-energy-pilot-v051.js
-    -> gw-energy-pilot-v051-history.js
-    -> gw-energy-pilot-v050.js
-        -> gw-energy-pilot-v049.js
-            -> gw-energy-pilot-v048.js
-                -> gw-energy-pilot-v047.js
-                    -> gw-energy-pilot-v046.js
-                        -> gw-energy-pilot-v045.js
-                            -> gw-energy-pilot-v044.js
-                                -> gw-energy-pilot-v043.js
-                                    -> gw-energy-pilot-v042.js
-                                        -> gw-energy-pilot-v041-emhass-settings.js
-                                            -> gw-energy-pilot-v041.js
-                                                -> gw-energy-pilot-v039.js
-                                                    -> gw-energy-pilot-v038.js
-                                                        -> gw-energy-pilot-v038-runtime.js
+gw-energy-pilot-v100.js
+    -> gw-energy-pilot-v051.js
+         -> gw-energy-pilot-v051-history.js
+         -> gw-energy-pilot-v050.js
+              -> gw-energy-pilot-v049.js
+                   -> gw-energy-pilot-v048.js
+                        -> gw-energy-pilot-v047.js
+                             -> gw-energy-pilot-v046.js
+                                  -> gw-energy-pilot-v045.js
+                                       -> gw-energy-pilot-v044.js
+                                            -> gw-energy-pilot-v043.js
+                                                 -> gw-energy-pilot-v042.js
+                                                      -> gw-energy-pilot-v041-emhass-settings.js
+                                                           -> gw-energy-pilot-v041.js
+                                                                -> gw-energy-pilot-v039.js
+                                                                     -> gw-energy-pilot-v038.js
+                                                                          -> gw-energy-pilot-v038-runtime.js
 ```
 
-v0.51 is a bounded presentation wrapper plus one scoped history-card module. It
-owns the v0.51 badge/footer, `0.51-h1` cache boundary, one canonical
-EMHASS-to-GoodWe card and targeted history refresh. The nested plan data/view
-owners implement Recorder attribution and wanted-SOC history. v0.50 retains
+v1.0.0 adds a presentation-only stable wrapper and `1.0.0-stable1` top-level
+cache boundary. The nested v0.51 feature layer owns the complete `0.51-h1`
+inner cache boundary, one canonical EMHASS-to-GoodWe card and targeted history
+refresh. The nested plan data/view owners implement Recorder attribution,
+wanted-SOC history and verified runtime-session-bounded EV underlays. v0.50 retains
 its release presentation and EV settings ownership; v0.49 retains its release
 presentation; v0.48 retains current Hybrid operator copy and stable-note
 ownership; v0.47 retains Custom Battery Saver editing, larger

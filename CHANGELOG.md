@@ -4,7 +4,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
-## [0.51] - 2026-08-30
+## [1.0.0] - 2026-08-30
 
 ### Added
 
@@ -17,6 +17,9 @@ All notable changes to GW EnergyPilot are documented here.
 - Added Recorder-based grid/solar charge and battery/solar export attribution
   in Large/expanded chart views, retaining unknown residuals.
 - Added historical wanted-SOC snapshots to the existing dashed line.
+- Added verified EV anti-discharge blocked/charge-permitted underlays from the
+  same canonical execution ledger, bounded to one Home Assistant runtime
+  session so a restart cannot fabricate a continuous interval.
 
 ### Changed
 
@@ -25,7 +28,14 @@ All notable changes to GW EnergyPilot are documented here.
 - Advanced the battery/plan chart payload to schema 6 and added optional
   dashboard-only official-plan `P_PV`/`P_Load` values.
 - Added `gw-energy-pilot-v051.js` and the complete `0.51-h1` frontend cache
-  boundary.
+  boundary beneath the stable `gw-energy-pilot-v100.js` presentation wrapper.
+- Correct generic Battery Strategy copy and keep the connectivity detail
+  popover isolated above surrounding live-dashboard content (#104, #105).
+- Replace branch-push release publication with a tag-only v1 contract: beta
+  releases use `v1.x.x-beta.N` from `beta` and are GitHub prereleases that are
+  never Latest; stable releases use `v1.x.x` from `main` and are normal/latest
+  releases. HACS hides the unversioned default branch, and automated checks
+  enforce tag/manifest/channel/source-branch/release-note consistency.
 
 ### Safety and compatibility
 
@@ -35,14 +45,6 @@ All notable changes to GW EnergyPilot are documented here.
 - Treat source attribution as an estimate and execution persistence as
   non-controlling evidence. Existing installs start with empty history and
   require no migration.
-
-### Changed
-
-- Replace branch-push release publication with a tag-only v1 contract: beta
-  releases use `v1.x.x-beta.N` from `beta` and are GitHub prereleases that are
-  never Latest; stable releases use `v1.x.x` from `main` and are normal/latest
-  releases. HACS now hides the unversioned default branch, and automated checks
-  enforce tag/manifest/channel/source-branch/release-note consistency.
 
 ## [0.50] - 2026-08-30
 

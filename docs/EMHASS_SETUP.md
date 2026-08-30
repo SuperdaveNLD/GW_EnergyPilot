@@ -313,7 +313,7 @@ fresh numeric outputs + expected optimization state
 ready
 ```
 
-EnergyPilot never blocks Home Assistant startup on an EMHASS solve. v0.51 retains the v0.44 background recovery behavior: one attempt 60 seconds after EnergyPilot setup when native orchestration is enabled. The normal Home Assistant-running, GoodWe-telemetry, EMHASS-health and finite-output gates still apply. A transient failure retries after 15, 30 and 60 seconds; any successful manual, event-driven or scheduled optimization after setup cancels the remaining startup sequence. After the bounded retries are exhausted, the normal wall-clock schedule remains active.
+EnergyPilot never blocks Home Assistant startup on an EMHASS solve. v1.0.0 retains the v0.44 background recovery behavior: one attempt 60 seconds after EnergyPilot setup when native orchestration is enabled. The normal Home Assistant-running, GoodWe-telemetry, EMHASS-health and finite-output gates still apply. A transient failure retries after 15, 30 and 60 seconds; any successful manual, event-driven or scheduled optimization after setup cancels the remaining startup sequence. After the bounded retries are exhausted, the normal wall-clock schedule remains active.
 
 ## 13. Enable Automatic Control
 

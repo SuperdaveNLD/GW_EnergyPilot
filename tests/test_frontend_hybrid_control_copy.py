@@ -19,7 +19,7 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v051.js?v=0.51-h1", init_source)
+        self.assertIn("gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source)
         self.assertIn(
             'import "./gw-energy-pilot-v048.js?v=0.51-h1";',
             active,

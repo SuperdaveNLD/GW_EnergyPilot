@@ -253,6 +253,10 @@ async def _execution_payload(
         "time_zone": getattr(hass.config, "time_zone", "UTC"),
         "retention_days": EXECUTION_HISTORY_RETENTION_DAYS,
         "event_limit": EXECUTION_HISTORY_LIMIT,
+        "revision": execution_history.revision if execution_history is not None else 0,
+        "runtime_session_id": (
+            getattr(getattr(runtime_data, "controller", None), "execution_session_id", None)
+        ),
         "history": history,
         "future": _future_execution_rows(entry, now=now, end=future_end),
         "future_assumptions": {

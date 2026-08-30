@@ -105,6 +105,18 @@ new controller ownership mode or additional Modbus write path. A future
 override would change safety and control ownership semantics and therefore
 requires a separate explicit design decision and review.
 
+### Historical chart evidence
+
+v1.0.0 draws EV protection underlays from the existing execution-history
+Store. Only post-refresh `verified` records qualify: solid means discharge was
+blocked through `ev_anti_discharge_hold`, while stripes mean an explicit
+strategy-aware battery/grid charging command was allowed. The overlay adds no
+control decision, Store or charger write.
+
+Intervals are limited to one controller runtime session. A Home Assistant
+restart therefore leaves an intentional gap until a new verified decision is
+recorded; retained records on opposite sides of a restart are never joined.
+
 ## Safety boundary
 
 GoodWe and the battery BMS remain authoritative for inverter, battery, SOC and electrical limits. This feature does not infer or add GoodWe registers and does not introduce a second fast feedback loop.

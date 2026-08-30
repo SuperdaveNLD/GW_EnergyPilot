@@ -640,6 +640,11 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 3000)])
         self.assertEqual(coordinator.refresh_count, 1)
         self.assertEqual(len(history.events), 1)
+        self.assertEqual(
+            history.events[0]["runtime_session_id"],
+            controller.execution_session_id,
+        )
+        self.assertTrue(controller.execution_session_id)
         outcome = history.events[0]["outcome"]
         self.assertEqual(outcome["write_status"], "completed")
         self.assertEqual(outcome["verification_status"], "verified")

@@ -106,7 +106,7 @@ function openModal(panel) {
     .ep-v027-backdrop{position:fixed;inset:0;z-index:10090;display:grid;place-items:center;padding:18px;background:rgba(1,7,18,.72);backdrop-filter:blur(16px);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;color:#eef9fd}
     .ep-v027-modal{width:min(1180px,97vw);max-height:93vh;overflow:auto;padding:22px;border:1px solid rgba(119,203,235,.22);border-radius:26px;background:linear-gradient(150deg,rgba(11,35,65,.98),rgba(5,17,36,.99));box-shadow:0 38px 120px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.04)}
     .ep-v027-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:8px}.ep-v027-modal-head small{display:block;color:#67e6f8;font-size:10px;letter-spacing:.15em;font-weight:850}.ep-v027-modal-head h2{margin:5px 0 0;font-size:25px;letter-spacing:-.02em}.ep-v027-modal-head p{margin:5px 0 0;color:#829caf;font-size:11px}.ep-v027-close{width:37px;height:37px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);color:#e0f0f7;font-size:20px;cursor:pointer}
-    .ep-v027-modal .ep-v027-chart{border-radius:17px;background:rgba(1,11,27,.31)}.ep-v027-modal .ep-v027-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:12px 24px;margin:7px 0 14px;color:#91a9ba;font-size:10px}.ep-v027-modal .ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-modal .ep-v027-legend i{display:inline-block}.ep-v027-modal .actual-charge,.ep-v027-modal .actual-discharge{width:10px;height:10px;border-radius:3px;background:#27dfc2}.ep-v027-modal .actual-discharge{background:#ffa52f}.ep-v027-modal .plan{width:18px;height:9px;border:1px dashed #9cbcc8;border-radius:3px}.ep-v027-modal .actual-soc{width:18px;height:2px;background:#f472b6}.ep-v027-modal .forecast-soc{width:18px;height:0;border-top:2px dashed #c4b5fd}.ep-v027-modal .price{width:20px;height:2px;background:#55e8ff}.ep-v027-modal .ep-v027-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}.ep-v027-modal .ep-v027-chip{display:flex;align-items:center;gap:9px;padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.025)}.ep-v027-modal .ep-v027-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;border:1px solid rgba(39,224,193,.6);color:#42ebce}.ep-v027-modal .discharge .ep-v027-icon{border-color:rgba(255,165,47,.65);color:#ffb34a}.ep-v027-modal .price .ep-v027-icon{border-color:rgba(85,232,255,.62);color:#64e9fb}.ep-v027-modal small{display:block;color:#849dae;font-size:8px}.ep-v027-modal strong{display:block;margin-top:2px}.ep-v027-modal em{display:block;margin-top:2px;color:#647f92;font-size:7px;font-style:normal}.ep-v027-modal .ep-v027-notes{margin-top:12px;color:#69879b;font-size:9px;line-height:1.55}
+    .ep-v027-modal .ep-v027-chart{border-radius:17px;background:rgba(1,11,27,.31)}.ep-v027-modal .ep-v027-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:12px 24px;margin:7px 0 14px;color:#91a9ba;font-size:10px}.ep-v027-modal .ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-modal .ep-v027-legend i{display:inline-block}.ep-v027-modal .actual-charge,.ep-v027-modal .actual-discharge{width:10px;height:10px;border-radius:3px;background:#27dfc2}.ep-v027-modal .actual-discharge{background:#ffa52f}.ep-v027-modal .plan{width:18px;height:9px;border:1px dashed #9cbcc8;border-radius:3px}.ep-v027-modal .ev-charge-allowed,.ep-v027-modal .ev-discharge-blocked{width:16px;height:9px;border:1px solid rgba(140,242,155,.46);border-radius:2px}.ep-v027-modal .ev-charge-allowed{background:repeating-linear-gradient(135deg,rgba(162,242,173,.42) 0 2px,rgba(121,230,140,.06) 2px 6px)}.ep-v027-modal .ev-discharge-blocked{background:rgba(121,230,140,.32)}.ep-v027-modal .actual-soc{width:18px;height:2px;background:#f472b6}.ep-v027-modal .forecast-soc{width:18px;height:0;border-top:2px dashed #c4b5fd}.ep-v027-modal .price{width:20px;height:2px;background:#55e8ff}.ep-v027-modal .ep-v027-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}.ep-v027-modal .ep-v027-chip{display:flex;align-items:center;gap:9px;padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.025)}.ep-v027-modal .ep-v027-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;border:1px solid rgba(39,224,193,.6);color:#42ebce}.ep-v027-modal .discharge .ep-v027-icon{border-color:rgba(255,165,47,.65);color:#ffb34a}.ep-v027-modal .price .ep-v027-icon{border-color:rgba(85,232,255,.62);color:#64e9fb}.ep-v027-modal small{display:block;color:#849dae;font-size:8px}.ep-v027-modal strong{display:block;margin-top:2px}.ep-v027-modal em{display:block;margin-top:2px;color:#647f92;font-size:7px;font-style:normal}.ep-v027-modal .ep-v027-notes{margin-top:12px;color:#69879b;font-size:9px;line-height:1.55}
     @media(max-width:850px){.ep-v027-modal{padding:15px;border-radius:20px}.ep-v027-modal .ep-v027-summary{grid-template-columns:1fr}.ep-v027-modal-head h2{font-size:21px}}
   </style><section class="ep-v027-modal"><div class="ep-v027-modal-head"><div><small>${panel._escape(t(panel, "actual"))} + ${panel._escape(t(panel, "future"))}</small><h2>${panel._escape(t(panel, "title"))}</h2><p>${panel._escape(t(panel, "subtitle"))}</p></div><button type="button" class="ep-v027-close" aria-label="${panel._escape(t(panel, "close"))}">×</button></div>${cardBody(panel, data, "large", true)}</section>`;
 
@@ -126,6 +126,15 @@ function currentOptimizationPlanRevision(panel) {
   const entityId = panel._entityId?.("optimize_now");
   const state = entityId ? panel._hass?.states?.[entityId] : null;
   const raw = state?.attributes?.plan_revision;
+  if (raw === null || raw === undefined || raw === "") return null;
+  const revision = Number(raw);
+  return Number.isFinite(revision) ? revision : null;
+}
+
+function currentExecutionHistoryRevision(panel) {
+  const entityId = panel._entityId?.("control_command");
+  const state = entityId ? panel._hass?.states?.[entityId] : null;
+  const raw = state?.attributes?.execution_history_revision;
   if (raw === null || raw === undefined || raw === "") return null;
   const revision = Number(raw);
   return Number.isFinite(revision) ? revision : null;
@@ -152,6 +161,17 @@ function activePlanChanged(panel, data) {
   const state = panel._hass?.states?.[entityId];
   if (!state?.last_updated || !plan?.last_updated) return false;
   return state.last_updated !== plan.last_updated;
+}
+
+function activeExecutionHistoryChanged(panel, data) {
+  const currentRevision = currentExecutionHistoryRevision(panel);
+  const cachedRaw = data?.payload?.execution?.revision;
+  const cachedRevision = cachedRaw === null || cachedRaw === undefined || cachedRaw === ""
+    ? null
+    : Number(cachedRaw);
+  return currentRevision !== null && (
+    !Number.isFinite(cachedRevision) || currentRevision !== cachedRevision
+  );
 }
 
 function chartRefreshIdle(panel) {
@@ -260,6 +280,8 @@ function installEnhancedCard(panel, root) {
   if (existingCard?.dataset.epRenderKey === renderKey) {
     if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) {
       void loadChartData(panel, true);
+    } else if (data && activeExecutionHistoryChanged(panel, data) && chartRefreshIdle(panel)) {
+      void loadChartData(panel, true, false);
     } else if (data && Date.now() - data.at >= DATA_CACHE_MS && chartRefreshIdle(panel)) {
       void loadChartData(panel);
     }
@@ -291,6 +313,7 @@ function installEnhancedCard(panel, root) {
 
   if (!data && chartRefreshIdle(panel)) void loadChartData(panel);
   else if (data && activePlanChanged(panel, data) && chartRefreshIdle(panel)) void loadChartData(panel, true);
+  else if (data && activeExecutionHistoryChanged(panel, data) && chartRefreshIdle(panel)) void loadChartData(panel, true, false);
   else if (data && Date.now() - data.at >= DATA_CACHE_MS && chartRefreshIdle(panel)) void loadChartData(panel);
 }
 

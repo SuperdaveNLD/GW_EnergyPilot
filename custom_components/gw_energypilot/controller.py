@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import logging
 from math import isfinite
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import (
@@ -115,6 +116,7 @@ class GWEnergyPilotController:
         self.coordinator = coordinator
         self.control_history = control_history
         self.execution_history = execution_history
+        self.execution_session_id = uuid4().hex
         self.enabled = False
         self.target_power = 0
         self.expected_mode = MODE_AUTO
@@ -391,6 +393,7 @@ class GWEnergyPilotController:
         return {
             "occurred_at": datetime.now(timezone.utc),
             "kind": "controller_decision",
+            "runtime_session_id": self.execution_session_id,
             "owner": "automatic" if self.enabled else "manual",
             "plan": {
                 "p_batt_w": p_batt,

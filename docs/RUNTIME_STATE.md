@@ -88,12 +88,13 @@ The optimization log is deliberately separate from `last_success`: failed runs a
 
 ## EMHASS-to-GoodWe execution history
 
-v0.51 adds a bounded evidence ledger for issue #108. It is not a command queue
+The v0.51 feature layer, promoted in v1.0.0, adds a bounded evidence ledger for issue #108. It is not a command queue
 and never becomes a control input. Each event snapshots the information that
 was available when Automatic Control evaluated a plan:
 
 ```text
 UTC instant + monotonic sequence
+Home Assistant runtime session ID
 automatic/manual ownership
 P_batt / P_grid / wanted SOC + live-or-mirror source
 plan generation / validity / revision
@@ -126,6 +127,13 @@ Assistant attributes. It does retain local power/SOC/strategy evidence and
 therefore remains private installation data. Existing installations need no
 migration: the new Store starts empty. Malformed/out-of-retention records are
 ignored or pruned on restore.
+
+The in-memory sequence is exposed as an execution-history revision so the
+dashboard can refresh only the affected evidence/chart regions. The revision
+is not persistent control state. A random controller runtime session ID is
+stored with every new event so verified EV protection spans never bridge a
+Home Assistant restart merely because two retained records have compatible
+commands.
 
 ## Scope
 

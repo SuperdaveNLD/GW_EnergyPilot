@@ -80,6 +80,7 @@ class ExecutionHistoryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_event_survives_restart_with_nested_evidence(self):
         first = self.history()
+        self.assertEqual(first.revision, 0)
         await first.async_append(
             {
                 "occurred_at": self.now,
@@ -90,10 +91,19 @@ class ExecutionHistoryTests(unittest.IsolatedAsyncioTestCase):
         restored = self.history()
         await restored.async_restore()
         rows = await restored.async_history()
+        self.assertEqual(restored.revision, 1)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["plan"]["p_batt_w"], -3000)
         self.assertEqual(rows[0]["outcome"]["verification_status"], "verified")
         self.assertTrue(rows[0]["event_id"].endswith(":1"))
+
+    async def test_revision_advances_for_each_append(self):
+        history = self.history()
+        await history.async_restore()
+        self.assertEqual(history.revision, 0)
+        await history.async_append({"occurred_at": self.now})
+        await history.async_append({"occurred_at": self.now + timedelta(minutes=1)})
+        self.assertEqual(history.revision, 2)
 
     async def test_retention_and_count_cap_are_both_enforced(self):
         history = self.history()

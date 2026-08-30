@@ -17,6 +17,18 @@ class V039ReleaseTests(unittest.TestCase):
         runtime = (FRONTEND / "gw-energy-pilot-v038-runtime.js").read_text(encoding="utf-8")
         i18n = (FRONTEND / "gw-energy-pilot-v038-i18n.js").read_text(encoding="utf-8")
         version = manifest["version"]
+        stable_v100 = version == "1.0.0"
+        if stable_v100:
+            v100 = (FRONTEND / "gw-energy-pilot-v100.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                "gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source
+            )
+            self.assertIn(
+                'import "./gw-energy-pilot-v051.js?v=1.0.0-stable1"', v100
+            )
+            version = "0.51"
 
         if version == "0.39":
             self.assertIn("gw-energy-pilot-v039.js?v=0.39-release1", init_source)
@@ -41,10 +53,11 @@ class V039ReleaseTests(unittest.TestCase):
                                     )
                                     if version == "0.51":
                                         v051 = (FRONTEND / "gw-energy-pilot-v051.js").read_text(encoding="utf-8")
-                                        self.assertIn(
-                                            "gw-energy-pilot-v051.js?v=0.51-h1",
-                                            init_source,
-                                        )
+                                        if not stable_v100:
+                                            self.assertIn(
+                                                "gw-energy-pilot-v051.js?v=0.51-h1",
+                                                init_source,
+                                            )
                                         self.assertIn(
                                             'import "./gw-energy-pilot-v050.js?v=0.51-h1"',
                                             v051,

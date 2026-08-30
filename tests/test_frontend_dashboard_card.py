@@ -56,6 +56,29 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn('data-series="forecast-soc"', view)
         self.assertIn('t(panel, "socAxis")', view)
 
+    def test_ev_protection_overlay_reuses_verified_execution_history(self) -> None:
+        data = (FRONTEND / "gw-energy-pilot-v027-battery-plan-data.js").read_text(
+            encoding="utf-8"
+        )
+        view = (FRONTEND / "gw-energy-pilot-v027-battery-plan-view.js").read_text(
+            encoding="utf-8"
+        )
+        core = (FRONTEND / "gw-energy-pilot-v027-battery-plan-core.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("normalizeExecutionEvIntervals", data)
+        self.assertIn('outcome.verification_status !== "verified"', data)
+        self.assertIn("runtime_session_id", data)
+        self.assertNotIn("payload?.ev_protection?.intervals", data)
+        self.assertIn('data-series="ev-protection"', view)
+        self.assertIn('data-ev-kind="${interval.kind}"', view)
+        self.assertIn("epV027EvChargeStripes", view)
+        self.assertIn("ev-charge-allowed", view)
+        self.assertIn("ev-discharge-blocked", view)
+        self.assertIn("activeExecutionHistoryChanged(panel, data)", core)
+        self.assertIn("loadChartData(panel, true, false)", core)
+
     def test_v034_flow_direction_neutralizes_legacy_reversal_specificity(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
