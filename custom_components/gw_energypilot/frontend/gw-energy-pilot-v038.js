@@ -1,5 +1,5 @@
-import "./gw-energy-pilot-v038-runtime.js?v=0.51-h1";
-import { localizeV038Controller } from "./gw-energy-pilot-v038-i18n.js?v=0.51-h1";
+import "./gw-energy-pilot-v038-runtime.js?v=1.0.1-beta1";
+import { localizeV038Controller } from "./gw-energy-pilot-v038-i18n.js?v=1.0.1-beta1";
 
 const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";

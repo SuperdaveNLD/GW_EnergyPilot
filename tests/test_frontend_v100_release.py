@@ -15,13 +15,9 @@ class FrontendV100ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_manifest_panel_and_presentation_are_stable_v100(self) -> None:
-        manifest = json.loads(
-            (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
-        )
+    def test_historical_presentation_remains_stable_v100(self) -> None:
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "1.0.0")
-        self.assertIn(f"gw-energy-pilot-v100.js?v={CACHE_KEY}", init_source)
+        self.assertNotIn(f"gw-energy-pilot-v100.js?v={CACHE_KEY}", init_source)
         self.assertIn(
             f'import "./gw-energy-pilot-v051.js?v={CACHE_KEY}"', self.release
         )

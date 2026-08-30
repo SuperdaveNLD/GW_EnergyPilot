@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v1.0.0 · Stable**
+**v1.0.1-beta.1 · Beta prerelease**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -36,6 +36,7 @@ See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.0.1-beta.1.md` — current opt-in beta release notes;
 - `docs/releases/v1.0.0.md` — first stable v1 release notes;
 - `docs/RELEASE_NOTES_V051.md` — development notes for the v0.51 feature layer promoted in v1.0.0;
 - `docs/RELEASE_WORKFLOW.md` — v1 stable/beta branches, tags, gates and HACS selection;
@@ -69,6 +70,20 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v1.0.1-beta.1 highlights
+
+- Legacy integral optimization cadences stored as numbers such as `15.0` are
+  normalized to the selector's canonical `15` form, so opening and saving the
+  options flow does not reject an otherwise supported cadence (#111).
+- Optimize now and EMHASS strategy buttons keep their existing text nodes when
+  live telemetry does not change their label, preserving the native mobile
+  click that WebKit delivers after `pointerup` (#110).
+- The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix now holds
+  both affected controls through rapid telemetry patches and verifies one
+  delivered action without a full render or replaced control.
+- No GoodWe register, EMS command, Automatic Control decision, entity identity,
+  persistent Store or EMHASS ownership behavior changes.
 
 ## v1.0.0 highlights
 

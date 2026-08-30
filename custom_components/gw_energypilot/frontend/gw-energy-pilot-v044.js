@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v043.js?v=0.51-h1";
+import "./gw-energy-pilot-v043.js?v=1.0.1-beta1";
 
 const VERSION = "0.44";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -207,7 +207,8 @@ function patchOptimizeUi(panel) {
   const busy = Boolean(panel.__epV044OptimizePending) || RUNNING_STATES.has(status);
   if (button) {
     button.disabled = !snapshot.entityId || busy;
-    button.textContent = busy ? copy(panel).optimizing : copy(panel).optimize;
+    const nextText = busy ? copy(panel).optimizing : copy(panel).optimize;
+    if (button.textContent !== nextText) button.textContent = nextText;
     button.setAttribute("aria-busy", busy ? "true" : "false");
   }
   patchOrchestrator(panel, root, snapshot.attributes);
