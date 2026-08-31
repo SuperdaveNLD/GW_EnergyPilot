@@ -27,7 +27,7 @@ EXTERNAL_PV_ENTITY_KEYS = (
     CONF_EXTERNAL_PV_ENTITY_4,
 )
 CONF_MAX_POWER = "max_power"
-# Stable legacy option key; v1.0.1-beta.2 defines it as the P_batt Hold band.
+# Stable legacy option key; v1.0.1-beta.3 retains it as the P_batt Hold band.
 CONF_DEADBAND = "deadband"
 CONF_GOODWE_AUTO_DEADBAND = "goodwe_auto_deadband"
 CONF_EV_DEADBAND = "ev_deadband"

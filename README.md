@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v1.0.1-beta.2 · Beta prerelease**
+**v1.0.1-beta.3 · Beta prerelease**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -36,8 +36,9 @@ See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
-- `docs/releases/v1.0.1-beta.2.md` — current opt-in beta release notes;
-- `docs/releases/v1.0.1-beta.1.md` — previous opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.3.md` — current opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.2.md` — previous opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.1.md` — earlier opt-in beta release notes;
 - `docs/releases/v1.0.0.md` — first stable v1 release notes;
 - `docs/RELEASE_NOTES_V051.md` — development notes for the v0.51 feature layer promoted in v1.0.0;
 - `docs/RELEASE_WORKFLOW.md` — v1 stable/beta branches, tags, gates and HACS selection;
@@ -71,6 +72,18 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v1.0.1-beta.3 highlights
+
+- Wall-clock and startup-recovery callbacks wait until Home Assistant Core is
+  running, avoiding false failed EMHASS runs during an ordinary restart.
+- Only an enabled historical recurring automation blocks native scheduling;
+  the manual optimize-now script and a disabled automation no longer cause a
+  false `legacy_yaml_detected` state (#115).
+- The live EMHASS Mapping metric now shows the backend controller's canonical
+  GoodWe mode and target, including Hybrid mode 1 around a zero grid target.
+- The v1.0.1-beta.2 two-deadband behavior and all earlier beta fixes remain
+  included; GoodWe writes and control decisions are unchanged.
 
 ## v1.0.1-beta.2 highlights
 

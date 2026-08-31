@@ -41,7 +41,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=1.0.1-beta2"', self.source
+            'import "./gw-energy-pilot-v039.js?v=1.0.1-beta3"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -149,6 +149,13 @@ class FrontendV041StableDomTests(unittest.TestCase):
         )
         self.assertIn("const value = socLimitValue(panel, kind)", self.source)
 
+    def test_emhass_mapping_uses_backend_controller_decision(self) -> None:
+        self.assertIn("attrs.controller_expected_mode", self.source)
+        self.assertIn("attrs.controller_target_power", self.source)
+        self.assertIn("attrs.controller_command", self.source)
+        self.assertIn("localizedEmsMode(language(panel), expectedMode)", self.source)
+        self.assertIn('command.startsWith("waiting_")', self.source)
+
     def test_v038_legacy_guards_are_disabled_only_for_v041(self) -> None:
         self.assertIn("function stableRuntimeActive(panel)", self.runtime)
         self.assertIn("!stableRuntime && interactionActive(this)", self.runtime)
@@ -222,6 +229,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("exercise_chart_size_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
         self.assertIn("exercise_soc_limit_fallback", browser_test)
+        self.assertIn("exercise_emhass_mapping", browser_test)
         self.assertIn("window.__epBeforeNarrowMain", browser_test)
         self.assertIn(
             "window.__epPanel.shadowRoot.querySelector('main') !==",

@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v039.js?v=1.0.1-beta2";
+import "./gw-energy-pilot-v039.js?v=1.0.1-beta3";
 import {
   FLOW_THRESHOLD_W,
   flowVisualMap,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta2";
+} from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta3";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.0.1-beta2";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.0.1-beta2";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.0.1-beta2";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.0.1-beta3";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.0.1-beta3";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.0.1-beta3";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -1324,13 +1324,35 @@ function patchEmhass(panel, root) {
   patchMetric(card, ["SOC forecast", "SOC-voorspelling", "SOC-prognose"], panel._formatState(socForecast));
   patchMetric(card, ["Load forecast", "Belastingsvoorspelling", "Verbruiksprognose"], panel._formatState(loadForecast));
   patchMetric(card, ["PV forecast", "PV-voorspelling", "PV-prognose"], panel._formatState(pvForecast));
-  const mapping = !Number.isFinite(pBatt)
-    ? t.waiting
-    : pBatt < -FLOW_THRESHOLD_W
-      ? t.modeCharge
-      : pBatt > FLOW_THRESHOLD_W
-        ? t.modeDischarge
-        : t.modeHold;
+  const attrs = optimizeAttributes(panel);
+  const expectedMode = finiteValue(attrs.controller_expected_mode);
+  const expectedTarget = finiteValue(attrs.controller_target_power);
+  const command = String(attrs.controller_command || "");
+  let mapping;
+  if (
+    attrs.controller_enabled === true &&
+    expectedMode !== null &&
+    !command.startsWith("waiting_")
+  ) {
+    const prefix = language(panel) === "nl" ? "Modus" : "Mode";
+    const name = localizedEmsMode(language(panel), expectedMode).name;
+    const setpoint = expectedTarget !== null && expectedTarget !== 0
+      ? ` · ${panel._formatPower(Math.abs(expectedTarget))}`
+      : "";
+    mapping = `${prefix} ${expectedMode} · ${name}${setpoint}`;
+  } else if (attrs.controller_enabled === false || command.startsWith("waiting_")) {
+    mapping = t.waiting;
+  } else {
+    // Compatibility fallback for an older backend that does not expose the
+    // canonical controller decision attributes yet.
+    mapping = !Number.isFinite(pBatt)
+      ? t.waiting
+      : pBatt < -FLOW_THRESHOLD_W
+        ? t.modeCharge
+        : pBatt > FLOW_THRESHOLD_W
+          ? t.modeDischarge
+          : t.modeHold;
+  }
   patchMetric(card, ["Mapping", "Toewijzing", "Aansturing"], mapping);
 
   for (const input of card.querySelectorAll("input[data-soc-slider]")) {

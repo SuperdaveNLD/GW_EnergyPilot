@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v031-window-controls.js?v=1.0.1-beta2";
+import "./gw-energy-pilot-v031-window-controls.js?v=1.0.1-beta3";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const CUSTOM_MODE = "custom";

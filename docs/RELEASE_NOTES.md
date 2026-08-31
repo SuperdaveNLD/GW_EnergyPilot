@@ -17,6 +17,20 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.0.1-beta.3 — Restart-safe scheduling and canonical EMS feedback
+
+Wall-clock boundaries and bounded startup recovery now wait until Home
+Assistant Core is running before entering the optimization/logging chain. An
+ordinary restart no longer creates a misleading failed EMHASS run while the
+delayed recovery is still waiting to build the fresh plan.
+
+Only an enabled historical recurring automation is treated as a competing
+scheduler. Its manual optimize-now helper and a disabled automation no longer
+block EnergyPilot's native schedule (#115). The live EMHASS Mapping value now
+uses the backend controller's canonical expected GoodWe mode and setpoint, so
+Hybrid mode 1 around a zero grid target is presented correctly. See
+`docs/releases/v1.0.1-beta.3.md`.
+
 # v1.0.1-beta.2 — Separate Battery Hold and GoodWe Auto deadbands
 
 Automatic Control now has two explicit neutral boundaries. Battery Hold uses
@@ -110,6 +124,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.0.1-beta.3** | 2026-08-31 | **Beta** | Makes scheduling restart-safe, fixes false legacy-scheduler detection and displays the backend controller's canonical GoodWe mapping. |
 | **1.0.1-beta.2** | 2026-08-30 | **Beta** | Separates Battery Hold on `P_batt` from GoodWe Auto on `P_grid` and adds the centered decision-zone settings panel. |
 | **1.0.1-beta.1** | 2026-08-30 | **Beta** | Normalizes integral legacy optimization intervals and keeps native mobile clicks connected while unchanged Optimize/strategy copy is patched. |
 | **1.0.0** | 2026-08-30 | **Stable** | First stable v1: execution/read-back history, EV protection underlays, source-attribution estimates, historical wanted SOC, presentation fixes and safe tag-only stable/beta channels. |

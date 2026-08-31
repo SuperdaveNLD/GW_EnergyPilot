@@ -22,19 +22,19 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v101.js?v=1.0.1-beta2", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.0.1-beta2"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.0.1-beta2"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.0.1-beta2"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.0.1-beta2"', v045)
+        self.assertIn("gw-energy-pilot-v101.js?v=1.0.1-beta3", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.0.1-beta3"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.0.1-beta3"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.0.1-beta3"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.0.1-beta3"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=1.0.1-beta2"',
+            'import "./gw-energy-pilot-v043.js?v=1.0.1-beta3"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.0.1-beta2"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.0.1-beta2"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.0.1-beta2"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.0.1-beta3"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.0.1-beta3"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.0.1-beta3"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:

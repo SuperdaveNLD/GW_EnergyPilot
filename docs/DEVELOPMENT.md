@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.0.1-beta.2 runtime structure
+## Current v1.0.1-beta.3 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.0.1-beta.2 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.0.1-beta.3 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -82,10 +82,10 @@ All layers are active runtime code. Check subclasses before changing a base meth
 Ownership by active layer:
 
 - v026: read-only dashboard/optimizer price-series caching;
-- v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries;
+- v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries and a pre-log Home Assistant `RUNNING` gate;
 - v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
-- v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup.
+- v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup or recording a slow Core startup as a failed optimization.
 
 Do not add release inheritance merely to change a label or constant when an existing bounded module can own the behavior.
 
@@ -156,8 +156,8 @@ gw-energy-pilot-v101.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.1-beta.2 adds a presentation-only beta wrapper and one complete
-`1.0.1-beta2` active-graph cache boundary. The nested v0.51 feature layer owns
+v1.0.1-beta.3 retains the presentation-only beta wrapper and advances one complete
+`1.0.1-beta3` active-graph cache boundary. The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
 plan data/view owners implement Recorder attribution,
 wanted-SOC history and verified runtime-session-bounded EV underlays. v0.50 retains
@@ -173,6 +173,9 @@ refresh, PV presentation and static-flow DOM/CSS.
 The existing settings module owns the two-deadband configuration panel and its
 zero-centered explanatory scale. Control behavior remains owned by the backend
 config and controller modules; the beta wrapper does not reinterpret it.
+The v0.41 stable-DOM EMHASS metric displays the backend controller's canonical
+expected mode/setpoint attributes; it must not grow a parallel Hybrid/EV
+decision implementation.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 

@@ -1,4 +1,4 @@
-"""Run the v1.0.1-beta.2 frontend regression matrix."""
+"""Run the v1.0.1-beta.3 frontend regression matrix."""
 
 from __future__ import annotations
 

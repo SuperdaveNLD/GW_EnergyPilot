@@ -4,6 +4,27 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.0.1-beta.3] - 2026-08-31
+
+### Fixed
+
+- Skip wall-clock and startup-recovery optimization attempts while Home
+  Assistant Core is still starting, so an expected restart boundary is not
+  persisted as a failed EMHASS run before the delayed recovery can succeed.
+- Treat only the enabled legacy
+  `automation.energypilot_emhass_orchestrator` as a competing scheduler; the
+  manual legacy optimize script and a disabled automation no longer produce a
+  false `legacy_yaml_detected` error (#115).
+- Render the dashboard EMHASS mapping from the backend controller's canonical
+  expected mode/setpoint. Hybrid `P_batt = +775 W`, `P_grid = 0 W` now shows
+  mode 1 instead of the obsolete Battery-only mode-12 interpretation.
+
+### Validation and compatibility
+
+- Add startup-boundary, bounded-retry, legacy-scheduler and stable-DOM mapping
+  regressions. GoodWe registers/writes, control decisions, identities and Store
+  schemas are unchanged.
+
 ## [1.0.1-beta.2] - 2026-08-30
 
 ### Added

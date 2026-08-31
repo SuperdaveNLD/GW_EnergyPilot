@@ -37,7 +37,10 @@ If this package is currently installed:
 9. Enable Automatic Control
 ```
 
-EnergyPilot v0.10 detects the legacy script/automation names and prevents its recurring scheduler from starting next to this package.
+Current EnergyPilot detects the enabled legacy
+`automation.energypilot_emhass_orchestrator` and prevents its native recurring
+schedule from starting next to it. The manual legacy optimize-now script alone
+is not a scheduler, and a disabled automation does not compete.
 
 ### Price source
 

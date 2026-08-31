@@ -527,6 +527,71 @@ def exercise_setpoint_update(page: Page) -> dict[str, object]:
         }
 
 
+def exercise_emhass_mapping(page: Page) -> dict[str, object]:
+    """Use the backend decision instead of reinterpreting P_batt in the UI."""
+    if EXPECTED_ENTRYPOINT not in STABLE_ENTRYPOINTS:
+        return {"ran": False, "mode1": False, "mode10": False, "stable": False}
+    try:
+        return page.evaluate(
+            """
+            async () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const metric = [...root.querySelectorAll('.panel-card.emhass .metric')].find(
+                node => ['Mapping', 'Toewijzing', 'Aansturing'].includes(
+                  node.querySelector('.metric-label')?.textContent?.trim()
+                )
+              );
+              const value = metric?.querySelector('.metric-value');
+              const main = root.querySelector('main');
+              const settle = () => new Promise(resolve => setTimeout(resolve, 180));
+              const setDecision = (command, mode, target, pBatt, pGrid) => {
+                window.__epSetEntity('sensor.p_batt_forecast', pBatt, {
+                  unit_of_measurement: 'W',
+                });
+                window.__epSetEntity('sensor.p_grid_forecast', pGrid, {
+                  unit_of_measurement: 'W',
+                });
+                window.__epSetEntityByKey('optimize_now', 'unknown', {
+                  controller_enabled: true,
+                  controller_command: command,
+                  controller_expected_mode: mode,
+                  controller_target_power: target,
+                  p_batt_value: pBatt,
+                  p_grid_value: pGrid,
+                });
+              };
+
+              setDecision('hybrid_grid_zero_auto', 1, 0, 775, 0);
+              await settle();
+              const mode1 = value?.textContent?.trim() || '';
+
+              setDecision('hybrid_grid_export', 10, 14128, 15000, -14128);
+              await settle();
+              const mode10 = value?.textContent?.trim() || '';
+
+              setDecision('battery_charge', 11, -1200, -1200, 1100);
+              await settle();
+              return {
+                ran: true,
+                mode1: mode1 === 'Mode 1 · GoodWe Auto / AI',
+                mode10: mode10 === 'Mode 10 · Grid export target · 14.1 kW',
+                stable: root.querySelector('main') === main &&
+                  [...root.querySelectorAll('.panel-card.emhass .metric')].includes(metric),
+              };
+            }
+            """
+        )
+    except PlaywrightError as err:
+        return {
+            "ran": True,
+            "mode1": False,
+            "mode10": False,
+            "stable": False,
+            "error": str(err),
+        }
+
+
 def exercise_automatic_control(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "present": False,
@@ -3893,6 +3958,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 
     strategy_note = exercise_strategy_note_stability(page)
     setpoint_update = exercise_setpoint_update(page)
+    emhass_mapping = exercise_emhass_mapping(page)
     static_flow = exercise_static_flow(page)
     connectivity = exercise_connectivity_status(page, profile)
     ev_protection = exercise_ev_protection_banner(page)
@@ -3959,6 +4025,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "telemetry_identity": telemetry_identity,
         "strategy_note": strategy_note,
         "setpoint_update": setpoint_update,
+        "emhass_mapping": emhass_mapping,
         "static_flow": static_flow,
         "connectivity": connectivity,
         "ev_protection": ev_protection,
@@ -3996,6 +4063,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     identity = result["telemetry_identity"]
     strategy_note = result["strategy_note"]
     setpoint_update = result["setpoint_update"]
+    emhass_mapping = result["emhass_mapping"]
     static_flow = result["static_flow"]
     connectivity = result["connectivity"]
     ev_protection = result["ev_protection"]
@@ -4033,7 +4101,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v050": "v0.50 BETA",
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
-        "v101": "v1.0.1-beta.2 BETA",
+        "v101": "v1.0.1-beta.3 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -4084,6 +4152,14 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     ):
         failures.append(
             f"{name}: EMS setpoint update evidence is missing or rebuilt: {setpoint_update}"
+        )
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and not all(
+        emhass_mapping.get(key) is True
+        for key in ("ran", "mode1", "mode10", "stable")
+    ):
+        failures.append(
+            f"{name}: EMHASS mapping diverged from the backend controller decision: "
+            f"{emhass_mapping}"
         )
     expected_initial = {
         "pv": ("active", "right", "high", "→"),

@@ -106,7 +106,9 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
         if self._legacy_yaml_present():
             self._set_status(
                 "legacy_yaml_detected",
-                "A legacy EnergyPilot EMHASS YAML scheduler is still loaded.",
+                "The legacy automation.energypilot_emhass_orchestrator "
+                "scheduler is enabled. Disable or remove it before using the "
+                "native EnergyPilot schedule.",
             )
             return
 
@@ -305,7 +307,15 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
 
     async def _async_wall_clock_tick(self, now: datetime) -> None:
         """Optimize or publish exactly once for a local wall-clock boundary."""
-        if not self.enabled or self._wall_clock_lock.locked():
+        # A wall-clock boundary can occur while Home Assistant is still
+        # starting. Skip it before entering the optimization/logging chain;
+        # v0.44 owns the delayed startup recovery attempt once dependencies
+        # have had time to settle.
+        if (
+            self.hass.state is not CoreState.running
+            or not self.enabled
+            or self._wall_clock_lock.locked()
+        ):
             return
 
         async with self._wall_clock_lock:

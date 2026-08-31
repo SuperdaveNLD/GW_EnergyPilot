@@ -22,7 +22,7 @@ GoodWe GW15K-ETA-G20
 Current release line:
 
 ```text
-v1.0.1-beta.2 Beta prerelease
+v1.0.1-beta.3 Beta prerelease
 ```
 
 Release-channel migration is prepared for v1:
@@ -39,11 +39,11 @@ Follow `docs/RELEASE_WORKFLOW.md`; do not reuse or move published tags.
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v1.0.1-beta.2)
+## Frontend stability contract (v0.41+, active v1.0.1-beta.3)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.0.1-beta.2 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.0.1-beta.3 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -385,7 +385,7 @@ gw-energy-pilot-v101.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.1-beta.2 owns beta release presentation and the complete `1.0.1-beta2` cache boundary. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v1.0.1-beta.3 owns beta release presentation and the complete `1.0.1-beta3` cache boundary. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

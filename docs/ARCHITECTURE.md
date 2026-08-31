@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v1.0.1-beta.2**.
+This document describes the current runtime architecture of **GW EnergyPilot v1.0.1-beta.3**.
 
 ## High-level flow
 
@@ -301,6 +301,17 @@ Responsibilities are layered deliberately:
 - v033: refresh the persistent canonical plan after a successful optimize/publish cycle and increment `plan_revision` in a `finally` block after the refresh attempt.
 - v044: schedule one non-blocking first post-restart optimization after 60 seconds, retry transient dependency failures after 15/30/60 seconds, and skip the sequence after any newer successful optimization.
 
+Wall-clock callbacks and v0.44 recovery callbacks return before entering the
+optimization/logging chain while Home Assistant Core is not yet `RUNNING`.
+This keeps an ordinary restart boundary out of the persistent failed-run log;
+the bounded recovery sequence remains responsible for the first post-startup
+solve.
+
+Native scheduling is blocked only when the legacy
+`automation.energypilot_emhass_orchestrator` entity exists and is enabled. The
+historical optimize-now script is manual, not a scheduler, and a disabled
+legacy automation cannot compete with EnergyPilot's wall-clock owner.
+
 The EnergyPilot-required runtime contract is defined once in `emhass_sync.py` and reused by both explicit **Synchronize required config** and automatic pre-solve preparation:
 
 ```text
@@ -330,6 +341,12 @@ inverter_is_hybrid
 The Settings → EMHASS synchronization API derives its managed-value list from the same `SYNCED_CONFIG_KEYS` definition, so UI ownership cannot drift away from the backend contract.
 
 `plan_revision` is deterministic freshness evidence for UI consumers. It does not replace EMHASS plan content or become a second optimizer version.
+
+The dashboard's live EMHASS **Mapping** metric consumes the controller's
+existing `controller_expected_mode` and `controller_target_power` diagnostics.
+It does not reimplement Battery/Grid/Hybrid/EV decision semantics in frontend
+code; older backends without those attributes retain the historical
+Battery-only display fallback.
 
 Fresh-output validation in v031 uses Home Assistant `State.last_reported` as proof of a new `P_batt` report. `last_updated` remains a compatibility fallback for older State-like test doubles. A repeated numeric `P_batt` is therefore valid when EMHASS actually reported it again. The existing finite-number and optimizer-ready gates remain mandatory.
 
@@ -469,7 +486,7 @@ gw-energy-pilot-v101.js
                                                                              -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card and source-attributed detailed plan graph. The existing settings module owns the two-deadband panel and zero-centered explanatory scale while backend config/controller modules own their semantics. v1.0.1-beta.2 owns beta presentation and the complete `1.0.1-beta2` active-graph cache boundary.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card and source-attributed detailed plan graph. The existing settings module owns the two-deadband panel and zero-centered explanatory scale while backend config/controller modules own their semantics. v1.0.1-beta.3 owns beta presentation and the complete `1.0.1-beta3` active-graph cache boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 
