@@ -3155,7 +3155,7 @@ def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]
 
 def exercise_chart_range_press(page: Page, profile: Profile) -> dict[str, object]:
     """Switch 12/24/36-hour views without reloading Recorder or replacing controls."""
-    enabled = EXPECTED_ENTRYPOINT == "v050"
+    enabled = EXPECTED_ENTRYPOINT in {"v050", "v110"}
     result: dict[str, object] = {
         "ran": enabled,
         "refresh_during_press": False,
@@ -4791,7 +4791,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh interrupted an S/M/L chart-size press")
     if chart_size_press["error"]:
         failures.append(f"{name}: chart-size press interaction error")
-    if EXPECTED_ENTRYPOINT == "v050" and not all(
+    if EXPECTED_ENTRYPOINT in {"v050", "v110"} and not all(
         chart_range_press[key] is True
         for key in (
             "ran", "refresh_during_press", "click_delivered",

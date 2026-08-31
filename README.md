@@ -27,17 +27,17 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.0.0` remains the stable production release. `v1.0.1-beta.4` is the
-published beta base and `v1.1.0-beta.1` is the next opt-in beta that combines
-those fixes with the new managed battery profiles. Normal users keep the HACS
-prerelease switch off. Testers explicitly enable the
+`v1.0.0` remains the stable production release. `v1.1.0-beta.1` is the current
+opt-in beta and combines every v1.0.1 beta fix with managed battery profiles,
+selectable plan-chart ranges and clearer internal/external PV flow. Normal users
+keep the HACS prerelease switch off. Testers explicitly enable the
 HACS prerelease switch for GW EnergyPilot and can then select a published beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
-- `docs/releases/v1.1.0-beta.1.md` — managed battery ranges and Chargegasm beta notes;
+- `docs/releases/v1.1.0-beta.1.md` — Chargegasm, plan ranges and PV-flow beta notes;
 - `docs/releases/v1.0.1-beta.4.md` — current opt-in beta release notes;
 - `docs/releases/v1.0.1-beta.3.md` — previous opt-in beta release notes;
 - `docs/releases/v1.0.1-beta.2.md` — earlier opt-in beta release notes;
@@ -90,6 +90,12 @@ Release documentation:
 - Battery Strategy hides editable sliders for managed profiles and shows the
   active policy values instead. Settings → EMHASS contains the complete
   read-only profile comparison.
+- Battery · Plan · Price remembers a 12h rolling, 24h local-day or 36h extended
+  view without another Recorder query for each range click.
+- The compact PV group separates internal ETA/DC PV from aggregated external
+  AC/PCC PV while retaining one combined display total.
+- Automatic Control collapses the connected manual mode/power controls to a
+  compact ownership summary; manual ownership reveals the same controls again.
 - The desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the
   complete `1.1.0-beta.1-charge1` frontend graph.
 

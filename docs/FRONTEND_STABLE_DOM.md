@@ -119,7 +119,7 @@ PV remains one compact group with one combined total. A structural render create
 
 ## Required invariants
 
-A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button, header connectivity button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. An Automatic Control ON/OFF cycle must additionally preserve the manual pad, mode-grid, mode-button, power-row and slider nodes while changing their semantic visibility and disabled state. A plan refresh must preserve the graph card shell and its S/M/L, expand and window controls while rebuilding its data-dependent contents.
+A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button, header connectivity button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. An Automatic Control ON/OFF cycle must additionally preserve the manual pad, mode-grid, mode-button, power-row and slider nodes while changing their semantic visibility and disabled state. A plan refresh must preserve the graph card shell and its 12h/24h/36h, S/M/L, expand and window controls while rebuilding its data-dependent contents.
 
 ## Regression matrix
 
