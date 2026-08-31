@@ -6,7 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "1.1.0-beta.1-charge1"
+CACHE_KEY = "1.1.0-beta.2-settings1"
 
 
 class FrontendV048ReleaseTests(unittest.TestCase):
@@ -25,8 +25,8 @@ class FrontendV048ReleaseTests(unittest.TestCase):
         v050 = (FRONTEND / "gw-energy-pilot-v050.js").read_text(encoding="utf-8")
         v049 = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "1.1.0-beta.1")
-        self.assertIn("gw-energy-pilot-v110.js?v=1.1.0-beta.1-charge1", init_source)
+        self.assertEqual(manifest["version"], "1.1.0-beta.2")
+        self.assertIn("gw-energy-pilot-v110.js?v=1.1.0-beta.2-settings1", init_source)
         self.assertIn(
             f'import "./gw-energy-pilot-v050.js?v={CACHE_KEY}"',
             active,

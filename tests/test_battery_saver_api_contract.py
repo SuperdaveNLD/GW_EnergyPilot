@@ -79,6 +79,33 @@ class BatterySaverApiContractTests(unittest.TestCase):
             source,
         )
 
+    def test_dashboard_settings_preserve_managed_soc_ownership(self) -> None:
+        settings = (INTEGRATION / "settings_api.py").read_text(encoding="utf-8")
+        generic_start = settings.index("        form_values = _options_for_form")
+        generic_end = settings.index(
+            "    require_restart = await _async_reload_entry"
+        )
+        generic_save = settings[generic_start:generic_end]
+
+        self.assertIn(
+            "BATTERY_SAVER_OPTION_KEYS = (\n"
+            "    CONF_BATTERY_SAVER_MODE,\n"
+            "    CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,\n"
+            ")",
+            settings,
+        )
+        self.assertIn(
+            "preserved_battery_saver = {\n"
+            "            key: form_values.pop(key)\n"
+            "            for key in BATTERY_SAVER_OPTION_KEYS\n"
+            "            if key in form_values\n"
+            "        }",
+            generic_save,
+        )
+        self.assertIn(
+            "stored_options.update(preserved_battery_saver)", generic_save
+        )
+
     def test_custom_cost_editor_uses_one_validated_transaction(self) -> None:
         source = self.source
         self.assertIn(

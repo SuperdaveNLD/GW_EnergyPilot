@@ -24,6 +24,7 @@ from .config_flow import (
 )
 from .const import (
     CONF_BATTERY_SAVER_MODE,
+    CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
     CONF_BUY_PRICE_ADDER,
     CONF_DEADBAND,
     CONF_EMHASS_FALLBACK_LOAD,
@@ -113,6 +114,11 @@ SECTION_EMHASS = "emhass"
 SECTION_EV = "ev"
 SECTION_GOODWE = "goodwe"
 SECTION_PV = "pv"
+
+BATTERY_SAVER_OPTION_KEYS = (
+    CONF_BATTERY_SAVER_MODE,
+    CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
+)
 
 ENERGYPILOT_KEYS = {
     CONF_MAX_POWER_KW,
@@ -1257,9 +1263,14 @@ async def websocket_update_settings(
 
         form_values = _options_for_form(dict(entry.options))
         # Battery Saver is managed by its dedicated control, not by this generic
-        # form schema. Remove it before validation and restore it after converting
-        # the regular form values back to config-entry options.
-        form_values.pop(CONF_BATTERY_SAVER_MODE, None)
+        # form schema. Remove all dedicated ownership options before validation
+        # and restore them after converting the regular form values back to
+        # config-entry options.
+        preserved_battery_saver = {
+            key: form_values.pop(key)
+            for key in BATTERY_SAVER_OPTION_KEYS
+            if key in form_values
+        }
         for key in PV_KEYS:
             form_values.pop(key, None)
         preserved_ev_load_balancing = {
@@ -1285,10 +1296,7 @@ async def websocket_update_settings(
         except (vol.Invalid, TypeError, ValueError) as err:
             connection.send_error(msg["id"], "invalid_settings", str(err))
             return
-        if CONF_BATTERY_SAVER_MODE in entry.options:
-            stored_options[CONF_BATTERY_SAVER_MODE] = entry.options[
-                CONF_BATTERY_SAVER_MODE
-            ]
+        stored_options.update(preserved_battery_saver)
         for key in PV_KEYS:
             if key in entry.options:
                 stored_options[key] = entry.options[key]
