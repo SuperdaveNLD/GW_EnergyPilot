@@ -1,12 +1,12 @@
-import "./gw-energy-pilot-v026-complete.js?v=1.1.0-beta.1-charge1";
+import "./gw-energy-pilot-v026-complete.js?v=1.1.0-beta.2-settings1";
 import {
   CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartRange,
   chartSize, chartSubtitle, chartWindowData, formatTime, loadChartData,
   saveChartRange, saveChartSize, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.1-charge1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.2-settings1";
 import {
   cardBody, ensureStyles, rangeControlHtml, sizeControlHtml,
-} from "./gw-energy-pilot-v027-battery-plan-view.js?v=1.1.0-beta.1-charge1";
+} from "./gw-energy-pilot-v027-battery-plan-view.js?v=1.1.0-beta.2-settings1";
 
 const V041_PANEL_STYLE_ID = "ep-v041-scoped-no-motion";
 const V041_GLOBAL_STYLE_ID = "ep-v041-scoped-global-no-motion";

@@ -4,7 +4,7 @@ import {
   language,
   loadChartData,
   timestampMs,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.1-charge1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.2-settings1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const CARD_ID = "emhass-goodwe-history";

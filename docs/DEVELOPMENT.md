@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.1.0-beta.1 runtime structure
+## Current v1.1.0-beta.2 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.1.0-beta.1 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.1.0-beta.2 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -159,8 +159,8 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.1.0-beta.1 adds the final presentation-only beta wrapper and advances one
-complete `1.1.0-beta.1-charge1` active-graph cache boundary. The bounded
+v1.1.0-beta.2 adds the final presentation-only beta wrapper and advances one
+complete `1.1.0-beta.2-settings1` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested

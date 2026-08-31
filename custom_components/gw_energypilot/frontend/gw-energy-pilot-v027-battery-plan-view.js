@@ -1,7 +1,7 @@
 import {
   chartSubtitle, currentPrice, energyComparison, formatChartTime, formatEnergy,
   formatPower, formatPrice, inferredPlanInterval, nicePowerPeak, planEnergy, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.1-charge1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.2-settings1";
 
 const ACTUAL_IDLE_W = 50;
 

@@ -17,6 +17,19 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.1.0-beta.2 — Managed-profile settings-save hotfix
+
+This beta fixes EP and EMHASS settings saves after a managed Battery Strategy
+profile has been selected. The dedicated
+`battery_saver_soc_limits_managed` ownership flag is now removed before the
+generic dashboard schema validates the remaining options and restored
+unchanged afterward. The prior `extra keys not allowed` error no longer blocks
+unrelated configuration changes.
+
+The fix does not change the selected profile, GoodWe minimum SOC, EMHASS
+policy, automatic control, entities or persistent Stores. It retains all
+v1.1.0-beta.1 features. See `docs/releases/v1.1.0-beta.2.md`.
+
 # v1.1.0-beta.1 — Chargegasm, chart ranges and clearer PV flow
 
 This beta includes every v1.0.1-beta.1 through beta.4 change and adds the new
@@ -172,6 +185,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.1.0-beta.2** | 2026-08-31 | **Beta** | Fixes EP/EMHASS settings saves for managed battery profiles while preserving SOC-limit ownership. |
 | **1.1.0-beta.1** | 2026-08-31 | **Beta** | Includes v1.0.1-beta.4 and adds Chargegasm, complete managed SOC ranges, 12h/24h/36h plan views, compact manual ownership and separate internal/external PV routes. |
 | **1.0.1-beta.4** | 2026-08-31 | **Beta** | Adds an exclusive power-or-status EV charging detector and bounded fresh-plan retries after charging stops. |
 | **1.0.1-beta.3** | 2026-08-31 | **Beta** | Makes scheduling restart-safe, fixes false legacy-scheduler detection and displays the backend controller's canonical GoodWe mapping. |

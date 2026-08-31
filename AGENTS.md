@@ -23,8 +23,8 @@ Current release lines:
 
 ```text
 v1.0.0 Stable
-v1.0.1-beta.4 Published beta base
-v1.1.0-beta.1 Next beta
+v1.1.0-beta.1 Previous beta
+v1.1.0-beta.2 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -391,7 +391,7 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.1.0-beta.1 owns final beta presentation and the complete `1.1.0-beta.1-charge1` cache boundary. v1.0.1-beta.4 remains in the chain as its bounded historical beta presentation layer. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v1.1.0-beta.2 owns final beta presentation and the complete `1.1.0-beta.2-settings1` cache boundary. v1.0.1-beta.4 remains in the chain as its bounded historical beta presentation layer. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 
