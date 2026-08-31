@@ -110,6 +110,16 @@ def exercise_emhass_settings(page):
             customInputs: 0,
             customSaved: false,
             customTypography: false,
+            profileChoices: root.querySelectorAll('.ep-v031-bs-mode').length,
+            comparisonRows: root.querySelectorAll('.ep-v031-bs-comparison tbody tr').length,
+            chargegasmVisible: [...root.querySelectorAll('.ep-v031-bs-comparison tbody tr')].some(
+              row => row.textContent.includes('Chargegasm') &&
+                row.textContent.includes('8%') && row.textContent.includes('96%')
+            ),
+            managedSlidersHidden: getComputedStyle(
+              root.querySelector('.ep-v011-soc-controls')
+            ).display === 'none',
+            customSlidersVisible: false,
           };
           const customButton = root.querySelector('.ep-v031-bs-mode[data-bs-mode="custom"]');
           customButton?.click();
@@ -153,13 +163,19 @@ def exercise_emhass_settings(page):
             parseFloat(getComputedStyle(modeTitle).fontSize) >= 12 &&
             parseFloat(getComputedStyle(modeCopy).fontSize) >= 10
           );
+          result.customSlidersVisible = getComputedStyle(
+            root.querySelector('.ep-v011-soc-controls')
+          ).display !== 'none';
           result.viewportContained =
             window.__epScroller.scrollWidth <= window.__epScroller.clientWidth + 2;
           if (
             !result.summary || result.groups < 3 || result.rows < 4 ||
             !result.storedMismatch || !result.synchronizedValue ||
             !result.syncButton || !result.intervalSelect || !result.viewportContained || !result.customMode ||
-            result.customInputs !== 5 || !result.customSaved || !result.customTypography
+            result.customInputs !== 5 || !result.customSaved || !result.customTypography ||
+            result.profileChoices !== 6 || result.comparisonRows !== 5 ||
+            !result.chargegasmVisible || !result.managedSlidersHidden ||
+            !result.customSlidersVisible
           ) {
             throw new Error(`EMHASS settings layout regression: ${JSON.stringify(result)}`);
           }

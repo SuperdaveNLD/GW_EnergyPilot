@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -102,7 +102,7 @@
       connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
-      control_strategy: ["v048", "v049", "v050", "v051", "v100"].includes(ENTRYPOINT) ? "hybrid" : "battery",
+      control_strategy: ["v048", "v049", "v050", "v051", "v100", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery",
       grid_energy_imported_today: 3.2,
       grid_energy_exported_today: 7.8,
       grid_energy_import_total: 1234.5,
@@ -323,20 +323,27 @@
       const modes = [
         ["mad_steve", "Mad-Steve"],
         ["gold_rush", "Gold Rush"],
+        ["chargegasm", "Chargegasm"],
         ["balanced", "Balanced"],
         ["battery_saver", "Battery Saver"],
       ].map(([key, label], index) => ({
         key,
         label,
         description: `${label} test profile`,
-        deficit_threshold_pct: [5, 5, 10, 15][index],
-        surplus_threshold_pct: [95, 95, 95, 95][index],
-        maximum_soc_pct: [100, 100, 100, 100][index],
+        minimum_soc_pct: [5, 5, 8, 10, 10][index],
+        deficit_threshold_pct: [10, 10, 13, 15, 20][index],
+        deficit_cost_factor_pct: [2, 2, 2, 5, 10][index],
+        surplus_threshold_pct: [95, 95, 91, 88, 80][index],
+        surplus_cost_factor_pct: [5, 12, 18, 25, 50][index],
+        maximum_soc_pct: [100, 100, 96, 93, 85][index],
+        stress_cost_factor_pct: [0, 0, 2, 6, 20][index],
+        anti_churn_cost_factor_pct: [2.25, 6, 6, 7, 9][index],
         recommended: key === "balanced",
       }));
       return {
         entry_id: ENTRY_ID,
         managed: batterySaverMode !== "custom",
+        soc_limits_managed: batterySaverMode !== "custom",
         mode: batterySaverMode === "custom" ? null : batterySaverMode,
         modes,
         current_emhass_values: {
@@ -600,7 +607,7 @@
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {
@@ -749,6 +756,7 @@
       v050: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v050.js?browser-harness=1",
       v051: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v051.js?browser-harness=1",
       v100: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v100.js?browser-harness=1",
+      v110: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v110.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -881,7 +889,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

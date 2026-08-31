@@ -15,6 +15,7 @@ from homeassistant.helpers import selector
 from .client import GWModbusClient, GWModbusError
 from .const import (
     CONF_BATTERY_SAVER_MODE,
+    CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
     CONF_BUY_PRICE_ADDER,
     CONF_DEADBAND,
     CONF_EMHASS_FALLBACK_LOAD,
@@ -448,6 +449,10 @@ class GWOptionsFlow(OptionsFlowWithReload):
                 stored_options[CONF_BATTERY_SAVER_MODE] = self.config_entry.options[
                     CONF_BATTERY_SAVER_MODE
                 ]
+            if CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED in self.config_entry.options:
+                stored_options[CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED] = (
+                    self.config_entry.options[CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED]
+                )
             # PV insight is managed from the dedicated dashboard PV tab. Keep
             # those options when the standard Home Assistant options form saves
             # unrelated controller and EMHASS settings.

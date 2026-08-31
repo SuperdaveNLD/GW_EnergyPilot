@@ -17,6 +17,27 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.1.0-beta.1 — Managed battery ranges and Chargegasm
+
+Battery Strategy now offers **Mad-Steve**, **Gold Rush**, **Chargegasm**,
+**Balanced**, **Battery Saver** and **Custom**. The five managed modes have
+explicit hard minimum/maximum SOC ranges, comfort zones, low/high-SOC costs,
+power-stress costs and anti-churn factors. The full comparison is visible in
+**Settings → EMHASS → Battery Saver** and summarized on the Controller card.
+
+Selecting a managed profile writes and verifies its whole-percentage GoodWe
+on-grid minimum before applying the matching EMHASS range and building a fresh
+plan. A failure restores the previous GoodWe minimum, mode and all ten owned
+EMHASS fields. Direct SOC slider/service writes are rejected while a managed
+profile is active; **Custom** preserves current values and restores the two
+sliders. Existing v1.0 managed selections require explicit reselection, so
+installing the beta alone does not change the inverter minimum.
+
+The documentation explains the lower-average-SOC, SOC-window, power and
+throughput rationale and its limits. The profile factors are transparent
+price-relative optimizer policy, not a battery-specific lifetime guarantee.
+See `docs/releases/v1.1.0-beta.1.md` and `docs/BATTERY_SAVER.md`.
+
 # v1.0.0 — First stable production release
 
 The dashboard now links each EnergyPilot controller decision to its plan,
@@ -84,6 +105,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.1.0-beta.1** | 2026-08-31 | **Beta** | Adds Chargegasm, complete managed SOC ranges, read-only profile comparison in Settings and rollback-safe GoodWe/EMHASS minimum ownership. |
 | **1.0.0** | 2026-08-30 | **Stable** | First stable v1: execution/read-back history, EV protection underlays, source-attribution estimates, historical wanted SOC, presentation fixes and safe tag-only stable/beta channels. |
 | **0.50** | 2026-08-30 | **Beta** | Reads GoodWe L1/L2/L3 automatically for one-/three-phase EV guarding, separates writable current-limit control from allocated-current feedback, verifies applied requests and fixes Zaptec/online entity pairing. |
 | **0.49** | 2026-08-30 | **Beta** | Consolidates wall-clock EMHASS plan execution, isolated soft EV load balancing, connectivity/EV safety visibility, persisted EMS evidence and stable graph/SOC/Hybrid presentation fixes. |

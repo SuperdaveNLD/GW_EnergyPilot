@@ -3,7 +3,7 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v1.0.0 Stable**. v1.0.0 retains the complete stable behavior through a presentation-only stable wrapper; its nested v0.51 feature layer adds one scoped execution-history card and owns the complete inner cache boundary.
+This document is the canonical frontend render/interaction decision for **GW EnergyPilot v1.1.0-beta.1**. The beta retains the complete stable behavior through a presentation-only wrapper; its nested v0.51 feature layer adds one scoped execution-history card and the active beta owns the complete inner cache boundary.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,29 +17,30 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v100.js?v=1.0.0-stable1
-       -> gw-energy-pilot-v051.js?v=1.0.0-stable1
-            -> gw-energy-pilot-v051-history.js?v=0.51-h1
-            -> gw-energy-pilot-v050.js?v=0.51-h1
-            -> gw-energy-pilot-v049.js?v=0.51-h1
-                 -> gw-energy-pilot-v048.js?v=0.51-h1
-                      -> gw-energy-pilot-v047.js?v=0.51-h1
-                           -> gw-energy-pilot-v046.js?v=0.51-h1
-                                -> gw-energy-pilot-v045.js?v=0.51-h1
-                                     -> gw-energy-pilot-v044.js?v=0.51-h1
-                                          -> gw-energy-pilot-v043.js?v=0.51-h1
-                                               -> gw-energy-pilot-v042.js?v=0.51-h1
-                                                    -> gw-energy-pilot-v041-emhass-settings.js?v=0.51-h1
-                                                         -> gw-energy-pilot-v041.js?v=0.51-h1
-                                                              -> gw-energy-pilot-v039.js?v=0.51-h1
-                                                                   -> gw-energy-pilot-v038.js?v=0.51-h1
-                                                                        -> gw-energy-pilot-v038-runtime.js?v=0.51-h1
+  -> gw-energy-pilot-v110.js?v=1.1.0-beta.1-charge1
+       -> gw-energy-pilot-v051.js?v=1.1.0-beta.1-charge1
+            -> gw-energy-pilot-v051-history.js?v=1.1.0-beta.1-charge1
+            -> gw-energy-pilot-v050.js?v=1.1.0-beta.1-charge1
+            -> gw-energy-pilot-v049.js?v=1.1.0-beta.1-charge1
+                 -> gw-energy-pilot-v048.js?v=1.1.0-beta.1-charge1
+                      -> gw-energy-pilot-v047.js?v=1.1.0-beta.1-charge1
+                           -> gw-energy-pilot-v046.js?v=1.1.0-beta.1-charge1
+                                -> gw-energy-pilot-v045.js?v=1.1.0-beta.1-charge1
+                                     -> gw-energy-pilot-v044.js?v=1.1.0-beta.1-charge1
+                                          -> gw-energy-pilot-v043.js?v=1.1.0-beta.1-charge1
+                                               -> gw-energy-pilot-v042.js?v=1.1.0-beta.1-charge1
+                                                    -> gw-energy-pilot-v041-emhass-settings.js?v=1.1.0-beta.1-charge1
+                                                         -> gw-energy-pilot-v041.js?v=1.1.0-beta.1-charge1
+                                                              -> gw-energy-pilot-v039.js?v=1.1.0-beta.1-charge1
+                                                                   -> gw-energy-pilot-v038.js?v=1.1.0-beta.1-charge1
+                                                                        -> gw-energy-pilot-v038-runtime.js?v=1.1.0-beta.1-charge1
 ```
 
-The v1.0.0 entrypoint and direct v0.51 feature import use `1.0.0-stable1`.
-Every import inside the feature graph uses `0.51-h1`. This ensures an upgraded
-v0.50 browser cannot reuse older nested plan/history modules while keeping the
-stable wrapper presentation-only.
+The v1.1.0 beta entrypoint and every import inside the feature graph use
+`1.1.0-beta.1-charge1`. This ensures an upgraded browser cannot reuse older
+nested strategy, settings, plan or history modules while keeping the release
+wrapper presentation-only. The historical v1.0.0 wrapper remains available for
+dependency compatibility but is not the active entrypoint.
 
 ## Render ownership
 

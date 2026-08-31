@@ -15,18 +15,23 @@ from .battery_saver import (
     BATTERY_SAVER_CONFIG_KEYS,
     BATTERY_SAVER_MODES,
     CUSTOM_BATTERY_COST_KEYS,
-    MODE_MAD_STEVE,
+    battery_saver_minimum_soc_pct,
     battery_saver_costs_are_zero,
+    battery_saver_mode_requires_stress_support,
     battery_saver_mode_payloads,
     custom_battery_cost_updates,
     emhass_supports_battery_stress,
     normalize_battery_saver_mode,
     number_of_batteries,
 )
-from .const import CONF_BATTERY_SAVER_MODE, DOMAIN
+from .const import (
+    CONF_BATTERY_SAVER_MODE,
+    CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
+    DOMAIN,
+)
 from .emhass_config import async_get_emhass_config, async_write_emhass_config
+from .soc_limits import async_set_goodwe_minimum_soc, goodwe_minimum_soc_pct
 
-GOODWE_ON_GRID_MINIMUM_SOC_KEY = "battery_discharge_depth_on_grid"
 CUSTOM_MODE = "custom"
 SELECTABLE_MODES: tuple[str, ...] = (*BATTERY_SAVER_MODES, CUSTOM_MODE)
 CUSTOM_BATTERY_COST_SCHEMA = {
@@ -53,17 +58,8 @@ def _percentage(value: Any) -> float | None:
 
 
 def _goodwe_minimum_soc(entry: ConfigEntry) -> float | None:
-    runtime = getattr(entry, "runtime_data", None)
-    coordinator = getattr(runtime, "coordinator", None)
-    snapshot = getattr(coordinator, "data", None)
-    if snapshot is None:
-        return None
-    raw = snapshot.values.get(GOODWE_ON_GRID_MINIMUM_SOC_KEY)
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        return None
-    return float(value) if 0 <= value <= 100 else None
+    value = goodwe_minimum_soc_pct(entry)
+    return float(value) if value is not None else None
 
 
 def _payload(entry: ConfigEntry, config: dict[str, Any]) -> dict[str, Any]:
@@ -85,6 +81,10 @@ def _payload(entry: ConfigEntry, config: dict[str, Any]) -> dict[str, Any]:
     return {
         "entry_id": entry.entry_id,
         "managed": mode is not None,
+        "soc_limits_managed": bool(
+            mode is not None
+            and entry.options.get(CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED)
+        ),
         "mode": mode,
         "legacy_behavior": (
             "mad_steve"
@@ -122,8 +122,8 @@ async def _async_restore_battery_saver_config(
 ) -> str | None:
     """Restore only Battery Saver-owned EMHASS fields after a failed apply.
 
-    Required EnergyPilot contract corrections such as continual_publish and the
-    synchronized hard minimum SOC intentionally remain in place.
+    Required EnergyPilot runtime-contract corrections such as continual_publish
+    intentionally remain in place. Both managed SOC limits are restored here.
     """
     try:
         current = await async_get_emhass_config(hass, entry)
@@ -242,30 +242,43 @@ async def websocket_set_battery_saver(
     emhass_version = getattr(orchestrator, "emhass_version", None)
     if (
         mode is not None
-        and mode != MODE_MAD_STEVE
+        and battery_saver_mode_requires_stress_support(mode)
         and emhass_version is not None
         and not emhass_supports_battery_stress(emhass_version)
     ):
         connection.send_error(
             msg["id"],
             "unsupported_emhass_version",
-            "Gold Rush, Balanced and Battery Saver require EMHASS 0.18.1 or newer",
+            "Chargegasm, Balanced and Battery Saver require EMHASS 0.18.1 or newer",
         )
         return
 
     old_options = dict(entry.options)
     previous_profile = getattr(orchestrator, "last_battery_saver_profile", None)
     previous_effective_soc = getattr(orchestrator, "last_effective_soc_final", None)
+    previous_goodwe_minimum = goodwe_minimum_soc_pct(entry)
+    goodwe_changed = False
     new_options = dict(old_options)
     if mode is None:
         # Custom starts from the exact currently effective EMHASS values. Only
         # release EnergyPilot's preset ownership; do not reset any battery field.
         new_options.pop(CONF_BATTERY_SAVER_MODE, None)
+        new_options.pop(CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED, None)
     else:
         new_options[CONF_BATTERY_SAVER_MODE] = mode
-    hass.config_entries.async_update_entry(entry, options=new_options)
+        new_options[CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED] = True
 
     try:
+        if mode is not None:
+            if previous_goodwe_minimum is None:
+                raise HomeAssistantError(
+                    "GoodWe on-grid minimum SOC is unavailable; no profile setting was changed"
+                )
+            requested_minimum = battery_saver_minimum_soc_pct(mode)
+            if previous_goodwe_minimum != requested_minimum:
+                await async_set_goodwe_minimum_soc(entry, requested_minimum)
+                goodwe_changed = True
+        hass.config_entries.async_update_entry(entry, options=new_options)
         await orchestrator.async_optimize(reason="battery_saver_changed")
     except Exception as err:  # noqa: BLE001 - rollback must cover all failed runs
         # Do not leave a mode transition active if the first complete policy+plan
@@ -277,9 +290,20 @@ async def websocket_set_battery_saver(
         rollback_error = await _async_restore_battery_saver_config(
             hass, entry, config
         )
+        goodwe_rollback_error = None
+        if goodwe_changed and previous_goodwe_minimum is not None:
+            try:
+                await async_set_goodwe_minimum_soc(entry, previous_goodwe_minimum)
+            except HomeAssistantError as rollback_err:
+                goodwe_rollback_error = str(rollback_err)
         message = str(err)
         if rollback_error:
             message += f"; Battery Saver EMHASS rollback also failed: {rollback_error}"
+        if goodwe_rollback_error:
+            message += (
+                "; Battery Saver GoodWe minimum-SOC rollback also failed: "
+                f"{goodwe_rollback_error}"
+            )
         connection.send_error(msg["id"], "apply_failed", message)
         return
 
@@ -359,6 +383,7 @@ async def websocket_set_custom_battery_costs(
     previous_effective_soc = getattr(orchestrator, "last_effective_soc_final", None)
     new_options = dict(old_options)
     new_options.pop(CONF_BATTERY_SAVER_MODE, None)
+    new_options.pop(CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED, None)
     hass.config_entries.async_update_entry(entry, options=new_options)
 
     updated_config = dict(config)

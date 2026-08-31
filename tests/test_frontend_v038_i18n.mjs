@@ -52,6 +52,11 @@ const backendEnglishModes = [
     description: "English backend Gold Rush description",
   },
   {
+    key: "chargegasm",
+    label: "Chargegasm",
+    description: "English backend Chargegasm description",
+  },
+  {
     key: "balanced",
     label: "Balanced",
     description: "English backend Balanced description",
@@ -64,6 +69,7 @@ const backendEnglishModes = [
 ];
 const localizedProfiles = canonicalProfiles("nl", backendEnglishModes);
 assert.equal(localizedProfiles.find((item) => item.key === "balanced").label, "Gebalanceerd");
+assert.equal(localizedProfiles.find((item) => item.key === "chargegasm").label, "Chargegasm");
 assert.equal(
   localizedProfiles.find((item) => item.key === "battery_saver").label,
   "Batterijbesparing"
@@ -74,6 +80,10 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   localizedProfiles.find((item) => item.key === "gold_rush").description,
+  /English backend/
+);
+assert.doesNotMatch(
+  localizedProfiles.find((item) => item.key === "chargegasm").description,
   /English backend/
 );
 

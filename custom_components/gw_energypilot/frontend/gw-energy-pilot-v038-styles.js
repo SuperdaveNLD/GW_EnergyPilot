@@ -11,7 +11,7 @@ export function ensureV038Styles(root) {
     .ep-v038-title { margin-top:3px; color:#e8f7fc; font-size:17px; font-weight:860; }
     .ep-v038-description { max-width:820px; margin-top:5px; color:#7696aa; font-size:11px; line-height:1.5; }
     .ep-v038-profile-grid {
-      display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:12px;
+      display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px;
     }
     .ep-v038-profile {
       appearance:none; position:relative; box-sizing:border-box; width:100%; min-width:0; min-height:86px;
@@ -40,6 +40,7 @@ export function ensureV038Styles(root) {
       overflow-wrap:anywhere; hyphens:auto;
     }
     .ep-v038-profile[aria-pressed="true"] small { color:#91b8b6; }
+    .ep-v038-profile-range { display:block; margin-top:7px; color:#9ab6c5; font-size:9px; font-weight:800; }
     .ep-v038-badge {
       position:absolute; top:8px; right:8px; color:#70e8c2; font-size:8px; font-weight:900; letter-spacing:.08em;
     }
@@ -73,6 +74,13 @@ export function ensureV038Styles(root) {
     }
     .ep-v038-custom-save:disabled { opacity:.5; cursor:wait; }
     .ep-v038-custom-note { margin-top:9px; color:#6f8ea1; font-size:9px; line-height:1.5; }
+    .ep-v038-managed {
+      margin-top:11px; padding:11px; border:1px solid rgba(67,188,215,.12); border-radius:11px;
+      background:rgba(5,24,42,.38);
+    }
+    .ep-v038-managed-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin-top:9px; }
+    .ep-v038-managed-grid span { padding:8px; border:1px solid rgba(76,157,202,.10); border-radius:8px; color:#7899aa; font-size:9px; }
+    .ep-v038-managed-grid strong { display:block; margin-top:3px; color:#d9edf5; font-size:11px; }
     .ep-v038-diagnostic-note { margin-top:10px; color:#66869a; font-size:10px; }
 
     /* v0.38 owns physical particle direction. The old inbound/outbound and
@@ -115,11 +123,11 @@ export function ensureV038Styles(root) {
 
     @media (max-width:1000px) {
       .ep-v038-profile-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
-      .ep-v038-custom-values { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .ep-v038-custom-values,.ep-v038-managed-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
     }
     @media (max-width:650px) {
       .ep-v038-profile-grid { grid-template-columns:1fr 1fr; }
-      .ep-v038-custom-grid,.ep-v038-custom-values { grid-template-columns:1fr; }
+      .ep-v038-custom-grid,.ep-v038-custom-values,.ep-v038-managed-grid { grid-template-columns:1fr; }
     }
     @media (max-width:430px) { .ep-v038-profile-grid { grid-template-columns:1fr; } }
   `;

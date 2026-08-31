@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v1.0.0 · Stable**
+**v1.1.0-beta.1 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -27,8 +27,8 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v0.50` remains the final published historical 0.x Beta. `v1.0.0` is the first
-stable production release under the new contract. Normal users keep the HACS
+`v1.0.0` remains the current stable production release. `v1.1.0-beta.1` is the
+next opt-in test release under the new contract. Normal users keep the HACS
 prerelease switch off. Testers explicitly enable the
 HACS prerelease switch for GW EnergyPilot and can then select a published beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
@@ -36,6 +36,7 @@ See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.1.0-beta.1.md` — managed battery ranges and Chargegasm beta notes;
 - `docs/releases/v1.0.0.md` — first stable v1 release notes;
 - `docs/RELEASE_NOTES_V051.md` — development notes for the v0.51 feature layer promoted in v1.0.0;
 - `docs/RELEASE_WORKFLOW.md` — v1 stable/beta branches, tags, gates and HACS selection;
@@ -69,6 +70,15 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v1.1.0-beta.1 highlights
+
+- Adds **Chargegasm** between Gold Rush and Balanced as the lighter battery-preservation profile.
+- Every managed profile owns a complete hard SOC range, matching comfort zone and price-relative low/high-SOC, power-stress and anti-churn costs.
+- Selecting a managed profile applies the EMHASS policy and verified GoodWe Minimum SOC as one rollback-safe transaction; **Custom** returns both SOC sliders and all cost controls to the operator.
+- Battery Strategy hides the editable sliders for managed profiles and shows the active policy values instead.
+- Settings → EMHASS contains the complete read-only profile comparison, while `docs/BATTERY_SAVER.md` documents the rationale and limitations.
+- The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the `1.1.0-beta.1-charge1` frontend graph.
 
 ## v1.0.0 highlights
 
@@ -116,9 +126,7 @@ Release documentation:
 
 - **Custom / Aangepast** is a first-class Battery Saver choice in both the dashboard and Settings → EMHASS.
 - Administrators can edit the five supported raw EMHASS battery cost values in one validated transaction and immediately rebuild the plan; a failed write or first optimization restores the previous Battery Saver configuration.
-- Gold Rush, Balanced and Battery Saver use a 6% × dynamic-price-reference anti-churn floor per direction. Mad-Steve retains its deliberately aggressive 2.25% floor.
-- Gold Rush power stress is reduced to 1% × dynamic price reference after field comparison, while Balanced and Battery Saver retain 8% and 20%.
-- All managed profiles can reach 100% SOC. A shared soft red zone above 95% applies profile-specific high-SOC dwell costs instead of hard-capping usable capacity.
+- Gold Rush uses a 6% × dynamic-price-reference anti-churn factor per direction and 1% power stress after field comparison. Balanced and Battery Saver retain the v0.47 values documented in its release notes.
 - Battery Strategy and Battery Saver settings typography is larger across desktop and touch layouts without changing the stable-DOM/native-scroll contract.
 - The complete active frontend graph uses the fresh `0.47-custom-battery1` cache key.
 - No GoodWe register/write, EMS/Automatic Control decision, entity identity, Store, plan-resilience or accounting contract changes.
@@ -221,7 +229,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - safe EMHASS required-config synchronization that preserves installation topology;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
 - deterministic Battery Plan refresh after EnergyPilot optimizations;
-- four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences, profile-owned maximum SOC and anti-churn battery-throughput costs;
+- five EnergyPilot battery profiles with price-relative SOC/power preferences, profile-owned minimum/maximum SOC and anti-churn battery-throughput costs;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
 - persistent latest successful EMS-setpoint update evidence in Controller diagnostics;
@@ -428,19 +436,19 @@ validate request
 
 If `45356` is unavailable, neither system is changed. If EMHASS fails after a verified GoodWe write, EnergyPilot attempts to restore the previous GoodWe value.
 
-There is no startup/background SOC synchronization.
+There is no startup/background SOC synchronization for Custom. Selecting a managed battery profile is an explicit transaction that writes and verifies its GoodWe minimum before applying the matching EMHASS range.
 
-The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains an EMHASS hard limit; when a Battery Saver profile is managed, EnergyPilot owns that EMHASS maximum as part of the selected profile.
+The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. A managed battery profile owns both hard SOC limits; Custom restores direct access to the existing synchronized NumberEntities.
 
 ## Battery Saver
 
-Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes a GoodWe mode directly. The public profiles are **Mad-Steve**, **Gold Rush**, **Balanced** and **Battery Saver**.
+Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes a GoodWe EMS mode directly. The public profiles are **Mad-Steve**, **Gold Rush**, **Chargegasm**, **Balanced** and **Battery Saver**.
 
-Choose **Custom / Aangepast** to keep direct ownership of the active EMHASS battery policy. The dashboard and **Settings → EMHASS → Battery Saver** expose the same five editable raw cost values: low-SOC cost, high-SOC cost, battery power stress, charge cost and discharge cost. **Save and optimize** writes the complete intended EMHASS configuration without replacing unrelated settings and immediately builds a fresh plan. Custom editing currently requires one EMHASS battery model; Minimum and Maximum SOC continue to use their existing synchronized Home Assistant number entities.
+Choose **Custom / Aangepast** to keep direct ownership of the active EMHASS battery policy. The dashboard and **Settings → EMHASS → Battery Saver** expose the same five editable raw cost values plus the existing Minimum and Maximum SOC sliders. **Save and optimize** writes the complete intended EMHASS configuration without replacing unrelated settings and immediately builds a fresh plan. Custom editing currently requires one EMHASS battery model.
 
-Managed profiles use price-relative charge/discharge anti-churn costs and profile-specific SOC/power-stress behavior. All four profiles can reach **100%**. The range above **95%** is a soft red zone with an hourly high-SOC dwell cost, so EMHASS only uses it when the expected value is high enough and avoids remaining full unnecessarily. Minimum SOC remains the GoodWe-synchronized hard floor.
+Managed profiles hide the SOC sliders and show their hard range, comfort zone and preservation factors read-only. Selecting one first writes and verifies its whole-percentage GoodWe minimum, then applies the matching EMHASS minimum, maximum and economic profile before publishing a fresh plan. Failure restores the previous GoodWe minimum, mode and all owned EMHASS fields.
 
-Mad-Steve retains **2.25% × price reference per direction** for maximum trading freedom. Gold Rush, Balanced and Battery Saver use the field-tuned **6% × price reference per direction** anti-churn floor. Gold Rush also uses a lighter **1% × price reference** power-stress cost; Balanced and Battery Saver retain their existing 8% and 20% stress factors.
+The complete comparison and the cell-aging rationale behind lower average SOC, power stress and throughput costs are shown in **Settings → EMHASS → Battery Saver** and documented in `docs/BATTERY_SAVER.md`. The factors are transparent optimizer policy, not a battery-specific lifetime promise.
 
 See `docs/BATTERY_SAVER.md` for exact profile factors and ownership.
 

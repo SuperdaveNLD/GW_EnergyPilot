@@ -42,8 +42,9 @@ orchestrator_v033.py    persistent official-plan refresh + deterministic plan_re
 orchestrator_v044.py    bounded non-blocking post-restart optimization recovery
 plan_runtime.py         validated /api/v1/plan mirror + Store lifecycle/current-value lookup
 battery_plan.py         pure plan normalization/timestep/validity helpers
-battery_saver.py        four Battery Saver profiles + nine owned EMHASS policy fields
+battery_saver.py        five Battery Saver profiles + ten owned EMHASS policy fields
 battery_saver_api.py    admin Battery Saver read/apply/rollback API
+soc_limits.py           shared verified GoodWe minimum-SOC read/write/publish helper
 price_series.py         pure timestamped price-series helpers
 battery_price_api.py    read-only battery/price/plan chart WebSocket API
 accounting.py           persistent daily grid-accounting runtime
@@ -137,7 +138,7 @@ post-refresh read-back but can never own or retry a command.
 Top level:
 
 ```text
-gw-energy-pilot-v100.js
+gw-energy-pilot-v110.js
     -> gw-energy-pilot-v051.js
          -> gw-energy-pilot-v051-history.js
          -> gw-energy-pilot-v050.js
@@ -156,9 +157,9 @@ gw-energy-pilot-v100.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.0 adds a presentation-only stable wrapper and `1.0.0-stable1` top-level
-cache boundary. The nested v0.51 feature layer owns the complete `0.51-h1`
-inner cache boundary, one canonical EMHASS-to-GoodWe card and targeted history
+v1.1.0-beta.1 adds a presentation-only beta wrapper and complete
+`1.1.0-beta.1-charge1` cache boundary. The nested v0.51 feature layer retains
+one canonical EMHASS-to-GoodWe card and targeted history
 refresh. The nested plan data/view owners implement Recorder attribution,
 wanted-SOC history and verified runtime-session-bounded EV underlays. v0.50 retains
 its release presentation and EV settings ownership; v0.49 retains its release
@@ -295,24 +296,24 @@ The public profile keys/names remain:
 ```text
 mad_steve    -> Mad-Steve
 gold_rush    -> Gold Rush
+chargegasm   -> Chargegasm
 balanced     -> Balanced
 battery_saver-> Battery Saver
 ```
 
 Battery Saver is opt-in for unmanaged installations. Do not silently adopt/overwrite existing custom EMHASS policy values on upgrade.
 
-Managed profile hard maxima are all 100%; the profile distinction above 95% is economic rather than physical:
+The complete profile ranges are:
 
 ```text
-Mad-Steve     100%
-Gold Rush     100%
-Balanced      100%
-Battery Saver 100%
+Mad-Steve      5–100%  comfort 10–95%
+Gold Rush      5–100%  comfort 10–95%
+Chargegasm     8–96%   comfort 13–91%
+Balanced      10–93%   comfort 15–88%
+Battery Saver 10–85%   comfort 20–80%
 ```
 
-All four use `battery_soc_surplus_threshold = 0.95`. Their surplus cost factors are 5% / 10% / 25% / 50% × dynamic price reference in mode order. Current EMHASS applies this as currency/kWh/hour, so every timestep above 95% adds dwell cost and reaching 100% remains possible when the modeled value is sufficient.
-
-The verified GoodWe-synchronized minimum SOC remains a separate hard lower boundary. All managed profile maxima are 100% and remain part of the EMHASS Battery Saver transaction and rollback path. The shared 95% surplus threshold is soft: EMHASS can enter 95–100% but pays the profile-specific surplus cost for every kWh/hour spent there.
+The low/high SOC cost factors are 2/5, 2/12, 2/18, 5/25 and 10/50 percent × dynamic price reference in profile order. The profile minimum is a verified GoodWe `45356` plus EMHASS transaction; the maximum remains EMHASS-only. Existing v1.0 managed entries require explicit reselection before the new minimum is written, so installing the beta alone never mutates the hardware floor.
 
 ### Linear anti-churn versus quadratic power stress
 
@@ -335,18 +336,19 @@ weight_battery_charge    = 2.25% × dynamic price reference
 weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-Gold Rush, Balanced and Battery Saver use the field-tuned transaction floor:
+Gold Rush and Chargegasm use the field-tuned transaction factor:
 
 ```text
 weight_battery_charge    = 6% × dynamic price reference
 weight_battery_discharge = 6% × dynamic price reference
 ```
 
-Gold Rush separately uses `battery_stress_cost = 1% × dynamic price reference`; Balanced and Battery Saver retain 8% and 20%. Keep these distinctions explicit in payload metadata, tests and customer documentation. Battery efficiency remains installation-owned and must not be silently rewritten by a managed profile.
+Balanced raises anti-churn to 7% and Battery Saver to 9%. Power-stress factors are 0% / 0% / 2% / 6% / 20% in mode order. Keep these distinctions explicit in payload metadata, tests and customer documentation. Battery efficiency remains installation-owned and must not be silently rewritten by a managed profile.
 
-Battery Saver owns nine EMHASS fields:
+Battery Saver owns ten EMHASS fields:
 
 ```text
+battery_minimum_state_of_charge
 battery_maximum_state_of_charge
 battery_soc_deficit_threshold
 battery_soc_deficit_cost
@@ -360,7 +362,7 @@ weight_battery_discharge
 
 When extending this list, update apply, rollback, unmanaged/custom detection, diagnostics, tests and `docs/BATTERY_SAVER.md` together.
 
-The Custom editor intentionally exposes only the five economic cost fields already presented in the customer UI. Dashboard and Settings use the same administrator-only `battery_saver/custom_set` WebSocket transaction. Keep its validation finite and non-negative, retain EMHASS scalar/list shapes, preserve the complete unrelated EMHASS configuration and include the write plus first optimization in the rollback boundary. Do not duplicate the Minimum/Maximum SOC entity paths in this transaction.
+The Custom editor intentionally exposes only the five economic cost fields already presented in the customer UI. Dashboard and Settings use the same administrator-only `battery_saver/custom_set` WebSocket transaction. Keep its validation finite and non-negative, retain EMHASS scalar/list shapes, preserve the complete unrelated EMHASS configuration and include the write plus first optimization in the rollback boundary. The existing SOC NumberEntities remain the only slider path and must reject writes while a managed profile is active.
 
 Battery Saver currently supports one EMHASS battery model. Do not broadcast a scalar/list profile over multi-battery configurations without an explicit per-battery ownership design.
 

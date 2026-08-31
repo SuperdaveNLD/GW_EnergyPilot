@@ -22,19 +22,19 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=0.51-h1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=0.51-h1"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=0.51-h1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=0.51-h1"', v045)
+        self.assertIn("gw-energy-pilot-v110.js?v=1.1.0-beta.1-charge1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.1.0-beta.1-charge1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.1.0-beta.1-charge1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.1.0-beta.1-charge1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.1.0-beta.1-charge1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=0.51-h1"',
+            'import "./gw-energy-pilot-v043.js?v=1.1.0-beta.1-charge1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=0.51-h1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=0.51-h1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=0.51-h1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.1.0-beta.1-charge1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.1.0-beta.1-charge1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.1.0-beta.1-charge1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:

@@ -4,6 +4,40 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.1.0-beta.1] - 2026-08-31
+
+### Added
+
+- Added **Chargegasm** between Gold Rush and Balanced with an 8–96% hard SOC
+  range, 13–91% comfort zone, 2% low-SOC cost, 18% high-SOC dwell cost,
+  2% power stress and 6% anti-churn policy steps.
+- Added the complete five-profile comparison to Settings → EMHASS → Battery
+  Saver and read-only hard-range/comfort/cost summaries to the Controller card.
+- Added shared verified GoodWe minimum-SOC helpers so Custom writes and managed
+  profile selection use the same canonical register-45356 read-back path.
+
+### Changed
+
+- Managed profile hard ranges are now Mad-Steve 5–100%, Gold Rush 5–100%,
+  Chargegasm 8–96%, Balanced 10–93% and Battery Saver 10–85%, with matching
+  comfort zones and price-relative factors documented in `docs/BATTERY_SAVER.md`.
+- Managed profiles own ten EMHASS fields including both SOC limits. Their SOC
+  sliders are hidden and backend service writes are rejected until Custom is
+  selected.
+- Balanced anti-churn/power stress move to 7%/6%; Battery Saver to 9%/20%;
+  Gold Rush uses 6%/0%; Chargegasm 6%/2%; Mad-Steve remains 2.25%/0%.
+- Advanced the active frontend to the presentation-only v1.1.0-beta.1 wrapper
+  and complete `1.1.0-beta.1-charge1` cache boundary.
+
+### Safety and compatibility
+
+- A managed selection writes and verifies GoodWe minimum SOC before persisting
+  the mode or applying EMHASS. A failed first solve restores the previous
+  hardware floor, options, runtime profile and all ten owned EMHASS fields.
+- Existing v1.0 managed selections retain their GoodWe floor until the user
+  explicitly selects a profile again, preventing an upgrade-only hardware
+  write. Entity unique IDs, device identity and Custom values remain intact.
+
 ## [1.0.0] - 2026-08-30
 
 ### Added

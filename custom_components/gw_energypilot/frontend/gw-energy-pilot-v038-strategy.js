@@ -3,7 +3,7 @@ import {
   PROFILE_KEYS,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=0.51-h1";
+} from "./gw-energy-pilot-v038-model.js?v=1.1.0-beta.1-charge1";
 
 const TEXT = {
   en: {
@@ -19,6 +19,13 @@ const TEXT = {
     saveCustom: "Save and optimize",
     loading: "Loading battery profiles…",
     customTitle: "Custom battery settings",
+    managedTitle: "Managed profile limits",
+    hardRange: "Hard SOC range",
+    comfortRange: "Comfort zone",
+    lowCost: "Low-SOC cost",
+    highCost: "High-SOC cost",
+    stressCost: "Power stress",
+    antiChurn: "Charge/discharge anti-churn",
     customNote:
       "SOC sliders use the existing Home Assistant entities. Minimum SOC remains synchronized with the GoodWe on-grid battery floor. Enter non-negative custom EMHASS costs below, then save once to build a fresh plan.",
     minimum: "Minimum SOC",
@@ -46,6 +53,13 @@ const TEXT = {
     saveCustom: "Opslaan en optimaliseren",
     loading: "Batterijprofielen laden…",
     customTitle: "Aangepaste batterijinstellingen",
+    managedTitle: "Vaste profielgrenzen",
+    hardRange: "Harde SOC-range",
+    comfortRange: "Comfortzone",
+    lowCost: "Kosten lage SOC",
+    highCost: "Kosten hoge SOC",
+    stressCost: "Vermogensstress",
+    antiChurn: "Anti-pendel laden/ontladen",
     customNote:
       "De SOC-schuifregelaars gebruiken de bestaande Home Assistant-entiteiten. Minimum SOC blijft gekoppeld aan de GoodWe on-grid ondergrens. Vul hieronder niet-negatieve aangepaste EMHASS-kosten in en sla ze één keer op om een nieuw plan te maken.",
     minimum: "Minimum SOC",
@@ -243,6 +257,29 @@ function inputConfigValue(value) {
   return Number.isFinite(number) && number >= 0 ? displayConfigValue(number) : "";
 }
 
+function percent(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${number}%` : "—";
+}
+
+function managedProfileHtml(panel, t, mode) {
+  if (!mode) return "";
+  const hard = `${percent(mode.minimum_soc_pct)} – ${percent(mode.maximum_soc_pct)}`;
+  const comfort = `${percent(mode.deficit_threshold_pct)} – ${percent(mode.surplus_threshold_pct)}`;
+  return `
+    <div class="ep-v038-managed">
+      <div class="ep-v038-custom-head">${panel._escape(t.managedTitle)}</div>
+      <div class="ep-v038-managed-grid">
+        <span>${panel._escape(t.hardRange)} <strong>${panel._escape(hard)}</strong></span>
+        <span>${panel._escape(t.comfortRange)} <strong>${panel._escape(comfort)}</strong></span>
+        <span>${panel._escape(t.lowCost)} <strong>${panel._escape(percent(mode.deficit_cost_factor_pct))}</strong></span>
+        <span>${panel._escape(t.highCost)} <strong>${panel._escape(percent(mode.surplus_cost_factor_pct))}</strong></span>
+        <span>${panel._escape(t.stressCost)} <strong>${panel._escape(percent(mode.stress_cost_factor_pct))}</strong></span>
+        <span>${panel._escape(t.antiChurn)} <strong>${panel._escape(percent(mode.anti_churn_cost_factor_pct))}</strong></span>
+      </div>
+    </div>`;
+}
+
 function customSocHtml(panel, t, data, busy) {
   const min = numberModel(panel, "emhass_minimum_soc", 0);
   const max = numberModel(panel, "emhass_maximum_soc", 100);
@@ -429,6 +466,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
   const t = copy(panel);
   const activeMode = activeProfileMode(cache);
   const modes = canonicalProfiles(language(panel), cache.data?.modes || []);
+  const activeProfile = modes.find((mode) => mode.key === activeMode);
   const controlsDisabled = Boolean(cache.busy || cache.loading || !cache.data);
 
   wrap.innerHTML = `
@@ -445,11 +483,12 @@ function renderCustomerStrategy(panel, wrap, cache) {
               ${activeMode === mode.key ? `<span class="ep-v038-badge">${panel._escape(t.active)}</span>` : ""}
               <strong>${panel._escape(mode.label)}</strong>
               <small>${panel._escape(mode.description)}</small>
+              ${mode.key === CUSTOM_MODE ? "" : `<span class="ep-v038-profile-range">SOC ${panel._escape(percent(mode.minimum_soc_pct))} – ${panel._escape(percent(mode.maximum_soc_pct))}</span>`}
             </button>`
         )
         .join("")}
     </div>
-    ${activeMode === CUSTOM_MODE ? customSocHtml(panel, t, cache.data, cache.busy) : ""}
+    ${activeMode === CUSTOM_MODE ? customSocHtml(panel, t, cache.data, cache.busy) : managedProfileHtml(panel, t, activeProfile)}
     <div class="ep-v038-message ${panel._escape(cache.tone || "")}">${panel._escape(cache.error || cache.message || (!cache.data || cache.loading ? t.loading : ""))}</div>
     <div class="ep-v038-diagnostic-note">${panel._escape(t.diagnostics)}</div>`;
   wrap.dataset.epV038Signature = signature;

@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v041.js?v=0.51-h1";
+import "./gw-energy-pilot-v041.js?v=1.1.0-beta.1-charge1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const STYLE_ID = "ep-v041-emhass-settings-style";

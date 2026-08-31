@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.0.0 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.1.0-beta.1 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -121,11 +121,11 @@ These settings do not change EMHASS input, optimizer topology, Automatic Control
 
 ### Maximum SOC
 
-Maximum SOC remains an **EMHASS-only** optimizer constraint.
+Maximum SOC remains an **EMHASS-only** optimizer constraint. Under a managed battery profile its value is fixed by that profile; under Custom it remains editable through the existing NumberEntity.
 
 ### Minimum SOC — one synchronized on-grid control
 
-The existing EMHASS minimum-SOC NumberEntity remains the single normal on-grid operator control and keeps its existing entity/unique ID.
+Under Custom, the existing EMHASS minimum-SOC NumberEntity remains the single normal on-grid operator control and keeps its existing entity/unique ID. A managed profile owns the same path and rejects direct NumberEntity writes until Custom is selected.
 
 Field validation on the reference GW15K-ETA-G20 confirmed that GoodWe register `45356` is an independent on-grid minimum-SOC floor. A lower EMHASS minimum alone cannot override a higher inverter floor.
 
@@ -150,7 +150,11 @@ Failure behavior:
 - if GoodWe verifies but EMHASS `/set-config` fails, EnergyPilot attempts to restore the previous `45356` value;
 - if rollback also fails, that second failure is surfaced explicitly.
 
-There is **no startup or periodic background synchronization**. Register `45356` is changed only after an explicit minimum-SOC NumberEntity write.
+There is **no startup or periodic background synchronization**. Register `45356` is changed only after an explicit Custom minimum-SOC write or managed-profile selection.
+
+Selecting a managed battery profile is also an explicit write. The profile transaction uses the same verified GoodWe-first ordering, then applies its matching EMHASS minimum/maximum and costs and runs a fresh optimization. Failure restores the previous GoodWe minimum, profile option and all ten owned EMHASS values. Installing the beta does not write a new minimum for an existing v1.0 managed profile; Settings asks the user to select that profile again.
+
+In **Settings → EMHASS → Battery Saver**, all five managed profiles are shown in one comparison table with hard range, comfort zone, low/high-SOC cost, power stress and anti-churn factor. Managed profiles hide the old SOC sliders. Selecting **Custom / Aangepast** shows them again and releases preset ownership without resetting their current values.
 
 The previous direct minimum-SOC field-test panel is intentionally not shown in the dashboard. This avoids a second operator path alongside the synchronized minimum-SOC control.
 
