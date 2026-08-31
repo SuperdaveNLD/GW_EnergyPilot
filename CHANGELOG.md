@@ -4,6 +4,26 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-31
+
+### Fixed
+
+- Exclude the dedicated `battery_saver_soc_limits_managed` ownership flag from
+  generic dashboard EP/EMHASS schema validation, then restore it unchanged.
+  Managed-profile installations can save unrelated settings again without the
+  `extra keys not allowed` error.
+
+### Changed
+
+- Advance the presentation-only stable wrapper and complete frontend cache
+  boundary to `1.1.1-stable1`.
+
+### Safety and compatibility
+
+- Existing managed-profile ownership is preserved; the fix does not write a
+  GoodWe register, change EMHASS policy, migrate config entries or alter entity
+  and persistent-Store identity.
+
 ## [1.1.0] - 2026-08-31
 
 ### Added
