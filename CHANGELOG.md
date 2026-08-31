@@ -4,7 +4,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
-## [1.1.0-beta.1] - 2026-08-31
+## [1.1.0] - 2026-08-31
 
 ### Added
 
@@ -23,7 +23,9 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Changed
 
-- Include all functional changes from v1.0.1-beta.4 as the base for this beta.
+- Promote the validated v1.1.0-beta.1 candidate to stable without changing
+  runtime, optimizer or control behavior.
+- Include all functional changes from v1.0.1-beta.4 as the release base.
 - Managed profile hard ranges are now Mad-Steve 5–100%, Gold Rush 5–100%,
   Chargegasm 8–96%, Balanced 10–93% and Battery Saver 10–85%, with matching
   comfort zones and price-relative factors documented in `docs/BATTERY_SAVER.md`.
@@ -32,8 +34,8 @@ All notable changes to GW EnergyPilot are documented here.
   selected.
 - Balanced anti-churn/power stress move to 7%/6%; Battery Saver to 9%/20%;
   Gold Rush uses 6%/0%; Chargegasm 6%/2%; Mad-Steve remains 2.25%/0%.
-- Advanced the active frontend to the presentation-only v1.1.0-beta.1 wrapper
-  above the v1.0.1-beta.4 layer and a complete `1.1.0-beta.1-charge1` cache
+- Advanced the active frontend to the presentation-only v1.1.0 stable wrapper
+  above the v1.0.1-beta.4 layer and a complete `1.1.0-stable1` cache
   boundary.
 - Split the live PV flow into one internal GoodWe/ETA node and one aggregated
   external-PV node while retaining one small combined PV group total (#116).

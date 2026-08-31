@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v1.1.0-beta.1 · Beta**
+**v1.1.0 · Stable**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -27,18 +27,20 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.0.0` remains the stable production release. `v1.1.0-beta.1` is the current
-opt-in beta and combines every v1.0.1 beta fix with managed battery profiles,
-selectable plan-chart ranges and clearer internal/external PV flow. Normal users
-keep the HACS prerelease switch off. Testers explicitly enable the
-HACS prerelease switch for GW EnergyPilot and can then select a published beta.
+`v1.1.0` is the current stable production release. It promotes the approved
+`v1.1.0-beta.1` candidate unchanged apart from stable version presentation and
+combines every v1.0.1 beta fix with managed battery profiles, selectable
+plan-chart ranges and clearer internal/external PV flow. Normal users keep the
+HACS prerelease switch off. Testers explicitly enable the HACS prerelease switch
+for GW EnergyPilot when they want a future published beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
-- `docs/releases/v1.1.0-beta.1.md` — Chargegasm, plan ranges and PV-flow beta notes;
-- `docs/releases/v1.0.1-beta.4.md` — current opt-in beta release notes;
+- `docs/releases/v1.1.0.md` — current stable Chargegasm, plan-range and PV-flow release notes;
+- `docs/releases/v1.1.0-beta.1.md` — promoted beta-candidate notes;
+- `docs/releases/v1.0.1-beta.4.md` — earlier opt-in beta release notes;
 - `docs/releases/v1.0.1-beta.3.md` — previous opt-in beta release notes;
 - `docs/releases/v1.0.1-beta.2.md` — earlier opt-in beta release notes;
 - `docs/releases/v1.0.1-beta.1.md` — earlier opt-in beta release notes;
@@ -76,7 +78,7 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 
-## v1.1.0-beta.1 highlights
+## v1.1.0 highlights
 
 - Includes every change from v1.0.1-beta.4, including explicit EV charging
   detection and bounded fresh-plan retries after charging stops.
@@ -97,7 +99,7 @@ Release documentation:
 - Automatic Control collapses the connected manual mode/power controls to a
   compact ownership summary; manual ownership reveals the same controls again.
 - The desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the
-  complete `1.1.0-beta.1-charge1` frontend graph.
+  complete `1.1.0-stable1` frontend graph.
 
 ## v1.0.1-beta.4 highlights
 
