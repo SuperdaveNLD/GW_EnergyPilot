@@ -1,7 +1,7 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.1.0**, the stable production release. All v1.0.1-beta.4 behavior and the
+v1.1.1**, the stable production release. All v1.0.1-beta.4 behavior and the
 validated v1.1.0-beta.1 candidate are included.
 
 ## High-level flow
@@ -536,8 +536,8 @@ ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped
 history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
-chain as its bounded presentation layer. v1.1.0 owns final stable
-presentation and the complete `1.1.0-stable1` active-graph cache
+chain as its bounded presentation layer. v1.1.1 owns final stable
+presentation and the complete `1.1.1-stable1` active-graph cache
 boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.

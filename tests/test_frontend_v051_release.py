@@ -6,7 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "1.1.0-stable1"
+CACHE_KEY = "1.1.1-stable1"
 
 
 class FrontendV051ReleaseTests(unittest.TestCase):
