@@ -1,7 +1,6 @@
 import "./gw-energy-pilot-v039.js?v=1.1.0-beta.1-charge1";
 import {
   FLOW_THRESHOLD_W,
-  flowVisualMap,
   resolveHousePower,
 } from "./gw-energy-pilot-v038-model.js?v=1.1.0-beta.1-charge1";
 import {
@@ -68,6 +67,8 @@ const COPY = Object.freeze({
     flowMedium: "medium relative flow",
     flowHigh: "high relative flow",
     pvToSystem: "PV to system",
+    internalPvToEta: "Internal PV to ETA DC / battery side",
+    externalPvToPcc: "External PV to AC / PCC",
     gridToSystem: "Grid to system",
     systemToGrid: "System to grid",
     systemToHouse: "System to house",
@@ -77,6 +78,12 @@ const COPY = Object.freeze({
     noPvSources: "No sources configured",
     internalPvTelemetry: "Internal GoodWe telemetry",
     externalPvEntity: "External PV entity",
+    pvGroup: "PV group",
+    pvTotal: "PV total",
+    internalPv: "Internal PV",
+    externalPv: "External PV",
+    internalPvRoute: "ETA · DC / battery side",
+    externalPvRoute: "AC · behind PCC meter",
     connectivityTitle: "System status",
     connectivityOk: "ALL OK",
     connectivityIssue: "ISSUE",
@@ -139,6 +146,8 @@ const COPY = Object.freeze({
     flowMedium: "gemiddelde relatieve stroom",
     flowHigh: "hoge relatieve stroom",
     pvToSystem: "PV naar systeem",
+    internalPvToEta: "Interne PV naar ETA DC-/batterijzijde",
+    externalPvToPcc: "Externe PV naar AC/PCC",
     gridToSystem: "Net naar systeem",
     systemToGrid: "Systeem naar net",
     systemToHouse: "Systeem naar woning",
@@ -148,6 +157,12 @@ const COPY = Object.freeze({
     noPvSources: "Geen bronnen geconfigureerd",
     internalPvTelemetry: "Interne GoodWe-telemetrie",
     externalPvEntity: "Externe PV-entiteit",
+    pvGroup: "PV-groep",
+    pvTotal: "PV totaal",
+    internalPv: "Interne PV",
+    externalPv: "Externe PV",
+    internalPvRoute: "ETA · DC-/batterijzijde",
+    externalPvRoute: "AC · achter PCC-meter",
     connectivityTitle: "Systeemstatus",
     connectivityOk: "ALLES OK",
     connectivityIssue: "STORING",
@@ -377,6 +392,141 @@ const NO_MOTION_CSS = `
     border-color: rgba(24, 220, 255, .30) !important;
     box-shadow: none !important;
     opacity: .68;
+  }
+  :host .ep-flow-stage {
+    --ep-v041-pv-group-width: 112px;
+    --ep-v041-pv-hub-half: 31px;
+  }
+  :host .ep-flow-pv-group {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    z-index: 4;
+    width: var(--ep-v041-pv-group-width);
+    height: 170px;
+    box-sizing: border-box;
+    padding: 7px;
+    transform: translateY(-50%);
+    border: 1px solid rgba(31, 239, 167, .24);
+    border-radius: 15px;
+    background: linear-gradient(145deg, rgba(9, 42, 63, .92), rgba(6, 25, 43, .96));
+    box-shadow: inset 0 0 24px rgba(31, 239, 167, .045);
+  }
+  :host .ep-flow-pv-group[data-ep-pv-flow-topology="internal"] {
+    top: calc(50% + 38px);
+    height: 118px;
+  }
+  :host .ep-flow-pv-group[data-ep-pv-flow-topology="external"] {
+    top: calc(50% - 18px);
+    height: 118px;
+  }
+  :host .ep-flow-pv-group[data-ep-pv-flow-topology="none"] {
+    height: 48px;
+  }
+  :host .ep-flow-pv-total {
+    position: absolute;
+    top: 7px;
+    left: 7px;
+    right: 7px;
+    min-height: 28px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 6px;
+    box-sizing: border-box;
+    border-radius: 9px;
+    color: #dffef4;
+    background: rgba(31, 239, 167, .09);
+  }
+  :host .ep-flow-pv-total-label {
+    overflow: hidden;
+    color: #79cdb8;
+    font-size: 7px;
+    font-weight: 850;
+    letter-spacing: .09em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  :host .ep-flow-pv-total-value {
+    color: #f2fffb;
+    font-size: 11px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+  :host .ep-flow-pv-group .ep-flow-pv-source {
+    position: absolute;
+    left: 7px;
+    width: calc(100% - 14px) !important;
+    height: 54px !important;
+    min-height: 54px !important;
+    padding: 6px 5px 5px !important;
+    box-sizing: border-box;
+    border-radius: 11px;
+  }
+  :host .ep-flow-pv-group[data-ep-pv-flow-topology="both"] .ep-flow-pv-external {
+    top: 44px;
+  }
+  :host .ep-flow-pv-group[data-ep-pv-flow-topology="both"] .ep-flow-pv-internal {
+    top: 108px;
+  }
+  :host .ep-flow-pv-group[data-ep-pv-flow-topology="internal"] .ep-flow-pv-internal,
+  :host .ep-flow-pv-group[data-ep-pv-flow-topology="external"] .ep-flow-pv-external {
+    top: 47px;
+  }
+  :host .ep-flow-pv-internal {
+    border-color: rgba(31, 239, 167, .28);
+  }
+  :host .ep-flow-pv-external {
+    border-color: rgba(58, 203, 255, .30);
+  }
+  :host .ep-flow-pv-source .ep-flow-node-title {
+    font-size: 7px;
+    letter-spacing: .10em;
+  }
+  :host .ep-flow-pv-source .ep-flow-node-value {
+    margin-top: 5px;
+    font-size: 12px;
+  }
+  :host .ep-flow-pv-source .ep-flow-node-sub {
+    margin-top: 3px;
+    font-size: 7px;
+  }
+  :host .ep-link-pv-internal,
+  :host .ep-link-pv-external {
+    left: calc(var(--ep-v041-pv-group-width) - 2px) !important;
+    width: auto !important;
+    height: 18px;
+    transform: translateY(-50%);
+  }
+  :host .ep-link-pv-internal {
+    right: calc(50% - 2px) !important;
+    top: calc(50% + 50px) !important;
+    color: #22f59c;
+  }
+  :host .ep-link-pv-external {
+    right: calc(50% + var(--ep-v041-pv-hub-half) - 13px) !important;
+    top: calc(50% - 14px) !important;
+    color: #3acbff;
+  }
+  :host .ep-flow-stage[data-ep-pv-flow-topology="internal"] .ep-link-pv-internal {
+    top: calc(50% + 38px) !important;
+  }
+  :host .ep-flow-stage[data-ep-pv-flow-topology="external"] .ep-link-pv-external {
+    top: 50% !important;
+  }
+  :host .ep-v034-flow-compact .ep-flow-stage {
+    --ep-v041-pv-group-width: calc(var(--ep-v034-node-width) + 16px);
+    --ep-v041-pv-hub-half: var(--ep-v034-hub-half);
+  }
+  :host .ep-v034-flow-tight .ep-flow-pv-total-label,
+  :host .ep-v034-flow-tight .ep-flow-pv-source .ep-flow-node-sub {
+    display: none !important;
+  }
+  :host .ep-v034-flow-tight .ep-flow-pv-total {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
   :host .ep-v034-flow-tight .ep-v041-flow-arrow {
     width: 18px;
@@ -623,19 +773,105 @@ function pvGenerationSnapshot(panel) {
     return {
       state: null,
       power: finite(panel, "pv_total_power"),
+      internalPower: finite(panel, "pv_total_power"),
+      externalPower: null,
       sources: [],
       configuredExternal: 0,
       internalEnabled: true,
+      externalEnabled: false,
     };
   }
   const attrs = state.attributes || {};
   return {
     state,
     power: finiteValue(state.state),
+    internalPower: finiteValue(attrs.internal_power_w),
+    externalPower: finiteValue(attrs.external_power_w),
     sources: Array.isArray(attrs.sources) ? attrs.sources : [],
     configuredExternal: Number(attrs.configured_external_sources || 0),
     internalEnabled: attrs.internal_enabled !== false,
+    externalEnabled: attrs.external_enabled === true,
   };
+}
+
+function installPvFlowGroup(root) {
+  const group = root?.querySelector(".ep-flow-solar");
+  const internalLink = root?.querySelector(".ep-link-pv");
+  if (!group || !internalLink || group.dataset.epPvFlowGroup === "1") return;
+
+  const initialTotal = group.querySelector(".ep-flow-node-value")?.textContent || "—";
+  group.classList.remove("ep-flow-node");
+  group.classList.add("ep-flow-pv-group");
+  group.dataset.epPvFlowGroup = "1";
+  group.setAttribute("role", "group");
+  group.innerHTML = `
+    <div class="ep-flow-pv-total">
+      <span class="ep-flow-pv-total-label">PV total</span>
+      <strong class="ep-flow-pv-total-value">${initialTotal}</strong>
+    </div>
+    <div class="ep-flow-node ep-flow-pv-source ep-flow-pv-external" hidden>
+      <div class="ep-flow-node-title">EXTERNAL PV</div>
+      <div class="ep-flow-node-value">—</div>
+      <div class="ep-flow-node-sub">AC · behind PCC meter</div>
+    </div>
+    <div class="ep-flow-node ep-flow-pv-source ep-flow-pv-internal">
+      <div class="ep-flow-node-title">INTERNAL PV</div>
+      <div class="ep-flow-node-value">${initialTotal}</div>
+      <div class="ep-flow-node-sub">ETA · DC / battery side</div>
+    </div>`;
+
+  internalLink.classList.add("ep-link-pv-internal");
+  internalLink.dataset.epPvRoute = "internal";
+
+  const externalLink = document.createElement("div");
+  externalLink.className = "ep-flow-link ep-link-pv-external idle";
+  externalLink.dataset.epPvRoute = "external";
+  externalLink.hidden = true;
+  externalLink.innerHTML = `
+    <div class="ep-flow-track"></div>
+    <div class="ep-flow-arrows"><span>›</span><span>›</span><span>›</span></div>`;
+  internalLink.insertAdjacentElement("afterend", externalLink);
+}
+
+function patchPvFlowGroup(panel, root, snapshot) {
+  const group = root?.querySelector(".ep-flow-pv-group");
+  const stage = root?.querySelector(".ep-flow-stage");
+  if (!group || !stage) return;
+  const t = copy(panel);
+  const internalVisible = snapshot.internalEnabled;
+  const externalVisible = snapshot.externalEnabled && snapshot.configuredExternal > 0;
+  const topology = internalVisible && externalVisible
+    ? "both"
+    : internalVisible
+      ? "internal"
+      : externalVisible
+        ? "external"
+        : "none";
+
+  group.dataset.epPvFlowTopology = topology;
+  stage.dataset.epPvFlowTopology = topology;
+  setText(group, ".ep-flow-pv-total-label", t.pvTotal);
+  setText(group, ".ep-flow-pv-total-value", panel._formatPower(snapshot.power));
+  group.setAttribute(
+    "aria-label",
+    `${t.pvGroup} · ${panel._formatPower(snapshot.power)}`
+  );
+
+  const internalNode = group.querySelector(".ep-flow-pv-internal");
+  const externalNode = group.querySelector(".ep-flow-pv-external");
+  const internalLink = root.querySelector(".ep-link-pv-internal");
+  const externalLink = root.querySelector(".ep-link-pv-external");
+  if (internalNode) internalNode.hidden = !internalVisible;
+  if (externalNode) externalNode.hidden = !externalVisible;
+  if (internalLink) internalLink.hidden = !internalVisible;
+  if (externalLink) externalLink.hidden = !externalVisible;
+
+  setText(internalNode, ".ep-flow-node-title", t.internalPv);
+  setText(internalNode, ".ep-flow-node-value", panel._formatPower(snapshot.internalPower));
+  setText(internalNode, ".ep-flow-node-sub", t.internalPvRoute);
+  setText(externalNode, ".ep-flow-node-title", t.externalPv);
+  setText(externalNode, ".ep-flow-node-value", panel._formatPower(snapshot.externalPower));
+  setText(externalNode, ".ep-flow-node-sub", t.externalPvRoute);
 }
 
 function patchPvSourceMetrics(panel, solar, snapshot) {
@@ -939,6 +1175,8 @@ function ensureStaticFlowNodes(link) {
 function flowDirectionText(panel, key, direction) {
   const t = copy(panel);
   if (key === "pv") return t.pvToSystem;
+  if (key === "pvInternal") return t.internalPvToEta;
+  if (key === "pvExternal") return t.externalPvToPcc;
   if (key === "house") return t.systemToHouse;
   if (key === "grid") return direction === "left" ? t.gridToSystem : t.systemToGrid;
   return direction === "up" ? t.batteryToSystem : t.systemToBattery;
@@ -947,6 +1185,8 @@ function flowDirectionText(panel, key, direction) {
 function flowSourceText(panel, key) {
   return {
     pv: "PV",
+    pvInternal: language(panel) === "nl" ? "Interne PV" : "Internal PV",
+    pvExternal: language(panel) === "nl" ? "Externe PV" : "External PV",
     grid: language(panel) === "nl" ? "Net" : "Grid",
     house: language(panel) === "nl" ? "Woning" : "House",
     battery: language(panel) === "nl" ? "Batterij" : "Battery",
@@ -982,19 +1222,80 @@ function patchStaticFlowLink(panel, link, key, presentation) {
   link.title = label;
 }
 
-function patchFlow(panel, root, pv, load, grid, battery, soc) {
+function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery }) {
+  const directions = {
+    pvInternal: Number.isFinite(pvInternal) && pvInternal > FLOW_THRESHOLD_W
+      ? "right"
+      : "idle",
+    pvExternal: Number.isFinite(pvExternal) && pvExternal > FLOW_THRESHOLD_W
+      ? "right"
+      : "idle",
+    grid: !Number.isFinite(grid) || Math.abs(grid) < FLOW_THRESHOLD_W
+      ? "idle"
+      : grid > 0 ? "right" : "left",
+    house: !Number.isFinite(house) || Math.abs(house) < FLOW_THRESHOLD_W
+      ? "idle"
+      : "up",
+    battery: !Number.isFinite(battery) || Math.abs(battery) < FLOW_THRESHOLD_W
+      ? "idle"
+      : battery > 0 ? "up" : "down",
+  };
+  const powers = { pvInternal, pvExternal, house, grid, battery };
+  const activeMaximum = Math.max(
+    0,
+    ...Object.entries(powers)
+      .filter(([key, power]) => Number.isFinite(power) && directions[key] !== "idle")
+      .map(([, power]) => Math.abs(power))
+  );
+
+  return Object.fromEntries(Object.entries(powers).map(([key, power]) => {
+    if (!Number.isFinite(power)) {
+      return [key, {
+        direction: "idle",
+        status: "unknown",
+        intensity: "none",
+        power: null,
+      }];
+    }
+    if (directions[key] === "idle") {
+      return [key, {
+        direction: "idle",
+        status: "idle",
+        intensity: "none",
+        power,
+      }];
+    }
+    const relative = activeMaximum > 0 ? Math.abs(power) / activeMaximum : 0;
+    return [key, {
+      direction: directions[key],
+      status: "active",
+      intensity: relative >= 0.75 ? "high" : relative >= 0.35 ? "medium" : "low",
+      power,
+    }];
+  }));
+}
+
+function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
+  const pv = pvSnapshot.power;
   const house = resolveHousePower(load, pv, grid, battery);
-  const visual = flowVisualMap({ pv, house, grid, battery }, FLOW_THRESHOLD_W);
+  const visual = splitPvFlowVisualMap({
+    pvInternal: pvSnapshot.internalEnabled ? pvSnapshot.internalPower : null,
+    pvExternal: pvSnapshot.externalEnabled && pvSnapshot.configuredExternal > 0
+      ? pvSnapshot.externalPower
+      : null,
+    house,
+    grid,
+    battery,
+  });
   const t = copy(panel);
   const gridMode = gridPresentation(panel, grid);
   const batteryMode = batteryPresentation(panel, battery);
 
+  patchPvFlowGroup(panel, root, pvSnapshot);
   setText(root, ".ep-flow-house .ep-flow-node-value", panel._formatPower(house));
-  setText(root, ".ep-flow-solar .ep-flow-node-value", panel._formatPower(pv));
   setText(root, ".ep-flow-grid .ep-flow-node-value", panel._formatPower(grid));
   setText(root, ".ep-flow-battery .ep-flow-node-value", panel._formatPower(battery));
   setText(root, ".ep-flow-house .ep-flow-node-sub", t.totalLoad);
-  setText(root, ".ep-flow-solar .ep-flow-node-sub", t.production);
   setText(root, ".ep-flow-grid .ep-flow-node-sub", gridMode.text);
   setText(
     root,
@@ -1003,7 +1304,10 @@ function patchFlow(panel, root, pv, load, grid, battery, soc) {
   );
 
   const semantic = {
-    pv: !Number.isFinite(pv) || pv <= FLOW_THRESHOLD_W ? "idle" : "inbound",
+    pvInternal: !Number.isFinite(pvSnapshot.internalPower) ||
+      pvSnapshot.internalPower <= FLOW_THRESHOLD_W ? "idle" : "inbound",
+    pvExternal: !Number.isFinite(pvSnapshot.externalPower) ||
+      pvSnapshot.externalPower <= FLOW_THRESHOLD_W ? "idle" : "inbound",
     grid: !Number.isFinite(grid) || Math.abs(grid) < FLOW_THRESHOLD_W
       ? "idle"
       : grid > 0 ? "outbound" : "inbound",
@@ -1013,7 +1317,8 @@ function patchFlow(panel, root, pv, load, grid, battery, soc) {
       : battery > 0 ? "inbound" : "outbound",
   };
   for (const [key, selector] of Object.entries({
-    pv: ".ep-link-pv",
+    pvInternal: ".ep-link-pv-internal",
+    pvExternal: ".ep-link-pv-external",
     grid: ".ep-link-grid",
     house: ".ep-link-house",
     battery: ".ep-link-battery",
@@ -1671,7 +1976,7 @@ function patchLiveDom(panel) {
   patchController(panel, root, automaticOn);
   patchEmhass(panel, root);
   patchStrategy(panel, root);
-  patchFlow(panel, root, pv, load, grid, battery, soc);
+  patchFlow(panel, root, pvSnapshot, load, grid, battery, soc);
   patchDiagnostics(panel, root);
   patchMotionMenu(panel, root);
 
@@ -1864,6 +2169,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     const result = previousRender.apply(this, args);
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
+    installPvFlowGroup(this.shadowRoot);
     installEvProtectionBanner(this.shadowRoot);
     this.__epV041RefreshLiveDom = () => {
       ensureNoMotionStyle(this.shadowRoot);

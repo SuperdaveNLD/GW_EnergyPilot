@@ -181,6 +181,7 @@
       if (key === "pv_generation_power") {
         Object.assign(attributes, {
           internal_enabled: true,
+          external_enabled: false,
           internal_power_w: 4800,
           external_power_w: null,
           configured_external_sources: 0,
@@ -859,6 +860,7 @@
         internalPower + externalPower,
         {
           internal_enabled: true,
+          external_enabled: true,
           internal_power_w: internalPower,
           external_power_w: externalPower,
           configured_external_sources: 1,

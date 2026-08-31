@@ -173,7 +173,9 @@ strategy/settings typography and field-tuned profile presentation; v0.46
 retains external-PV presentation, v0.44 owns the bounded Optimize
 listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS
 settings overview, and v0.41 ordinary telemetry patching, targeted plan
-refresh, PV presentation and static-flow DOM/CSS.
+refresh, PV presentation and static-flow DOM/CSS. The v0.41 PV flow keeps one
+combined group total while patching one internal ETA/DC node and one aggregated
+external AC/PCC node; it remains independent of control and EMHASS inputs.
 
 The existing settings module owns the two-deadband configuration panel and its
 zero-centered explanatory scale. Control behavior remains owned by the backend

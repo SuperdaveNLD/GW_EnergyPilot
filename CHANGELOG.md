@@ -35,6 +35,11 @@ All notable changes to GW EnergyPilot are documented here.
 - Advanced the active frontend to the presentation-only v1.1.0-beta.1 wrapper
   above the v1.0.1-beta.4 layer and a complete `1.1.0-beta.1-charge1` cache
   boundary.
+- Split the live PV flow into one internal GoodWe/ETA node and one aggregated
+  external-PV node while retaining one small combined PV group total (#116).
+- Route internal PV visually through the ETA DC/battery side and external
+  AC-coupled PV directly to the shared PCC side. Up to four configured external
+  entities remain combined into that single external node.
 
 ### Safety and compatibility
 
@@ -44,6 +49,10 @@ All notable changes to GW EnergyPilot are documented here.
 - Existing v1.0 managed selections retain their GoodWe floor until the user
   explicitly selects a profile again, preventing an upgrade-only hardware
   write. Entity unique IDs, device identity and Custom values remain intact.
+- Keep the PV split strictly presentation-only: `pv_generation_power`,
+  Automatic Control, GoodWe writes, EMHASS, plans, accounting, entity identity
+  and Store schemas are unchanged. Desktop Chromium, iPad WebKit touch and
+  iPhone WebKit cover route geometry, values, totals and stable node identity.
 
 ## [1.0.1-beta.4] - 2026-08-31
 

@@ -46,10 +46,18 @@ Read-only PV insight is a separate presentation path:
 ```text
 coordinator pv_total_power + up to four configured HA power entities
     -> pv_generation_power sensor
-    -> dashboard PV total/source breakdown/live-flow value
+    -> dashboard PV total/source breakdown
+    -> one internal ETA/DC live-flow node
+       + one aggregated external AC/PCC live-flow node
 ```
 
-That aggregate does not feed the controller, orchestrator, EMHASS or accounting. External entity changes update the aggregate independently; internal GoodWe PV continues to follow coordinator updates. See `docs/PV_INSIGHT.md`.
+The live flow retains one combined PV group total. Its internal connector ends
+at the ETA DC/battery-side branch; its single external connector ends at the
+shared AC/PCC side. This is topology presentation, not source-to-load
+attribution. The aggregate does not feed the controller, orchestrator, EMHASS
+or accounting. External entity changes update the aggregate independently;
+internal GoodWe PV continues to follow coordinator updates. See
+`docs/PV_INSIGHT.md`.
 
 EV charger load balancing is a separate actuator domain:
 
@@ -521,7 +529,8 @@ The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37
 stability wrappers in a fresh browser session. Their files remain for release
 history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are
 no longer active owners. v0.41 replaces normal telemetry renders with
-stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and
+stable-DOM patches and owns the internal-ETA/external-PCC PV-flow presentation;
+v0.42-v0.44 add bounded settings, touch-presentation and
 Optimize behavior; v0.45-v0.50 add bounded release presentation/cache
 ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped
 history card and source-attributed detailed plan graph. The settings module

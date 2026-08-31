@@ -205,10 +205,30 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
             }));
           };
           const settle = () => new Promise((resolve) => setTimeout(resolve, 180));
+          const setInternalPv = (value) => {
+            const numeric = Number(value);
+            const available = value !== 'unknown' && Number.isFinite(numeric);
+            window.__epSetEntityByKey('pv_total_power', value);
+            window.__epSetEntityByKey('pv_generation_power', value, {
+              internal_enabled: true,
+              external_enabled: false,
+              internal_power_w: available ? numeric : null,
+              external_power_w: null,
+              configured_external_sources: 0,
+              available_external_sources: 0,
+              sources: [{
+                source_key: 'goodwe_internal',
+                kind: 'internal',
+                name: 'GoodWe PV',
+                entity_id: null,
+                power_w: available ? numeric : null,
+                available,
+              }],
+            });
+          };
 
+          setInternalPv(4800);
           for (const [key, value] of [
-            ['pv_total_power', 4800],
-            ['pv_generation_power', 4800],
             ['total_load_power', 2500],
             ['meter_total_power_fast', 1100],
             ['battery_power', -1200],
@@ -222,15 +242,15 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
           await settle();
           const reversed = read();
 
-          for (const key of ['pv_total_power', 'pv_generation_power', 'total_load_power', 'meter_total_power_fast', 'battery_power']) {
+          setInternalPv('unknown');
+          for (const key of ['total_load_power', 'meter_total_power_fast', 'battery_power']) {
             window.__epSetEntityByKey(key, 'unknown');
           }
           await settle();
           const unknown = read();
 
+          setInternalPv(49);
           for (const [key, value] of [
-            ['pv_total_power', 49],
-            ['pv_generation_power', 49],
             ['total_load_power', 49],
             ['meter_total_power_fast', -49],
             ['battery_power', 49],
@@ -240,9 +260,8 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
           await settle();
           const idle = read();
 
+          setInternalPv(4800);
           for (const [key, value] of [
-            ['pv_total_power', 4800],
-            ['pv_generation_power', 4800],
             ['total_load_power', 2500],
             ['meter_total_power_fast', 1100],
             ['battery_power', -1200],
@@ -3587,8 +3606,12 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
         "source_count": 0,
         "total_matches": False,
         "flow_matches": False,
+        "split_nodes": False,
+        "routes_match": False,
         "telemetry_main_stable": False,
         "external_value_matches": False,
+        "flow_values_match": False,
+        "flow_nodes_stable": False,
         "scroll_delta": None,
         "error": None,
     }
@@ -3619,6 +3642,12 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                 panel._entityId('pv_generation_power')
               ];
               const expected = panel._formatPower(Number(aggregate.state));
+              const expectedInternal = panel._formatPower(
+                Number(aggregate.attributes.internal_power_w)
+              );
+              const expectedExternal = panel._formatPower(
+                Number(aggregate.attributes.external_power_w)
+              );
               const main = root.querySelector('main');
               window.__epPvTelemetryMain = main;
               const scroller = window.__epScroller;
@@ -3627,6 +3656,24 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                 Math.round((scroller.scrollHeight - scroller.clientHeight) * 0.36)
               );
               window.__epPvScrollBefore = scroller.scrollTop;
+              const group = root.querySelector('.ep-flow-pv-group');
+              const internalNode = group?.querySelector('.ep-flow-pv-internal');
+              const externalNode = group?.querySelector('.ep-flow-pv-external');
+              const internalLink = root.querySelector('.ep-link-pv-internal');
+              const externalLink = root.querySelector('.ep-link-pv-external');
+              const batteryLink = root.querySelector('.ep-link-battery');
+              const hub = root.querySelector('.ep-flow-hub');
+              const internalRect = internalLink?.getBoundingClientRect();
+              const externalRect = externalLink?.getBoundingClientRect();
+              const batteryRect = batteryLink?.getBoundingClientRect();
+              const hubRect = hub?.getBoundingClientRect();
+              window.__epPvFlowIdentity = {
+                group,
+                internalNode,
+                externalNode,
+                internalLink,
+                externalLink,
+              };
               return {
                 topologyRendered: window.__epPvBeforeTopologyMain !== main,
                 sourceCount: root.querySelectorAll(
@@ -3635,7 +3682,23 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                 totalMatches:
                   root.querySelector('.energy-card.solar .hero-value')?.textContent === expected,
                 flowMatches:
-                  root.querySelector('.ep-flow-solar .ep-flow-node-value')?.textContent === expected,
+                  group?.querySelector('.ep-flow-pv-total-value')?.textContent === expected,
+                splitNodes: Boolean(
+                  group?.dataset.epPvFlowTopology === 'both' &&
+                  internalNode && !internalNode.hidden &&
+                  externalNode && !externalNode.hidden &&
+                  internalNode.querySelector('.ep-flow-node-value')?.textContent === expectedInternal &&
+                  externalNode.querySelector('.ep-flow-node-value')?.textContent === expectedExternal
+                ),
+                routesMatch: Boolean(
+                  internalRect && externalRect && batteryRect && hubRect &&
+                  internalLink.dataset.epPvRoute === 'internal' &&
+                  externalLink.dataset.epPvRoute === 'external' &&
+                  internalRect.top > externalRect.top &&
+                  Math.abs(internalRect.right - (batteryRect.left + batteryRect.width / 2)) <= 4 &&
+                  externalRect.right >= hubRect.left - 18 &&
+                  externalRect.right <= hubRect.right
+                ),
               };
             }
             """
@@ -3650,9 +3713,30 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
               const external = root.querySelector(
                 '.energy-card.solar [data-pv-source-index="1"] .metric-value'
               );
+              const group = root.querySelector('.ep-flow-pv-group');
+              const internalNode = group?.querySelector('.ep-flow-pv-internal');
+              const externalNode = group?.querySelector('.ep-flow-pv-external');
+              const aggregate = window.__epHass.states[
+                panel._entityId('pv_generation_power')
+              ];
               return {
                 mainStable: window.__epPvTelemetryMain === root.querySelector('main'),
                 externalMatches: external?.textContent === panel._formatPower(1700),
+                flowValuesMatch: Boolean(
+                  group?.querySelector('.ep-flow-pv-total-value')?.textContent ===
+                    panel._formatPower(Number(aggregate.state)) &&
+                  internalNode?.querySelector('.ep-flow-node-value')?.textContent ===
+                    panel._formatPower(Number(aggregate.attributes.internal_power_w)) &&
+                  externalNode?.querySelector('.ep-flow-node-value')?.textContent ===
+                    panel._formatPower(1700)
+                ),
+                flowNodesStable: Boolean(
+                  window.__epPvFlowIdentity.group === group &&
+                  window.__epPvFlowIdentity.internalNode === internalNode &&
+                  window.__epPvFlowIdentity.externalNode === externalNode &&
+                  window.__epPvFlowIdentity.internalLink === root.querySelector('.ep-link-pv-internal') &&
+                  window.__epPvFlowIdentity.externalLink === root.querySelector('.ep-link-pv-external')
+                ),
                 scrollDelta: window.__epScroller.scrollTop - window.__epPvScrollBefore,
               };
             }
@@ -3665,8 +3749,12 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                 "source_count": topology["sourceCount"],
                 "total_matches": topology["totalMatches"],
                 "flow_matches": topology["flowMatches"],
+                "split_nodes": topology["splitNodes"],
+                "routes_match": topology["routesMatch"],
                 "telemetry_main_stable": telemetry["mainStable"],
                 "external_value_matches": telemetry["externalMatches"],
+                "flow_values_match": telemetry["flowValuesMatch"],
+                "flow_nodes_stable": telemetry["flowNodesStable"],
                 "scroll_delta": telemetry["scrollDelta"],
             }
         )
@@ -4516,7 +4604,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             pv_insight[key] is True
             for key in (
                 "ran", "topology_rendered", "total_matches", "flow_matches",
-                "telemetry_main_stable", "external_value_matches",
+                "split_nodes", "routes_match", "telemetry_main_stable",
+                "external_value_matches", "flow_values_match", "flow_nodes_stable",
             )
         ) or pv_insight["source_count"] != 2:
             failures.append(f"{name}: combined PV topology/live patch regression failed")

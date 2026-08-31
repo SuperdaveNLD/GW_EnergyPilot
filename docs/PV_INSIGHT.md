@@ -1,6 +1,6 @@
 # PV insight
 
-GW EnergyPilot can combine the existing internal GoodWe PV total with up to four external Home Assistant PV power entities for dashboard insight.
+GW EnergyPilot can combine the existing internal GoodWe PV total with up to four external Home Assistant PV power entities for dashboard insight. External PV means AC-coupled generation behind the same GoodWe/PCC meter. Internal PV means generation connected to the ETA inverter's DC/battery side.
 
 This feature is deliberately read-only:
 
@@ -61,7 +61,14 @@ The `sources` list keeps the configured topology stable and reports the latest n
 
 With no external sources configured, the existing GoodWe PV total and PV1–PV4 breakdown remain unchanged.
 
-When external PV is enabled and at least one source is configured, the PV headline and the PV node in the live-flow presentation use the combined total. The PV card shows a source breakdown for GoodWe PV (when enabled) plus the configured external installations.
+The live-flow presentation keeps one compact PV group with one combined total. Inside that group it shows at most two source nodes:
+
+- one internal GoodWe/ETA node whose connector follows the ETA DC/battery-side route;
+- one aggregated external node whose connector enters the AC/PCC side directly.
+
+Up to four configured external entities are combined in that one external flow node. Their individual source breakdown remains available in the PV card. The diagram does not claim source-to-load attribution and must not draw external PV as utility-grid import or as power passing through the battery.
+
+The group and its source nodes use the existing `pv_generation_power` attributes. They remain presentation-only and do not publish their visual split to EMHASS.
 
 Ordinary source updates patch the existing dashboard DOM. Enabling/disabling internal or external PV, or changing the configured source list, is treated as a genuine PV topology change and may trigger one structural render after the integration reload.
 
