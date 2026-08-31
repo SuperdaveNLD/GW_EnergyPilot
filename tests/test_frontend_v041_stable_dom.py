@@ -41,7 +41,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=1.0.1-beta4"', self.source
+            'import "./gw-energy-pilot-v039.js?v=1.1.0-beta.1-charge1"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -182,6 +182,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("refreshBatteryPlanCard(this)", self.source)
         self.assertIn("function preserveInteractiveShell", self.plan_core)
         self.assertIn("child !== windowBar && child !== existingHead", self.plan_core)
+        self.assertIn('existingHead?.querySelectorAll("[data-chart-range]")', self.plan_core)
         self.assertNotIn('addEventListener("pointerdown"', self.plan_core)
         self.assertNotIn("setPointerCapture", self.plan_core)
         self.assertNotIn("preventDefault", self.plan_core)
@@ -201,7 +202,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         browser_test = (BROWSER / "test_frontend_stability.py").read_text(
             encoding="utf-8"
         )
-        wrapper = (BROWSER / "test_frontend_stability_v101.py").read_text(
+        wrapper = (BROWSER / "test_frontend_stability_v110.py").read_text(
             encoding="utf-8"
         )
         harness = (BROWSER / "frontend_harness.html").read_text(
@@ -216,10 +217,10 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("telemetry_identity", browser_test)
         self.assertIn("exercise_plan_refresh", browser_test)
         self.assertIn("animation[\"animations\"] != 0", browser_test)
-        self.assertIn("frontend_harness.html?entry=v101", wrapper)
-        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v101"', wrapper)
+        self.assertIn("frontend_harness.html?entry=v110", wrapper)
+        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v110"', wrapper)
         self.assertIn(
-            '"v050", "v051", "v100", "v101"].includes(requestedEntry)',
+            '"v050", "v051", "v100", "v101", "v110"].includes(requestedEntry)',
             harness,
         )
         self.assertIn("exercise_touch_controls", browser_test)
@@ -227,6 +228,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("exercise_host_property_press", browser_test)
         self.assertIn("exercise_live_copy_press", browser_test)
         self.assertIn("exercise_chart_size_press", browser_test)
+        self.assertIn("exercise_chart_range_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
         self.assertIn("exercise_soc_limit_fallback", browser_test)
         self.assertIn("exercise_emhass_mapping", browser_test)
@@ -235,7 +237,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
             "window.__epPanel.shadowRoot.querySelector('main') !==",
             browser_test,
         )
-        self.assertIn("test_frontend_stability_v101.py", workflow)
+        self.assertIn("test_frontend_stability_v110.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)
         self.assertFalse((BROWSER / "frontend_harness_v041.html").exists())

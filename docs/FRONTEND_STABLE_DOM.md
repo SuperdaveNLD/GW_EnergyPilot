@@ -3,7 +3,10 @@
 
 ## Status
 
-This document is the canonical frontend render/interaction decision for **GW EnergyPilot v1.0.1-beta.4**. The beta retains the complete stable behavior through a presentation-only wrapper; its nested v0.51 feature layer supplies the scoped execution-history card.
+This document is the canonical frontend render/interaction decision for **GW
+EnergyPilot v1.1.0-beta.1**. The beta retains the complete stable behavior and
+all v1.0.1-beta.4 fixes through presentation-only wrappers; its nested v0.51
+feature layer supplies the scoped execution-history card.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,28 +20,29 @@ The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed r
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v101.js?v=1.0.1-beta4
-       -> gw-energy-pilot-v051.js?v=1.0.1-beta4
-            -> gw-energy-pilot-v051-history.js?v=1.0.1-beta4
-            -> gw-energy-pilot-v050.js?v=1.0.1-beta4
-            -> gw-energy-pilot-v049.js?v=1.0.1-beta4
-                 -> gw-energy-pilot-v048.js?v=1.0.1-beta4
-                      -> gw-energy-pilot-v047.js?v=1.0.1-beta4
-                           -> gw-energy-pilot-v046.js?v=1.0.1-beta4
-                                -> gw-energy-pilot-v045.js?v=1.0.1-beta4
-                                     -> gw-energy-pilot-v044.js?v=1.0.1-beta4
-                                          -> gw-energy-pilot-v043.js?v=1.0.1-beta4
-                                               -> gw-energy-pilot-v042.js?v=1.0.1-beta4
-                                                    -> gw-energy-pilot-v041-emhass-settings.js?v=1.0.1-beta4
-                                                         -> gw-energy-pilot-v041.js?v=1.0.1-beta4
-                                                              -> gw-energy-pilot-v039.js?v=1.0.1-beta4
-                                                                   -> gw-energy-pilot-v038.js?v=1.0.1-beta4
-                                                                        -> gw-energy-pilot-v038-runtime.js?v=1.0.1-beta4
+  -> gw-energy-pilot-v110.js?v=1.1.0-beta.1-charge1
+       -> gw-energy-pilot-v101.js?v=1.1.0-beta.1-charge1
+            -> gw-energy-pilot-v051.js?v=1.1.0-beta.1-charge1
+                 -> gw-energy-pilot-v051-history.js?v=1.1.0-beta.1-charge1
+                 -> gw-energy-pilot-v050.js?v=1.1.0-beta.1-charge1
+                 -> gw-energy-pilot-v049.js?v=1.1.0-beta.1-charge1
+                      -> gw-energy-pilot-v048.js?v=1.1.0-beta.1-charge1
+                           -> gw-energy-pilot-v047.js?v=1.1.0-beta.1-charge1
+                                -> gw-energy-pilot-v046.js?v=1.1.0-beta.1-charge1
+                                     -> gw-energy-pilot-v045.js?v=1.1.0-beta.1-charge1
+                                          -> gw-energy-pilot-v044.js?v=1.1.0-beta.1-charge1
+                                               -> gw-energy-pilot-v043.js?v=1.1.0-beta.1-charge1
+                                                    -> gw-energy-pilot-v042.js?v=1.1.0-beta.1-charge1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.1.0-beta.1-charge1
+                                                              -> gw-energy-pilot-v041.js?v=1.1.0-beta.1-charge1
+                                                                   -> gw-energy-pilot-v039.js?v=1.1.0-beta.1-charge1
+                                                                        -> gw-energy-pilot-v038.js?v=1.1.0-beta.1-charge1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.1.0-beta.1-charge1
 ```
 
-Every import in the active v1.0.1-beta.4 graph uses `1.0.1-beta4`. This ensures
-an upgraded browser cannot reuse older button-patch or nested plan/history
-modules while keeping the beta wrapper presentation-only.
+Every import in the active graph uses `1.1.0-beta.1-charge1`. This ensures an
+upgraded browser cannot reuse older button, strategy, settings or nested
+plan/history modules while both release wrappers remain presentation-only.
 
 ## Render ownership
 
@@ -73,7 +77,6 @@ The four Battery quick actions keep their existing button nodes while an action 
 The persistent EMHASS cost-function selector follows the same rule: service completion and later entity publication patch its existing buttons, label and accessibility state without rebuilding `main`. Its explicit busy state remains authoritative across intervening telemetry patches, so a second strategy/optimization request cannot start while the first service call is still running. Manual EMS controls read Automatic Control ownership at event time rather than retaining the ownership value from the structural render; pending, enabled and message feedback is patched in place. This matters when Automatic Control changes through a normal stable-DOM state event after those controls were created.
 
 The persisted latest EMS-setpoint update time is rendered as secondary text inside the existing EMS-setpoint metric. A controller dispatcher update publishes the existing `control_command` entity attributes, and the v0.41 live patch updates only that text node. It does not rebuild the Controller card or treat ordinary telemetry polling as a new setpoint update.
-
 ### Battery Strategy refresh
 
 Loading, pending, success/error and Custom-SOC feedback rerender only `.ep-v038-strategy`. Stable backend mode keys, not translated labels, remain the control identity.
@@ -82,7 +85,7 @@ The separate Hybrid strategy explanation is owned by v0.48 presentation while Hy
 
 ### Plan graph refresh
 
-A changed `plan_revision` or configured `P_batt` state invalidates graph data. Only the non-interactive body and footer of `.ep-v027-battery-plan-card` are rebuilt. The connected card shell, S/M/L selector, expand action and window bar retain their DOM identity so a concurrent scoped refresh cannot cancel a native press. Actual and forecast SOC are part of this same canonical scoped card.
+A changed `plan_revision` or configured `P_batt` state invalidates graph data. Only the non-interactive body and footer of `.ep-v027-battery-plan-card` are rebuilt. The connected card shell, 12h/24h/36h range selector, S/M/L selector, expand action and window bar retain their DOM identity so a concurrent scoped refresh cannot cancel a native press. Range changes filter the existing cached dataset and must not trigger a Recorder request. Actual and forecast SOC are part of this same canonical scoped card.
 
 ### Execution-history refresh
 
@@ -112,13 +115,15 @@ EnergyPilot-owned content has no CSS animations, CSS transitions, moving flow pa
 
 The live-flow alternative is deliberately static. Existing connector nodes receive a fixed pipeline with an integrated arrowhead and directional brightness for active power, a quiet dot for finite near-zero idle power or a dashed line/question mark for unavailable power. Low/medium/high line thickness uses restrained 3/4/5-pixel steps relative to the strongest finite active connector in the same telemetry snapshot. Arrow/state children are created once per structural render and patched in place; they never pulse, move or transition. Each connector exposes a localized `role="img"` accessible name.
 
+PV remains one compact group with one combined total. A structural render creates at most one internal ETA/DC source node and one aggregated external AC/PCC source node. Ordinary telemetry patches their values, link state and accessibility text without replacing either node or connector. Internal PV ends at the battery-side branch; external AC-coupled PV ends at the shared PCC side. The split is display-only and does not infer source-to-load attribution or alter EMHASS/control inputs.
+
 ## Required invariants
 
-A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button, header connectivity button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. An Automatic Control ON/OFF cycle must additionally preserve the manual pad, mode-grid, mode-button, power-row and slider nodes while changing their semantic visibility and disabled state. A plan refresh must preserve the graph card shell and its S/M/L, expand and window controls while rebuilding its data-dependent contents.
+A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button, header connectivity button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. An Automatic Control ON/OFF cycle must additionally preserve the manual pad, mode-grid, mode-button, power-row and slider nodes while changing their semantic visibility and disabled state. A plan refresh must preserve the graph card shell and its 12h/24h/36h, S/M/L, expand and window controls while rebuilding its data-dependent contents.
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v1.0.1-beta.4 by `tests/browser/test_frontend_stability_v101.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also hold Optimize now and EMHASS strategy presses across rapid live-copy patches and require unchanged button child nodes until the native click is delivered. They force a plan-card refresh during a physical S/M/L press and require exactly one delivered click with stable card/header/control identity. They also require the Hybrid explanation to retain node identity, height and child-list stability through sixty telemetry patches. The matrix further requires the zero-centered two-deadband scale, overlap validation and responsive settings layout; the header reachability control in its exact position with green/red/live-detail transitions and stable node identity; one external-PV group with four fields and correct switch/value preservation; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; editable Custom costs with stable main-node identity and larger typography; combined PV and bounded SOC telemetry; all static flow states; the single history card, immutable wanted-SOC history, detailed source bars, verified EV-protection underlays and full-table modal; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after scoped card refreshes.
+The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v1.1.0-beta.1 by `tests/browser/test_frontend_stability_v110.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also hold Optimize now and EMHASS strategy presses across rapid live-copy patches and require unchanged button child nodes until the native click is delivered. They force a plan-card refresh during a physical S/M/L press and require exactly one delivered click with stable card/header/control identity. They also require the Hybrid explanation to retain node identity, height and child-list stability through sixty telemetry patches. The matrix further requires the zero-centered two-deadband scale, overlap validation and responsive settings layout; the complete managed-profile table and Custom-only SOC sliders; the header reachability control in its exact position with green/red/live-detail transitions and stable node identity; one external-PV group with four fields and correct switch/value preservation; one internal ETA/DC and one aggregated external AC/PCC flow route with a shared PV total and stable node identity; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; editable Custom costs with stable main-node identity and larger typography; combined PV and bounded SOC telemetry; all static flow states; the single history card, immutable wanted-SOC history, detailed source bars, verified EV-protection underlays and full-table modal; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after scoped card refreshes.
 
 ## Contributor rules
 

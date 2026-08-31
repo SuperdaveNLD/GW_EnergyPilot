@@ -19,6 +19,7 @@ from .battery_plan import (
     normalize_emhass_forecasts,
     normalized_timestamp,
 )
+from .chart_time import build_chart_time_payload
 from .control_decision import resolve_control_decision
 from .const import (
     CONF_DEADBAND,
@@ -328,6 +329,9 @@ async def websocket_get_battery_price(
             "entry_id": entry.entry_id,
             "chart_schema_version": 6,
             "plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0),
+            "chart_time": build_chart_time_payload(
+                getattr(hass.config, "time_zone", None)
+            ),
             **price_payload,
             "battery_energy": _battery_energy_payload(runtime_data),
             "battery_plan": _battery_plan_payload(hass, entry),

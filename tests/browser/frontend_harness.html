@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -102,7 +102,7 @@
       connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
-      control_strategy: ["v048", "v049", "v050", "v051", "v100", "v101"].includes(ENTRYPOINT) ? "hybrid" : "battery",
+      control_strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery",
       grid_energy_imported_today: 3.2,
       grid_energy_exported_today: 7.8,
       grid_energy_import_total: 1234.5,
@@ -181,6 +181,7 @@
       if (key === "pv_generation_power") {
         Object.assign(attributes, {
           internal_enabled: true,
+          external_enabled: false,
           internal_power_w: 4800,
           external_power_w: null,
           configured_external_sources: 0,
@@ -324,20 +325,27 @@
       const modes = [
         ["mad_steve", "Mad-Steve"],
         ["gold_rush", "Gold Rush"],
+        ["chargegasm", "Chargegasm"],
         ["balanced", "Balanced"],
         ["battery_saver", "Battery Saver"],
       ].map(([key, label], index) => ({
         key,
         label,
         description: `${label} test profile`,
-        deficit_threshold_pct: [5, 5, 10, 15][index],
-        surplus_threshold_pct: [95, 95, 95, 95][index],
-        maximum_soc_pct: [100, 100, 100, 100][index],
+        minimum_soc_pct: [5, 5, 8, 10, 10][index],
+        deficit_threshold_pct: [10, 10, 13, 15, 20][index],
+        deficit_cost_factor_pct: [2, 2, 2, 5, 10][index],
+        surplus_threshold_pct: [95, 95, 91, 88, 80][index],
+        surplus_cost_factor_pct: [5, 12, 18, 25, 50][index],
+        maximum_soc_pct: [100, 100, 96, 93, 85][index],
+        stress_cost_factor_pct: [0, 0, 2, 6, 20][index],
+        anti_churn_cost_factor_pct: [2.25, 6, 6, 7, 9][index],
         recommended: key === "balanced",
       }));
       return {
         entry_id: ENTRY_ID,
         managed: batterySaverMode !== "custom",
+        soc_limits_managed: batterySaverMode !== "custom",
         mode: batterySaverMode === "custom" ? null : batterySaverMode,
         modes,
         current_emhass_values: {
@@ -461,17 +469,39 @@
     function batteryPricePayload() {
       const now = new Date();
       const hour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
-      const points = Array.from({ length: 24 }, (_, index) => ({
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const extendedEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12);
+      const rollingStart = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+      const rollingEnd = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+      const dayNumber = (value) => Date.UTC(
+        value.getFullYear(), value.getMonth(), value.getDate()
+      ) / (24 * 60 * 60 * 1000);
+      const tick = (value) => ({
+        at: value.toISOString(), day_offset: dayNumber(value) - dayNumber(dayStart),
+      });
+      const fixedTicks = (lastHour) => {
+        const ticks = [0, 6, 12, 18].map((tickHour) => tick(new Date(
+          dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), tickHour
+        )));
+        for (let tickHour = 0; tickHour <= lastHour; tickHour += 6) {
+          ticks.push(tick(new Date(
+            dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1, tickHour
+          )));
+        }
+        return ticks;
+      };
+      const points = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         market_price: 0.12 + index * 0.001,
         buy_price: 0.22 + index * 0.001,
         sell_price: 0.08 + index * 0.001,
       }));
-      const plan = Array.from({ length: 24 }, (_, index) => ({
+      const plan = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         value_w: index % 4 === 0 ? -1600 : index % 5 === 0 ? 1100 : 0,
       }));
-      const socPlan = Array.from({ length: 24 }, (_, index) => ({
+      const socPlan = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         value_pct: Math.min(95, 54 + index * 1.25),
       }));
@@ -534,6 +564,28 @@
       }));
       return {
         chart_schema_version: 6,
+        chart_time: {
+          time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          now: now.toISOString(),
+          day_start: dayStart.toISOString(),
+          day_end: dayEnd.toISOString(),
+          history_start: new Date(Math.min(dayStart.getTime(), rollingStart.getTime())).toISOString(),
+          max_end: extendedEnd.toISOString(),
+          windows: {
+            "12h": {
+              start: rollingStart.toISOString(), end: rollingEnd.toISOString(),
+              ticks: Array.from({ length: 5 }, (_, index) => tick(new Date(
+                rollingStart.getTime() + index * 3 * 60 * 60 * 1000
+              ))),
+            },
+            "24h": {
+              start: dayStart.toISOString(), end: dayEnd.toISOString(), ticks: fixedTicks(0),
+            },
+            "36h": {
+              start: dayStart.toISOString(), end: extendedEnd.toISOString(), ticks: fixedTicks(12),
+            },
+          },
+        },
         entry_id: ENTRY_ID,
         generated_at: new Date().toISOString(),
         plan_revision: planRevision,
@@ -615,7 +667,7 @@
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v101"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {
@@ -765,6 +817,7 @@
       v051: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v051.js?browser-harness=1",
       v100: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v100.js?browser-harness=1",
       v101: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v101.js?browser-harness=1",
+      v110: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v110.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -807,6 +860,7 @@
         internalPower + externalPower,
         {
           internal_enabled: true,
+          external_enabled: true,
           internal_power_w: internalPower,
           external_power_w: externalPower,
           configured_external_sources: 1,
@@ -897,7 +951,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

@@ -79,6 +79,38 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("activeExecutionHistoryChanged(panel, data)", core)
         self.assertIn("loadChartData(panel, true, false)", core)
 
+    def test_chart_ranges_are_local_views_over_one_cached_dataset(self) -> None:
+        data = (FRONTEND / "gw-energy-pilot-v027-battery-plan-data.js").read_text(
+            encoding="utf-8"
+        )
+        view = (FRONTEND / "gw-energy-pilot-v027-battery-plan-view.js").read_text(
+            encoding="utf-8"
+        )
+        core = (FRONTEND / "gw-energy-pilot-v027-battery-plan-core.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('new Set(["12h", "24h", "36h"])', data)
+        self.assertIn('const DEFAULT_RANGE = "24h"', data)
+        self.assertIn("export function chartWindowData", data)
+        self.assertIn("chartTime.historyStartMs", data)
+        self.assertIn("chartTime.maxEndMs", data)
+        self.assertIn("dayActualRows", data)
+        self.assertIn("data-chart-range", view)
+        self.assertIn("rangeControlHtml(panel, range)", core)
+        self.assertIn("saveChartRange(button.dataset.chartRange)", core)
+        self.assertNotIn("loadChartData(panel", core[core.index('card.querySelectorAll("[data-chart-range]")'):core.index('card.querySelectorAll("[data-chart-size]")')])
+
+    def test_range_controls_remain_in_the_connected_header(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v027-battery-plan-core.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('existingHead?.querySelectorAll("[data-chart-range]")', source)
+        self.assertIn('nextHead?.querySelectorAll("[data-chart-range]")', source)
+        self.assertIn("nextByRange", source)
+        self.assertIn("child !== windowBar && child !== existingHead", source)
+
     def test_v034_flow_direction_neutralizes_legacy_reversal_specificity(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v034.js").read_text(
             encoding="utf-8"
@@ -206,11 +238,11 @@ class FrontendDashboardCardTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            'gw-energy-pilot-v031-battery-saver.js?v=1.0.1-beta4',
+            'gw-energy-pilot-v031-battery-saver.js?v=1.1.0-beta.1-charge1',
             release_v034,
         )
         self.assertIn(
-            'gw-energy-pilot-v027-battery-plan-core.js?v=1.0.1-beta4',
+            'gw-energy-pilot-v027-battery-plan-core.js?v=1.1.0-beta.1-charge1',
             release_v034,
         )
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)

@@ -36,7 +36,7 @@ class FrontendControlStabilityTests(unittest.TestCase):
 
     def test_v038_bypasses_failed_pointer_and_button_reuse_layers(self) -> None:
         self.assertIn("gw-energy-pilot-v038-runtime.js?v=", self.entry)
-        self.assertIn('gw-energy-pilot-v034.js?v=1.0.1-beta4', self.runtime)
+        self.assertIn('gw-energy-pilot-v034.js?v=1.1.0-beta.1-charge1', self.runtime)
         combined = self.entry + self.runtime + self.strategy
         self.assertNotIn("gw-energy-pilot-v035.js", combined)
         self.assertNotIn("gw-energy-pilot-v0363-control-stability.js", combined)
@@ -86,12 +86,39 @@ class FrontendControlStabilityTests(unittest.TestCase):
         self.assertIn("data-bs-custom-form", self.settings_battery)
         self.assertIn("shareBatterySaverData", self.settings_battery)
 
+    def test_managed_profiles_replace_sliders_and_settings_compare_all_values(self) -> None:
+        self.assertIn('"chargegasm"', self.model)
+        self.assertIn("function managedProfileHtml", self.strategy)
+        self.assertIn(
+            "activeMode === CUSTOM_MODE ? customSocHtml(panel, t, cache.data, cache.busy) : managedProfileHtml(panel, t, activeProfile)",
+            self.strategy,
+        )
+        for metadata in (
+            "minimum_soc_pct",
+            "maximum_soc_pct",
+            "deficit_threshold_pct",
+            "surplus_threshold_pct",
+            "deficit_cost_factor_pct",
+            "surplus_cost_factor_pct",
+            "stress_cost_factor_pct",
+            "anti_churn_cost_factor_pct",
+        ):
+            with self.subTest(metadata=metadata):
+                self.assertIn(metadata, self.strategy + self.settings_battery)
+
+        self.assertIn("function setSocSliderVisibility", self.settings_battery)
+        self.assertIn(
+            "setSocSliderVisibility(panel, activeMode !== CUSTOM_MODE)",
+            self.settings_battery,
+        )
+        self.assertIn("function comparisonTableHtml", self.settings_battery)
+        self.assertIn("ep-v031-bs-comparison", self.settings_battery)
+
     def test_battery_strategy_typography_no_longer_uses_six_or_seven_px_copy(self) -> None:
         self.assertNotIn("font-size:6px", self.styles)
         self.assertNotIn("font-size:7px", self.styles)
         self.assertNotIn("font-size:6px", self.settings_battery)
         self.assertNotIn("font-size:7px", self.settings_battery)
-
     def test_manual_controls_compact_without_replacing_control_nodes(self) -> None:
         self.assertIn('pad.className = `ep-v021-manual-pad', self.manual)
         self.assertIn('class="ep-v021-mode-grid"${compact ? " hidden" : ""}', self.manual)

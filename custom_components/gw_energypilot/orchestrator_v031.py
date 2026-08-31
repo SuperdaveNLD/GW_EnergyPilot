@@ -11,8 +11,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .battery_saver import (
-    MODE_MAD_STEVE,
     apply_battery_saver_profile,
+    battery_saver_mode_requires_stress_support,
     battery_saver_price_reference,
     clamp_soc_final,
     emhass_supports_battery_stress,
@@ -21,6 +21,7 @@ from .battery_saver import (
 )
 from .const import (
     CONF_BATTERY_SAVER_MODE,
+    CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
     CONF_P_BATT_ENTITY,
     DEFAULT_P_BATT_ENTITY,
 )
@@ -28,8 +29,7 @@ from .emhass_config import async_get_emhass_config, async_write_emhass_config
 from .emhass_sync import apply_emhass_runtime_contract
 from .orchestrator import OUTPUT_TIMEOUT
 from .orchestrator_v026 import GWEnergyPilotOrchestrator as _V026Orchestrator
-
-GOODWE_ON_GRID_MINIMUM_SOC_KEY = "battery_discharge_depth_on_grid"
+from .soc_limits import goodwe_minimum_soc_pct
 
 
 class GWEnergyPilotOrchestrator(_V026Orchestrator):
@@ -50,6 +50,10 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
             {
                 "battery_saver_managed": configured_mode is not None,
                 "battery_saver_mode": configured_mode,
+                "battery_saver_soc_limits_managed": bool(
+                    configured_mode is not None
+                    and self.entry.options.get(CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED)
+                ),
                 "battery_saver_profile": self.last_battery_saver_profile,
                 "effective_runtime_soc_final": self.last_effective_soc_final,
             }
@@ -58,17 +62,8 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
 
     def _goodwe_minimum_soc(self) -> float | None:
         """Return the verified coordinator value for GoodWe on-grid minimum SOC."""
-        snapshot = self.coordinator.data
-        if snapshot is None:
-            return None
-        raw = snapshot.values.get(GOODWE_ON_GRID_MINIMUM_SOC_KEY)
-        try:
-            value = int(raw)
-        except (TypeError, ValueError):
-            return None
-        if not 0 <= value <= 100:
-            return None
-        return round(value / 100.0, 4)
+        value = goodwe_minimum_soc_pct(self.entry)
+        return round(value / 100.0, 4) if value is not None else None
 
     def _p_batt_report_timestamp(self) -> datetime | None:
         """Return the timestamp proving that the configured P_batt was reported."""
@@ -143,11 +138,11 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
                 raise HomeAssistantError(str(err)) from err
 
             emhass_version = getattr(self, "emhass_version", None)
-            if mode != MODE_MAD_STEVE and not emhass_supports_battery_stress(
-                emhass_version
-            ):
+            if battery_saver_mode_requires_stress_support(
+                mode
+            ) and not emhass_supports_battery_stress(emhass_version):
                 raise HomeAssistantError(
-                    "Gold Rush, Balanced and Battery Saver require EMHASS 0.18.1 "
+                    "Chargegasm, Balanced and Battery Saver require EMHASS 0.18.1 "
                     "or newer because they use the battery stress cost model"
                 )
 
@@ -161,24 +156,54 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
                 price_reference,
             )
 
-        # The managed profile maximum must be applied before validating the
-        # canonical GoodWe minimum. This prevents a stale/custom previous EMHASS
-        # maximum from rejecting a mode that intentionally raises the hard cap
-        # (for example Mad-Steve 100%). Unmanaged installations keep their
-        # existing EMHASS maximum exactly as before.
+        # Explicitly selected beta profiles own both hard limits. Entries that
+        # already had a managed v1.0 profile retain their verified GoodWe floor
+        # until the operator selects a profile again; this avoids an unexpected
+        # hardware write merely because the integration was upgraded.
         goodwe_minimum = self._goodwe_minimum_soc()
-        if battery_count == 1 and goodwe_minimum is not None:
+        limits_managed = bool(
+            configured_mode is not None
+            and self.entry.options.get(CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED)
+        )
+        if battery_count == 1 and configured_mode is not None and limits_managed:
+            profile_minimum = updated.get("battery_minimum_state_of_charge")
+            if goodwe_minimum is None:
+                raise HomeAssistantError(
+                    "Managed battery profile cannot verify the GoodWe minimum SOC"
+                )
+            if profile_minimum != goodwe_minimum:
+                raise HomeAssistantError(
+                    "GoodWe minimum SOC no longer matches the managed battery profile; "
+                    "select the profile again to restore its hard limits"
+                )
+            if profile is not None:
+                profile["soc_limits_managed"] = True
+        elif battery_count == 1 and goodwe_minimum is not None:
+            updated["battery_minimum_state_of_charge"] = goodwe_minimum
+            if profile is not None:
+                profile["battery_minimum_state_of_charge"] = goodwe_minimum
+                profile["soc_limits_managed"] = False
+
+        if battery_count == 1:
             maximum = updated.get("battery_maximum_state_of_charge", 1.0)
+            minimum = updated.get("battery_minimum_state_of_charge", 0.0)
             try:
                 maximum_value = float(maximum)
             except (TypeError, ValueError):
                 maximum_value = 1.0
-            if 0.0 <= maximum_value <= 1.0 and goodwe_minimum > maximum_value:
+            try:
+                minimum_value = float(minimum)
+            except (TypeError, ValueError):
+                minimum_value = 0.0
+            if (
+                0.0 <= minimum_value <= 1.0
+                and 0.0 <= maximum_value <= 1.0
+                and minimum_value > maximum_value
+            ):
                 raise HomeAssistantError(
                     "GoodWe minimum SOC exceeds the effective EMHASS maximum SOC; "
                     "select a profile or maximum SOC compatible with the GoodWe minimum"
                 )
-            updated["battery_minimum_state_of_charge"] = goodwe_minimum
 
         try:
             effective_soc_final = clamp_soc_final(

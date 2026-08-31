@@ -58,68 +58,93 @@ class BatterySaverTests(unittest.TestCase):
         payloads = battery_saver.battery_saver_mode_payloads()
         self.assertEqual(
             [item["key"] for item in payloads],
-            ["mad_steve", "gold_rush", "balanced", "battery_saver"],
+            ["mad_steve", "gold_rush", "chargegasm", "balanced", "battery_saver"],
         )
         self.assertEqual(payloads[0]["label"], "Mad-Steve")
-        self.assertEqual(payloads[0]["maximum_soc_pct"], 100)
-        self.assertEqual(payloads[1]["maximum_soc_pct"], 100)
-        self.assertEqual(payloads[2]["maximum_soc_pct"], 100)
-        self.assertEqual(payloads[3]["maximum_soc_pct"], 100)
+        self.assertEqual(payloads[2]["label"], "Chargegasm")
+        self.assertEqual(
+            [item["minimum_soc_pct"] for item in payloads],
+            [5, 5, 8, 10, 10],
+        )
+        self.assertEqual(
+            [item["maximum_soc_pct"] for item in payloads],
+            [100, 100, 96, 93, 85],
+        )
         self.assertEqual(
             [item["description"] for item in payloads],
             [
-                "Maximum economic freedom, with anti-churn protection and the lightest battery-preservation costs.",
-                "Profit first, with anti-churn protection and light battery-preservation costs.",
-                "Balances trading value and battery preservation with moderate battery-preservation costs.",
-                "Prioritizes battery preservation with the strongest low-SOC, high-SOC and high-power costs.",
+                "Maximum trading freedom across the widest battery range.",
+                "Profit first, while filtering out marginal battery movements.",
+                "Strong trading opportunities with tighter limits for battery longevity.",
+                "Balances trading value and battery preservation for everyday use.",
+                "Prioritizes a low average SOC and gentle battery use.",
             ],
         )
         for payload in payloads:
             self.assertNotIn("%", payload["description"])
             self.assertNotIn("hard maximum", payload["description"].lower())
-        for payload in payloads:
-            self.assertEqual(payload["surplus_threshold_pct"], 95)
+        self.assertEqual(
+            [item["surplus_threshold_pct"] for item in payloads],
+            [95, 95, 91, 88, 80],
+        )
         self.assertEqual(payloads[0]["anti_churn_cost_factor_pct"], 2.25)
         self.assertEqual(payloads[1]["anti_churn_cost_factor_pct"], 6.0)
         self.assertEqual(payloads[2]["anti_churn_cost_factor_pct"], 6.0)
-        self.assertEqual(payloads[3]["anti_churn_cost_factor_pct"], 6.0)
-        self.assertTrue(payloads[2]["recommended"])
+        self.assertEqual(payloads[3]["anti_churn_cost_factor_pct"], 7.0)
+        self.assertEqual(payloads[4]["anti_churn_cost_factor_pct"], 9.0)
+        self.assertTrue(payloads[3]["recommended"])
 
     def test_profiles_scale_virtual_costs_with_price_reference(self):
         mad = battery_saver.build_battery_saver_profile("mad_steve", 0.20)
         gold = battery_saver.build_battery_saver_profile("gold_rush", 0.20)
+        chargegasm = battery_saver.build_battery_saver_profile("chargegasm", 0.20)
         balanced = battery_saver.build_battery_saver_profile("balanced", 0.20)
         saver = battery_saver.build_battery_saver_profile("battery_saver", 0.20)
 
         self.assertEqual(mad["weight_battery_charge"], [0.0045])
         self.assertEqual(mad["weight_battery_discharge"], [0.0045])
-        for profile in (gold, balanced, saver):
+        for profile in (gold, chargegasm):
             self.assertEqual(profile["weight_battery_charge"], [0.012])
             self.assertEqual(profile["weight_battery_discharge"], [0.012])
+        self.assertEqual(balanced["weight_battery_charge"], [0.014])
+        self.assertEqual(balanced["weight_battery_discharge"], [0.014])
+        self.assertEqual(saver["weight_battery_charge"], [0.018])
+        self.assertEqual(saver["weight_battery_discharge"], [0.018])
 
+        self.assertEqual(mad["battery_minimum_state_of_charge"], 0.05)
         self.assertEqual(mad["battery_maximum_state_of_charge"], 1.0)
-        self.assertEqual(mad["battery_soc_deficit_cost"], 0.0)
+        self.assertEqual(mad["battery_soc_deficit_threshold"], 0.10)
+        self.assertEqual(mad["battery_soc_deficit_cost"], 0.004)
         self.assertEqual(mad["battery_soc_surplus_threshold"], 0.95)
         self.assertEqual(mad["battery_soc_surplus_cost"], 0.01)
         self.assertEqual(mad["battery_stress_cost"], 0.0)
 
         self.assertEqual(gold["battery_maximum_state_of_charge"], 1.0)
-        self.assertEqual(gold["battery_soc_deficit_threshold"], 0.05)
+        self.assertEqual(gold["battery_soc_deficit_threshold"], 0.10)
         self.assertEqual(gold["battery_soc_surplus_threshold"], 0.95)
-        self.assertEqual(gold["battery_soc_surplus_cost"], 0.02)
-        self.assertEqual(gold["battery_stress_cost"], 0.002)
+        self.assertEqual(gold["battery_soc_surplus_cost"], 0.024)
+        self.assertEqual(gold["battery_stress_cost"], 0.0)
 
-        self.assertEqual(balanced["battery_maximum_state_of_charge"], 1.0)
-        self.assertEqual(balanced["battery_soc_deficit_threshold"], 0.10)
+        self.assertEqual(chargegasm["battery_minimum_state_of_charge"], 0.08)
+        self.assertEqual(chargegasm["battery_maximum_state_of_charge"], 0.96)
+        self.assertEqual(chargegasm["battery_soc_deficit_threshold"], 0.13)
+        self.assertEqual(chargegasm["battery_soc_surplus_threshold"], 0.91)
+        self.assertEqual(chargegasm["battery_soc_surplus_cost"], 0.036)
+        self.assertEqual(chargegasm["battery_stress_cost"], 0.004)
+
+        self.assertEqual(balanced["battery_minimum_state_of_charge"], 0.10)
+        self.assertEqual(balanced["battery_maximum_state_of_charge"], 0.93)
+        self.assertEqual(balanced["battery_soc_deficit_threshold"], 0.15)
         self.assertEqual(balanced["battery_soc_deficit_cost"], 0.01)
-        self.assertEqual(balanced["battery_soc_surplus_threshold"], 0.95)
+        self.assertEqual(balanced["battery_soc_surplus_threshold"], 0.88)
         self.assertEqual(balanced["battery_soc_surplus_cost"], 0.05)
-        self.assertEqual(balanced["battery_stress_cost"], 0.016)
+        self.assertEqual(balanced["battery_stress_cost"], 0.012)
 
-        self.assertEqual(saver["battery_maximum_state_of_charge"], 1.0)
-        self.assertEqual(saver["battery_soc_deficit_threshold"], 0.15)
+        self.assertEqual(saver["battery_minimum_state_of_charge"], 0.10)
+        self.assertEqual(saver["battery_maximum_state_of_charge"], 0.85)
+        self.assertEqual(saver["battery_soc_deficit_threshold"], 0.20)
         self.assertEqual(saver["battery_soc_deficit_cost"], 0.02)
-        self.assertEqual(saver["battery_soc_surplus_threshold"], 0.95)
+        self.assertEqual(saver["battery_soc_surplus_threshold"], 0.80)
         self.assertEqual(saver["battery_soc_surplus_cost"], 0.10)
         self.assertEqual(saver["battery_stress_cost"], 0.04)
         self.assertEqual(saver["battery_stress_segments"], 10)
@@ -128,8 +153,8 @@ class BatterySaverTests(unittest.TestCase):
         profile = battery_saver.build_battery_saver_profile("gold_rush", 0.1215)
         self.assertEqual(profile["battery_maximum_state_of_charge"], 1.0)
         self.assertEqual(profile["battery_soc_surplus_threshold"], 0.95)
-        self.assertEqual(profile["battery_soc_surplus_cost"], 0.01215)
-        self.assertEqual(profile["battery_stress_cost"], 0.001215)
+        self.assertEqual(profile["battery_soc_surplus_cost"], 0.01458)
+        self.assertEqual(profile["battery_stress_cost"], 0.0)
         self.assertEqual(profile["weight_battery_charge"], [0.00729])
         self.assertEqual(profile["weight_battery_discharge"], [0.00729])
 
@@ -169,18 +194,20 @@ class BatterySaverTests(unittest.TestCase):
             0.20,
         )
         self.assertEqual(updated["custom_setting"], original["custom_setting"])
-        self.assertEqual(updated["battery_maximum_state_of_charge"], 1.0)
+        self.assertEqual(updated["battery_minimum_state_of_charge"], 0.10)
+        self.assertEqual(updated["battery_maximum_state_of_charge"], 0.93)
         self.assertEqual(updated["battery_soc_deficit_cost"], 0.01)
-        self.assertEqual(updated["weight_battery_charge"], [0.012])
-        self.assertEqual(updated["weight_battery_discharge"], [0.012])
+        self.assertEqual(updated["weight_battery_charge"], [0.014])
+        self.assertEqual(updated["weight_battery_discharge"], [0.014])
         self.assertEqual(profile["mode"], "balanced")
         self.assertEqual(original["battery_maximum_state_of_charge"], 0.99)
         self.assertEqual(original["battery_soc_deficit_cost"], 99)
 
-    def test_profile_ownership_includes_hard_maximum_soc(self):
+    def test_profile_ownership_includes_both_hard_soc_limits(self):
         self.assertEqual(
             battery_saver.BATTERY_SAVER_CONFIG_KEYS,
             (
+                "battery_minimum_state_of_charge",
                 "battery_maximum_state_of_charge",
                 "battery_soc_deficit_threshold",
                 "battery_soc_deficit_cost",
@@ -201,6 +228,12 @@ class BatterySaverTests(unittest.TestCase):
             battery_saver.clamp_soc_final(0.5, 0.8, 0.7)
 
     def test_stress_profiles_require_emhass_0181_when_version_is_known(self):
+        self.assertFalse(
+            battery_saver.battery_saver_mode_requires_stress_support("gold_rush")
+        )
+        self.assertTrue(
+            battery_saver.battery_saver_mode_requires_stress_support("chargegasm")
+        )
         self.assertFalse(battery_saver.emhass_supports_battery_stress("0.18.0"))
         self.assertTrue(battery_saver.emhass_supports_battery_stress("0.18.1"))
         self.assertTrue(battery_saver.emhass_supports_battery_stress("0.19.0-beta"))

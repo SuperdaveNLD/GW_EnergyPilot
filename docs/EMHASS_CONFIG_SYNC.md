@@ -75,11 +75,11 @@ Battery Saver penalty fields are intentionally outside the generic required-conf
 
 ## Minimum SOC ownership
 
-The generic config-sync action does not write a GoodWe register. Minimum SOC is handled by the dedicated synchronized Minimum SOC NumberEntity and the EnergyPilot-owned optimization policy:
+The generic config-sync action does not write a GoodWe register. Minimum SOC is handled by the dedicated synchronized Minimum SOC NumberEntity under Custom and by the explicit managed-profile transaction:
 
-- GoodWe on-grid minimum SOC is the canonical operational floor;
-- the slider mirrors that verified GoodWe value into EMHASS `battery_minimum_state_of_charge`;
-- EnergyPilot-owned optimization runs reassert the available GoodWe floor in EMHASS;
+- the Custom slider mirrors its verified GoodWe value into EMHASS `battery_minimum_state_of_charge`;
+- a managed profile writes and verifies its GoodWe minimum first, then owns the matching EMHASS minimum and maximum;
+- legacy v1.0 managed selections retain the available GoodWe floor until explicitly reselected;
 - runtime `soc_final` is clamped to the effective minimum/maximum SOC range.
 
 An explicit slider change retains the existing safety order: write and verify GoodWe first, then update EMHASS, and roll GoodWe back if the EMHASS write fails.

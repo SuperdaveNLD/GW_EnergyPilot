@@ -10,17 +10,20 @@ from typing import Any, Iterable, Mapping
 
 MODE_MAD_STEVE = "mad_steve"
 MODE_GOLD_RUSH = "gold_rush"
+MODE_CHARGEGASM = "chargegasm"
 MODE_BALANCED = "balanced"
 MODE_BATTERY_SAVER = "battery_saver"
 
 BATTERY_SAVER_MODES: tuple[str, ...] = (
     MODE_MAD_STEVE,
     MODE_GOLD_RUSH,
+    MODE_CHARGEGASM,
     MODE_BALANCED,
     MODE_BATTERY_SAVER,
 )
 
 BATTERY_SAVER_CONFIG_KEYS: tuple[str, ...] = (
+    "battery_minimum_state_of_charge",
     "battery_maximum_state_of_charge",
     "battery_soc_deficit_threshold",
     "battery_soc_deficit_cost",
@@ -58,6 +61,7 @@ class BatterySaverPreset:
     key: str
     label: str
     short_description: str
+    minimum_soc: float
     maximum_soc: float
     deficit_threshold: float
     deficit_cost_factor: float
@@ -73,11 +77,12 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_MAD_STEVE,
         label="Mad-Steve",
         short_description=(
-            "Maximum economic freedom, with anti-churn protection and the lightest battery-preservation costs."
+            "Maximum trading freedom across the widest battery range."
         ),
+        minimum_soc=0.05,
         maximum_soc=1.00,
-        deficit_threshold=0.05,
-        deficit_cost_factor=0.0,
+        deficit_threshold=0.10,
+        deficit_cost_factor=0.02,
         surplus_threshold=0.95,
         surplus_cost_factor=0.05,
         stress_cost_factor=0.0,
@@ -87,43 +92,61 @@ PRESETS: dict[str, BatterySaverPreset] = {
         key=MODE_GOLD_RUSH,
         label="Gold Rush",
         short_description=(
-            "Profit first, with anti-churn protection and light battery-preservation costs."
+            "Profit first, while filtering out marginal battery movements."
         ),
+        minimum_soc=0.05,
         maximum_soc=1.00,
-        deficit_threshold=0.05,
-        deficit_cost_factor=0.0,
+        deficit_threshold=0.10,
+        deficit_cost_factor=0.02,
         surplus_threshold=0.95,
-        surplus_cost_factor=0.10,
-        stress_cost_factor=0.01,
+        surplus_cost_factor=0.12,
+        stress_cost_factor=0.0,
+        anti_churn_cost_factor=MANAGED_ANTI_CHURN_COST_FACTOR,
+    ),
+    MODE_CHARGEGASM: BatterySaverPreset(
+        key=MODE_CHARGEGASM,
+        label="Chargegasm",
+        short_description=(
+            "Strong trading opportunities with tighter limits for battery longevity."
+        ),
+        minimum_soc=0.08,
+        maximum_soc=0.96,
+        deficit_threshold=0.13,
+        deficit_cost_factor=0.02,
+        surplus_threshold=0.91,
+        surplus_cost_factor=0.18,
+        stress_cost_factor=0.02,
         anti_churn_cost_factor=MANAGED_ANTI_CHURN_COST_FACTOR,
     ),
     MODE_BALANCED: BatterySaverPreset(
         key=MODE_BALANCED,
         label="Balanced",
         short_description=(
-            "Balances trading value and battery preservation with moderate battery-preservation costs."
+            "Balances trading value and battery preservation for everyday use."
         ),
-        maximum_soc=1.00,
-        deficit_threshold=0.10,
+        minimum_soc=0.10,
+        maximum_soc=0.93,
+        deficit_threshold=0.15,
         deficit_cost_factor=0.05,
-        surplus_threshold=0.95,
+        surplus_threshold=0.88,
         surplus_cost_factor=0.25,
-        stress_cost_factor=0.08,
-        anti_churn_cost_factor=MANAGED_ANTI_CHURN_COST_FACTOR,
+        stress_cost_factor=0.06,
+        anti_churn_cost_factor=0.07,
     ),
     MODE_BATTERY_SAVER: BatterySaverPreset(
         key=MODE_BATTERY_SAVER,
         label="Battery Saver",
         short_description=(
-            "Prioritizes battery preservation with the strongest low-SOC, high-SOC and high-power costs."
+            "Prioritizes a low average SOC and gentle battery use."
         ),
-        maximum_soc=1.00,
-        deficit_threshold=0.15,
+        minimum_soc=0.10,
+        maximum_soc=0.85,
+        deficit_threshold=0.20,
         deficit_cost_factor=0.10,
-        surplus_threshold=0.95,
+        surplus_threshold=0.80,
         surplus_cost_factor=0.50,
         stress_cost_factor=0.20,
-        anti_churn_cost_factor=MANAGED_ANTI_CHURN_COST_FACTOR,
+        anti_churn_cost_factor=0.09,
     ),
 }
 
@@ -137,16 +160,32 @@ def normalize_battery_saver_mode(value: Any) -> str:
     return mode
 
 
+def battery_saver_mode_requires_stress_support(mode: str) -> bool:
+    """Return whether a preset uses the EMHASS battery-stress cost model."""
+    normalized = normalize_battery_saver_mode(mode)
+    return PRESETS[normalized].stress_cost_factor > 0
+
+
+def battery_saver_minimum_soc_pct(mode: str) -> int:
+    """Return the managed GoodWe/EMHASS minimum as a whole percentage."""
+    normalized = normalize_battery_saver_mode(mode)
+    return round(PRESETS[normalized].minimum_soc * 100)
+
+
 def battery_saver_mode_payloads() -> list[dict[str, Any]]:
-    """Return frontend-safe metadata for the four public modes."""
+    """Return frontend-safe metadata for the five public modes."""
     return [
         {
             "key": preset.key,
             "label": preset.label,
             "description": preset.short_description,
+            "minimum_soc_pct": round(preset.minimum_soc * 100),
             "maximum_soc_pct": round(preset.maximum_soc * 100),
             "deficit_threshold_pct": round(preset.deficit_threshold * 100),
+            "deficit_cost_factor_pct": round(preset.deficit_cost_factor * 100, 2),
             "surplus_threshold_pct": round(preset.surplus_threshold * 100),
+            "surplus_cost_factor_pct": round(preset.surplus_cost_factor * 100, 2),
+            "stress_cost_factor_pct": round(preset.stress_cost_factor * 100, 2),
             "anti_churn_cost_factor_pct": round(
                 preset.anti_churn_cost_factor * 100, 2
             ),
@@ -257,6 +296,7 @@ def build_battery_saver_profile(
         "mode": preset.key,
         "label": preset.label,
         "price_reference": reference,
+        "battery_minimum_state_of_charge": preset.minimum_soc,
         "battery_maximum_state_of_charge": preset.maximum_soc,
         "battery_soc_deficit_threshold": preset.deficit_threshold,
         "battery_soc_deficit_cost": round(reference * preset.deficit_cost_factor, 6),

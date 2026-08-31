@@ -69,6 +69,7 @@ CONF_NORDPOOL_CURRENCY = "nordpool_currency"
 CONF_BUY_PRICE_ADDER = "buy_price_adder"
 CONF_SELL_PRICE_DEDUCTION = "sell_price_deduction"
 CONF_BATTERY_SAVER_MODE = "battery_saver_mode"
+CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED = "battery_saver_soc_limits_managed"
 
 DEFAULT_PORT = 502
 DEFAULT_SLAVE = 247

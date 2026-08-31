@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.0.1-beta.4 runtime structure
+## Current v1.1.0-beta.1 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.0.1-beta.4 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.1.0-beta.1 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -43,8 +43,9 @@ orchestrator_v033.py    persistent official-plan refresh + deterministic plan_re
 orchestrator_v044.py    bounded non-blocking post-restart optimization recovery
 plan_runtime.py         validated /api/v1/plan mirror + Store lifecycle/current-value lookup
 battery_plan.py         pure plan normalization/timestep/validity helpers
-battery_saver.py        four Battery Saver profiles + nine owned EMHASS policy fields
+battery_saver.py        five Battery Saver profiles + ten owned EMHASS policy fields
 battery_saver_api.py    admin Battery Saver read/apply/rollback API
+soc_limits.py           shared verified GoodWe minimum-SOC read/write/publish helper
 price_series.py         pure timestamped price-series helpers
 battery_price_api.py    read-only battery/price/plan chart WebSocket API
 accounting.py           persistent daily grid-accounting runtime
@@ -138,8 +139,9 @@ post-refresh read-back but can never own or retry a command.
 Top level:
 
 ```text
-gw-energy-pilot-v101.js
-    -> gw-energy-pilot-v051.js
+gw-energy-pilot-v110.js
+    -> gw-energy-pilot-v101.js
+         -> gw-energy-pilot-v051.js
          -> gw-energy-pilot-v051-history.js
          -> gw-energy-pilot-v050.js
               -> gw-energy-pilot-v049.js
@@ -157,8 +159,10 @@ gw-energy-pilot-v101.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.1-beta.4 retains the presentation-only beta wrapper and advances one complete
-`1.0.1-beta4` active-graph cache boundary. The nested v0.51 feature layer owns
+v1.1.0-beta.1 adds the final presentation-only beta wrapper and advances one
+complete `1.1.0-beta.1-charge1` active-graph cache boundary. The bounded
+v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
+The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
 plan data/view owners implement Recorder attribution,
 wanted-SOC history and verified runtime-session-bounded EV underlays. v0.50 retains
@@ -169,7 +173,9 @@ strategy/settings typography and field-tuned profile presentation; v0.46
 retains external-PV presentation, v0.44 owns the bounded Optimize
 listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS
 settings overview, and v0.41 ordinary telemetry patching, targeted plan
-refresh, PV presentation and static-flow DOM/CSS.
+refresh, PV presentation and static-flow DOM/CSS. The v0.41 PV flow keeps one
+combined group total while patching one internal ETA/DC node and one aggregated
+external AC/PCC node; it remains independent of control and EMHASS inputs.
 
 The existing settings module owns the two-deadband configuration panel and its
 zero-centered explanatory scale. Control behavior remains owned by the backend
@@ -310,24 +316,29 @@ The public profile keys/names remain:
 ```text
 mad_steve    -> Mad-Steve
 gold_rush    -> Gold Rush
+chargegasm   -> Chargegasm
 balanced     -> Balanced
 battery_saver-> Battery Saver
 ```
 
 Battery Saver is opt-in for unmanaged installations. Do not silently adopt/overwrite existing custom EMHASS policy values on upgrade.
 
-Managed profile hard maxima are all 100%; the profile distinction above 95% is economic rather than physical:
+The complete profile ranges are:
 
 ```text
-Mad-Steve     100%
-Gold Rush     100%
-Balanced      100%
-Battery Saver 100%
+Mad-Steve      5–100%  comfort 10–95%
+Gold Rush      5–100%  comfort 10–95%
+Chargegasm     8–96%   comfort 13–91%
+Balanced      10–93%   comfort 15–88%
+Battery Saver 10–85%   comfort 20–80%
 ```
 
-All four use `battery_soc_surplus_threshold = 0.95`. Their surplus cost factors are 5% / 10% / 25% / 50% × dynamic price reference in mode order. Current EMHASS applies this as currency/kWh/hour, so every timestep above 95% adds dwell cost and reaching 100% remains possible when the modeled value is sufficient.
-
-The verified GoodWe-synchronized minimum SOC remains a separate hard lower boundary. All managed profile maxima are 100% and remain part of the EMHASS Battery Saver transaction and rollback path. The shared 95% surplus threshold is soft: EMHASS can enter 95–100% but pays the profile-specific surplus cost for every kWh/hour spent there.
+The low/high SOC cost factors are 2/5, 2/12, 2/18, 5/25 and 10/50
+percent × dynamic price reference in profile order. The profile minimum is a
+verified GoodWe `45356` plus EMHASS transaction; the maximum remains
+EMHASS-only. Existing v1.0 managed entries require explicit reselection before
+the new minimum is written, so installing the beta alone never mutates the
+hardware floor.
 
 ### Linear anti-churn versus quadratic power stress
 
@@ -350,18 +361,23 @@ weight_battery_charge    = 2.25% × dynamic price reference
 weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-Gold Rush, Balanced and Battery Saver use the field-tuned transaction floor:
+Gold Rush and Chargegasm use the field-tuned transaction factor:
 
 ```text
 weight_battery_charge    = 6% × dynamic price reference
 weight_battery_discharge = 6% × dynamic price reference
 ```
 
-Gold Rush separately uses `battery_stress_cost = 1% × dynamic price reference`; Balanced and Battery Saver retain 8% and 20%. Keep these distinctions explicit in payload metadata, tests and customer documentation. Battery efficiency remains installation-owned and must not be silently rewritten by a managed profile.
+Balanced raises anti-churn to 7% and Battery Saver to 9%. Power-stress factors
+are 0% / 0% / 2% / 6% / 20% in mode order. Keep these distinctions explicit
+in payload metadata, tests and customer documentation. Battery efficiency
+remains installation-owned and must not be silently rewritten by a managed
+profile.
 
-Battery Saver owns nine EMHASS fields:
+Battery Saver owns ten EMHASS fields:
 
 ```text
+battery_minimum_state_of_charge
 battery_maximum_state_of_charge
 battery_soc_deficit_threshold
 battery_soc_deficit_cost
@@ -375,7 +391,13 @@ weight_battery_discharge
 
 When extending this list, update apply, rollback, unmanaged/custom detection, diagnostics, tests and `docs/BATTERY_SAVER.md` together.
 
-The Custom editor intentionally exposes only the five economic cost fields already presented in the customer UI. Dashboard and Settings use the same administrator-only `battery_saver/custom_set` WebSocket transaction. Keep its validation finite and non-negative, retain EMHASS scalar/list shapes, preserve the complete unrelated EMHASS configuration and include the write plus first optimization in the rollback boundary. Do not duplicate the Minimum/Maximum SOC entity paths in this transaction.
+The Custom editor intentionally exposes only the five economic cost fields
+already presented in the customer UI. Dashboard and Settings use the same
+administrator-only `battery_saver/custom_set` WebSocket transaction. Keep its
+validation finite and non-negative, retain EMHASS scalar/list shapes, preserve
+the complete unrelated EMHASS configuration and include the write plus first
+optimization in the rollback boundary. The existing SOC NumberEntities remain
+the only slider path and must reject writes while a managed profile is active.
 
 Battery Saver currently supports one EMHASS battery model. Do not broadcast a scalar/list profile over multi-battery configurations without an explicit per-battery ownership design.
 
@@ -500,9 +522,12 @@ existing EnergyPilot runtime price-source path
 The chart API uses schema `6` and includes `plan_revision` plus bounded
 `execution` history/projection. The frontend should force-refresh the one
 canonical plan card and one canonical execution card when live evidence differs
-from the cached payload. `P_batt.last_updated` remains the compatibility
-fallback for changes outside EnergyPilot. Do not solve refresh bugs by allowing
-duplicate cards.
+from the cached payload. It also includes backend-derived Home Assistant-timezone
+windows for rolling 12h, fixed-today 24h and fixed-today-through-tomorrow-noon
+36h views. The frontend filters one shared cached dataset when the range changes.
+`P_batt.last_updated` remains the compatibility fallback for changes outside
+EnergyPilot. Do not solve range/refresh bugs by adding Recorder calls per click
+or allowing duplicate cards.
 
 Do not discover Nord Pool independently in the browser. Chart energy summaries are visualization only; persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
 

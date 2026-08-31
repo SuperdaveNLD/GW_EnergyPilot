@@ -34,7 +34,7 @@ class BatterySaverApiContractTests(unittest.TestCase):
         source = self.source
         self.assertIn("if mode is not None and number_of_batteries(config) != 1:", source)
         self.assertIn(
-            "mode is not None\n        and mode != MODE_MAD_STEVE",
+            "mode is not None\n        and battery_saver_mode_requires_stress_support(mode)",
             source,
         )
 
@@ -65,6 +65,19 @@ class BatterySaverApiContractTests(unittest.TestCase):
             rollback,
         )
         self.assertIn("_async_restore_battery_saver_config(", rollback)
+        self.assertIn("async_set_goodwe_minimum_soc(", rollback)
+
+    def test_managed_profile_writes_verified_goodwe_minimum_before_optimization(self) -> None:
+        source = self.source
+        write = source.index("await async_set_goodwe_minimum_soc(entry, requested_minimum)")
+        option = source.index("hass.config_entries.async_update_entry(entry, options=new_options)")
+        optimize = source.index('await orchestrator.async_optimize(reason="battery_saver_changed")')
+        self.assertLess(write, option)
+        self.assertLess(option, optimize)
+        self.assertIn(
+            "new_options[CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED] = True",
+            source,
+        )
 
     def test_custom_cost_editor_uses_one_validated_transaction(self) -> None:
         source = self.source

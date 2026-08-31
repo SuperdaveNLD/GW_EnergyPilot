@@ -1,10 +1,10 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.0.0 Stable**.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.1.0-beta.1** and retained from v1.0.0 Stable.
 
 ## Purpose
 
-The dashboard shows, on one local-day timeline:
+The dashboard shows, on one selectable Home Assistant-local timeline:
 
 - actual GoodWe battery charging and discharging;
 - the EMHASS battery-power target that was active historically;
@@ -17,6 +17,22 @@ The dashboard shows, on one local-day timeline:
   from the canonical execution ledger.
 
 The chart is visualization only. It does not own GoodWe control, EMHASS optimization or persistent financial accounting.
+
+## Chart ranges and time contract
+
+The connected chart header offers three independent range choices:
+
+- **12h** — a rolling zoom from six elapsed hours before `NOW` through six elapsed hours after `NOW`;
+- **24h** — the fixed Home Assistant-local day from 00:00 through the next 00:00;
+- **36h** — the fixed Home Assistant-local window from today 00:00 through tomorrow 12:00.
+
+`24h` remains the backwards-compatible default. The selected range is stored under `ranges.battery-price` in the existing browser-local `gw_energypilot_dashboard_v008` preference object. It adds no config-entry option, entity or Home Assistant Store.
+
+The backend derives `NOW`, local-day boundaries and axis ticks from `hass.config.time_zone`. Absolute instants are serialized in UTC together with the configured IANA timezone and local calendar-day offsets. A spring DST day is therefore 23 elapsed hours and an autumn DST day 25 elapsed hours while both remain the fixed **24h / today** operator choice. The rolling 12h zoom always spans exactly twelve elapsed hours. Invalid timezone input fails safe to UTC.
+
+One cached read covers the earliest possible history boundary — at most six hours before local midnight during the early morning — through tomorrow 12:00 for price and plan points. Range clicks filter this shared dataset locally and do not call Recorder or the plan API again. Compared with the former today-only request, Recorder/history load is unchanged after 06:00 and increases by at most six hours before 06:00. The existing five-minute data-cache and explicit `plan_revision` invalidation remain authoritative.
+
+The visible horizon is bounded by available source data. EnergyPilot does not extrapolate an expired EMHASS plan or invent tomorrow prices when the upstream plan/price provider has not published them yet.
 
 ## Actual battery series
 
@@ -98,9 +114,9 @@ P_batt > 0 W = planned discharge
 P_batt ~= 0 W = neutral battery target
 ```
 
-For the elapsed part of the day, the chart reads Home Assistant history for that configured entity. Each state is treated as the published target that remained active until the next state change.
+For the elapsed part of the loaded history window, the chart reads Home Assistant history for that configured entity. Each state is treated as the published target that remained active until the next state change.
 
-The Home Assistant history API can return the state active at the requested start time with its original timestamp from before local midnight when `include_start_time_state` is enabled. EnergyPilot clamps that valid boundary state to local 00:00 instead of discarding it.
+The Home Assistant history API can return the state active at the requested start time with its original earlier timestamp when `include_start_time_state` is enabled. EnergyPilot clamps that valid state to the requested history boundary — local 00:00 for the fixed views, or at most six hours earlier for the rolling early-morning view — instead of discarding it.
 
 This layer is intentionally the **active historical plan**. It does not rewrite history using the newest complete optimization horizon.
 
@@ -166,9 +182,11 @@ These values are **not expected to be mathematically identical**. They are separ
 
 These GoodWe battery counters are separate from grid import/export accounting and are not used to calculate financial profit.
 
+Changing the visible chart range does not change these headline **today** totals. The Recorder comparison continues to integrate only the fixed Home Assistant-local day, while planned charge/discharge in L/expanded presentation is explicitly calculated for the selected visible window.
+
 ## Card sizes and window controls
 
-The chart offers an Apple-style segmented size selector:
+The chart offers separate Apple-style segmented selectors for range (`12h / 24h / 36h`) and size:
 
 - **S / Compact** — half-width on sufficiently wide dashboards, reduced axes and concise legend;
 - **M / Normal** — full-width standard chart;
@@ -195,6 +213,7 @@ gw_energypilot/battery_price/get
 The current command uses chart schema version **`6`** and includes:
 
 - `plan_revision` — the EnergyPilot optimization generation currently owning the mirrored plan;
+- `chart_time` — authoritative Home Assistant timezone, current instant, local-day/history/maximum boundaries and the rolling/fixed window ticks;
 - `battery_energy` — current GoodWe charged/discharged day counters;
 - `battery_plan` — configured entity id, current target/source, future points, persistent-plan source, `generated_at`, `valid_until` and restore diagnostics;
 - `battery_soc_plan` — optional normalized `value_pct` points, `%` unit and exact official source-column/unit evidence;
@@ -218,15 +237,15 @@ The frontend normally keeps a short chart-data cache. v0.33 uses two independent
 1. **EnergyPilot optimization revision.** Every successful call through the central orchestrator refreshes `GWEnergyPilotPlanRuntime`, advances `plan_revision` and emits the existing orchestrator dispatcher signal. The existing Optimize Now button entity already subscribes to that signal and exposes orchestrator attributes, so no new entity is added. The chart compares that live revision with the revision stored in its last `battery_price/get` payload and force-refreshes immediately when they differ.
 2. **External EMHASS publication fallback.** The configured `P_batt` entity's `last_updated` is still compared with the timestamp in the cached chart payload. A plan changed outside EnergyPilot therefore also bypasses normal cache expiry.
 
-After either freshness signal, the chart calls the read-only API with force refresh, rebuilds the data-dependent contents inside the one connected canonical `.ep-v027-battery-plan-card`, and removes any accidental duplicate card left by a prior layered-render regression. Its S/M/L selector, expand action and window bar stay connected so a refresh between native press and release cannot swallow that interaction.
+After either freshness signal, the chart calls the read-only API with force refresh, rebuilds the data-dependent contents inside the one connected canonical `.ep-v027-battery-plan-card`, and removes any accidental duplicate card left by a prior layered-render regression. Its 12h/24h/36h and S/M/L selectors, expand action and window bar stay connected so a refresh between native press and release cannot swallow that interaction.
 
 The duplicate-card guard must therefore **not** return permanently just because a canonical card already exists. It may skip rendering only when the render key is unchanged and no fresh plan evidence exists.
 
 ## Frontend cache contract
 
-The active v1.0.0 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v1.1.0-beta.1 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.0.0 uses `1.0.0-stable1` for its presentation wrapper/direct feature import; v0.51 loads every inner feature import through `0.51-h1`, including the scoped plan-refresh and execution-history owners. The older v0.33 plan-refresh mechanism remains historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.1.0-beta.1 loads its presentation wrapper and every inner feature import through `1.1.0-beta.1-charge1`, including the strategy, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
 
 ## EV protection underlays
 

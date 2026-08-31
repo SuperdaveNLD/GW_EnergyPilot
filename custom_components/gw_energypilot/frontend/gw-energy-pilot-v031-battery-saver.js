@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v031-window-controls.js?v=1.0.1-beta4";
+import "./gw-energy-pilot-v031-window-controls.js?v=1.1.0-beta.1-charge1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const CUSTOM_MODE = "custom";
@@ -6,12 +6,13 @@ const CUSTOM_MODE = "custom";
 const TEXT = {
   en: {
     title: "Battery Saver",
-    description: "Choose how strongly EnergyPilot values battery preservation inside EMHASS optimization. A managed profile sets the EMHASS Maximum SOC; the GoodWe-synchronized Minimum SOC remains the hard lower operating limit.",
+    description: "Compare the complete battery profiles. A managed profile owns both SOC limits and its preservation costs; choose Custom to edit the SOC sliders and raw costs.",
     unmanaged: "Existing EMHASS behavior is not managed by EnergyPilot yet.",
     legacyMadSteve: "Legacy zero-cost EMHASS behavior is more aggressive than current Mad-Steve. Select a mode to add the shared anti-churn trading cost.",
     custom: "Custom EMHASS battery costs are active. Edit and save them below, or choose a managed EnergyPilot profile.",
     customLabel: "Custom",
     customDescription: "Keep direct control of the five EMHASS battery cost values.",
+    legacyLimits: "This profile was selected before managed SOC ranges were introduced. Select it again to apply and verify its new GoodWe/EMHASS minimum and maximum.",
     customTitle: "Custom battery costs",
     deficit: "Low-SOC cost",
     surplus: "High-SOC cost",
@@ -29,6 +30,13 @@ const TEXT = {
     low: "Low-SOC soft threshold",
     high: "High-SOC soft threshold",
     maximum: "Hard maximum",
+    range: "Hard range",
+    comfort: "Comfort zone",
+    lowCost: "Low SOC",
+    highCost: "High SOC",
+    stressCost: "Power stress",
+    antiChurn: "Anti-churn",
+    comparisonNote: "Costs are percentages of the dynamic price reference; high-SOC cost applies per kWh/hour. Anti-churn is the same percentage for charging and discharging.",
     effective: "Effective profile",
     priceRef: "price reference",
     recommended: "RECOMMENDED",
@@ -37,12 +45,13 @@ const TEXT = {
   },
   nl: {
     title: "Battery Saver",
-    description: "Kies hoe zwaar EnergyPilot batterijbehoud meeweegt in de EMHASS-optimalisatie. Een beheerd profiel stelt de EMHASS Maximum SOC in; de met GoodWe gesynchroniseerde Minimum SOC blijft de harde ondergrens.",
+    description: "Vergelijk hier alle batterijprofielen. Een vaste stand beheert beide SOC-grenzen en de beschermingskosten; kies Aangepast om de SOC-schuiven en kosten zelf te wijzigen.",
     unmanaged: "Het bestaande EMHASS-gedrag wordt nog niet door EnergyPilot beheerd.",
     legacyMadSteve: "Het oude EMHASS-gedrag zonder kosten is agressiever dan de huidige Mad-Steve. Kies een modus om de gedeelde anti-churn handelskosten toe te passen.",
     custom: "Aangepaste EMHASS-batterijkosten zijn actief. Bewerk en bewaar ze hieronder, of kies een beheerd EnergyPilot-profiel.",
     customLabel: "Aangepast",
     customDescription: "Beheer de vijf EMHASS-batterijkosten rechtstreeks.",
+    legacyLimits: "Dit profiel is gekozen voordat vaste SOC-ranges werden ingevoerd. Kies het opnieuw om de nieuwe GoodWe/EMHASS minimum- en maximumgrens toe te passen en te verifiëren.",
     customTitle: "Aangepaste batterijkosten",
     deficit: "Kosten lage SOC",
     surplus: "Kosten hoge SOC",
@@ -60,6 +69,13 @@ const TEXT = {
     low: "Zachte low-SOC-drempel",
     high: "Zachte high-SOC-drempel",
     maximum: "Harde maximum-SOC",
+    range: "Harde range",
+    comfort: "Comfortzone",
+    lowCost: "Lage SOC",
+    highCost: "Hoge SOC",
+    stressCost: "Vermogensstress",
+    antiChurn: "Anti-pendel",
+    comparisonNote: "Kosten zijn percentages van de dynamische prijsreferentie; hoge-SOC-kosten gelden per kWh/uur. Anti-pendel gebruikt hetzelfde percentage voor laden en ontladen.",
     effective: "Effectief profiel",
     priceRef: "prijsreferentie",
     recommended: "AANBEVOLEN",
@@ -103,7 +119,7 @@ function ensureStyles(root) {
     .ep-v031-bs-status { margin-top:11px; padding:9px 10px; border:1px solid rgba(79,167,205,.10); border-radius:9px; color:#88a7b8; background:rgba(4,24,42,.35); font-size:10px; line-height:1.5; }
     .ep-v031-bs-status.ok { color:#83dcb9; border-color:rgba(49,211,157,.16); }
     .ep-v031-bs-status.error { color:#f1aaa3; border-color:rgba(238,139,125,.20); }
-    .ep-v031-bs-modes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:13px; }
+    .ep-v031-bs-modes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:13px; }
     .ep-v031-bs-mode {
       position:relative; min-height:112px; padding:12px; border:1px solid rgba(77,164,207,.11); border-radius:11px;
       color:#abc6d4; background:rgba(5,27,47,.50); cursor:pointer; text-align:left;
@@ -119,6 +135,13 @@ function ensureStyles(root) {
     .ep-v031-bs-meta { display:flex; flex-wrap:wrap; gap:7px 14px; margin-top:12px; color:#7798aa; font-size:10px; }
     .ep-v031-bs-meta strong { color:#c5dce7; font-weight:780; }
     .ep-v031-bs-profile { margin-top:7px; color:#6f90a2; font-size:9px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; word-break:break-word; }
+    .ep-v031-bs-comparison { margin-top:12px; overflow-x:auto; border:1px solid rgba(70,181,211,.11); border-radius:10px; }
+    .ep-v031-bs-comparison table { width:100%; min-width:760px; border-collapse:collapse; color:#88a7b8; font-size:9px; }
+    .ep-v031-bs-comparison th,.ep-v031-bs-comparison td { padding:8px 9px; border-bottom:1px solid rgba(70,181,211,.08); text-align:left; white-space:nowrap; }
+    .ep-v031-bs-comparison th { color:#b7d0dc; background:rgba(5,30,49,.72); font-weight:850; }
+    .ep-v031-bs-comparison tr:last-child td { border-bottom:0; }
+    .ep-v031-bs-comparison tr.active td { color:#d9f5ec; background:rgba(16,94,77,.20); }
+    .ep-v031-bs-comparison-note { margin:7px 2px 0; color:#6f91a3; font-size:9px; line-height:1.45; }
     .ep-v031-bs-custom { margin-top:12px; padding:11px; border:1px solid rgba(70,181,211,.13); border-radius:10px; background:rgba(4,24,42,.38); }
     .ep-v031-bs-custom-title { color:#dceff6; font-size:12px; font-weight:850; }
     .ep-v031-bs-custom-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:9px; }
@@ -169,6 +192,8 @@ async function setBatterySaverMode(panel, mode) {
   if (!panel._hass?.callWS || !id || panel.__epV031BSBusy) return;
   const t = copy(panel);
   panel.__epV031BSBusy = true;
+  panel.__epV031BSPendingMode = mode;
+  setSocSliderVisibility(panel, mode !== CUSTOM_MODE);
   panel.__epV031BSError = null;
   panel.__epV031BSMessage = t.applying;
   panel._queueRender();
@@ -184,6 +209,7 @@ async function setBatterySaverMode(panel, mode) {
     panel.__epV031BSMessage = null;
   } finally {
     panel.__epV031BSBusy = false;
+    panel.__epV031BSPendingMode = null;
     panel._queueRender();
   }
 }
@@ -191,6 +217,48 @@ async function setBatterySaverMode(panel, mode) {
 function pct(value) {
   if (value === null || value === undefined || value === "") return "—";
   return Number.isFinite(Number(value)) ? `${Number(value).toFixed(0)}%` : "—";
+}
+
+function factorPct(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${number}%` : "—";
+}
+
+function setSocSliderVisibility(panel, managed) {
+  const controls = panel.shadowRoot?.querySelector(".ep-v011-soc-controls");
+  if (controls) controls.style.display = managed ? "none" : "";
+}
+
+function comparisonTableHtml(panel, t, modes, activeMode) {
+  const managed = modes.filter((mode) => mode.key !== CUSTOM_MODE);
+  if (!managed.length) return "";
+  return `
+    <div>
+      <div class="ep-v031-bs-comparison">
+        <table>
+        <thead><tr>
+          <th>${panel._escape(t.title)}</th>
+          <th>${panel._escape(t.range)}</th>
+          <th>${panel._escape(t.comfort)}</th>
+          <th>${panel._escape(t.lowCost)}</th>
+          <th>${panel._escape(t.highCost)}</th>
+          <th>${panel._escape(t.stressCost)}</th>
+          <th>${panel._escape(t.antiChurn)}</th>
+          </tr></thead>
+          <tbody>${managed.map((mode) => `
+          <tr class="${mode.key === activeMode ? "active" : ""}">
+            <td><strong>${panel._escape(mode.label)}</strong></td>
+            <td>${panel._escape(`${mode.minimum_soc_pct}% – ${mode.maximum_soc_pct}%`)}</td>
+            <td>${panel._escape(`${mode.deficit_threshold_pct}% – ${mode.surplus_threshold_pct}%`)}</td>
+            <td>${panel._escape(factorPct(mode.deficit_cost_factor_pct))}</td>
+            <td>${panel._escape(factorPct(mode.surplus_cost_factor_pct))}</td>
+            <td>${panel._escape(factorPct(mode.stress_cost_factor_pct))}</td>
+            <td>${panel._escape(factorPct(mode.anti_churn_cost_factor_pct))}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+      </div>
+      <div class="ep-v031-bs-comparison-note">${panel._escape(t.comparisonNote)}</div>
+    </div>`;
 }
 
 function firstWeight(value) {
@@ -274,12 +342,15 @@ async function saveCustomValues(panel, form) {
 function renderBatterySaver(panel, root) {
   if (!panel.__epV016SettingsOpen || panel.__epV016SettingsTab !== "emhass") return;
   const content = root.querySelector(".ep-v016-settings-content");
-  if (!content || content.querySelector(".ep-v031-battery-saver")) return;
+  if (!content) return;
   const id = entryId(panel);
   if (!id) return;
   const t = copy(panel);
   const data = panel.__epV031BSData?.entry_id === id ? panel.__epV031BSData : null;
   const busy = Boolean(panel.__epV031BSBusy || panel.__epV031BSLoading);
+  const activeMode = panel.__epV031BSPendingMode || (data?.managed ? data.mode : CUSTOM_MODE);
+  setSocSliderVisibility(panel, activeMode !== CUSTOM_MODE);
+  if (content.querySelector(".ep-v031-battery-saver")) return;
 
   if (!data && !panel.__epV031BSLoading && !panel.__epV031BSError) {
     queueMicrotask(() => loadBatterySaver(panel));
@@ -298,28 +369,33 @@ function renderBatterySaver(panel, root) {
     statusTone = "ok";
   } else if (data && !data.managed) {
     statusText = data.legacy_behavior === "mad_steve" ? t.legacyMadSteve : t.custom;
+  } else if (data?.managed && !data.soc_limits_managed) {
+    statusText = t.legacyLimits;
   }
 
   const availableModes = [
     ...(data?.modes || []),
     { key: CUSTOM_MODE, label: t.customLabel, description: t.customDescription },
   ];
-  const activeMode = data?.managed ? data.mode : CUSTOM_MODE;
   const modes = availableModes.map((mode) => `
     <button type="button" class="ep-v031-bs-mode ${activeMode === mode.key ? "active" : ""}" data-bs-mode="${panel._escape(mode.key)}" ${busy ? "disabled" : ""}>
       ${mode.recommended ? `<span class="ep-v031-bs-rec">${panel._escape(t.recommended)}</span>` : ""}
       <strong>${panel._escape(mode.label)}</strong>
       <p>${panel._escape(mode.description)}</p>
-      ${mode.key === CUSTOM_MODE ? "" : `<div class="ep-v031-bs-thresholds">${panel._escape(t.low)} ${mode.deficit_threshold_pct}% · ${panel._escape(t.high)} ${mode.surplus_threshold_pct}% · ${panel._escape(t.maximum)} ${mode.maximum_soc_pct}%</div>`}
+      ${mode.key === CUSTOM_MODE ? "" : `<div class="ep-v031-bs-thresholds">${panel._escape(t.range)} ${mode.minimum_soc_pct}–${mode.maximum_soc_pct}% · ${panel._escape(t.comfort)} ${mode.deficit_threshold_pct}–${mode.surplus_threshold_pct}%</div>`}
     </button>`).join("");
 
   const profile = data?.effective_profile;
+  const profileMin = profile?.battery_minimum_state_of_charge;
+  const profileMinText = Number.isFinite(Number(profileMin))
+    ? `${Math.round(Number(profileMin) * 100)}%`
+    : "—";
   const profileMax = profile?.battery_maximum_state_of_charge;
   const profileMaxText = Number.isFinite(Number(profileMax))
     ? `${Math.round(Number(profileMax) * 100)}%`
     : "—";
   const profileText = profile
-    ? `${t.effective}: max SOC ${profileMaxText} · cycle charge ${firstWeight(profile.weight_battery_charge)} · cycle discharge ${firstWeight(profile.weight_battery_discharge)} · deficit ${profile.battery_soc_deficit_cost} · surplus ${profile.battery_soc_surplus_cost} · stress ${profile.battery_stress_cost} · ${t.priceRef} ${profile.price_reference}`
+    ? `${t.effective}: SOC ${profileMinText}–${profileMaxText} · cycle charge ${firstWeight(profile.weight_battery_charge)} · cycle discharge ${firstWeight(profile.weight_battery_discharge)} · deficit ${profile.battery_soc_deficit_cost} · surplus ${profile.battery_soc_surplus_cost} · stress ${profile.battery_stress_cost} · ${t.priceRef} ${profile.price_reference}`
     : "";
 
   wrap.innerHTML = `
@@ -332,6 +408,7 @@ function renderBatterySaver(panel, root) {
     </div>
     ${statusText ? `<div class="ep-v031-bs-status ${statusTone}">${panel._escape(statusText)}</div>` : ""}
     ${modes ? `<div class="ep-v031-bs-modes">${modes}</div>` : ""}
+    ${comparisonTableHtml(panel, t, availableModes, activeMode)}
     ${activeMode === CUSTOM_MODE ? customEditorHtml(panel, t, data, busy) : ""}
     <div class="ep-v031-bs-meta">
       <span>${panel._escape(t.hardRange)} · <strong>${pct(data?.hard_minimum_soc_pct)} – ${pct(data?.hard_maximum_soc_pct)}</strong></span>

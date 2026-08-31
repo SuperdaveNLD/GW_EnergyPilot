@@ -19,19 +19,19 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v101.js?v=1.0.1-beta4", init_source)
+        self.assertIn("gw-energy-pilot-v110.js?v=1.1.0-beta.1-charge1", init_source)
         self.assertIn(
-            'import "./gw-energy-pilot-v048.js?v=1.0.1-beta4";',
+            'import "./gw-energy-pilot-v048.js?v=1.1.0-beta.1-charge1";',
             active,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v047.js?v=1.0.1-beta4";',
+            'import "./gw-energy-pilot-v047.js?v=1.1.0-beta.1-charge1";',
             self.source,
         )
         self.assertIn('panel._stateByKey?.("control_strategy")?.state', self.source)
         self.assertIn("PanelClass.prototype.__epV048Installed = true", self.source)
 
-    def test_copy_describes_separate_deadbands_and_full_setpoint(self) -> None:
+    def test_copy_describes_two_deadbands_and_full_setpoint(self) -> None:
         for expected in (
             "Battery Hold deadband on P_batt",
             "separate GoodWe Auto deadband",

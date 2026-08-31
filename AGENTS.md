@@ -19,10 +19,12 @@ Primary tested inverter:
 GoodWe GW15K-ETA-G20
 ```
 
-Current release line:
+Current release lines:
 
 ```text
-v1.0.1-beta.4 Beta prerelease
+v1.0.0 Stable
+v1.0.1-beta.4 Published beta base
+v1.1.0-beta.1 Next beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -39,11 +41,11 @@ Follow `docs/RELEASE_WORKFLOW.md`; do not reuse or move published tags.
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v1.0.1-beta.4)
+## Frontend stability contract (v0.41+, active v1.1.0 beta)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.0.1-beta.4 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.1.0 beta telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -220,22 +222,24 @@ Public modes are exactly:
 ```text
 Mad-Steve
 Gold Rush
+Chargegasm
 Balanced
 Battery Saver
 ```
 
-The verified GoodWe-synchronized Minimum SOC remains a separate hard lower boundary. When a Battery Saver profile is explicitly managed, its EMHASS `battery_maximum_state_of_charge` is part of the profile transaction.
+When a Battery Saver profile is explicitly selected, its verified GoodWe/EMHASS minimum and EMHASS maximum are one rollback-safe profile transaction. Direct SOC NumberEntity writes are rejected until Custom is selected.
 
-All managed profiles can use the complete physical EMHASS SOC range:
+Managed hard ranges and comfort zones are:
 
 ```text
-Mad-Steve    100%
-Gold Rush    100%
-Balanced     100%
-Battery Saver 100%
+Mad-Steve      5–100%  comfort 10–95%
+Gold Rush      5–100%  comfort 10–95%
+Chargegasm     8–96%   comfort 13–91%
+Balanced      10–93%   comfort 15–88%
+Battery Saver 10–85%   comfort 20–80%
 ```
 
-The range above 95% is a shared soft red zone. `battery_soc_surplus_cost` is a time-dependent EMHASS dwell penalty in currency/kWh/hour and uses profile factors of 5% / 10% / 25% / 50% × dynamic price reference for Mad-Steve / Gold Rush / Balanced / Battery Saver. This allows 100% only when its value exceeds both the transaction cost and the accumulated cost of staying above 95%.
+The profile lower/upper shoulders use deficit/surplus factors of 2/5, 2/12, 2/18, 5/25 and 10/50 percent × dynamic price reference in mode order. `battery_soc_surplus_cost` remains a time-dependent currency/kWh/hour dwell penalty.
 
 v0.34 introduced two distinct economic mechanisms that remain active in v0.35:
 
@@ -249,18 +253,19 @@ weight_battery_charge    = 2.25% × dynamic price reference
 weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-Gold Rush, Balanced and Battery Saver use the field-tuned floor:
+Gold Rush and Chargegasm use the field-tuned factor:
 
 ```text
 weight_battery_charge    = 6% × dynamic price reference
 weight_battery_discharge = 6% × dynamic price reference
 ```
 
-Gold Rush separately uses `battery_stress_cost = 1% × dynamic price reference`; Balanced remains at 8% and Battery Saver at 20%. The 6% transaction floor removed several marginal one-slot reversals in the captured Gold Rush comparison while preserving full-power dispatch. Applying the same floor to the more conservative profiles keeps the strategy ordering coherent. Profile-specific deficit and power-stress penalties remain separate from the shared 95–100% red-zone policy. Battery charge/discharge efficiency remains installation-owned and is not changed by profile selection.
+Balanced uses 7% anti-churn and Battery Saver 9%. Power-stress factors are 0% / 0% / 2% / 6% / 20% in mode order. The 6% factor removed several marginal one-slot reversals in the captured Gold Rush comparison while preserving full-power dispatch. Battery charge/discharge efficiency remains installation-owned and is not changed by profile selection.
 
-Battery Saver owns nine EMHASS fields after explicit profile selection:
+Battery Saver owns ten EMHASS fields after explicit profile selection:
 
 ```text
+battery_minimum_state_of_charge
 battery_maximum_state_of_charge
 battery_soc_deficit_threshold
 battery_soc_deficit_cost
@@ -272,7 +277,7 @@ weight_battery_charge
 weight_battery_discharge
 ```
 
-Existing unmanaged/custom values remain untouched until selection. The profile apply/rollback path must include all nine owned fields. Multi-battery profile ownership is rejected rather than guessed. See `docs/BATTERY_SAVER.md`.
+Existing unmanaged/custom values remain untouched until selection. Existing v1.0 managed modes retain their GoodWe floor until explicitly reselected, preventing upgrade-only hardware writes. The profile apply/rollback path must include all ten owned fields plus the verified GoodWe minimum. Multi-battery profile ownership is rejected rather than guessed. See `docs/BATTERY_SAVER.md`.
 
 ## Hybrid inverter power interpretation
 
@@ -366,8 +371,9 @@ v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v101.js
-  -> gw-energy-pilot-v051.js
+gw-energy-pilot-v110.js
+  -> gw-energy-pilot-v101.js
+       -> gw-energy-pilot-v051.js
        -> gw-energy-pilot-v051-history.js
        -> gw-energy-pilot-v050.js
        -> gw-energy-pilot-v049.js
@@ -385,7 +391,7 @@ gw-energy-pilot-v101.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.1-beta.4 owns beta release presentation and the complete `1.0.1-beta4` cache boundary. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v1.1.0-beta.1 owns final beta presentation and the complete `1.1.0-beta.1-charge1` cache boundary. v1.0.1-beta.4 remains in the chain as its bounded historical beta presentation layer. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

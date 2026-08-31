@@ -17,6 +17,36 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.1.0-beta.1 — Chargegasm, chart ranges and clearer PV flow
+
+This beta includes every v1.0.1-beta.1 through beta.4 change and adds the new
+Battery Saver policy layer. Battery Strategy now offers **Mad-Steve**, **Gold
+Rush**, **Chargegasm**, **Balanced**, **Battery Saver** and **Custom**. The five
+managed modes have explicit hard minimum/maximum SOC ranges, comfort zones,
+low/high-SOC costs, power-stress costs and anti-churn factors. The full
+comparison is visible in **Settings → EMHASS → Battery Saver** and summarized
+on the Controller card.
+
+Battery · Plan · Price now remembers 12h, 24h and 36h views using backend
+Home Assistant-timezone/DST windows while reusing one cached Recorder dataset.
+The live PV group keeps one combined total and separates the internal ETA/DC
+route from the aggregated external AC/PCC route. Automatic ownership collapses
+the existing manual inverter controls to a compact summary and reveals the same
+connected controls again when manual ownership returns.
+
+Selecting a managed profile writes and verifies its whole-percentage GoodWe
+on-grid minimum before applying the matching EMHASS range and building a fresh
+plan. A failure restores the previous GoodWe minimum, mode and all ten owned
+EMHASS fields. Direct SOC slider/service writes are rejected while a managed
+profile is active; **Custom** preserves current values and restores the two
+sliders. Existing v1.0 managed selections require explicit reselection, so
+installing the beta alone does not change the inverter minimum.
+
+The documentation explains the lower-average-SOC, SOC-window, power and
+throughput rationale and its limits. The profile factors are transparent
+price-relative optimizer policy, not a battery-specific lifetime guarantee.
+See `docs/releases/v1.1.0-beta.1.md` and `docs/BATTERY_SAVER.md`.
+
 # v1.0.1-beta.4 — Explicit charging detection and safe EV-stop recovery
 
 Settings → EV now asks the operator to choose one charging signal: measured
@@ -142,6 +172,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.1.0-beta.1** | 2026-08-31 | **Beta** | Includes v1.0.1-beta.4 and adds Chargegasm, complete managed SOC ranges, 12h/24h/36h plan views, compact manual ownership and separate internal/external PV routes. |
 | **1.0.1-beta.4** | 2026-08-31 | **Beta** | Adds an exclusive power-or-status EV charging detector and bounded fresh-plan retries after charging stops. |
 | **1.0.1-beta.3** | 2026-08-31 | **Beta** | Makes scheduling restart-safe, fixes false legacy-scheduler detection and displays the backend controller's canonical GoodWe mapping. |
 | **1.0.1-beta.2** | 2026-08-30 | **Beta** | Separates Battery Hold on `P_batt` from GoodWe Auto on `P_grid` and adds the centered decision-zone settings panel. |

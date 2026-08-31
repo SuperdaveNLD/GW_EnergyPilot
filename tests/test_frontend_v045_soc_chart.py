@@ -23,19 +23,19 @@ class FrontendV045SocChartTests(unittest.TestCase):
         v048 = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "1.0.1-beta.4")
-        self.assertIn("gw-energy-pilot-v101.js?v=1.0.1-beta4", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.0.1-beta4"', v048)
+        self.assertEqual(manifest["version"], "1.1.0-beta.1")
+        self.assertIn("gw-energy-pilot-v110.js?v=1.1.0-beta.1-charge1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.1.0-beta.1-charge1"', v048)
         self.assertIn(
-            'import "./gw-energy-pilot-v046.js?v=1.0.1-beta4"',
+            'import "./gw-energy-pilot-v046.js?v=1.1.0-beta.1-charge1"',
             active,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v045.js?v=1.0.1-beta4"',
+            'import "./gw-energy-pilot-v045.js?v=1.1.0-beta.1-charge1"',
             v046,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v044.js?v=1.0.1-beta4"',
+            'import "./gw-energy-pilot-v044.js?v=1.1.0-beta.1-charge1"',
             self.source,
         )
         self.assertIn('const VERSION = "0.45"', self.source)

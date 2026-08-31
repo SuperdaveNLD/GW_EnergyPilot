@@ -14,12 +14,14 @@ assert.deepEqual(
   dutch.map((profile) => profile.key),
   [...PROFILE_KEYS, "custom"]
 );
-assert.equal(english.length, 5);
-assert.equal(dutch.length, 5);
-assert.equal(english[3].label, "Battery Saver");
-assert.equal(dutch[3].label, "Batterijbesparing");
-assert.equal(english[4].label, "Custom");
-assert.equal(dutch[4].label, "Aangepast");
+assert.equal(english.length, 6);
+assert.equal(dutch.length, 6);
+assert.equal(english[2].label, "Chargegasm");
+assert.equal(dutch[2].label, "Chargegasm");
+assert.equal(english[4].label, "Battery Saver");
+assert.equal(dutch[4].label, "Batterijbesparing");
+assert.equal(english[5].label, "Custom");
+assert.equal(dutch[5].label, "Aangepast");
 
 class FakeElement {}
 globalThis.Element = FakeElement;
@@ -97,6 +99,7 @@ class FakeRoot {
 const buttons = [
   new FakeButton("mad_steve", "MAD-STEVE ACTIEF"),
   new FakeButton("gold_rush", "GOUDKOORTS"),
+  new FakeButton("chargegasm", "CHARGEGASM"),
   new FakeButton("balanced", "VOLLEDIG ANDERE ZICHTBARE TEKST"),
   new FakeButton("battery_saver", "BATTERIJBESPARING"),
   new FakeButton("custom", "AANGEPAST"),
@@ -175,7 +178,7 @@ assert.equal(root.listeners.size, 4);
 
 let prevented = false;
 root.listeners.get("click")({
-  composedPath: () => [buttons[3]],
+  composedPath: () => [buttons[4]],
   preventDefault: () => {
     prevented = true;
   },
@@ -202,7 +205,7 @@ assert.deepEqual(
 // service request rather than duplicating the real renderer in the unit test.
 panel.__epV041StableRuntime = false;
 root.listeners.get("click")({
-  composedPath: () => [buttons[2]],
+  composedPath: () => [buttons[3]],
   preventDefault: () => {},
 });
 await new Promise((resolve) => setTimeout(resolve, 0));
