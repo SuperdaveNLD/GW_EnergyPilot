@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 import logging
 
+from homeassistant.core import CoreState
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later
 
@@ -60,6 +61,12 @@ class GWEnergyPilotOrchestrator(_BaseOrchestrator):
     async def _async_initial_optimize(self, _now: datetime) -> None:
         """Run one post-restart solve/publish cycle with bounded recovery."""
         if not self.enabled or self._startup_already_refreshed():
+            return
+        # Do not turn a slow Home Assistant startup into a persisted failed
+        # optimization attempt. The bounded retry sequence remains responsible
+        # for trying again after Core reaches RUNNING.
+        if self.hass.state is not CoreState.running:
+            self._schedule_startup_retry()
             return
         try:
             await self.async_optimize(reason="startup")

@@ -28,6 +28,7 @@ from .const import (
     CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
+    CONF_EV_DETECTION_METHOD,
     CONF_EV_MODE_ENTITY,
     CONF_EV_ONLINE_ENTITY,
     CONF_EV_POWER_ENTITY,
@@ -40,6 +41,7 @@ from .const import (
     CONF_EV_LOAD_BALANCE_WINDOW,
     CONF_GRID_CONNECTION_PROFILE,
     CONF_GRID_CUSTOM_CURRENT,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_MAX_POWER,
     CONF_NORDPOOL_AREA,
     CONF_NORDPOOL_CURRENCY,
@@ -59,6 +61,8 @@ from .const import (
     DEFAULT_EMHASS_SOC_FINAL,
     DEFAULT_EMHASS_URL,
     DEFAULT_EV_DEADBAND,
+    DEFAULT_EV_DETECTION_METHOD,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_NORDPOOL_AREA,
     DEFAULT_NORDPOOL_CURRENCY,
@@ -74,9 +78,11 @@ from .const import (
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
     EMHASS_OPTIMIZATION_INTERVALS,
+    EV_DETECTION_METHODS,
     EXTERNAL_PV_ENTITY_KEYS,
     NAME,
 )
+from .ev_detection import default_detection_method
 
 CONF_MAX_POWER_KW = "max_power_kw"
 CONF_EMHASS_SOC_FINAL_PCT = "emhass_soc_final_pct"
@@ -98,11 +104,20 @@ async def _async_validate_connection(host: str, port: int, slave: int) -> None:
         await client.async_close()
 
 
+def _optimization_interval_for_form(value: Any) -> str:
+    """Return an integral stored cadence in the selector's canonical form."""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return str(value)
+    return str(int(numeric)) if numeric.is_integer() else str(value)
+
+
 def _optimization_interval_options(current: Any = None) -> list[str]:
     """Return supported choices while preserving one stored legacy cadence."""
     options = [str(value) for value in EMHASS_OPTIMIZATION_INTERVALS]
     try:
-        legacy = int(current)
+        legacy = int(_optimization_interval_for_form(current))
     except (TypeError, ValueError):
         return options
     if 5 <= legacy <= 60 and legacy % 5 == 0 and str(legacy) not in options:
@@ -156,6 +171,18 @@ def _controller_schema(
                 selector.NumberSelectorConfig(
                     min=0,
                     max=2000,
+                    step=50,
+                    mode=selector.NumberSelectorMode.BOX,
+                    unit_of_measurement="W",
+                )
+            ),
+            vol.Required(
+                CONF_GOODWE_AUTO_DEADBAND,
+                default=DEFAULT_GOODWE_AUTO_DEADBAND,
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=100,
+                    max=5000,
                     step=50,
                     mode=selector.NumberSelectorMode.BOX,
                     unit_of_measurement="W",
@@ -261,11 +288,24 @@ def _controller_schema(
                 CONF_ENABLE_EV_COORDINATION,
                 default=False,
             ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_EV_DETECTION_METHOD,
+                default=DEFAULT_EV_DETECTION_METHOD,
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(EV_DETECTION_METHODS),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="ev_detection_method",
+                )
+            ),
             vol.Optional(CONF_EV_MODE_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(multiple=False)
+                selector.EntitySelectorConfig(
+                    domain=["binary_sensor", "switch", "sensor", "input_boolean"],
+                    multiple=False,
+                )
             ),
             vol.Optional(CONF_EV_POWER_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(multiple=False)
+                selector.EntitySelectorConfig(domain="sensor", multiple=False)
             ),
             vol.Optional(CONF_EV_ONLINE_ENTITY): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=False)
@@ -289,6 +329,12 @@ def _controller_schema(
 def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
     """Convert user-facing values to runtime/storage values."""
     options = dict(user_input)
+    if float(options[CONF_DEADBAND]) >= float(
+        options[CONF_GOODWE_AUTO_DEADBAND]
+    ):
+        raise vol.Invalid(
+            "Battery Hold deadband must be smaller than the GoodWe Auto deadband"
+        )
     optimization_interval = int(options[CONF_EMHASS_OPTIMIZATION_INTERVAL])
     if not 5 <= optimization_interval <= 60 or optimization_interval % 5:
         raise vol.Invalid("Optimization interval must be a 5-minute cadence")
@@ -306,6 +352,10 @@ def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
 def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     """Convert stored runtime values to user-facing values."""
     form_options = dict(options)
+    form_options.setdefault(
+        CONF_EV_DETECTION_METHOD,
+        default_detection_method(options),
+    )
     form_options.setdefault(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
     form_options.setdefault(CONF_P_GRID_ENTITY, DEFAULT_P_GRID_ENTITY)
     form_options.setdefault(CONF_OPTIM_STATUS_ENTITY, DEFAULT_OPTIM_STATUS_ENTITY)
@@ -316,7 +366,7 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
         CONF_EMHASS_OPTIMIZATION_INTERVAL,
         DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     )
-    form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL] = str(
+    form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL] = _optimization_interval_for_form(
         form_options[CONF_EMHASS_OPTIMIZATION_INTERVAL]
     )
     form_options.setdefault(

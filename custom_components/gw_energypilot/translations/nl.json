@@ -25,7 +25,8 @@
           "optim_status_entity": "Entiteits-ID voor EMHASS-optimalisatiestatus",
           "optim_required_state": "Vereiste optimalisatiestatus",
           "max_power_kw": "Maximaal regelsetpoint",
-          "deadband": "Regeldodeband",
+          "deadband": "Battery Hold-deadband (P_batt)",
+          "goodwe_auto_deadband": "GoodWe Auto-deadband (P_grid)",
           "scan_interval": "Modbus-scaninterval",
           "enable_emhass_orchestrator": "Ingebouwde EMHASS-orchestrator inschakelen",
           "emhass_url": "EMHASS-URL",
@@ -39,7 +40,8 @@
           "buy_price_adder": "Opslag importprijs",
           "sell_price_deduction": "Aftrek exportprijs",
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
-          "ev_mode_entity": "Entiteit voor EV-laadmodus",
+          "ev_detection_method": "Detectie van EV-laden",
+          "ev_mode_entity": "Entiteit voor laadstatus / boolean",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
           "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
@@ -50,7 +52,8 @@
           "optim_status_entity": "Standaard-ID: sensor.optim_status. Deze kan worden ingevuld voordat EMHASS de entiteit heeft aangemaakt.",
           "optim_required_state": "EnergyPilot voert EMHASS-doelen alleen uit wanneer deze status overeenkomt. Standaard: Optimal.",
           "max_power_kw": "Begrenst het modespecifieke GoodWe-setpoint: PCC import-/exportdoel met smart-meterregeling AAN, of direct accudoel met deze regeling UIT.",
-          "deadband": "Tolerantie rond 0 W. Wordt toegepast op P_grid met smart-meterregeling AAN en op P_batt wanneer deze UIT staat. Aanbevolen: 300 W.",
+          "deadband": "P_batt-tolerantie rond 0 W. Binnen deze zone kiest EnergyPilot modus 8 Battery Hold. Aanbevolen: 100 W.",
+          "goodwe_auto_deadband": "P_grid-tolerantie rond 0 W. Buiten Battery Hold en binnen deze zone kiest EnergyPilot modus 1 GoodWe Auto. Aanbevolen: 1000 W.",
           "scan_interval": "Hoe vaak EnergyPilot de omvormer uitleest. Aanbevolen: 10 seconden.",
           "enable_emhass_orchestrator": "Voert optimalisatie en publicatie onafhankelijk van Automatische regeling uit.",
           "emhass_url": "Standaard Home Assistant EMHASS add-on-URL: http://5b918bf2-emhass:5000.",
@@ -64,8 +67,9 @@
           "buy_price_adder": "Variabele leverancierskosten, belastingen of toeslagen in EUR/kWh.",
           "sell_price_deduction": "Bedrag dat van de marktprijs voor teruglevering wordt afgetrokken in EUR/kWh.",
           "enable_ev_coordination": "Voorkomt ontladen van de thuisaccu tijdens actief EV-laden en optimaliseert opnieuw wanneer het laden stopt.",
-          "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
-          "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_detection_method": "Kies detectie via gemeten laadvermogen of via één laadstatus/boolean.",
+          "ev_mode_entity": "Voor statusdetectie. On, true, charging en connected_charging betekenen actief laden.",
+          "ev_power_entity": "Voor vermogensdetectie; selecteer het werkelijk gemeten laadvermogen.",
           "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
@@ -89,7 +93,8 @@
           "optim_status_entity": "Entiteits-ID voor EMHASS-optimalisatiestatus",
           "optim_required_state": "Vereiste optimalisatiestatus",
           "max_power_kw": "Maximaal regelsetpoint",
-          "deadband": "Regeldodeband",
+          "deadband": "Battery Hold-deadband (P_batt)",
+          "goodwe_auto_deadband": "GoodWe Auto-deadband (P_grid)",
           "scan_interval": "Modbus-scaninterval",
           "enable_emhass_orchestrator": "Ingebouwde EMHASS-orchestrator inschakelen",
           "emhass_url": "EMHASS-URL",
@@ -103,7 +108,8 @@
           "buy_price_adder": "Opslag importprijs",
           "sell_price_deduction": "Aftrek exportprijs",
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
-          "ev_mode_entity": "Entiteit voor EV-laadmodus",
+          "ev_detection_method": "Detectie van EV-laden",
+          "ev_mode_entity": "Entiteit voor laadstatus / boolean",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
           "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
@@ -114,7 +120,8 @@
           "optim_status_entity": "Standaard-ID: sensor.optim_status.",
           "optim_required_state": "Standaard: Optimal.",
           "max_power_kw": "Maximaal modespecifiek GoodWe-setpoint in kW.",
-          "deadband": "Aanbevolen: 300 W. Geldt voor P_grid in PCC-regeling of P_batt in directe accuregeling.",
+          "deadband": "Aanbevolen: 100 W. P_batt binnen deze zone kiest modus 8 Battery Hold.",
+          "goodwe_auto_deadband": "Aanbevolen: 1000 W. P_grid binnen deze zone kiest na de Battery Hold-controle modus 1 GoodWe Auto.",
           "scan_interval": "Aanbevolen: 10 seconden.",
           "enable_emhass_orchestrator": "Schakelt optimalisatie op vaste kloktijden, gebeurtenisgestuurde optimalisatie en publicatie van de actieve planstap in.",
           "emhass_url": "Standaard: http://5b918bf2-emhass:5000.",
@@ -128,11 +135,20 @@
           "buy_price_adder": "Extra importkosten in EUR/kWh.",
           "sell_price_deduction": "Aftrek op teruglevering in EUR/kWh.",
           "enable_ev_coordination": "Optionele EV-ontlaadbeveiliging en heroptimalisatie na stoppen met laden.",
-          "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
-          "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_detection_method": "Kies detectie via gemeten laadvermogen of via één laadstatus/boolean.",
+          "ev_mode_entity": "Voor statusdetectie. On, true, charging en connected_charging betekenen actief laden.",
+          "ev_power_entity": "Voor vermogensdetectie; selecteer het werkelijk gemeten laadvermogen.",
           "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
+      }
+    }
+  },
+  "selector": {
+    "ev_detection_method": {
+      "options": {
+        "power": "Vermogenssensor laadpaal",
+        "state": "Laadstatus / boolean"
       }
     }
   },

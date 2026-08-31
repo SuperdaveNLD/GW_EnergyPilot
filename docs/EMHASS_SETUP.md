@@ -315,6 +315,17 @@ ready
 
 EnergyPilot never blocks Home Assistant startup on an EMHASS solve. v1.0.0 retains the v0.44 background recovery behavior: one attempt 60 seconds after EnergyPilot setup when native orchestration is enabled. The normal Home Assistant-running, GoodWe-telemetry, EMHASS-health and finite-output gates still apply. A transient failure retries after 15, 30 and 60 seconds; any successful manual, event-driven or scheduled optimization after setup cancels the remaining startup sequence. After the bounded retries are exhausted, the normal wall-clock schedule remains active.
 
+A scheduled boundary reached while Home Assistant Core is still starting is
+skipped before an optimization attempt is logged. The delayed recovery above
+creates the first fresh plan after startup instead.
+
+When migrating from the historical YAML package, only an enabled
+`automation.energypilot_emhass_orchestrator` blocks the native schedule. Disable
+or remove that automation first. The old manual
+`script.energypilot_emhass_optimize_now` may remain temporarily without being
+misidentified as a second scheduler, although removing the complete obsolete
+package after migration is still recommended.
+
 ## 13. Enable Automatic Control
 
 Before enabling control confirm:

@@ -13,11 +13,15 @@ from homeassistant.core import HomeAssistant, callback
 
 from .const import (
     CONF_CONTROL_STRATEGY,
+    CONF_DEADBAND,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_USE_GOODWE_SMART_METER,
     CONTROL_STRATEGIES,
     CONTROL_STRATEGY_BATTERY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
+    DEFAULT_DEADBAND,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_USE_GOODWE_SMART_METER,
     DOMAIN,
 )
@@ -74,6 +78,15 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
         "enabled": strategy != CONTROL_STRATEGY_BATTERY,
         "meter_available": available,
         "meter_power": meter_power,
+        "battery_hold_deadband": float(
+            entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
+        ),
+        "goodwe_auto_deadband": float(
+            entry.options.get(
+                CONF_GOODWE_AUTO_DEADBAND,
+                DEFAULT_GOODWE_AUTO_DEADBAND,
+            )
+        ),
         "strategies": {
             CONTROL_STRATEGY_BATTERY: "Battery control",
             CONTROL_STRATEGY_GRID: "Grid control",
@@ -81,7 +94,11 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
         },
         "battery_strategy": "P_batt -> GoodWe modes 11/12; mode 8 around zero",
         "grid_strategy": "P_grid -> GoodWe modes 9/10; mode 1 around zero",
-        "hybrid_strategy": "P_grid import -> mode 9; P_batt discharge/sell -> mode 12; P_batt near zero -> mode 8; GoodWe self-use otherwise",
+        "hybrid_strategy": (
+            "P_batt inside the Battery Hold deadband -> mode 8; otherwise "
+            "P_grid inside the GoodWe Auto deadband -> mode 1; signed P_grid "
+            "outside it -> modes 9/10"
+        ),
         "storage": "home_assistant_config_entry_data",
     }
 

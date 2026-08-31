@@ -22,9 +22,11 @@ from .battery_plan import (
 from .control_decision import resolve_control_decision
 from .const import (
     CONF_DEADBAND,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_MAX_POWER,
     CONF_P_BATT_ENTITY,
     DEFAULT_DEADBAND,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_P_BATT_ENTITY,
     DOMAIN,
@@ -169,7 +171,13 @@ def _future_execution_rows(
     p_pv = _points_by_start(plan_runtime.points("p_pv"), "value_w")
     p_load = _points_by_start(plan_runtime.points("p_load"), "value_w")
     soc_opt = _points_by_start(plan_runtime.points("soc_opt"), "value_pct")
-    deadband = float(entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
+    battery_deadband = float(entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
+    grid_deadband = float(
+        entry.options.get(
+            CONF_GOODWE_AUTO_DEADBAND,
+            DEFAULT_GOODWE_AUTO_DEADBAND,
+        )
+    )
     max_power = int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
     start_seconds = now.timestamp()
     end_seconds = end.timestamp()
@@ -184,7 +192,8 @@ def _future_execution_rows(
             strategy=controller.control_strategy,
             p_batt=battery,
             p_grid=grid,
-            deadband=deadband,
+            battery_deadband=battery_deadband,
+            grid_deadband=grid_deadband,
             max_power=max_power,
             # EV/manual/failsafe state is intentionally not forecast.
             ev_active=False,
@@ -209,7 +218,9 @@ def _future_execution_rows(
                 },
                 "configuration": {
                     "strategy": controller.control_strategy,
-                    "deadband_w": deadband,
+                    "deadband_w": battery_deadband,
+                    "battery_hold_deadband_w": battery_deadband,
+                    "goodwe_auto_deadband_w": grid_deadband,
                     "max_power_w": max_power,
                     "ev_active": False,
                 },

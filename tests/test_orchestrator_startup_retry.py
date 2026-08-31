@@ -38,6 +38,13 @@ def _load_module(*, enabled: bool = True, setup_status: str = "scheduled"):
 
     homeassistant = _module("homeassistant")
     homeassistant.__path__ = []
+    core = _module("homeassistant.core")
+
+    class CoreState:
+        running = object()
+
+    core.CoreState = CoreState
+    homeassistant.core = core
     exceptions = _module("homeassistant.exceptions")
 
     class HomeAssistantError(Exception):
@@ -95,10 +102,16 @@ def _load_module(*, enabled: bool = True, setup_status: str = "scheduled"):
     return module, scheduled
 
 
+def _running_hass(module):
+    return types.SimpleNamespace(state=module.CoreState.running)
+
+
 class StartupOptimizeRetryTests(unittest.IsolatedAsyncioTestCase):
     async def test_setup_schedules_initial_attempt_after_restored_state(self):
         module, scheduled = _load_module()
-        orchestrator = module.GWEnergyPilotOrchestrator(object(), object(), object())
+        orchestrator = module.GWEnergyPilotOrchestrator(
+            _running_hass(module), object(), object()
+        )
         restored = datetime(2026, 8, 28, 8, 0, tzinfo=timezone.utc)
         orchestrator.restored_success = restored
 
@@ -116,7 +129,7 @@ class StartupOptimizeRetryTests(unittest.IsolatedAsyncioTestCase):
                     setup_status=status,
                 )
                 orchestrator = module.GWEnergyPilotOrchestrator(
-                    object(), object(), object()
+                    _running_hass(module), object(), object()
                 )
 
                 await orchestrator.async_setup()
@@ -125,7 +138,9 @@ class StartupOptimizeRetryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_startup_optimize_schedules_bounded_backoff(self):
         module, scheduled = _load_module()
-        orchestrator = module.GWEnergyPilotOrchestrator(object(), object(), object())
+        orchestrator = module.GWEnergyPilotOrchestrator(
+            _running_hass(module), object(), object()
+        )
         orchestrator.failures_remaining = 4
         await orchestrator.async_setup()
 
@@ -140,7 +155,9 @@ class StartupOptimizeRetryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_successful_startup_optimize_does_not_schedule_retry(self):
         module, scheduled = _load_module()
-        orchestrator = module.GWEnergyPilotOrchestrator(object(), object(), object())
+        orchestrator = module.GWEnergyPilotOrchestrator(
+            _running_hass(module), object(), object()
+        )
         await orchestrator.async_setup()
 
         await orchestrator._async_initial_optimize(datetime.now(timezone.utc))
@@ -150,7 +167,9 @@ class StartupOptimizeRetryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_external_success_before_callback_skips_duplicate_optimize(self):
         module, scheduled = _load_module()
-        orchestrator = module.GWEnergyPilotOrchestrator(object(), object(), object())
+        orchestrator = module.GWEnergyPilotOrchestrator(
+            _running_hass(module), object(), object()
+        )
         restored = datetime(2026, 8, 28, 8, 0, tzinfo=timezone.utc)
         orchestrator.restored_success = restored
         await orchestrator.async_setup()
@@ -163,7 +182,9 @@ class StartupOptimizeRetryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_disabled_before_callback_skips_startup_optimize(self):
         module, scheduled = _load_module()
-        orchestrator = module.GWEnergyPilotOrchestrator(object(), object(), object())
+        orchestrator = module.GWEnergyPilotOrchestrator(
+            _running_hass(module), object(), object()
+        )
         await orchestrator.async_setup()
         orchestrator.enabled_value = False
 
@@ -171,6 +192,19 @@ class StartupOptimizeRetryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(orchestrator.optimize_calls, [])
         self.assertEqual([delay for delay, _callback in scheduled], [60])
+
+    async def test_home_assistant_starting_retries_without_optimization_attempt(self):
+        module, scheduled = _load_module()
+        hass = types.SimpleNamespace(state=object())
+        orchestrator = module.GWEnergyPilotOrchestrator(
+            hass, object(), object()
+        )
+        await orchestrator.async_setup()
+
+        await orchestrator._async_initial_optimize(datetime.now(timezone.utc))
+
+        self.assertEqual(orchestrator.optimize_calls, [])
+        self.assertEqual([delay for delay, _callback in scheduled], [60, 15])
 
 
 if __name__ == "__main__":

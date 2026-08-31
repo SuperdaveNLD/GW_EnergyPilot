@@ -32,7 +32,8 @@ The active frontend chain is documented in `docs/FRONTEND_STABLE_DOM.md`. The se
 The EP section owns:
 
 - maximum controller/setpoint power;
-- control deadband;
+- Battery Hold deadband for `P_batt` (100 W fresh default);
+- GoodWe Auto deadband for `P_grid` (1000 W fresh default);
 - GoodWe telemetry interval;
 
 ## EV page
@@ -57,11 +58,16 @@ appends a durable operational acknowledgement to
 `gw_energypilot.ev_load_balancing_audit.<entry_id>`. See
 `docs/EV_LOAD_BALANCING.md`.
 
-The anti-discharge EV mode/power/online inputs remain observation-only. The
-settings API accepts `binary_sensor` connectivity entities such as a Zaptec
-Online sensor. When the selected EV entities share one unambiguous Home Assistant
-device or config-entry relation, EnergyPilot proposes the matching Zaptec
-Available-current control and allocated-current feedback sensor.
+The anti-discharge EV inputs remain observation-only. **Charging detection**
+selects exactly one source: measured charger power above the configured watt
+threshold, or a charging status/boolean whose active value is `on`, `true`,
+`charging` or `connected_charging`. For Tesla Wall Connector history the correct
+status source is its `Opladen` binary sensor; plug and connectivity entities do
+not indicate charging. Allocated-current feedback is also not an activity signal
+because it may stay at its permitted limit while the EV is idle. The settings
+API accepts `binary_sensor` connectivity entities such as a Zaptec Online sensor
+and proposes the matching Zaptec Available-current control and allocated-current
+feedback sensor.
 
 During active EV charging:
 
@@ -71,7 +77,9 @@ P_batt is neutral         -> Battery Hold
 P_batt requests charge    -> mode 11 charge allowed
 ```
 
-When native orchestration is enabled, EV stop waits for a fresh optimization before normal Automatic Control resumes.
+When native orchestration is enabled, EV stop waits for a fresh optimization
+before normal Automatic Control resumes. Transient stop-optimization failures
+receive bounded retries while Battery Hold remains the safe fallback.
 
 When an online entity is configured, missing, `unknown` and `unavailable` mean unreachable. A `binary_sensor` uses `on`/`off` explicitly; another available entity state means the charger integration is reporting. If the charger remains unreachable for five minutes, EnergyPilot temporarily suspends effective EV coordination without changing the saved user setting. Five stable online minutes resume it only when the setting is still enabled. Both transitions and connectivity changes are written to the Home Assistant log and the opt-in debug session.
 
@@ -87,6 +95,10 @@ The EMHASS section owns EnergyPilot's EMHASS integration settings:
 - `P_batt` and `P_grid` output entities;
 - optimization status entity/required state;
 - Nord Pool/runtime-price settings.
+
+Supported integral cadences stored by an older release as a float, for example
+`15.0`, are normalized to `15` when the options form opens. Unsupported
+fractional values remain invalid instead of being silently rounded.
 
 The stateful EMHASS optimization strategy remains the active `costfun` value:
 
@@ -174,29 +186,29 @@ Connection changes are validated with a temporary `GWModbusClient` before the ex
 **Battery control**
 
 ```text
-P_batt < -deadband -> mode 11 Battery charge power
-P_batt > +deadband -> mode 12 Battery discharge power
-P_batt near 0 W    -> mode 8 Battery Hold
+P_batt < -Battery Hold deadband -> mode 11 Battery charge power
+P_batt > +Battery Hold deadband -> mode 12 Battery discharge power
+P_batt inside Battery Hold deadband -> mode 8 Battery Hold
 ```
 
 **Grid control**
 
 ```text
-P_grid > +deadband -> mode 9 Grid import target
-P_grid < -deadband -> mode 10 Grid export target
-P_grid near 0 W    -> mode 1 GoodWe Auto / self-use
+P_grid > +GoodWe Auto deadband -> mode 9 Grid import target
+P_grid < -GoodWe Auto deadband -> mode 10 Grid export target
+P_grid inside GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
 ```
 
 **Hybrid control**
 
 ```text
-P_batt near 0 W -> mode 8 Battery Hold
-else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
-else P_grid > +deadband -> mode 9 Grid import target
-else P_grid < -deadband -> mode 10 Grid export target
+abs(P_batt) <= Battery Hold deadband -> mode 8 Battery Hold
+else abs(P_grid) <= GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
+else P_grid > +GoodWe Auto deadband -> mode 9 Grid import target
+else P_grid < -GoodWe Auto deadband -> mode 10 Grid export target
 ```
 
-Hybrid evaluates the configured deadband against `P_batt` first, so a neutral battery plan always remains mode 8. Every non-neutral plan then follows signed `P_grid`: mode 1 around zero lets GoodWe close the current local balance, while modes 9/10 receive the complete absolute planned import/export magnitude. Exact deadband boundaries remain neutral and the deadband is never subtracted from the setpoint.
+Hybrid evaluates the Battery Hold deadband against `P_batt` first, so a neutral battery plan always remains mode 8. Every non-neutral plan then follows signed `P_grid`: the separate GoodWe Auto deadband selects mode 1, while modes 9/10 receive the complete absolute planned import/export magnitude outside it. Exact boundaries remain neutral and neither threshold is subtracted from the setpoint. Existing stored `deadband` values remain Battery Hold values after upgrade.
 
 When no explicit `control_strategy` exists, backwards compatibility remains:
 

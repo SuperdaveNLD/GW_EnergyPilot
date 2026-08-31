@@ -1260,9 +1260,10 @@ function patchCostFunctionSelector(panel, root) {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", active ? "true" : "false");
     button.disabled = Boolean(busyRaw) || !available;
-    button.textContent = busyRaw === raw
+    const nextText = busyRaw === raw
       ? "Applying…"
       : `${active ? "✓ " : ""}${label}`;
+    if (button.textContent !== nextText) button.textContent = nextText;
     button.title = active
       ? `${label} is the active EMHASS cost function`
       : `Set EMHASS costfun to ${raw} and run a fresh optimization`;
@@ -1323,13 +1324,35 @@ function patchEmhass(panel, root) {
   patchMetric(card, ["SOC forecast", "SOC-voorspelling", "SOC-prognose"], panel._formatState(socForecast));
   patchMetric(card, ["Load forecast", "Belastingsvoorspelling", "Verbruiksprognose"], panel._formatState(loadForecast));
   patchMetric(card, ["PV forecast", "PV-voorspelling", "PV-prognose"], panel._formatState(pvForecast));
-  const mapping = !Number.isFinite(pBatt)
-    ? t.waiting
-    : pBatt < -FLOW_THRESHOLD_W
-      ? t.modeCharge
-      : pBatt > FLOW_THRESHOLD_W
-        ? t.modeDischarge
-        : t.modeHold;
+  const attrs = optimizeAttributes(panel);
+  const expectedMode = finiteValue(attrs.controller_expected_mode);
+  const expectedTarget = finiteValue(attrs.controller_target_power);
+  const command = String(attrs.controller_command || "");
+  let mapping;
+  if (
+    attrs.controller_enabled === true &&
+    expectedMode !== null &&
+    !command.startsWith("waiting_")
+  ) {
+    const prefix = language(panel) === "nl" ? "Modus" : "Mode";
+    const name = localizedEmsMode(language(panel), expectedMode).name;
+    const setpoint = expectedTarget !== null && expectedTarget !== 0
+      ? ` · ${panel._formatPower(Math.abs(expectedTarget))}`
+      : "";
+    mapping = `${prefix} ${expectedMode} · ${name}${setpoint}`;
+  } else if (attrs.controller_enabled === false || command.startsWith("waiting_")) {
+    mapping = t.waiting;
+  } else {
+    // Compatibility fallback for an older backend that does not expose the
+    // canonical controller decision attributes yet.
+    mapping = !Number.isFinite(pBatt)
+      ? t.waiting
+      : pBatt < -FLOW_THRESHOLD_W
+        ? t.modeCharge
+        : pBatt > FLOW_THRESHOLD_W
+          ? t.modeDischarge
+          : t.modeHold;
+  }
   patchMetric(card, ["Mapping", "Toewijzing", "Aansturing"], mapping);
 
   for (const input of card.querySelectorAll("input[data-soc-slider]")) {
@@ -1493,6 +1516,7 @@ function diagnosticValue(panel, label, attrs, configAttrs) {
   if (key.includes("controller target")) return power(attrs.controller_target_power);
   if (key.includes("expected ems mode")) return text(attrs.controller_expected_mode);
   if (key.includes("maximum power")) return power(attrs.controller_max_power);
+  if (key.includes("goodwe auto deadband")) return power(attrs.controller_goodwe_auto_deadband);
   if (key.includes("deadband")) return power(attrs.controller_deadband);
   if (key === "p_batt") return power(attrs.p_batt_value);
   if (key.includes("p_batt entity")) return text(attrs.p_batt_entity);

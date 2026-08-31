@@ -31,6 +31,19 @@ class EVLoadBalancingContractTests(unittest.TestCase):
         self.assertIn("window.confirm", frontend)
         self.assertIn("values._confirm_high_current = true", frontend)
 
+    def test_ev_tab_offers_exclusive_power_or_status_detection(self):
+        constants = (INTEGRATION / "const.py").read_text(encoding="utf-8")
+        settings = (INTEGRATION / "settings_api.py").read_text(encoding="utf-8")
+        frontend = (
+            INTEGRATION / "frontend" / "gw-energy-pilot-settings-v016.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('CONF_EV_DETECTION_METHOD = "ev_detection_method"', constants)
+        self.assertIn('"value": EV_DETECTION_METHOD_POWER', settings)
+        self.assertIn('"value": EV_DETECTION_METHOD_STATE', settings)
+        self.assertIn('data-setting-key="ev_detection_method"', frontend)
+        self.assertIn('detection?.value === "state"', frontend)
+
     def test_goodwe_currents_feedback_and_online_entity_contract(self):
         constants = (INTEGRATION / "const.py").read_text(encoding="utf-8")
         settings = (INTEGRATION / "settings_api.py").read_text(encoding="utf-8")

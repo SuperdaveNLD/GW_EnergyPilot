@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import test_frontend_stability_v051  # noqa: F401 - installs inherited hooks
+import test_frontend_stability_v101  # noqa: F401 - keeps beta-4 matrix in chain
 import test_frontend_stability as stability
 
 

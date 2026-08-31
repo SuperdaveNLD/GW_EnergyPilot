@@ -14,11 +14,13 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import GWConfigEntry
 from .const import (
     CONF_DEADBAND,
+    CONF_GOODWE_AUTO_DEADBAND,
     CONF_MAX_POWER,
     CONF_OPTIM_STATUS_ENTITY,
     CONF_P_BATT_ENTITY,
     CONF_P_GRID_ENTITY,
     DEFAULT_DEADBAND,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_OPTIM_STATUS_ENTITY,
     DEFAULT_P_BATT_ENTITY,
@@ -165,6 +167,12 @@ class GWOptimizeNowButton(GWEnergyPilotEntity, ButtonEntity):
             ),
             "controller_deadband": float(
                 self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
+            ),
+            "controller_goodwe_auto_deadband": float(
+                self.entry.options.get(
+                    CONF_GOODWE_AUTO_DEADBAND,
+                    DEFAULT_GOODWE_AUTO_DEADBAND,
+                )
             ),
             "manual_charge_limit_soc": controller.manual_charge_limit_soc,
             "p_batt_entity": p_batt_entity,

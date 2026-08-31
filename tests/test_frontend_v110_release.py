@@ -23,7 +23,7 @@ class FrontendV110ReleaseTests(unittest.TestCase):
         self.assertEqual(manifest["version"], "1.1.0-beta.1")
         self.assertIn(f"gw-energy-pilot-v110.js?v={CACHE_KEY}", init_source)
         self.assertIn(
-            f'import "./gw-energy-pilot-v051.js?v={CACHE_KEY}"', self.release
+            f'import "./gw-energy-pilot-v101.js?v={CACHE_KEY}"', self.release
         )
         self.assertIn('const VERSION = "1.1.0-beta.1"', self.release)
         self.assertIn("v${VERSION} BETA", self.release)

@@ -25,7 +25,8 @@
           "optim_status_entity": "EMHASS optimization status entity ID",
           "optim_required_state": "Required optimization state",
           "max_power_kw": "Maximum control setpoint",
-          "deadband": "Control deadband",
+          "deadband": "Battery Hold deadband (P_batt)",
+          "goodwe_auto_deadband": "GoodWe Auto deadband (P_grid)",
           "scan_interval": "Modbus scan interval",
           "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator",
           "emhass_url": "EMHASS URL",
@@ -39,7 +40,8 @@
           "buy_price_adder": "Import price addition",
           "sell_price_deduction": "Export price deduction",
           "enable_ev_coordination": "Enable EV coordination",
-          "ev_mode_entity": "EV charging mode entity",
+          "ev_detection_method": "EV charging detection",
+          "ev_mode_entity": "EV charging status / boolean entity",
           "ev_power_entity": "EV charging power entity",
           "ev_online_entity": "EV online entity",
           "ev_deadband": "EV active power threshold"
@@ -50,7 +52,8 @@
           "optim_status_entity": "Standard ID: sensor.optim_status. It can be entered before EMHASS creates the entity.",
           "optim_required_state": "EnergyPilot executes EMHASS targets only when this state matches. Standard: Optimal.",
           "max_power_kw": "Caps the GoodWe mode-specific setpoint: PCC import/export target with smart-meter control ON, or direct battery target with it OFF.",
-          "deadband": "Tolerance around 0 W. Applied to P_grid with smart-meter control ON and to P_batt with it OFF. Recommended: 300 W.",
+          "deadband": "P_batt tolerance around 0 W. Inside this band EnergyPilot selects mode 8 Battery Hold. Recommended: 100 W.",
+          "goodwe_auto_deadband": "P_grid tolerance around 0 W. Outside Battery Hold and inside this band EnergyPilot selects mode 1 GoodWe Auto. Recommended: 1000 W.",
           "scan_interval": "How often EnergyPilot polls the inverter. Recommended: 10 seconds. v0.22 does not run the former 30-second mode-11 grid-neutral feedback loop when PCC control is enabled.",
           "enable_emhass_orchestrator": "Runs optimization and publish independently from Automatic Control.",
           "emhass_url": "Default Home Assistant EMHASS add-on URL: http://5b918bf2-emhass:5000.",
@@ -64,8 +67,9 @@
           "buy_price_adder": "Variable supplier fees, taxes or additions in EUR/kWh.",
           "sell_price_deduction": "Amount deducted from the market export price in EUR/kWh.",
           "enable_ev_coordination": "Holds the battery while EV charging is active and re-optimizes when charging stops.",
-          "ev_mode_entity": "Optional EV charging-state entity.",
-          "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_detection_method": "Choose whether charging follows measured charger power or one charging status/boolean.",
+          "ev_mode_entity": "Used for status detection. On, true, charging and connected_charging mean active charging.",
+          "ev_power_entity": "Used for power detection; select the charger's measured power entity.",
           "ev_online_entity": "Optional entity that reports whether the EV charger is reachable.",
           "ev_deadband": "Power above this threshold is considered active EV charging."
         }
@@ -89,7 +93,8 @@
           "optim_status_entity": "EMHASS optimization status entity ID",
           "optim_required_state": "Required optimization state",
           "max_power_kw": "Maximum control setpoint",
-          "deadband": "Control deadband",
+          "deadband": "Battery Hold deadband (P_batt)",
+          "goodwe_auto_deadband": "GoodWe Auto deadband (P_grid)",
           "scan_interval": "Modbus scan interval",
           "enable_emhass_orchestrator": "Enable built-in EMHASS orchestrator",
           "emhass_url": "EMHASS URL",
@@ -103,7 +108,8 @@
           "buy_price_adder": "Import price addition",
           "sell_price_deduction": "Export price deduction",
           "enable_ev_coordination": "Enable EV coordination",
-          "ev_mode_entity": "EV charging mode entity",
+          "ev_detection_method": "EV charging detection",
+          "ev_mode_entity": "EV charging status / boolean entity",
           "ev_power_entity": "EV charging power entity",
           "ev_online_entity": "EV online entity",
           "ev_deadband": "EV active power threshold"
@@ -114,7 +120,8 @@
           "optim_status_entity": "Standard ID: sensor.optim_status.",
           "optim_required_state": "Standard: Optimal.",
           "max_power_kw": "Maximum GoodWe mode-specific setpoint in kW.",
-          "deadband": "Recommended: 300 W. Applies to P_grid in PCC mode or P_batt in direct-battery mode.",
+          "deadband": "Recommended: 100 W. P_batt inside this band selects mode 8 Battery Hold.",
+          "goodwe_auto_deadband": "Recommended: 1000 W. P_grid inside this band selects mode 1 GoodWe Auto after the Battery Hold check.",
           "scan_interval": "Recommended: 10 seconds.",
           "enable_emhass_orchestrator": "Enables wall-clock and event-driven optimization plus active plan-step publication.",
           "emhass_url": "Default: http://5b918bf2-emhass:5000.",
@@ -128,11 +135,20 @@
           "buy_price_adder": "Extra import cost in EUR/kWh.",
           "sell_price_deduction": "Export deduction in EUR/kWh.",
           "enable_ev_coordination": "Optional EV hold and stop-triggered re-optimization.",
-          "ev_mode_entity": "Optional EV charging-state entity.",
-          "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_detection_method": "Choose whether charging follows measured charger power or one charging status/boolean.",
+          "ev_mode_entity": "Used for status detection. On, true, charging and connected_charging mean active charging.",
+          "ev_power_entity": "Used for power detection; select the charger's measured power entity.",
           "ev_online_entity": "Optional entity that reports whether the EV charger is reachable.",
           "ev_deadband": "Power above this threshold is considered active EV charging."
         }
+      }
+    }
+  },
+  "selector": {
+    "ev_detection_method": {
+      "options": {
+        "power": "Charger power sensor",
+        "state": "Charging status / boolean"
       }
     }
   },

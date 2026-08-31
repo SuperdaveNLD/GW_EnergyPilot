@@ -28,8 +28,15 @@ class V039ReleaseTests(unittest.TestCase):
                 "gw-energy-pilot-v110.js?v=1.1.0-beta.1-charge1", init_source
             )
             self.assertIn(
-                'import "./gw-energy-pilot-v051.js?v=1.1.0-beta.1-charge1"',
+                'import "./gw-energy-pilot-v101.js?v=1.1.0-beta.1-charge1"',
                 v110,
+            )
+            v101 = (FRONTEND / "gw-energy-pilot-v101.js").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                'import "./gw-energy-pilot-v051.js?v=1.1.0-beta.1-charge1"',
+                v101,
             )
             version = "0.51"
         elif stable_v100:

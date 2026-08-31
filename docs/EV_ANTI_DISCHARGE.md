@@ -67,7 +67,21 @@ The established `47512 -> wait -> 47511` write sequence remains unchanged.
 
 The stored option key remains `enable_ev_coordination` for backwards compatibility.
 
-EV activity can be detected through the configured EV charging-mode entity and/or the configured EV charging-power entity plus activity threshold. These are observation inputs only and do not give EnergyPilot ownership of the charger.
+The EV page offers one explicit charging-detection choice:
+
+- **Charger power sensor**: active when the selected measured-power entity is
+  above the configured watt threshold.
+- **Charging status / boolean**: active only for `on`, `true`, `charging` or
+  `connected_charging`. This supports binary sensors such as Tesla Wall
+  Connector `Opladen` and status sensors such as Zaptec charger mode.
+
+Only the selected source controls the anti-discharge guard. Allocated or
+available charger current is deliberately not an activity signal: it is a limit
+and can remain at (for example) `16 A` while the EV draws no current. Existing
+config entries without the new method key retain their exact former
+`connected_charging`-or-power behavior until the operator saves an explicit
+choice. Both detection sources are observation-only and do not give EnergyPilot
+ownership of the charger.
 
 An optional EV online entity separately reports charger reachability. Missing, `unknown` and `unavailable` are unreachable. A binary sensor is explicit (`on` online, `off` unreachable); for other domains every usable state is online, so an idle charging switch that reports `off` is not mistaken for an offline charger.
 
@@ -87,6 +101,11 @@ When the native EMHASS orchestrator is enabled and EV charging stops, the existi
 2. keep the battery held while the old plan is stale;
 3. request/wait for a fresh optimization;
 4. resume normal automatic control from the new plan.
+
+If that immediate optimization collides with another plan cycle or fails
+transiently, EnergyPilot keeps Battery Hold and retries after 5, 15, 30 and 60
+seconds. A new EV charging start cancels the pending retry. The regular
+wall-clock schedule remains the fallback after the bounded retry sequence.
 
 ## Dashboard status
 

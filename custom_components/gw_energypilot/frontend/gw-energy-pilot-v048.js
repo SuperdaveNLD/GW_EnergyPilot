@@ -5,13 +5,13 @@ const PANEL_NAME = "gw-energypilot-panel";
 
 const TEXT = Object.freeze({
   en: Object.freeze({
-    hybridDescription: "Holds a neutral P_batt plan in mode 8. Otherwise P_grid uses mode 1 inside the configured deadband and modes 9/10 outside it, with the full grid target as setpoint.",
+    hybridDescription: "Uses the Battery Hold deadband on P_batt for mode 8 first. Outside it, P_grid uses mode 1 inside the separate GoodWe Auto deadband and modes 9/10 outside it, with the full grid target as setpoint.",
     strategyNote: "Automatic control strategy:",
     hybridLabel: "Hybrid control",
     evOverride: "EV anti-discharge protection remains active as a safety override.",
   }),
   nl: Object.freeze({
-    hybridDescription: "Houdt een neutraal P_batt-plan vast in modus 8. Anders gebruikt P_grid modus 1 binnen de ingestelde deadband en modi 9/10 erbuiten, met het volledige netdoel als setpoint.",
+    hybridDescription: "Gebruikt eerst de Battery Hold-deadband op P_batt voor modus 8. Daarbuiten gebruikt P_grid modus 1 binnen de aparte GoodWe Auto-deadband en modi 9/10 erbuiten, met het volledige netdoel als setpoint.",
     strategyNote: "Automatische regelstrategie:",
     hybridLabel: "Hybride regeling",
     evOverride: "EV-ontlaadbeveiliging blijft actief als veiligheidsoverride.",

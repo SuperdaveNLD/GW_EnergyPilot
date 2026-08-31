@@ -149,6 +149,13 @@ class FrontendV041StableDomTests(unittest.TestCase):
         )
         self.assertIn("const value = socLimitValue(panel, kind)", self.source)
 
+    def test_emhass_mapping_uses_backend_controller_decision(self) -> None:
+        self.assertIn("attrs.controller_expected_mode", self.source)
+        self.assertIn("attrs.controller_target_power", self.source)
+        self.assertIn("attrs.controller_command", self.source)
+        self.assertIn("localizedEmsMode(language(panel), expectedMode)", self.source)
+        self.assertIn('command.startsWith("waiting_")', self.source)
+
     def test_v038_legacy_guards_are_disabled_only_for_v041(self) -> None:
         self.assertIn("function stableRuntimeActive(panel)", self.runtime)
         self.assertIn("!stableRuntime && interactionActive(this)", self.runtime)
@@ -211,13 +218,18 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("animation[\"animations\"] != 0", browser_test)
         self.assertIn("frontend_harness.html?entry=v110", wrapper)
         self.assertIn('stability.EXPECTED_ENTRYPOINT = "v110"', wrapper)
-        self.assertIn('"v050", "v051", "v100", "v110"].includes(requestedEntry)', harness)
+        self.assertIn(
+            '"v050", "v051", "v100", "v101", "v110"].includes(requestedEntry)',
+            harness,
+        )
         self.assertIn("exercise_touch_controls", browser_test)
         self.assertIn("exercise_optimize_stability", browser_test)
         self.assertIn("exercise_host_property_press", browser_test)
+        self.assertIn("exercise_live_copy_press", browser_test)
         self.assertIn("exercise_chart_size_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
         self.assertIn("exercise_soc_limit_fallback", browser_test)
+        self.assertIn("exercise_emhass_mapping", browser_test)
         self.assertIn("window.__epBeforeNarrowMain", browser_test)
         self.assertIn(
             "window.__epPanel.shadowRoot.querySelector('main') !==",

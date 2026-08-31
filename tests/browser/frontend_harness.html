@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -102,7 +102,7 @@
       connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
-      control_strategy: ["v048", "v049", "v050", "v051", "v100", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery",
+      control_strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery",
       grid_energy_imported_today: 3.2,
       grid_energy_exported_today: 7.8,
       grid_energy_import_total: 1234.5,
@@ -221,7 +221,8 @@
           last_ems_mode: 11,
           last_ems_setpoint_command: "battery_charge",
           controller_max_power: 15000,
-          controller_deadband: 50,
+          controller_deadband: 100,
+          controller_goodwe_auto_deadband: 1000,
           ems_mode: 11,
           ems_mode_name: "Battery charge power",
           ems_setpoint: 1200,
@@ -369,7 +370,12 @@
             title: "EnergyPilot",
             short_title: "EP",
             description: "Controller and telemetry.",
-            fields: [],
+            fields: [
+              { key: "max_power_kw", label: "Maximum control power", type: "number", value: 15, unit: "kW", min: 0.5, max: 15, step: 0.1, readonly: false },
+              { key: "deadband", label: "Battery Hold deadband · P_batt", type: "number", value: 100, unit: "W", min: 0, max: 2000, step: 50, readonly: false },
+              { key: "goodwe_auto_deadband", label: "GoodWe Auto deadband · P_grid", type: "number", value: 1000, unit: "W", min: 100, max: 5000, step: 50, readonly: false },
+              { key: "scan_interval", label: "GoodWe telemetry refresh", type: "number", value: 10, unit: "s", min: 5, max: 60, step: 1, readonly: false },
+            ],
           },
           ev: {
             title: "EV",
@@ -377,6 +383,15 @@
             description: "Soft EV charger load balancing.",
             fields: [
               { key: "enable_ev_load_balancing", label: "Load balancing for EV charger", type: "boolean", value: false, readonly: false },
+              { key: "enable_ev_coordination", label: "Enable EV coordination", type: "boolean", value: true, readonly: false },
+              { key: "ev_detection_method", label: "Charging detection", type: "select", value: "power", readonly: false, options: [
+                { value: "power", label: "Charger power sensor" },
+                { value: "state", label: "Charging status / boolean" },
+              ] },
+              { key: "ev_mode_entity", label: "Charging status / boolean entity", type: "entity", domains: ["binary_sensor", "switch", "sensor", "input_boolean"], value: "binary_sensor.tesla_wall_connector_opladen", readonly: false },
+              { key: "ev_power_entity", label: "EV power entity", type: "entity", domains: ["sensor"], device_classes: ["power"], value: "sensor.zaptec_charge_power", readonly: false },
+              { key: "ev_online_entity", label: "EV online entity", type: "entity", value: "binary_sensor.charger_online", readonly: false },
+              { key: "ev_deadband", label: "EV active power threshold", type: "number", value: 500, unit: "W", min: 0, max: 3000, step: 50, readonly: false },
               { key: "grid_connection_profile", label: "House connection", type: "select", value: "3x25", readonly: false, options: [
                 { value: "3x25", label: "3 × 25 A" },
                 { value: "custom_1_phase", label: "Custom · 1 phase" },
@@ -487,7 +502,7 @@
           runtime_session_id: "browser-session",
           owner: "automatic",
           plan: { p_batt_w: -3000, p_grid_w: 3000, soc_opt_pct: soc + 1, revision: planRevision },
-          configuration: { strategy: "hybrid", deadband_w: 300, max_power_w: 15000, ev_active: evActive },
+          configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: evActive },
           actual: {
             battery_soc_pct: soc,
             battery_power_w: -3600,
@@ -514,7 +529,7 @@
         occurred_at: new Date(hour.getTime() + index * 15 * 60 * 1000).toISOString(),
         owner: "automatic",
         plan: { p_batt_w: index < 4 ? -3000 : 0, p_grid_w: index < 4 ? 3000 : 0, soc_opt_pct: 56 + index, revision: planRevision },
-        configuration: { strategy: "hybrid", deadband_w: 300, max_power_w: 15000, ev_active: false },
+        configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: false },
         actual: {},
         outcome: {
           command: index < 4 ? "hybrid_grid_import" : "hybrid_battery_hold",
@@ -607,7 +622,7 @@
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {
@@ -756,6 +771,7 @@
       v050: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v050.js?browser-harness=1",
       v051: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v051.js?browser-harness=1",
       v100: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v100.js?browser-harness=1",
+      v101: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v101.js?browser-harness=1",
       v110: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v110.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
@@ -889,7 +905,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

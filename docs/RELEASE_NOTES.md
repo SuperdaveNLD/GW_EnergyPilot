@@ -19,11 +19,13 @@ history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
 # v1.1.0-beta.1 — Managed battery ranges and Chargegasm
 
-Battery Strategy now offers **Mad-Steve**, **Gold Rush**, **Chargegasm**,
-**Balanced**, **Battery Saver** and **Custom**. The five managed modes have
-explicit hard minimum/maximum SOC ranges, comfort zones, low/high-SOC costs,
-power-stress costs and anti-churn factors. The full comparison is visible in
-**Settings → EMHASS → Battery Saver** and summarized on the Controller card.
+This beta includes every v1.0.1-beta.1 through beta.4 change and adds the new
+Battery Saver policy layer. Battery Strategy now offers **Mad-Steve**, **Gold
+Rush**, **Chargegasm**, **Balanced**, **Battery Saver** and **Custom**. The five
+managed modes have explicit hard minimum/maximum SOC ranges, comfort zones,
+low/high-SOC costs, power-stress costs and anti-churn factors. The full
+comparison is visible in **Settings → EMHASS → Battery Saver** and summarized
+on the Controller card.
 
 Selecting a managed profile writes and verifies its whole-percentage GoodWe
 on-grid minimum before applying the matching EMHASS range and building a fresh
@@ -37,6 +39,64 @@ The documentation explains the lower-average-SOC, SOC-window, power and
 throughput rationale and its limits. The profile factors are transparent
 price-relative optimizer policy, not a battery-specific lifetime guarantee.
 See `docs/releases/v1.1.0-beta.1.md` and `docs/BATTERY_SAVER.md`.
+
+# v1.0.1-beta.4 — Explicit charging detection and safe EV-stop recovery
+
+Settings → EV now asks the operator to choose one charging signal: measured
+charger power or a charging status/boolean. Only the selected source can
+activate EV anti-discharge. Status mode accepts `on`, `true`, `charging` and
+`connected_charging`, covering a Tesla Wall Connector `Opladen` binary sensor
+and a Zaptec charging-mode sensor without treating plug/connectivity state as
+active charging. Allocated or maximum current remains excluded because it can
+stay non-zero while the EV is idle.
+
+Existing entries without the method key keep their exact previous
+`connected_charging`-or-power behavior until an explicit choice is saved. When
+EV charging stops, a transient failure or overlap in the required fresh
+optimization now keeps the battery safely held and retries after 5, 15, 30 and
+60 seconds; renewed charging cancels that sequence. GoodWe registers, EMS
+writes and all non-EV controller decisions are unchanged. See
+`docs/releases/v1.0.1-beta.4.md`.
+
+# v1.0.1-beta.3 — Restart-safe scheduling and canonical EMS feedback
+
+Wall-clock boundaries and bounded startup recovery now wait until Home
+Assistant Core is running before entering the optimization/logging chain. An
+ordinary restart no longer creates a misleading failed EMHASS run while the
+delayed recovery is still waiting to build the fresh plan.
+
+Only an enabled historical recurring automation is treated as a competing
+scheduler. Its manual optimize-now helper and a disabled automation no longer
+block EnergyPilot's native schedule (#115). The live EMHASS Mapping value now
+uses the backend controller's canonical expected GoodWe mode and setpoint, so
+Hybrid mode 1 around a zero grid target is presented correctly. See
+`docs/releases/v1.0.1-beta.3.md`.
+
+# v1.0.1-beta.2 — Separate Battery Hold and GoodWe Auto deadbands
+
+Automatic Control now has two explicit neutral boundaries. Battery Hold uses
+`P_batt` with a 100 W fresh default; GoodWe Auto uses `P_grid` with a separate
+1000 W default. Hybrid evaluates them in that order before selecting signed
+mode 9/10 PCC control, and exact boundaries remain neutral.
+
+Settings → EP presents both values with a central 0 W marker, charging and
+discharging directions and the mode 10/1/8/1/9 bar. Existing stored `deadband`
+values remain Battery Hold values and are not silently retuned. EV
+anti-discharge remains higher priority. See
+`docs/releases/v1.0.1-beta.2.md`.
+
+# v1.0.1-beta.1 — Mobile click and legacy interval compatibility
+
+The options flow now accepts supported wall-clock cadences that older stored
+configuration represented as integral floats, such as `15.0`, and presents
+them in the selector's canonical string form. Fractional or unsupported values
+remain invalid.
+
+Optimize now and EMHASS cost-function telemetry patches no longer rewrite an
+unchanged button text node while WebKit is holding a native press. The browser
+matrix verifies the complete press and exactly one service action on desktop
+Chromium, iPad WebKit and iPhone WebKit. Controller, GoodWe and EMHASS command
+semantics are unchanged. See `docs/releases/v1.0.1-beta.1.md`.
 
 # v1.0.0 — First stable production release
 
@@ -105,7 +165,11 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
-| **1.1.0-beta.1** | 2026-08-31 | **Beta** | Adds Chargegasm, complete managed SOC ranges, read-only profile comparison in Settings and rollback-safe GoodWe/EMHASS minimum ownership. |
+| **1.1.0-beta.1** | 2026-08-31 | **Beta** | Includes v1.0.1-beta.4 and adds Chargegasm, complete managed SOC ranges, a read-only profile comparison and rollback-safe GoodWe/EMHASS minimum ownership. |
+| **1.0.1-beta.4** | 2026-08-31 | **Beta** | Adds an exclusive power-or-status EV charging detector and bounded fresh-plan retries after charging stops. |
+| **1.0.1-beta.3** | 2026-08-31 | **Beta** | Makes scheduling restart-safe, fixes false legacy-scheduler detection and displays the backend controller's canonical GoodWe mapping. |
+| **1.0.1-beta.2** | 2026-08-30 | **Beta** | Separates Battery Hold on `P_batt` from GoodWe Auto on `P_grid` and adds the centered decision-zone settings panel. |
+| **1.0.1-beta.1** | 2026-08-30 | **Beta** | Normalizes integral legacy optimization intervals and keeps native mobile clicks connected while unchanged Optimize/strategy copy is patched. |
 | **1.0.0** | 2026-08-30 | **Stable** | First stable v1: execution/read-back history, EV protection underlays, source-attribution estimates, historical wanted SOC, presentation fixes and safe tag-only stable/beta channels. |
 | **0.50** | 2026-08-30 | **Beta** | Reads GoodWe L1/L2/L3 automatically for one-/three-phase EV guarding, separates writable current-limit control from allocated-current feedback, verifies applied requests and fixes Zaptec/online entity pairing. |
 | **0.49** | 2026-08-30 | **Beta** | Consolidates wall-clock EMHASS plan execution, isolated soft EV load balancing, connectivity/EV safety visibility, persisted EMS evidence and stable graph/SOC/Hybrid presentation fixes. |

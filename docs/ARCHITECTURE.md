@@ -1,6 +1,8 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v1.1.0-beta.1**. The stable production release remains v1.0.0.
+This document describes the current runtime architecture of **GW EnergyPilot
+v1.1.0-beta.1**. The stable production release remains v1.0.0 and all
+v1.0.1-beta.4 behavior is included.
 
 ## High-level flow
 
@@ -146,29 +148,29 @@ When OFF, EnergyPilot returns the inverter to mode 1 / 0 W.
 ### Battery strategy
 
 ```text
-P_batt < -deadband -> mode 11
-P_batt > +deadband -> mode 12
-P_batt near 0 W    -> mode 8
+P_batt < -Battery Hold deadband -> mode 11
+P_batt > +Battery Hold deadband -> mode 12
+P_batt inside Battery Hold deadband -> mode 8
 ```
 
 ### Grid strategy
 
 ```text
-P_grid > +deadband -> mode 9
-P_grid < -deadband -> mode 10
-P_grid near 0 W    -> mode 1
+P_grid > +GoodWe Auto deadband -> mode 9
+P_grid < -GoodWe Auto deadband -> mode 10
+P_grid inside GoodWe Auto deadband -> mode 1
 ```
 
 ### Hybrid strategy
 
 ```text
-P_batt near 0 W -> mode 8
-else P_grid near 0 W -> mode 1
-else P_grid > +deadband -> mode 9 using abs(P_grid)
-else P_grid < -deadband -> mode 10 using abs(P_grid)
+abs(P_batt) <= Battery Hold deadband -> mode 8
+else abs(P_grid) <= GoodWe Auto deadband -> mode 1
+else P_grid > +GoodWe Auto deadband -> mode 9 using abs(P_grid)
+else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 ```
 
-Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance around a zero grid target, while modes 9/10 own non-zero planned import/export. The configured deadband is evaluated independently against `P_batt` and `P_grid` in that order; exact boundaries remain neutral and the threshold is never subtracted from the final mode-9/10 setpoint.
+Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance inside the separate GoodWe Auto deadband, while modes 9/10 own non-zero planned import/export outside it. Exact boundaries remain neutral and neither threshold is ever subtracted from the final mode-9/10 setpoint.
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
@@ -179,19 +181,24 @@ The EV feature is a higher-priority directional safety guard, not an EV charger 
 During an active EV charging session:
 
 ```text
-P_batt >= -deadband -> mode 8 Battery Hold
-P_batt < -deadband  -> explicit home-battery charge remains allowed
+P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
+P_batt < -Battery Hold deadband  -> explicit home-battery charge remains allowed
 ```
 
 Charge execution follows the selected strategy as far as safely possible:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 ```
 
-The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. EV-stop stale-plan protection remains unchanged.
+The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. `ev_detection.py` owns the exclusive power-versus-status interpretation used by the controller and event listener. Explicit status mode accepts `on`, `true`, `charging` and `connected_charging`; explicit power mode evaluates only finite, unit-normalized measured power above its threshold. Allocated or maximum charger current is not an activity signal. Entries without the method key retain the exact historical `connected_charging`-or-power interpretation until saved.
+
+EV-stop stale-plan protection keeps Battery Hold while a fresh optimization is
+required. `event_triggers.py` retries transient failures after 5, 15, 30 and 60
+seconds, cancels the sequence if charging restarts and otherwise leaves the
+normal wall-clock schedule authoritative after the bounded sequence.
 
 The optional charger-online guard is evaluated before this override. While that guard is suspended, the controller follows its normal configured Automatic Control strategy and does not infer EV activity from stale charger mode/power entities.
 
@@ -301,6 +308,17 @@ Responsibilities are layered deliberately:
 - v033: refresh the persistent canonical plan after a successful optimize/publish cycle and increment `plan_revision` in a `finally` block after the refresh attempt.
 - v044: schedule one non-blocking first post-restart optimization after 60 seconds, retry transient dependency failures after 15/30/60 seconds, and skip the sequence after any newer successful optimization.
 
+Wall-clock callbacks and v0.44 recovery callbacks return before entering the
+optimization/logging chain while Home Assistant Core is not yet `RUNNING`.
+This keeps an ordinary restart boundary out of the persistent failed-run log;
+the bounded recovery sequence remains responsible for the first post-startup
+solve.
+
+Native scheduling is blocked only when the legacy
+`automation.energypilot_emhass_orchestrator` entity exists and is enabled. The
+historical optimize-now script is manual, not a scheduler, and a disabled
+legacy automation cannot compete with EnergyPilot's wall-clock owner.
+
 The EnergyPilot-required runtime contract is defined once in `emhass_sync.py` and reused by both explicit **Synchronize required config** and automatic pre-solve preparation:
 
 ```text
@@ -331,6 +349,12 @@ The Settings → EMHASS synchronization API derives its managed-value list from 
 
 `plan_revision` is deterministic freshness evidence for UI consumers. It does not replace EMHASS plan content or become a second optimizer version.
 
+The dashboard's live EMHASS **Mapping** metric consumes the controller's
+existing `controller_expected_mode` and `controller_target_power` diagnostics.
+It does not reimplement Battery/Grid/Hybrid/EV decision semantics in frontend
+code; older backends without those attributes retain the historical
+Battery-only display fallback.
+
 Fresh-output validation in v031 uses Home Assistant `State.last_reported` as proof of a new `P_batt` report. `last_updated` remains a compatibility fallback for older State-like test doubles. A repeated numeric `P_batt` is therefore valid when EMHASS actually reported it again. The existing finite-number and optimizer-ready gates remain mandatory.
 
 See `docs/EMHASS_CONFIG_SYNC.md` for the synchronization ownership contract.
@@ -347,7 +371,8 @@ Balanced
 Battery Saver
 ```
 
-When a profile is explicitly selected, both hard SOC limits are part of the profile transaction:
+When a profile is explicitly selected, both hard SOC limits are part of the
+profile transaction:
 
 ```text
 Mad-Steve      5–100%
@@ -357,9 +382,16 @@ Balanced      10–93%
 Battery Saver 10–85%
 ```
 
-The whole-percentage minimum is written and verified on GoodWe `45356` before the selected mode and EMHASS configuration are changed. The profile selection transaction rolls that hardware value back together with EMHASS and options on failure. Existing v1.0 managed entries do not receive an upgrade-triggered hardware write; the user must select the profile again to activate managed SOC limits.
+The whole-percentage minimum is written and verified on GoodWe `45356` before
+the selected mode and EMHASS configuration are changed. The transaction rolls
+that hardware value back together with EMHASS and options on failure. Existing
+v1.0 managed entries do not receive an upgrade-triggered hardware write; the
+user must select the profile again to activate managed SOC limits.
 
-Each profile has a comfort zone inside its hard range. The lower shoulder uses `battery_soc_deficit_cost`; the upper shoulder uses the time-dependent `battery_soc_surplus_cost`. The complete ranges and factors are canonical in `battery_saver.py` and documented in `docs/BATTERY_SAVER.md`.
+Each profile has a comfort zone inside its hard range. The lower shoulder uses
+`battery_soc_deficit_cost`; the upper shoulder uses the time-dependent
+`battery_soc_surplus_cost`. The complete ranges and factors are canonical in
+`battery_saver.py` and documented in `docs/BATTERY_SAVER.md`.
 
 v0.34 distinguishes two economic mechanisms:
 
@@ -373,7 +405,11 @@ weight_battery_charge    = 2.25% × dynamic price reference
 weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-Gold Rush and Chargegasm apply 6% per direction. Balanced uses 7% and Battery Saver 9%; the captured Gold Rush comparison remains the empirical basis for the 6% step. Power-stress factors increase from 0% / 0% / 2% / 6% / 20% in profile order. Battery efficiency and inverter topology remain installation-owned.
+Gold Rush and Chargegasm apply 6% per direction. Balanced uses 7% and Battery
+Saver 9%; the captured Gold Rush comparison remains the empirical basis for
+the 6% step. Power-stress factors increase from 0% / 0% / 2% / 6% / 20% in
+profile order. Battery efficiency and inverter topology remain
+installation-owned.
 
 Battery Saver owns exactly ten EMHASS fields after the user explicitly selects a managed mode:
 
@@ -392,7 +428,13 @@ weight_battery_discharge
 
 Existing unmanaged/custom values are preserved. Multi-battery Battery Saver ownership is rejected instead of broadcasting scalar policy values across heterogeneous batteries. Failed first-apply optimization transactions restore the previous option and all owned EMHASS fields.
 
-The administrator-only Custom editor in the dashboard and EMHASS settings shares one `gw_energypilot/battery_saver/custom_set` transaction. It accepts the five visible non-negative economic cost values, preserves scalar versus one-item-list EMHASS shapes, writes the complete merged EMHASS configuration, runs one optimization and rolls back the previous Battery Saver-owned configuration on failure. The existing Minimum/Maximum SOC NumberEntities become writable only under Custom; managed mode service writes are rejected.
+The administrator-only Custom editor in the dashboard and EMHASS settings
+shares one `gw_energypilot/battery_saver/custom_set` transaction. It accepts
+the five visible non-negative economic cost values, preserves scalar versus
+one-item-list EMHASS shapes, writes the complete merged EMHASS configuration,
+runs one optimization and rolls back the previous Battery Saver-owned
+configuration on failure. The existing Minimum/Maximum SOC NumberEntities
+become writable only under Custom; managed mode service writes are rejected.
 
 See `docs/BATTERY_SAVER.md`.
 
@@ -452,7 +494,8 @@ Active top-level module:
 
 ```text
 gw-energy-pilot-v110.js
-  -> gw-energy-pilot-v051.js
+  -> gw-energy-pilot-v101.js
+       -> gw-energy-pilot-v051.js
        -> gw-energy-pilot-v051-history.js
        -> gw-energy-pilot-v050.js
        -> gw-energy-pilot-v049.js
@@ -472,7 +515,19 @@ gw-energy-pilot-v110.js
                                                                              -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card and source-attributed detailed plan graph. v1.0.0 retains its historical stable presentation; v1.1.0-beta.1 owns the active beta presentation and complete `1.1.0-beta.1-charge1` cache boundary.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37
+stability wrappers in a fresh browser session. Their files remain for release
+history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are
+no longer active owners. v0.41 replaces normal telemetry renders with
+stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and
+Optimize behavior; v0.45-v0.50 add bounded release presentation/cache
+ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped
+history card and source-attributed detailed plan graph. The settings module
+owns the two-deadband panel and zero-centered explanatory scale while backend
+config/controller modules own their semantics. v1.0.1-beta.4 remains in the
+chain as its bounded presentation layer. v1.1.0-beta.1 owns final beta
+presentation and the complete `1.1.0-beta.1-charge1` active-graph cache
+boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 
@@ -484,7 +539,8 @@ Historical frontend layering remains technical debt below the v0.34 base. Furthe
 
 The normal on-grid minimum has cross-system ownership because both EMHASS and GoodWe can impose a floor.
 
-Under Custom, the existing EMHASS minimum-SOC NumberEntity is the operator control. On explicit writes, `number.py` performs:
+Under Custom, the existing EMHASS minimum-SOC NumberEntity is the operator
+control. On explicit writes, `number.py` performs:
 
 ```text
 validate EMHASS min/max relation
@@ -498,9 +554,16 @@ schedule debounced fresh optimization
 
 The operation is GoodWe-first because the hardware floor is authoritative in real inverter behavior. If EMHASS fails after a successful GoodWe write, EnergyPilot attempts to roll `45356` back to the previous value.
 
-When a managed profile is selected, `battery_saver_api.py` uses the same verified GoodWe helper before persisting mode ownership and optimizing. Both SOC NumberEntities reject direct writes until Custom is selected. The orchestrator validates managed GoodWe/EMHASS agreement, retains legacy v1.0 floors without background hardware writes and clamps runtime `soc_final` to the effective hard range.
+When a managed profile is selected, `battery_saver_api.py` uses the same
+verified GoodWe helper before persisting mode ownership and optimizing. Both SOC
+NumberEntities reject direct writes until Custom is selected. The orchestrator
+validates managed GoodWe/EMHASS agreement, retains legacy v1.0 floors without
+background hardware writes and clamps runtime `soc_final` to the effective
+hard range.
 
-The low-level Beta SOC API remains available for controlled diagnostics/tooling. Managed profiles include both hard limits in the EnergyPilot transaction.
+The low-level Beta SOC API remains available for controlled
+diagnostics/tooling. Managed profiles include both hard limits in the
+EnergyPilot transaction.
 
 ## Persistent grid accounting
 

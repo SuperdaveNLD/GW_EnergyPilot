@@ -18,6 +18,7 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Changed
 
+- Include all functional changes from v1.0.1-beta.4 as the base for this beta.
 - Managed profile hard ranges are now Mad-Steve 5–100%, Gold Rush 5–100%,
   Chargegasm 8–96%, Balanced 10–93% and Battery Saver 10–85%, with matching
   comfort zones and price-relative factors documented in `docs/BATTERY_SAVER.md`.
@@ -27,7 +28,8 @@ All notable changes to GW EnergyPilot are documented here.
 - Balanced anti-churn/power stress move to 7%/6%; Battery Saver to 9%/20%;
   Gold Rush uses 6%/0%; Chargegasm 6%/2%; Mad-Steve remains 2.25%/0%.
 - Advanced the active frontend to the presentation-only v1.1.0-beta.1 wrapper
-  and complete `1.1.0-beta.1-charge1` cache boundary.
+  above the v1.0.1-beta.4 layer and a complete `1.1.0-beta.1-charge1` cache
+  boundary.
 
 ### Safety and compatibility
 
@@ -37,6 +39,103 @@ All notable changes to GW EnergyPilot are documented here.
 - Existing v1.0 managed selections retain their GoodWe floor until the user
   explicitly selects a profile again, preventing an upgrade-only hardware
   write. Entity unique IDs, device identity and Custom values remain intact.
+
+## [1.0.1-beta.4] - 2026-08-31
+
+### Added
+
+- Add an exclusive EV charging-detection setting: either a measured charger
+  power sensor or a charging status/boolean. Explicit status mode accepts
+  `on`, `true`, `charging` and `connected_charging`.
+
+### Fixed
+
+- Keep the safe EV-stop Battery Hold and retry a transiently failed fresh-plan
+  optimization after 5, 15, 30 and 60 seconds instead of remaining held until
+  the next wall-clock cycle. Restarting EV charging cancels the pending retry.
+
+### Changed
+
+- Listen to and evaluate only the explicitly selected detection source.
+  Allocated/current-limit entities remain excluded because a non-zero limit
+  does not prove that the vehicle is drawing power.
+- Preserve the exact former `connected_charging`-or-power behavior for existing
+  entries without the new method key until the operator saves a choice.
+
+### Validation and compatibility
+
+- Add detection, source-exclusivity, power-unit, Tesla/Zaptec status and
+  bounded EV-stop retry regressions, plus settings-contract coverage.
+- Pass Python compilation, all 420 repository tests, repository/release
+  validation, active JavaScript checks and the desktop Chromium/iPad
+  WebKit/iPhone WebKit dashboard matrix.
+- GoodWe registers and EMS commands, non-EV controller decisions, unique IDs,
+  device identity and persistent Store schemas are unchanged.
+
+## [1.0.1-beta.3] - 2026-08-31
+
+### Fixed
+
+- Skip wall-clock and startup-recovery optimization attempts while Home
+  Assistant Core is still starting, so an expected restart boundary is not
+  persisted as a failed EMHASS run before the delayed recovery can succeed.
+- Treat only the enabled legacy
+  `automation.energypilot_emhass_orchestrator` as a competing scheduler; the
+  manual legacy optimize script and a disabled automation no longer produce a
+  false `legacy_yaml_detected` error (#115).
+- Render the dashboard EMHASS mapping from the backend controller's canonical
+  expected mode/setpoint. Hybrid `P_batt = +775 W`, `P_grid = 0 W` now shows
+  mode 1 instead of the obsolete Battery-only mode-12 interpretation.
+
+### Validation and compatibility
+
+- Add startup-boundary, bounded-retry, legacy-scheduler and stable-DOM mapping
+  regressions. GoodWe registers/writes, control decisions, identities and Store
+  schemas are unchanged.
+
+## [1.0.1-beta.2] - 2026-08-30
+
+### Added
+
+- Add a separate `goodwe_auto_deadband` for `P_grid` mode-1 decisions, with a
+  1000 W fresh default.
+- Add a bilingual Settings → EP panel with two inputs, a central 0 W marker,
+  charge/discharge direction and the mode 10/1/8/1/9 decision bar.
+
+### Changed
+
+- Define the stable legacy `deadband` option exclusively as Battery Hold on
+  `P_batt`; fresh configurations default to 100 W and existing values remain
+  unchanged.
+- Apply both thresholds consistently to live control, EV anti-discharge,
+  future plan projection, diagnostics and execution evidence.
+
+### Validation and compatibility
+
+- Add pure-decision, controller and three-profile browser regressions for exact
+  boundaries, the `-231 W / 0 W` field case, frontend validation and responsive
+  rendering.
+- Preserve all v1.0.1-beta.1 fixes, GoodWe registers/write order, manual
+  ownership, identities, Store schemas, accounting and EMHASS ownership.
+
+## [1.0.1-beta.1] - 2026-08-30
+
+### Fixed
+
+- Normalize integral legacy wall-clock optimization cadences such as numeric
+  `15.0` and string `"30.0"` before presenting the select field, while leaving
+  unsupported fractional values invalid (#111).
+- Avoid rewriting unchanged Optimize now and EMHASS cost-function button text
+  during live telemetry patches, preserving WebKit's pending native click
+  between pointer-down and pointer-up (#110).
+
+### Validation and compatibility
+
+- Add focused config-flow tests plus a desktop Chromium, iPad WebKit and iPhone
+  WebKit regression that holds both affected controls through rapid telemetry,
+  requires zero label-child mutations and verifies exactly one service action.
+- Keep all GoodWe registers/writes, EMS decisions, EMHASS ownership, entity and
+  device identity, persistent state, accounting and chart behavior unchanged.
 
 ## [1.0.0] - 2026-08-30
 

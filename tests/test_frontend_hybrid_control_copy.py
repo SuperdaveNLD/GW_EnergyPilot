@@ -31,13 +31,13 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
         self.assertIn('panel._stateByKey?.("control_strategy")?.state', self.source)
         self.assertIn("PanelClass.prototype.__epV048Installed = true", self.source)
 
-    def test_copy_describes_neutral_hold_variable_deadband_and_full_setpoint(self) -> None:
+    def test_copy_describes_two_deadbands_and_full_setpoint(self) -> None:
         for expected in (
-            "neutral P_batt plan in mode 8",
-            "configured deadband",
+            "Battery Hold deadband on P_batt",
+            "separate GoodWe Auto deadband",
             "full grid target as setpoint",
-            "neutraal P_batt-plan vast in modus 8",
-            "ingestelde deadband",
+            "Battery Hold-deadband op P_batt",
+            "aparte GoodWe Auto-deadband",
             "volledige netdoel als setpoint",
         ):
             self.assertIn(expected, self.source)

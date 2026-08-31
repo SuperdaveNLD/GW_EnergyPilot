@@ -182,6 +182,7 @@ class FakeHass:
         self.config_entries = FakeConfigEntries()
         self.dispatched = []
         self.loop = asyncio.get_running_loop()
+        self.state = None
 
 
 class FakePlanRuntime:
@@ -227,8 +228,29 @@ class WallClockOrchestrationTests(unittest.IsolatedAsyncioTestCase):
         module, error_type, tracked = _load_orchestrator()
         calls = []
         entry = FakeEntry(interval, step_seconds, calls)
-        orchestrator = module.GWEnergyPilotOrchestrator(FakeHass(), entry, object())
+        hass = FakeHass()
+        hass.state = module.CoreState.running
+        orchestrator = module.GWEnergyPilotOrchestrator(hass, entry, object())
         return orchestrator, error_type, tracked, calls
+
+    async def test_startup_boundary_is_skipped_before_optimization_or_publish(self):
+        orchestrator, _, _, calls = self.make_orchestrator(interval=30)
+        orchestrator.hass.state = object()
+
+        async def optimize(*, reason):
+            calls.append(f"optimize:{reason}")
+
+        async def publish():
+            calls.append("publish")
+
+        orchestrator.async_optimize = optimize
+        orchestrator._async_publish_plan_step = publish
+
+        await orchestrator._async_wall_clock_tick(
+            datetime(2026, 8, 30, 0, 30, 15, tzinfo=timezone.utc)
+        )
+
+        self.assertEqual(calls, [])
 
     async def test_setup_registers_offset_wall_clock_timer_and_unload_cancels_it(self):
         orchestrator, _, tracked, _ = self.make_orchestrator()

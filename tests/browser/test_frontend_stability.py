@@ -17,7 +17,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
 
 
 @dataclass(frozen=True)
@@ -527,6 +527,71 @@ def exercise_setpoint_update(page: Page) -> dict[str, object]:
         }
 
 
+def exercise_emhass_mapping(page: Page) -> dict[str, object]:
+    """Use the backend decision instead of reinterpreting P_batt in the UI."""
+    if EXPECTED_ENTRYPOINT not in STABLE_ENTRYPOINTS:
+        return {"ran": False, "mode1": False, "mode10": False, "stable": False}
+    try:
+        return page.evaluate(
+            """
+            async () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const metric = [...root.querySelectorAll('.panel-card.emhass .metric')].find(
+                node => ['Mapping', 'Toewijzing', 'Aansturing'].includes(
+                  node.querySelector('.metric-label')?.textContent?.trim()
+                )
+              );
+              const value = metric?.querySelector('.metric-value');
+              const main = root.querySelector('main');
+              const settle = () => new Promise(resolve => setTimeout(resolve, 180));
+              const setDecision = (command, mode, target, pBatt, pGrid) => {
+                window.__epSetEntity('sensor.p_batt_forecast', pBatt, {
+                  unit_of_measurement: 'W',
+                });
+                window.__epSetEntity('sensor.p_grid_forecast', pGrid, {
+                  unit_of_measurement: 'W',
+                });
+                window.__epSetEntityByKey('optimize_now', 'unknown', {
+                  controller_enabled: true,
+                  controller_command: command,
+                  controller_expected_mode: mode,
+                  controller_target_power: target,
+                  p_batt_value: pBatt,
+                  p_grid_value: pGrid,
+                });
+              };
+
+              setDecision('hybrid_grid_zero_auto', 1, 0, 775, 0);
+              await settle();
+              const mode1 = value?.textContent?.trim() || '';
+
+              setDecision('hybrid_grid_export', 10, 14128, 15000, -14128);
+              await settle();
+              const mode10 = value?.textContent?.trim() || '';
+
+              setDecision('battery_charge', 11, -1200, -1200, 1100);
+              await settle();
+              return {
+                ran: true,
+                mode1: mode1 === 'Mode 1 · GoodWe Auto / AI',
+                mode10: mode10 === 'Mode 10 · Grid export target · 14.1 kW',
+                stable: root.querySelector('main') === main &&
+                  [...root.querySelectorAll('.panel-card.emhass .metric')].includes(metric),
+              };
+            }
+            """
+        )
+    except PlaywrightError as err:
+        return {
+            "ran": True,
+            "mode1": False,
+            "mode10": False,
+            "stable": False,
+            "error": str(err),
+        }
+
+
 def exercise_automatic_control(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "present": False,
@@ -778,7 +843,7 @@ def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
         "context_refresh": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050", "v051", "v100", "v110"}:
+    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
         return result
     try:
         state = page.evaluate(
@@ -1281,7 +1346,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, object]:
     """Emulate Home Assistant host assignments during one physical press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
     result: dict[str, object] = {
         "ran": enabled,
         "no_full_render": False,
@@ -1494,9 +1559,169 @@ def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, obje
     return result
 
 
+def exercise_live_copy_press(page: Page, profile: Profile) -> dict[str, object]:
+    """Keep WebKit's native click alive while live patches refresh button copy."""
+    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110"}
+    result: dict[str, object] = {
+        "ran": enabled,
+        "optimize_click": False,
+        "costfun_click": False,
+        "optimize_copy_stable": False,
+        "costfun_copy_stable": False,
+        "no_full_render": False,
+        "main_stable": False,
+        "controls_stable": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        wait_render_idle(page)
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              window.__epIssue110Identity = {
+                main: root.querySelector('main'),
+                optimize: root.querySelector('.ep-optimize-now'),
+                costfun: root.querySelector('[data-costfun="cost"]'),
+              };
+              window.__epIssue110RenderCount = 0;
+              window.__epIssue110OriginalRender = panel._render;
+              panel._render = function issue110RenderProbe(...args) {
+                window.__epIssue110RenderCount += 1;
+                return window.__epIssue110OriginalRender.apply(this, args);
+              };
+              window.__epSetEntity(
+                panel._entityId('emhass_cost_function'),
+                'Profit',
+                {emhass_costfun: 'profit'}
+              );
+            }
+            """
+        )
+        page.wait_for_timeout(120)
+
+        for name, selector, entity_key in (
+            ("optimize", ".ep-optimize-now", "optimize_now"),
+            ("costfun", '[data-costfun="cost"]', "emhass_cost_function"),
+        ):
+            entity_id = page.evaluate(
+                "key => window.__epPanel._entityId(key)", entity_key
+            )
+            before = page.evaluate(
+                """
+                entityId => window.__epServiceCalls.filter(
+                  call => call.data?.entity_id === entityId
+                ).length
+                """,
+                entity_id,
+            )
+            control = shadow(page, selector)
+            control.scroll_into_view_if_needed(timeout=5_000)
+            box = control.bounding_box()
+            if box is None:
+                raise RuntimeError(f"{name} has no hit area")
+            page.evaluate(
+                """
+                selector => {
+                  const panel = window.__epPanel;
+                  const button = panel.shadowRoot.querySelector(selector);
+                  let mutations = 0;
+                  const count = records => {
+                    mutations += records.filter(
+                      record => record.type === 'childList' ||
+                        record.type === 'characterData'
+                    ).length;
+                  };
+                  const observer = new MutationObserver(count);
+                  observer.observe(button, {
+                    childList: true,
+                    characterData: true,
+                    subtree: true,
+                  });
+                  window.__epIssue110StopCopyProbe = () => {
+                    count(observer.takeRecords());
+                    observer.disconnect();
+                    return mutations;
+                  };
+                  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+                  window.__epIssue110Telemetry = (async () => {
+                    for (let index = 0; index < 90; index += 1) {
+                      window.__epSetEntityByKey(
+                        'battery_power', index % 2 ? 925 + index : -1175 - index
+                      );
+                      await wait(3);
+                    }
+                  })();
+                }
+                """,
+                selector,
+            )
+            page.wait_for_timeout(15)
+            x = box["x"] + box["width"] / 2
+            y = box["y"] + box["height"] / 2
+            page.mouse.move(x, y)
+            page.mouse.down()
+            page.wait_for_timeout(180)
+            mutations = page.evaluate("window.__epIssue110StopCopyProbe()")
+            page.mouse.up()
+            page.evaluate("window.__epIssue110Telemetry")
+            wait_service_count(page, entity_id, before + 1)
+            result[f"{name}_click"] = True
+            result[f"{name}_copy_stable"] = mutations == 0
+            page.wait_for_function(
+                "selector => !window.__epPanel.shadowRoot.querySelector(selector)?.disabled",
+                arg=selector,
+                timeout=10_000,
+            )
+
+        stable = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              return {
+                renders: window.__epIssue110RenderCount,
+                main: window.__epIssue110Identity.main === root.querySelector('main'),
+                controls:
+                  window.__epIssue110Identity.optimize ===
+                    root.querySelector('.ep-optimize-now') &&
+                  window.__epIssue110Identity.costfun ===
+                    root.querySelector('[data-costfun="cost"]'),
+              };
+            }
+            """
+        )
+        result["no_full_render"] = stable["renders"] == 0
+        result["main_stable"] = stable["main"]
+        result["controls_stable"] = stable["controls"]
+    except (PlaywrightError, RuntimeError) as err:
+        result["error"] = str(err)
+    finally:
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              window.__epIssue110StopCopyProbe?.();
+              if (window.__epIssue110OriginalRender) {
+                panel._render = window.__epIssue110OriginalRender;
+              }
+              window.__epSetEntity(
+                panel._entityId('emhass_cost_function'),
+                'Profit',
+                {emhass_costfun: 'profit'}
+              );
+            }
+            """
+        )
+    return result
+
+
 def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, object]:
     """Prove split HA state events patch one unambiguous stable selection."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
     result: dict[str, object] = {
         "ran": enabled,
         "event_ordering": False,
@@ -1700,7 +1925,7 @@ def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Keep EMHASS and manual selectors live without rebuilding the dashboard."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
     result: dict[str, object] = {
         "ran": enabled,
         "costfun_delayed": False,
@@ -1954,7 +2179,7 @@ def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -2514,7 +2739,7 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -2765,7 +2990,7 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]:
     """Refresh the plan card during one physical S/M/L press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110"}
     result: dict[str, object] = {
         "ran": enabled,
         "refresh_during_press": False,
@@ -3330,11 +3555,136 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Verify the beta.2 EP deadband panel, validation and responsive fit."""
+    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110"}
+    result: dict[str, object] = {
+        "ran": enabled,
+        "inputs_present": False,
+        "defaults_correct": False,
+        "zero_centered": False,
+        "directions_present": False,
+        "modes_correct": False,
+        "invalid_blocked": False,
+        "valid_restored": False,
+        "submitted_both": False,
+        "responsive_fit": False,
+        "closed": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        page.wait_for_selector(
+            'gw-energypilot-panel >> .ep-v016-form[data-section="energypilot"]',
+            timeout=10_000,
+        )
+        state = page.evaluate(
+            """
+            async () => {
+              const root = window.__epPanel.shadowRoot;
+              const form = root.querySelector('.ep-v016-form[data-section="energypilot"]');
+              const group = form?.querySelector('.ep-v016-deadband-group');
+              const hold = form?.querySelector('[data-setting-key="deadband"]');
+              const automatic = form?.querySelector(
+                '[data-setting-key="goodwe_auto_deadband"]'
+              );
+              const zero = form?.querySelector('.ep-v016-deadband-zero');
+              const windowBar = form?.querySelector('.ep-v016-deadband-window');
+              const direction = form?.querySelector('.ep-v016-deadband-direction')
+                ?.textContent || '';
+              const modes = [...(windowBar?.querySelectorAll('span') || [])]
+                .map((item) => item.textContent?.trim());
+              const zeroRect = zero?.getBoundingClientRect();
+              const windowRect = windowBar?.getBoundingClientRect();
+              const defaultsCorrect = hold?.value === '100' && automatic?.value === '1000';
+
+              hold.value = '1000';
+              hold.dispatchEvent(new Event('input', { bubbles: true }));
+              const invalidBlocked = Boolean(
+                !form.querySelector('[data-deadband-validation]')?.hidden &&
+                form.querySelector('button[type="submit"]')?.disabled &&
+                !hold.checkValidity()
+              );
+
+              hold.value = '100';
+              hold.dispatchEvent(new Event('input', { bubbles: true }));
+              automatic.value = '1000';
+              automatic.dispatchEvent(new Event('input', { bubbles: true }));
+              const validRestored = Boolean(
+                form.querySelector('[data-deadband-validation]')?.hidden &&
+                !form.querySelector('button[type="submit"]')?.disabled &&
+                hold.checkValidity() && automatic.checkValidity()
+              );
+
+              form.dispatchEvent(new Event('submit', {
+                bubbles: true, composed: true, cancelable: true,
+              }));
+              await new Promise((resolve) => setTimeout(resolve, 120));
+              const call = [...window.__epWsCalls].reverse().find(
+                (item) => item.type === 'gw_energypilot/settings/update' &&
+                  item.section === 'energypilot'
+              );
+              return {
+                inputsPresent: Boolean(hold && automatic),
+                defaultsCorrect,
+                zeroCentered: Boolean(
+                  zero?.textContent?.trim() === '0 W' && zeroRect && windowRect &&
+                  Math.abs(
+                    (zeroRect.left + zeroRect.width / 2) -
+                    (windowRect.left + windowRect.width / 2)
+                  ) <= 2
+                ),
+                directionsPresent:
+                  direction.includes('Charge') && direction.includes('negative P_batt') &&
+                  direction.includes('positive P_batt') && direction.includes('Discharge'),
+                modesCorrect: JSON.stringify(modes) === JSON.stringify([
+                  'mode 10', 'mode 1', 'mode 8', 'mode 1', 'mode 9'
+                ]),
+                invalidBlocked,
+                validRestored,
+                submittedBoth: call?.values?.deadband === 100 &&
+                  call?.values?.goodwe_auto_deadband === 1000,
+                responsiveFit: Boolean(group) && group.scrollWidth <= group.clientWidth + 1,
+              };
+            }
+            """
+        )
+        for key, value in state.items():
+            result[
+                {
+                    "inputsPresent": "inputs_present",
+                    "defaultsCorrect": "defaults_correct",
+                    "zeroCentered": "zero_centered",
+                    "directionsPresent": "directions_present",
+                    "modesCorrect": "modes_correct",
+                    "invalidBlocked": "invalid_blocked",
+                    "validRestored": "valid_restored",
+                    "submittedBoth": "submitted_both",
+                    "responsiveFit": "responsive_fit",
+                }[key]
+            ] = value
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        result["closed"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the EV tab, entity filtering and >16 A acknowledgement path."""
     result: dict[str, object] = {
         "ran": False,
         "tab_present": False,
+        "detection_choice_present": False,
+        "power_source_exclusive": False,
+        "status_source_exclusive": False,
+        "detection_submitted": False,
         "profiles_present": False,
         "recommended_window": False,
         "feedback_entity_present": False,
@@ -3363,11 +3713,24 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
             async () => {
               const root = window.__epPanel.shadowRoot;
               const form = root.querySelector('.ep-v016-form[data-section="ev"]');
+              const detection = form.querySelector('[data-setting-key="ev_detection_method"]');
+              const status = form.querySelector('[data-setting-key="ev_mode_entity"]');
+              const power = form.querySelector('[data-setting-key="ev_power_entity"]');
+              const threshold = form.querySelector('[data-setting-key="ev_deadband"]');
               const profile = form.querySelector('[data-setting-key="grid_connection_profile"]');
               const windowSelect = form.querySelector('[data-setting-key="ev_load_balance_window"]');
               const max = form.querySelector('[data-setting-key="ev_charger_max_current"]');
               const datalistValues = [...form.querySelectorAll('datalist option')]
                 .map((option) => option.value);
+              const detectionChoicePresent = detection?.value === 'power' &&
+                [...detection.options].some((option) => option.value === 'power') &&
+                [...detection.options].some((option) => option.value === 'state');
+              const powerSourceExclusive = status?.disabled === true &&
+                power?.disabled === false && threshold?.disabled === false;
+              detection.value = 'state';
+              detection.dispatchEvent(new Event('change', { bubbles: true }));
+              const statusSourceExclusive = status?.disabled === false &&
+                power?.disabled === true && threshold?.disabled === true;
               max.value = '20';
               max.dispatchEvent(new Event('input', { bubbles: true }));
               const warningProminent = root.querySelector('[data-ev-safety-note]')
@@ -3380,6 +3743,9 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
                 (item) => item.type === 'gw_energypilot/settings/update' && item.section === 'ev'
               );
               return {
+                detectionChoicePresent,
+                powerSourceExclusive,
+                statusSourceExclusive,
                 profilesPresent: [...profile.options].some((option) => option.value === '3x25') &&
                   [...profile.options].some((option) => option.value === 'custom_1_phase') &&
                   [...profile.options].some((option) => option.value === 'custom_3_phase'),
@@ -3395,6 +3761,10 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
                 ),
                 chargerEntityPresent: datalistValues.includes('number.zaptec_max_current'),
                 warningProminent,
+                detectionSubmitted: call?.values?.ev_detection_method === 'state' &&
+                  call?.values?.ev_mode_entity === 'binary_sensor.tesla_wall_connector_opladen' &&
+                  call?.values?.ev_power_entity === 'sensor.zaptec_charge_power' &&
+                  call?.values?.ev_deadband === 500,
                 confirmationSent: call?.values?.ev_charger_max_current === 20 &&
                   call?.values?._confirm_high_current === true,
               };
@@ -3402,6 +3772,10 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
             """
         )
         result.update({
+            "detection_choice_present": state["detectionChoicePresent"],
+            "power_source_exclusive": state["powerSourceExclusive"],
+            "status_source_exclusive": state["statusSourceExclusive"],
+            "detection_submitted": state["detectionSubmitted"],
             "profiles_present": state["profilesPresent"],
             "recommended_window": state["recommendedWindow"],
             "feedback_entity_present": state["feedbackEntityPresent"],
@@ -3441,7 +3815,7 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         "modal_closed": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v051", "v100", "v110"}:
+    if EXPECTED_ENTRYPOINT not in {"v051", "v100", "v101", "v110"}:
         return result
     try:
         page.wait_for_function(
@@ -3638,6 +4012,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 
     strategy_note = exercise_strategy_note_stability(page)
     setpoint_update = exercise_setpoint_update(page)
+    emhass_mapping = exercise_emhass_mapping(page)
     static_flow = exercise_static_flow(page)
     connectivity = exercise_connectivity_status(page, profile)
     ev_protection = exercise_ev_protection_banner(page)
@@ -3675,9 +4050,11 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     )
 
     pv_insight = exercise_pv_insight(page)
+    deadband_settings = exercise_deadband_settings(page, profile)
     pv_settings = exercise_pv_settings(page, profile)
     ev_settings = exercise_ev_settings(page, profile)
     host_property_press = exercise_host_property_press(page, profile)
+    live_copy_press = exercise_live_copy_press(page, profile)
     quick_action_state = exercise_quick_action_state(page, profile)
     selector_stability = exercise_selector_stability(page, profile)
     touch_controls = exercise_touch_controls(page, profile)
@@ -3702,14 +4079,17 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "telemetry_identity": telemetry_identity,
         "strategy_note": strategy_note,
         "setpoint_update": setpoint_update,
+        "emhass_mapping": emhass_mapping,
         "static_flow": static_flow,
         "connectivity": connectivity,
         "ev_protection": ev_protection,
         "motion": motion,
         "pv_insight": pv_insight,
+        "deadband_settings": deadband_settings,
         "pv_settings": pv_settings,
         "ev_settings": ev_settings,
         "host_property_press": host_property_press,
+        "live_copy_press": live_copy_press,
         "quick_action_state": quick_action_state,
         "selector_stability": selector_stability,
         "touch_controls": touch_controls,
@@ -3737,14 +4117,17 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     identity = result["telemetry_identity"]
     strategy_note = result["strategy_note"]
     setpoint_update = result["setpoint_update"]
+    emhass_mapping = result["emhass_mapping"]
     static_flow = result["static_flow"]
     connectivity = result["connectivity"]
     ev_protection = result["ev_protection"]
     motion = result["motion"]
     pv_insight = result["pv_insight"]
+    deadband_settings = result["deadband_settings"]
     pv_settings = result["pv_settings"]
     ev_settings = result["ev_settings"]
     host_property_press = result["host_property_press"]
+    live_copy_press = result["live_copy_press"]
     quick_action_state = result["quick_action_state"]
     selector_stability = result["selector_stability"]
     touch_controls = result["touch_controls"]
@@ -3772,20 +4155,30 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v050": "v0.50 BETA",
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
+        "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.1.0-beta.1 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
             f"{name}: release badge is {initial['releaseVersion']!r} instead of {expected_badge}"
         )
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v110"} and not all(
-        phrase in initial["hybridNote"]
-        for phrase in (
+    hybrid_phrases = (
+        (
+            "Battery Hold deadband on P_batt",
+            "separate GoodWe Auto deadband",
+            "modes 9/10 outside it",
+            "full grid target as setpoint",
+        )
+        if EXPECTED_ENTRYPOINT in {"v101", "v110"}
+        else (
             "neutral P_batt plan in mode 8",
             "mode 1 inside the configured deadband",
             "modes 9/10 outside it",
             "full grid target as setpoint",
         )
+    )
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110"} and not all(
+        phrase in initial["hybridNote"] for phrase in hybrid_phrases
     ):
         failures.append(f"{name}: active Hybrid operator copy is stale")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and initial["stableMarker"] != "1":
@@ -3796,7 +4189,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
         required_strategy_note = (
             "ran", "present", "note_stable", "strong_stable", "height_stable",
             "no_child_rebuilds", "dutch_copy", "context_refresh",
@@ -3814,6 +4207,14 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     ):
         failures.append(
             f"{name}: EMS setpoint update evidence is missing or rebuilt: {setpoint_update}"
+        )
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and not all(
+        emhass_mapping.get(key) is True
+        for key in ("ran", "mode1", "mode10", "stable")
+    ):
+        failures.append(
+            f"{name}: EMHASS mapping diverged from the backend controller decision: "
+            f"{emhass_mapping}"
         )
     expected_initial = {
         "pv": ("active", "right", "high", "→"),
@@ -3927,11 +4328,27 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v101", "v110"} and not all(
+        deadband_settings.get(key) is True
+        for key in (
+            "ran", "inputs_present", "defaults_correct", "zero_centered",
+            "directions_present", "modes_correct", "invalid_blocked",
+            "valid_restored", "submitted_both", "responsive_fit", "closed",
+        )
+    ):
+        failures.append(
+            f"{name}: EP deadband settings panel or validation regressed: "
+            f"{deadband_settings}"
+        )
+    if deadband_settings["error"]:
+        failures.append(f"{name}: EP deadband settings interaction error")
+    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
         if not all(
             ev_settings[key] is True
             for key in (
-                "ran", "tab_present", "profiles_present", "recommended_window",
+                "ran", "tab_present", "detection_choice_present",
+                "power_source_exclusive", "status_source_exclusive",
+                "detection_submitted", "profiles_present", "recommended_window",
                 "feedback_entity_present", "manual_grid_current_removed",
                 "goodwe_source_present", "charger_entity_present",
                 "warning_prominent", "confirmation_sent", "closed",
@@ -3940,7 +4357,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: EV load-balancing settings safety regression failed")
         if ev_settings["error"]:
             failures.append(f"{name}: EV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
         required_host_press = (
             "ran", "no_full_render", "main_stable", "controls_stable",
             "native_click", "touch_click",
@@ -3950,6 +4367,20 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: Home Assistant host update interrupted a control press")
         if host_property_press["error"]:
             failures.append(f"{name}: host-property press interaction error")
+        if EXPECTED_ENTRYPOINT in {"v101", "v110"}:
+            required_live_copy_press = (
+                "ran", "optimize_click", "costfun_click",
+                "optimize_copy_stable", "costfun_copy_stable",
+                "no_full_render", "main_stable", "controls_stable",
+            )
+            if not all(
+                live_copy_press[key] is True for key in required_live_copy_press
+            ):
+                failures.append(
+                    f"{name}: live button-copy patch interrupted a physical press"
+                )
+            if live_copy_press["error"]:
+                failures.append(f"{name}: live button-copy press interaction error")
         required_quick_state = (
             "ran", "event_ordering", "pressed_semantics", "inactive_auto_neutral",
             "no_full_render", "main_stable", "button_stable", "delayed_publication",
@@ -3970,7 +4401,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: stable selector feedback regression failed")
         if selector_stability["error"]:
             failures.append(f"{name}: stable selector feedback interaction error")
-    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}:
+    if profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -3980,7 +4411,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -4051,7 +4482,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if strategy["error"]:
         failures.append(f"{name}: Battery Strategy interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v110"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110"} and not all(
         chart_size_press[key] is True
         for key in (
             "ran", "refresh_during_press", "click_delivered", "size_selected",
@@ -4077,7 +4508,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
     if plan["error"]:
         failures.append(f"{name}: battery-plan refresh interaction error")
-    if EXPECTED_ENTRYPOINT in {"v051", "v100", "v110"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v051", "v100", "v101", "v110"} and not all(
         execution_history.get(key) is True
         for key in (
             "ran", "single_card", "compact_rows", "future_rows",
