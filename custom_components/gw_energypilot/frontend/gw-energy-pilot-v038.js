@@ -77,12 +77,14 @@ if (!PanelClass.prototype.__epV038HoverStabilityInstalled) {
     const root = this.shadowRoot;
     if (!root) return;
 
-    localizeV038Controller(this, root);
-    ensureHoverStabilityStyle(root);
-    installHoverTracking(this, root);
+    if (!this.__epControlSurfaceArchitecture) {
+      localizeV038Controller(this, root);
+      ensureHoverStabilityStyle(root);
+      installHoverTracking(this, root);
 
-    const hoveredAfter = root.querySelector(`${PROFILE_SELECTOR}:hover`);
-    if (hoveredAfter) setStableHover(root, hoveredAfter);
+      const hoveredAfter = root.querySelector(`${PROFILE_SELECTOR}:hover`);
+      if (hoveredAfter) setStableHover(root, hoveredAfter);
+    }
   };
   PanelClass.prototype.__epV038HoverStabilityInstalled = true;
 }

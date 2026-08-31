@@ -197,6 +197,7 @@ function installStableOptimizeButton(panel, root) {
 }
 
 function patchOptimizeUi(panel) {
+  if (panel?.__epControlSurfaceArchitecture) return;
   const root = panel?.shadowRoot;
   if (!root) return;
 

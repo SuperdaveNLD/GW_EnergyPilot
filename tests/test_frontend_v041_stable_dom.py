@@ -62,9 +62,9 @@ class FrontendV041StableDomTests(unittest.TestCase):
     def test_host_properties_ignore_semantically_identical_assignments(self) -> None:
         self.assertIn("function plainJsonEqual(left, right)", self.source)
         self.assertIn("equal = Object.is", self.source)
-        self.assertIn(
-            'installStableHostProperty(PanelClass, "narrow", Boolean)', self.source
-        )
+        self.assertIn("function installReactiveNarrowProperty(PanelClass)", self.source)
+        self.assertIn("installReactiveNarrowProperty(PanelClass)", self.source)
+        self.assertIn("patchNarrowControlSurface(this, next)", self.source)
         self.assertIn(
             'installStableHostProperty(PanelClass, "panel", (value) => value, plainJsonEqual)',
             self.source,

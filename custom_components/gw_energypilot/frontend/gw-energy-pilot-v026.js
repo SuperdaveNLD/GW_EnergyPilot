@@ -326,6 +326,7 @@ function localizeControlStrategy(panel, root) {
   const note = root.querySelector(".ep-v022-strategy-note");
   if (
     note &&
+    !note.closest("ep-control-surface") &&
     !(note.dataset.epReleasePresentationOwner === "v048-hybrid" && strategy === "hybrid")
   ) {
     note.innerHTML = `<strong>${panel._escape(t(panel, "strategyNote"))}</strong> ${panel._escape(current.label)} · ${panel._escape(current.description)} ${panel._escape(t(panel, "evOverride"))}`;
@@ -376,6 +377,7 @@ function localizeSettings(panel, root) {
 
 function replaceText(root, selector, from, to) {
   root.querySelectorAll(selector).forEach((node) => {
+    if (node.closest("ep-control-surface")) return;
     if (node.textContent?.trim() === from) node.textContent = to;
   });
 }

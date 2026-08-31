@@ -59,6 +59,8 @@ Release documentation:
 - `docs/RELEASE_NOTES_V042.md` — v0.42 clearer EMHASS settings overview;
 - `docs/RELEASE_NOTES_V041.md` — v0.41 stable DOM, native scrolling and no-motion dashboard;
 - `docs/FRONTEND_STABLE_DOM.md` — structural-render, telemetry-patch, interaction and browser-regression contract;
+- `docs/FRONTEND_CONTROL_ARCHITECTURE.md` — complete control inventory and permanent declarative Lit boundary;
+- `docs/FRONTEND_IPHONE_ACCEPTANCE.md` — physical Safari/Companion acceptance and passive trace protocol;
 - `docs/RELEASE_NOTES_V040.md` — v0.40 stable dashboard/menu controls across full renders;
 - `docs/RELEASE_NOTES_V039.md` — v0.39 stable strategy hover and complete Dutch Controller copy;
 - `docs/RELEASE_NOTES_V038.md` — v0.38 rebuilt controls and canonical live-flow direction;
@@ -120,6 +122,28 @@ Release documentation:
   connectivity entities describe connection state, not active charging.
 - GoodWe registers, EMS writes, normal strategy decisions, entity identities
   and persistent Store schemas remain unchanged.
+
+## Unreleased frontend reliability work
+
+- Operational dashboard controls now live in one permanent declarative Lit
+  surface with native buttons/clicks and frozen control-only models.
+- Service completion never selects a control optimistically: each action waits
+  for matching Home Assistant or API publication, with visible pending/error
+  state and duplicate-request rejection.
+- The exact control nodes survive telemetry, plan refresh, Settings and real
+  language/narrow/panel structural changes. The inherited renderer no longer
+  assigns `shadowRoot.innerHTML`.
+- A dedicated desktop Chromium, iPad WebKit and iPhone WebKit gate executes 50
+  actions for every rendered control across ten critical groups (1,500 per
+  profile, 4,500 total) and also covers delayed/reordered
+  publication, errors, unknown state, keyboard/focus, scrolling, geometry and
+  1,000 telemetry updates.
+- Automated software acceptance is complete. Physical iPhone Safari and Home
+  Assistant Companion acceptance remains open and must follow
+  `docs/FRONTEND_IPHONE_ACCEPTANCE.md`.
+- This frontend-only work does not change GoodWe registers/writes, EMS mappings,
+  controller decisions, EMHASS ownership, entities, configuration or Store
+  schemas.
 
 ## v1.0.1-beta.3 highlights
 

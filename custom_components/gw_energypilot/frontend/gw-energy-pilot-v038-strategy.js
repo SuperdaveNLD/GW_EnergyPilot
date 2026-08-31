@@ -400,6 +400,7 @@ function eventElement(event, selector) {
 }
 
 export function installV038DelegatedControls(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   if (panel.__epV038DelegatedControlsInstalled) return;
   panel.__epV038DelegatedControlsInstalled = true;
 
@@ -495,6 +496,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
 }
 
 export function installV038CustomerStrategy(panel, root, reusableStrategy = null) {
+  if (panel.__epControlSurfaceArchitecture) return null;
   const card = root.querySelector(".panel-card.controller");
   if (!card) return null;
   removeLowLevelCommand(card);

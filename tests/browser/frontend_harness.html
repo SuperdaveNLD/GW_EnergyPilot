@@ -629,7 +629,13 @@
     const unknownWsTypes = new Set();
     const serviceCalls = [];
     const wsCalls = [];
-    const actionDelay = () => new Promise((resolve) => setTimeout(resolve, 18));
+    window.__epControlTestMode = true;
+    const actionDelay = () => new Promise((resolve) => setTimeout(
+      resolve,
+      Number.isFinite(Number(window.__epActionDelayMs))
+        ? Math.max(0, Number(window.__epActionDelayMs))
+        : 18
+    ));
     const snapshot = (value) => JSON.parse(JSON.stringify(value || {}));
 
     function keyForEntityId(entityId) {
@@ -639,6 +645,11 @@
     async function callWS(message) {
       const type = message?.type || "";
       wsCalls.push(snapshot(message));
+      if (window.__epRejectNextWsCall) {
+        window.__epRejectNextWsCall = false;
+        await actionDelay();
+        throw new Error("Injected WebSocket failure");
+      }
       if (type === "config/entity_registry/list") return registry;
       if (type === "gw_energypilot/battery_saver/get") return batterySaverPayload();
       if (type === "gw_energypilot/battery_saver/set") {
@@ -716,6 +727,13 @@
       const entityId = data?.entity_id;
       serviceCalls.push({ domain, service, data: snapshot(data) });
       await actionDelay();
+      if (window.__epRejectNextServiceCall) {
+        window.__epRejectNextServiceCall = false;
+        throw new Error("Injected service failure");
+      }
+      const suppressPublication = Boolean(window.__epSuppressNextPublication);
+      window.__epSuppressNextPublication = false;
+      if (suppressPublication) return undefined;
       if (domain === "switch" && entityId) {
         const current = window.__epHass.states[entityId];
         if (current) {
@@ -737,16 +755,26 @@
           Cost: "cost",
           "Self-consumption": "self-consumption",
         }[data.option];
-        const publishSelect = () => window.__epSetEntity(
-          entityId,
-          data.option,
-          raw ? { emhass_costfun: raw } : null
-        );
+        const publishSelect = () => {
+          window.__epSetEntity(
+            entityId,
+            data.option,
+            raw ? { emhass_costfun: raw } : null
+          );
+          if (entityId === entityIdForKey("manual_mode")) {
+            const mode = Number(String(data.option || "").split(":", 1)[0]);
+            if (Number.isFinite(mode)) window.__epSetEntityByKey("ems_mode", mode);
+          }
+        };
         const publishDelay = entityId === costfunId
           ? Number(window.__epCostfunPublishDelayMs || 0)
           : 0;
         if (publishDelay > 0) window.setTimeout(publishSelect, publishDelay);
         else publishSelect();
+        const returnDelay = Number(window.__epServiceReturnDelayMs || 0);
+        if (returnDelay > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, returnDelay));
+        }
       } else if (domain === "button" && service === "press") {
         const key = keyForEntityId(entityId);
         if (key === "optimize_now") {

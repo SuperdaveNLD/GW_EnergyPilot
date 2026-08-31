@@ -177,6 +177,24 @@ refresh, PV presentation and static-flow DOM/CSS. The v0.41 PV flow keeps one
 combined group total while patching one internal ETA/DC node and one aggregated
 external AC/PCC node; it remains independent of control and EMHASS inputs.
 
+For the current issue #84 architecture, v0.41 also mounts
+`ep-control-surface.js` and supplies it with frozen control-only models. The
+surface and its six Lit child components own all operational dashboard actions:
+Battery quick actions, Automatic Control, EMHASS strategy, Battery Strategy
+including Custom/SOC, Optimize and manual EMS. The old v0.10/v0.16/v0.21,
+v0.38 delegated-strategy, v0.44 Optimize and base Automatic Control listeners
+must remain bypassed while `__epControlSurfaceArchitecture` is active.
+Historical modules may style compatible class names but must neither recreate
+nor mutate descendants of `ep-control-surface`.
+
+The inherited renderer must use `_commitStructuralRender()` so a structural
+dashboard update keeps the exact ShadowRoot, `main`, control surface and child
+controls connected. Never restore `shadowRoot.innerHTML`. A control action is a
+native `click` and one gateway request. Its selected state comes only from the
+confirmed Home Assistant/API model; service completion and backend publication
+may arrive in either order. See `FRONTEND_CONTROL_ARCHITECTURE.md` and
+`FRONTEND_STABLE_DOM.md`.
+
 The existing settings module owns the two-deadband configuration panel and its
 zero-centered explanatory scale. Control behavior remains owned by the backend
 config and controller modules; the stable wrapper does not reinterpret it.
@@ -185,6 +203,19 @@ expected mode/setpoint attributes; it must not grow a parallel Hybrid/EV
 decision implementation.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
+
+Run both frontend browser gates after a rendering, interaction or CSS change:
+
+```text
+/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_control_surface.py
+/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_stability_v101.py
+```
+
+The first is the authoritative gate for 50 activations of every rendered
+permanent control (1,500 per profile). The second protects the complete
+historical dashboard presentation and scoped
+cards. Passing Playwright WebKit does not close physical iPhone acceptance;
+follow `FRONTEND_IPHONE_ACCEPTANCE.md` for Safari and Home Assistant Companion.
 
 ## Automatic-control contract
 
@@ -596,7 +627,7 @@ Do not fix a presentation issue by changing Modbus semantics unless the data its
 
 ## Current technical debt priorities
 
-1. **Frontend layering** — consolidate versioned monkey-patch layers into functional components under browser-level regression tests.
+1. **Frontend layering** — continue the completed operational-control boundary by consolidating remaining dashboard cards, Settings, modals, diagnostics and layout/window presentation into functional components under browser-level regression tests.
 2. **Orchestrator inheritance** — eventually replace release-version inheritance with composable policy/forecast/price/runner services under existing tests.
 3. **Home Assistant lifecycle tests** — add config-entry/WebSocket/Recorder fixtures for integration-level startup/reload coverage, especially persistent-plan recovery.
 4. **Control policy extraction** — separate pure Battery/Grid/Hybrid decision logic from Home Assistant state reading and Modbus execution when the next control refactor is scheduled.

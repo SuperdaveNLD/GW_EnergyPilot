@@ -15,7 +15,10 @@ INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
 INIT = INTEGRATION / "__init__.py"
 
-IMPORT_RE = re.compile(r'^\s*import\s+["\'](?P<path>\./[^"\']+)["\']\s*;', re.MULTILINE)
+IMPORT_RE = re.compile(
+    r'^\s*import(?:\s+[^;"\']+?\s+from)?\s+["\'](?P<path>\./[^"\']+)["\']\s*;',
+    re.MULTILINE,
+)
 PANEL_RE = re.compile(r'PANEL_MODULE\s*=.*?/(?P<name>gw-energy-pilot[^?"\']+\.js)')
 
 PATTERNS: dict[str, re.Pattern[str]] = {

@@ -529,9 +529,11 @@ The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37
 stability wrappers in a fresh browser session. Their files remain for release
 history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are
 no longer active owners. v0.41 replaces normal telemetry renders with
-stable-DOM patches and owns the internal-ETA/external-PCC PV-flow presentation;
-v0.42-v0.44 add bounded settings, touch-presentation and
-Optimize behavior; v0.45-v0.50 add bounded release presentation/cache
+stable-DOM patches, owns the internal-ETA/external-PCC PV-flow presentation and
+mounts one permanent declarative Lit control surface. v0.42-v0.44 retain
+bounded settings, touch-presentation and compatibility presentation; their
+historical operational listeners are disabled while the permanent architecture
+is active. v0.45-v0.50 add bounded release presentation/cache
 ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped
 history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
@@ -540,11 +542,11 @@ chain as its bounded presentation layer. v1.1.1 owns final stable
 presentation and the complete `1.1.1-stable1` active-graph cache
 boundary.
 
-The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
+The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 
-Visible/translated text is never a control identity. Canonical profile keys plus `aria-pressed` define action and selected state. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; current presentation is static and patched in place. See `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
+Visible/translated text is never a control identity. Canonical action/profile keys plus confirmed Home Assistant/API models and `aria-pressed` define selected state. Each asynchronous action is `idle -> pending -> acknowledged | error`; a resolved service call cannot select a control before matching backend publication. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; current presentation is static and patched in place. See `docs/FRONTEND_CONTROL_ARCHITECTURE.md`, `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
-Historical frontend layering remains technical debt below the v0.34 base. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
+Historical frontend layering remains technical debt below the v0.34 base. The permanent control surface is the first consolidated functional boundary; dashboard cards, Settings, modals, diagnostics, layout/window controls, flow and graph/history presentation still use the historical chain. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
 
 ## Synchronized minimum SOC
 

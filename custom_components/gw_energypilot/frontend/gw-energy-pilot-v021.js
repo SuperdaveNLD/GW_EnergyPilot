@@ -411,6 +411,7 @@ async function applyManualMode(panel, definition) {
 }
 
 function installManualModePad(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const card = root.querySelector(".panel-card.controller");
   if (!card || card.querySelector(".ep-v021-manual-pad")) return;
 

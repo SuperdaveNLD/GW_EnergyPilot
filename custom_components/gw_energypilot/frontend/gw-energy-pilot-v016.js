@@ -181,6 +181,7 @@ async function chooseStrategy(panel, definition) {
 }
 
 function installStrategySelector(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const old = root.querySelector(".ep-v015-costfun");
   if (!old) return;
 

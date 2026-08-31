@@ -65,6 +65,27 @@ The documentation explains the lower-average-SOC, SOC-window, power and
 throughput rationale and its limits. The profile factors are transparent
 price-relative optimizer policy, not a battery-specific lifetime guarantee.
 See `docs/releases/v1.1.0.md` and `docs/BATTERY_SAVER.md`.
+# v1.2.0-beta.1 — Permanent declarative mobile controls
+
+The dashboard's operational controls now live in one permanent Lit component
+tree. Battery actions, Automatic Control, EMHASS and Battery strategies,
+Optimize, Custom/SOC and manual EMS use native buttons/events and one common
+pending/acknowledged/error contract. A successful request changes selected
+state only after the matching Home Assistant state or API payload is confirmed;
+rapid duplicate taps while pending cannot start a second request.
+
+The exact controls remain connected through normal telemetry, plan refreshes,
+Settings and genuine language/layout/panel structural updates. Automated
+desktop Chromium, iPad WebKit and iPhone WebKit acceptance executes 50 actions
+for every rendered control across ten critical groups (1,500 per profile,
+4,500 total) and includes failure/reordering, scroll,
+keyboard/focus, geometry and 1,000-update identity cases. Physical iPhone Safari
+and Home Assistant Companion acceptance is still open; use
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md` and the built-in passive trace.
+
+This work changes frontend ownership only. GoodWe registers/writes, EMS mode
+semantics, Automatic Control decisions, EMHASS ownership, entity/device
+identity, configuration and persistent Store schemas are unchanged.
 
 # v1.0.1-beta.4 — Explicit charging detection and safe EV-stop recovery
 

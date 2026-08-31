@@ -279,6 +279,68 @@ class GWEnergyPilotPanel extends HTMLElement {
       </div>`;
   }
 
+  _commitStructuralRender(markup) {
+    const template = document.createElement("template");
+    template.innerHTML = markup;
+    const existingSurface =
+      this.__epPermanentControlSurface ||
+      this.shadowRoot.querySelector("ep-control-surface");
+    const existingMain = existingSurface?.isConnected
+      ? existingSurface.closest("main")
+      : null;
+    const nextMain = template.content.querySelector("main");
+
+    if (!existingSurface?.isConnected || !existingMain || !nextMain) {
+      this.shadowRoot.replaceChildren(template.content);
+      globalThis.__epRecordEnergyPilotControlTrace?.(this, "structural-render", {
+        preserved: false,
+        isConnected: Boolean(existingSurface?.isConnected),
+      });
+      return;
+    }
+
+    // Rebuild replaceable dashboard content while the operational control
+    // surface stays attached to the same main/ShadowRoot for the whole commit.
+    // This path is reserved for genuine context/structure changes.
+    for (const child of [...this.shadowRoot.childNodes]) {
+      if (child !== existingMain) child.remove();
+    }
+    let afterMain = false;
+    for (const child of [...template.content.childNodes]) {
+      if (child === nextMain) {
+        afterMain = true;
+        continue;
+      }
+      if (afterMain) this.shadowRoot.appendChild(child);
+      else this.shadowRoot.insertBefore(child, existingMain);
+    }
+
+    for (const attribute of [...existingMain.attributes]) {
+      existingMain.removeAttribute(attribute.name);
+    }
+    for (const attribute of [...nextMain.attributes]) {
+      existingMain.setAttribute(attribute.name, attribute.value);
+    }
+    for (const child of [...existingMain.childNodes]) {
+      if (child !== existingSurface) child.remove();
+    }
+
+    let afterAnchor = false;
+    for (const child of [...nextMain.childNodes]) {
+      if (child instanceof Element && child.hasAttribute("data-ep-control-anchor")) {
+        afterAnchor = true;
+        continue;
+      }
+      if (afterAnchor) existingMain.appendChild(child);
+      else existingMain.insertBefore(child, existingSurface);
+    }
+
+    globalThis.__epRecordEnergyPilotControlTrace?.(this, "structural-render", {
+      preserved: true,
+      isConnected: existingSurface.isConnected,
+    });
+  }
+
   _render() {
     if (!this.shadowRoot) {
       return;
@@ -414,7 +476,7 @@ class GWEnergyPilotPanel extends HTMLElement {
       ? `<div class="notice warning"><strong>EMHASS P_batt is not numeric.</strong> Check optimization and publish-data.</div>`
       : "";
 
-    this.shadowRoot.innerHTML = `
+    this._commitStructuralRender(`
       <style>${this._styles()}</style>
       <main class="page ${this._narrow ? "narrow" : ""}">
         <header class="topbar">
@@ -433,6 +495,7 @@ class GWEnergyPilotPanel extends HTMLElement {
 
         ${registryMessage}
         ${emhassNotice}
+        <div data-ep-control-anchor hidden></div>
 
         <section class="hero-grid">
           <article class="energy-card solar">
@@ -499,10 +562,11 @@ class GWEnergyPilotPanel extends HTMLElement {
                 <div class="card-kicker">ENERGYPILOT CONTROL</div>
                 <h2>Controller</h2>
               </div>
-              <button class="auto-button ${automaticOn ? "on" : "off"}" id="auto-toggle" ${!autoEntity ? "disabled" : ""}>
-                <span class="switch-track"><span class="switch-knob"></span></span>
-                ${automaticOn ? "Automatic ON" : "Automatic OFF"}
-              </button>
+              ${this.__epControlSurfaceArchitecture ? "" : `
+                <button type="button" class="auto-button ${automaticOn ? "on" : "off"}" id="auto-toggle" ${!autoEntity ? "disabled" : ""}>
+                  <span class="switch-track"><span class="switch-knob"></span></span>
+                  ${automaticOn ? "Automatic ON" : "Automatic OFF"}
+                </button>`}
             </div>
             <div class="control-grid">
               ${this._metric("EMS mode", `${emsMode} · ${emsModeName}`)}
@@ -554,9 +618,11 @@ class GWEnergyPilotPanel extends HTMLElement {
           <span>GW EnergyPilot v${VERSION}</span>
           <span>Local Modbus TCP · GoodWe ETA</span>
         </footer>
-      </main>`;
+      </main>`);
 
-    const toggle = this.shadowRoot.getElementById("auto-toggle");
+    const toggle = this.__epControlSurfaceArchitecture
+      ? null
+      : this.shadowRoot.getElementById("auto-toggle");
     if (toggle) {
       toggle.addEventListener("click", () => this._toggleAutomatic());
     }
