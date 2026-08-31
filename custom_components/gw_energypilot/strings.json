@@ -40,7 +40,8 @@
           "buy_price_adder": "Import price addition",
           "sell_price_deduction": "Export price deduction",
           "enable_ev_coordination": "Enable EV coordination",
-          "ev_mode_entity": "EV charging mode entity",
+          "ev_detection_method": "EV charging detection",
+          "ev_mode_entity": "EV charging status / boolean entity",
           "ev_power_entity": "EV charging power entity",
           "ev_online_entity": "EV online entity",
           "ev_deadband": "EV active power threshold"
@@ -66,8 +67,9 @@
           "buy_price_adder": "Variable supplier fees, taxes or additions in EUR/kWh.",
           "sell_price_deduction": "Amount deducted from the market export price in EUR/kWh.",
           "enable_ev_coordination": "Holds the battery while EV charging is active and re-optimizes when charging stops.",
-          "ev_mode_entity": "Optional EV charging-state entity.",
-          "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_detection_method": "Choose whether charging follows measured charger power or one charging status/boolean.",
+          "ev_mode_entity": "Used for status detection. On, true, charging and connected_charging mean active charging.",
+          "ev_power_entity": "Used for power detection; select the charger's measured power entity.",
           "ev_online_entity": "Optional entity that reports whether the EV charger is reachable.",
           "ev_deadband": "Power above this threshold is considered active EV charging."
         }
@@ -106,7 +108,8 @@
           "buy_price_adder": "Import price addition",
           "sell_price_deduction": "Export price deduction",
           "enable_ev_coordination": "Enable EV coordination",
-          "ev_mode_entity": "EV charging mode entity",
+          "ev_detection_method": "EV charging detection",
+          "ev_mode_entity": "EV charging status / boolean entity",
           "ev_power_entity": "EV charging power entity",
           "ev_online_entity": "EV online entity",
           "ev_deadband": "EV active power threshold"
@@ -132,11 +135,20 @@
           "buy_price_adder": "Extra import cost in EUR/kWh.",
           "sell_price_deduction": "Export deduction in EUR/kWh.",
           "enable_ev_coordination": "Optional EV hold and stop-triggered re-optimization.",
-          "ev_mode_entity": "Optional EV charging-state entity.",
-          "ev_power_entity": "Optional EV charging-power entity in watts.",
+          "ev_detection_method": "Choose whether charging follows measured charger power or one charging status/boolean.",
+          "ev_mode_entity": "Used for status detection. On, true, charging and connected_charging mean active charging.",
+          "ev_power_entity": "Used for power detection; select the charger's measured power entity.",
           "ev_online_entity": "Optional entity that reports whether the EV charger is reachable.",
           "ev_deadband": "Power above this threshold is considered active EV charging."
         }
+      }
+    }
+  },
+  "selector": {
+    "ev_detection_method": {
+      "options": {
+        "power": "Charger power sensor",
+        "state": "Charging status / boolean"
       }
     }
   },

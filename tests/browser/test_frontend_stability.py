@@ -3655,6 +3655,10 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
     result: dict[str, object] = {
         "ran": False,
         "tab_present": False,
+        "detection_choice_present": False,
+        "power_source_exclusive": False,
+        "status_source_exclusive": False,
+        "detection_submitted": False,
         "profiles_present": False,
         "recommended_window": False,
         "feedback_entity_present": False,
@@ -3683,11 +3687,24 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
             async () => {
               const root = window.__epPanel.shadowRoot;
               const form = root.querySelector('.ep-v016-form[data-section="ev"]');
+              const detection = form.querySelector('[data-setting-key="ev_detection_method"]');
+              const status = form.querySelector('[data-setting-key="ev_mode_entity"]');
+              const power = form.querySelector('[data-setting-key="ev_power_entity"]');
+              const threshold = form.querySelector('[data-setting-key="ev_deadband"]');
               const profile = form.querySelector('[data-setting-key="grid_connection_profile"]');
               const windowSelect = form.querySelector('[data-setting-key="ev_load_balance_window"]');
               const max = form.querySelector('[data-setting-key="ev_charger_max_current"]');
               const datalistValues = [...form.querySelectorAll('datalist option')]
                 .map((option) => option.value);
+              const detectionChoicePresent = detection?.value === 'power' &&
+                [...detection.options].some((option) => option.value === 'power') &&
+                [...detection.options].some((option) => option.value === 'state');
+              const powerSourceExclusive = status?.disabled === true &&
+                power?.disabled === false && threshold?.disabled === false;
+              detection.value = 'state';
+              detection.dispatchEvent(new Event('change', { bubbles: true }));
+              const statusSourceExclusive = status?.disabled === false &&
+                power?.disabled === true && threshold?.disabled === true;
               max.value = '20';
               max.dispatchEvent(new Event('input', { bubbles: true }));
               const warningProminent = root.querySelector('[data-ev-safety-note]')
@@ -3700,6 +3717,9 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
                 (item) => item.type === 'gw_energypilot/settings/update' && item.section === 'ev'
               );
               return {
+                detectionChoicePresent,
+                powerSourceExclusive,
+                statusSourceExclusive,
                 profilesPresent: [...profile.options].some((option) => option.value === '3x25') &&
                   [...profile.options].some((option) => option.value === 'custom_1_phase') &&
                   [...profile.options].some((option) => option.value === 'custom_3_phase'),
@@ -3715,6 +3735,10 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
                 ),
                 chargerEntityPresent: datalistValues.includes('number.zaptec_max_current'),
                 warningProminent,
+                detectionSubmitted: call?.values?.ev_detection_method === 'state' &&
+                  call?.values?.ev_mode_entity === 'binary_sensor.tesla_wall_connector_opladen' &&
+                  call?.values?.ev_power_entity === 'sensor.zaptec_charge_power' &&
+                  call?.values?.ev_deadband === 500,
                 confirmationSent: call?.values?.ev_charger_max_current === 20 &&
                   call?.values?._confirm_high_current === true,
               };
@@ -3722,6 +3746,10 @@ def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
             """
         )
         result.update({
+            "detection_choice_present": state["detectionChoicePresent"],
+            "power_source_exclusive": state["powerSourceExclusive"],
+            "status_source_exclusive": state["statusSourceExclusive"],
+            "detection_submitted": state["detectionSubmitted"],
             "profiles_present": state["profilesPresent"],
             "recommended_window": state["recommendedWindow"],
             "feedback_entity_present": state["feedbackEntityPresent"],
@@ -4101,7 +4129,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v050": "v0.50 BETA",
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
-        "v101": "v1.0.1-beta.3 BETA",
+        "v101": "v1.0.1-beta.4 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -4291,7 +4319,9 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         if not all(
             ev_settings[key] is True
             for key in (
-                "ran", "tab_present", "profiles_present", "recommended_window",
+                "ran", "tab_present", "detection_choice_present",
+                "power_source_exclusive", "status_source_exclusive",
+                "detection_submitted", "profiles_present", "recommended_window",
                 "feedback_entity_present", "manual_grid_current_removed",
                 "goodwe_source_present", "charger_entity_present",
                 "warning_prominent", "confirmation_sent", "closed",

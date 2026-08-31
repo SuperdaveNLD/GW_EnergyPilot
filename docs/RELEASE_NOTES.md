@@ -17,6 +17,24 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.0.1-beta.4 — Explicit charging detection and safe EV-stop recovery
+
+Settings → EV now asks the operator to choose one charging signal: measured
+charger power or a charging status/boolean. Only the selected source can
+activate EV anti-discharge. Status mode accepts `on`, `true`, `charging` and
+`connected_charging`, covering a Tesla Wall Connector `Opladen` binary sensor
+and a Zaptec charging-mode sensor without treating plug/connectivity state as
+active charging. Allocated or maximum current remains excluded because it can
+stay non-zero while the EV is idle.
+
+Existing entries without the method key keep their exact previous
+`connected_charging`-or-power behavior until an explicit choice is saved. When
+EV charging stops, a transient failure or overlap in the required fresh
+optimization now keeps the battery safely held and retries after 5, 15, 30 and
+60 seconds; renewed charging cancels that sequence. GoodWe registers, EMS
+writes and all non-EV controller decisions are unchanged. See
+`docs/releases/v1.0.1-beta.4.md`.
+
 # v1.0.1-beta.3 — Restart-safe scheduling and canonical EMS feedback
 
 Wall-clock boundaries and bounded startup recovery now wait until Home
@@ -124,6 +142,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.0.1-beta.4** | 2026-08-31 | **Beta** | Adds an exclusive power-or-status EV charging detector and bounded fresh-plan retries after charging stops. |
 | **1.0.1-beta.3** | 2026-08-31 | **Beta** | Makes scheduling restart-safe, fixes false legacy-scheduler detection and displays the backend controller's canonical GoodWe mapping. |
 | **1.0.1-beta.2** | 2026-08-30 | **Beta** | Separates Battery Hold on `P_batt` from GoodWe Auto on `P_grid` and adds the centered decision-zone settings panel. |
 | **1.0.1-beta.1** | 2026-08-30 | **Beta** | Normalizes integral legacy optimization intervals and keeps native mobile clicks connected while unchanged Optimize/strategy copy is patched. |

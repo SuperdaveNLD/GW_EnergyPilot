@@ -51,6 +51,8 @@ from .const import (
     DEFAULT_P_GRID_ENTITY,
     DEFAULT_USE_GOODWE_SMART_METER,
     DOMAIN,
+    EV_DETECTION_METHOD_POWER,
+    EV_DETECTION_METHOD_STATE,
     EXTERNAL_PV_ENTITY_KEYS,
     MODE_AUTO,
     MODE_BATTERY_HOLD,
@@ -58,6 +60,13 @@ from .const import (
     MODES_ZERO_POWER,
 )
 from .coordinator import GWEnergyPilotCoordinator
+from .ev_detection import (
+    detection_method,
+    legacy_status_is_active,
+    power_is_active,
+    source_entity_ids,
+    status_is_active,
+)
 from .pv_insight import (
     external_sources_enabled,
     normalize_generation_power_w,
@@ -209,16 +218,15 @@ class GWEnergyPilotController:
     def _p_grid_entity_id(self) -> str:
         return str(self.entry.options.get(CONF_P_GRID_ENTITY, DEFAULT_P_GRID_ENTITY) or DEFAULT_P_GRID_ENTITY)
 
-    def _ev_source_ids(self) -> set[str]:
-        entity_ids = {self.entry.options.get(CONF_EV_MODE_ENTITY), self.entry.options.get(CONF_EV_POWER_ENTITY)}
-        entity_ids.discard(None)
-        entity_ids.discard("")
-        return {str(entity_id) for entity_id in entity_ids}
+    @property
+    def ev_source_ids(self) -> set[str]:
+        """Return the selected EV activity source."""
+        return source_entity_ids(self.entry.options)
 
     async def async_setup(self) -> None:
         self._ev_coordination_was_effective = self._ev_coordination_effective()
         self._ev_was_active = self.ev_is_active()
-        entity_ids = {self._p_batt_entity_id(), self._p_grid_entity_id(), self.entry.options.get(CONF_OPTIM_STATUS_ENTITY), *self._ev_source_ids()}
+        entity_ids = {self._p_batt_entity_id(), self._p_grid_entity_id(), self.entry.options.get(CONF_OPTIM_STATUS_ENTITY), *self.ev_source_ids}
         entity_ids.discard(None)
         entity_ids.discard("")
         if entity_ids:
@@ -246,7 +254,7 @@ class GWEnergyPilotController:
         if not self.enabled:
             return
         entity_id = str(event.data.get("entity_id") or "")
-        if entity_id in self._ev_source_ids():
+        if entity_id in self.ev_source_ids:
             ev_active = self.ev_is_active()
             ev_was_active = self._ev_was_active
             self._ev_was_active = ev_active
@@ -521,12 +529,19 @@ class GWEnergyPilotController:
         mode_entity = self.entry.options.get(CONF_EV_MODE_ENTITY)
         power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
         ev_deadband = float(self.entry.options.get(CONF_EV_DEADBAND, DEFAULT_EV_DEADBAND))
-        mode_active = False
-        if mode_entity:
-            state = self.hass.states.get(mode_entity)
-            mode_active = state is not None and state.state.lower() == "connected_charging"
-        ev_power = self._state_float(power_entity)
-        return mode_active or (ev_power is not None and ev_power > ev_deadband)
+        status_active = status_is_active(self.hass.states, mode_entity)
+        power_active = power_is_active(self.hass.states, power_entity, ev_deadband)
+        method = detection_method(self.entry.options)
+        if method == EV_DETECTION_METHOD_STATE:
+            return status_active
+        if method == EV_DETECTION_METHOD_POWER:
+            return power_active
+        # Entries created before the selector existed retain their exact former
+        # connected_charging-or-power behavior until an explicit choice is saved.
+        return (
+            legacy_status_is_active(self.hass.states, mode_entity)
+            or power_active
+        )
 
     @callback
     def _async_connectivity_updated(self) -> None:

@@ -27,6 +27,7 @@ from .const import (
     CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
+    CONF_EV_DETECTION_METHOD,
     CONF_EV_MODE_ENTITY,
     CONF_EV_ONLINE_ENTITY,
     CONF_EV_POWER_ENTITY,
@@ -59,6 +60,7 @@ from .const import (
     DEFAULT_EMHASS_SOC_FINAL,
     DEFAULT_EMHASS_URL,
     DEFAULT_EV_DEADBAND,
+    DEFAULT_EV_DETECTION_METHOD,
     DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
     DEFAULT_NORDPOOL_AREA,
@@ -75,9 +77,11 @@ from .const import (
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
     EMHASS_OPTIMIZATION_INTERVALS,
+    EV_DETECTION_METHODS,
     EXTERNAL_PV_ENTITY_KEYS,
     NAME,
 )
+from .ev_detection import default_detection_method
 
 CONF_MAX_POWER_KW = "max_power_kw"
 CONF_EMHASS_SOC_FINAL_PCT = "emhass_soc_final_pct"
@@ -283,11 +287,24 @@ def _controller_schema(
                 CONF_ENABLE_EV_COORDINATION,
                 default=False,
             ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_EV_DETECTION_METHOD,
+                default=DEFAULT_EV_DETECTION_METHOD,
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(EV_DETECTION_METHODS),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="ev_detection_method",
+                )
+            ),
             vol.Optional(CONF_EV_MODE_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(multiple=False)
+                selector.EntitySelectorConfig(
+                    domain=["binary_sensor", "switch", "sensor", "input_boolean"],
+                    multiple=False,
+                )
             ),
             vol.Optional(CONF_EV_POWER_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(multiple=False)
+                selector.EntitySelectorConfig(domain="sensor", multiple=False)
             ),
             vol.Optional(CONF_EV_ONLINE_ENTITY): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=False)
@@ -334,6 +351,10 @@ def _options_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
 def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     """Convert stored runtime values to user-facing values."""
     form_options = dict(options)
+    form_options.setdefault(
+        CONF_EV_DETECTION_METHOD,
+        default_detection_method(options),
+    )
     form_options.setdefault(CONF_P_BATT_ENTITY, DEFAULT_P_BATT_ENTITY)
     form_options.setdefault(CONF_P_GRID_ENTITY, DEFAULT_P_GRID_ENTITY)
     form_options.setdefault(CONF_OPTIM_STATUS_ENTITY, DEFAULT_OPTIM_STATUS_ENTITY)

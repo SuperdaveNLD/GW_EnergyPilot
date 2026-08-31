@@ -11,6 +11,7 @@ CONF_P_GRID_ENTITY = "p_grid_entity"
 CONF_OPTIM_STATUS_ENTITY = "optim_status_entity"
 CONF_OPTIM_REQUIRED_STATE = "optim_required_state"
 CONF_ENABLE_EV_COORDINATION = "enable_ev_coordination"
+CONF_EV_DETECTION_METHOD = "ev_detection_method"
 CONF_EV_MODE_ENTITY = "ev_mode_entity"
 CONF_EV_POWER_ENTITY = "ev_power_entity"
 CONF_EV_ONLINE_ENTITY = "ev_online_entity"
@@ -27,7 +28,7 @@ EXTERNAL_PV_ENTITY_KEYS = (
     CONF_EXTERNAL_PV_ENTITY_4,
 )
 CONF_MAX_POWER = "max_power"
-# Stable legacy option key; v1.0.1-beta.3 retains it as the P_batt Hold band.
+# Stable legacy option key; v1.0.1-beta.4 retains it as the P_batt Hold band.
 CONF_DEADBAND = "deadband"
 CONF_GOODWE_AUTO_DEADBAND = "goodwe_auto_deadband"
 CONF_EV_DEADBAND = "ev_deadband"
@@ -79,6 +80,13 @@ DEFAULT_MAX_POWER = 15000
 DEFAULT_DEADBAND = 100
 DEFAULT_GOODWE_AUTO_DEADBAND = 1000
 DEFAULT_EV_DEADBAND = 500
+EV_DETECTION_METHOD_POWER = "power"
+EV_DETECTION_METHOD_STATE = "state"
+EV_DETECTION_METHODS = (
+    EV_DETECTION_METHOD_POWER,
+    EV_DETECTION_METHOD_STATE,
+)
+DEFAULT_EV_DETECTION_METHOD = EV_DETECTION_METHOD_POWER
 DEFAULT_ENABLE_EV_LOAD_BALANCING = False
 DEFAULT_GRID_CONNECTION_PROFILE = "3x25"
 DEFAULT_GRID_CUSTOM_CURRENT = 25

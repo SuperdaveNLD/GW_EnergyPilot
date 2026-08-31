@@ -4,6 +4,38 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.0.1-beta.4] - 2026-08-31
+
+### Added
+
+- Add an exclusive EV charging-detection setting: either a measured charger
+  power sensor or a charging status/boolean. Explicit status mode accepts
+  `on`, `true`, `charging` and `connected_charging`.
+
+### Fixed
+
+- Keep the safe EV-stop Battery Hold and retry a transiently failed fresh-plan
+  optimization after 5, 15, 30 and 60 seconds instead of remaining held until
+  the next wall-clock cycle. Restarting EV charging cancels the pending retry.
+
+### Changed
+
+- Listen to and evaluate only the explicitly selected detection source.
+  Allocated/current-limit entities remain excluded because a non-zero limit
+  does not prove that the vehicle is drawing power.
+- Preserve the exact former `connected_charging`-or-power behavior for existing
+  entries without the new method key until the operator saves a choice.
+
+### Validation and compatibility
+
+- Add detection, source-exclusivity, power-unit, Tesla/Zaptec status and
+  bounded EV-stop retry regressions, plus settings-contract coverage.
+- Pass Python compilation, all 420 repository tests, repository/release
+  validation, active JavaScript checks and the desktop Chromium/iPad
+  WebKit/iPhone WebKit dashboard matrix.
+- GoodWe registers and EMS commands, non-EV controller decisions, unique IDs,
+  device identity and persistent Store schemas are unchanged.
+
 ## [1.0.1-beta.3] - 2026-08-31
 
 ### Fixed

@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v1.0.1-beta.3 · Beta prerelease**
+**v1.0.1-beta.4 · Beta prerelease**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -36,8 +36,9 @@ See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
-- `docs/releases/v1.0.1-beta.3.md` — current opt-in beta release notes;
-- `docs/releases/v1.0.1-beta.2.md` — previous opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.4.md` — current opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.3.md` — previous opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.2.md` — earlier opt-in beta release notes;
 - `docs/releases/v1.0.1-beta.1.md` — earlier opt-in beta release notes;
 - `docs/releases/v1.0.0.md` — first stable v1 release notes;
 - `docs/RELEASE_NOTES_V051.md` — development notes for the v0.51 feature layer promoted in v1.0.0;
@@ -72,6 +73,23 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v1.0.1-beta.4 highlights
+
+- Settings → EV offers one explicit charging-detection choice: a measured
+  charger-power sensor or a charging status/boolean.
+- Only the selected source controls EV anti-discharge. Status detection accepts
+  `on`, `true`, `charging` and `connected_charging`; charger current limits and
+  allocated current remain excluded because they can stay non-zero while idle.
+- Existing entries without the new choice retain the exact former
+  `connected_charging`-or-power behavior until the operator saves a method.
+- If the fresh-plan request after EV charging stops fails transiently, the
+  battery remains safely held while EnergyPilot retries after 5, 15, 30 and 60
+  seconds. Charging restarting cancels the pending retry.
+- Tesla Wall Connector users can select the `Opladen` binary sensor; plug and
+  connectivity entities describe connection state, not active charging.
+- GoodWe registers, EMS writes, normal strategy decisions, entity identities
+  and persistent Store schemas remain unchanged.
 
 ## v1.0.1-beta.3 highlights
 

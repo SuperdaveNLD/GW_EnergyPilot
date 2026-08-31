@@ -35,6 +35,7 @@ from .const import (
     CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
     CONF_EV_DEADBAND,
+    CONF_EV_DETECTION_METHOD,
     CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
     CONF_EV_CHARGER_CURRENT_ENTITY,
     CONF_EV_CHARGER_PHASE,
@@ -69,6 +70,7 @@ from .const import (
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
     DEFAULT_EV_DEADBAND,
+    DEFAULT_EV_DETECTION_METHOD,
     DEFAULT_EV_CHARGER_PHASE,
     DEFAULT_EV_CHARGER_PHASES,
     DEFAULT_ENABLE_EV_LOAD_BALANCING,
@@ -94,6 +96,9 @@ from .const import (
     DOMAIN,
     EMHASS_OPTIMIZATION_INTERVALS,
     EV_CHARGER_PHASE_OPTIONS,
+    EV_DETECTION_METHOD_POWER,
+    EV_DETECTION_METHOD_STATE,
+    EV_DETECTION_METHODS,
     EXTERNAL_PV_ENTITY_KEYS,
     EV_LOAD_BALANCE_WINDOW_OPTIONS,
     GRID_CONNECTION_CUSTOM_PROFILES,
@@ -117,6 +122,7 @@ ENERGYPILOT_KEYS = {
 }
 EV_KEYS = {
     CONF_ENABLE_EV_COORDINATION,
+    CONF_EV_DETECTION_METHOD,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
     CONF_EV_ONLINE_ENTITY,
@@ -135,6 +141,7 @@ EV_KEYS = {
 }
 EV_LOAD_BALANCING_KEYS = EV_KEYS - {
     CONF_ENABLE_EV_COORDINATION,
+    CONF_EV_DETECTION_METHOD,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
     CONF_EV_ONLINE_ENTITY,
@@ -240,6 +247,10 @@ EV_SCHEMA = vol.Schema(
             default=DEFAULT_EV_CHARGER_MAX_CURRENT,
         ): vol.All(vol.Coerce(float), vol.Range(min=6, max=32)),
         vol.Required(CONF_ENABLE_EV_COORDINATION, default=False): bool,
+        vol.Required(
+            CONF_EV_DETECTION_METHOD,
+            default=DEFAULT_EV_DETECTION_METHOD,
+        ): vol.In(EV_DETECTION_METHODS),
         vol.Optional(CONF_EV_MODE_ENTITY): ENTITY_ID,
         vol.Optional(CONF_EV_POWER_ENTITY): ENTITY_ID,
         vol.Optional(CONF_EV_ONLINE_ENTITY): ENTITY_ID,
@@ -637,19 +648,44 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
         ),
     },
     {
+        "key": CONF_EV_DETECTION_METHOD,
+        "label": "Charging detection",
+        "type": "select",
+        "default": DEFAULT_EV_DETECTION_METHOD,
+        "options": [
+            {
+                "value": EV_DETECTION_METHOD_POWER,
+                "label": "Charger power sensor",
+            },
+            {
+                "value": EV_DETECTION_METHOD_STATE,
+                "label": "Charging status / boolean",
+            },
+        ],
+        "description": "Only the selected source determines whether the EV is charging.",
+    },
+    {
         "key": CONF_EV_MODE_ENTITY,
-        "label": "EV mode entity",
-        "type": "text",
+        "label": "Charging status / boolean entity",
+        "type": "entity",
+        "domains": ["binary_sensor", "switch", "sensor", "input_boolean"],
         "default": "",
-        "description": "Optional Home Assistant entity used to determine EV charging state.",
+        "description": (
+            "Used for status detection. Active values are on, true, charging and "
+            "connected_charging. Select an entity that is active only while charging."
+        ),
     },
     {
         "key": CONF_EV_POWER_ENTITY,
         "label": "EV power entity",
         "type": "entity",
         "domains": ["sensor"],
+        "device_classes": ["power"],
         "default": "",
-        "description": "Optional Home Assistant power entity for EV coordination.",
+        "description": (
+            "Used for power detection. Charging is active above the configured "
+            "power threshold."
+        ),
     },
     {
         "key": CONF_EV_ONLINE_ENTITY,
@@ -671,7 +707,7 @@ EV_FIELD_SPECS: tuple[dict[str, Any], ...] = (
         "min": 0,
         "max": 3000,
         "step": 50,
-        "description": "Power threshold used when determining whether EV charging is active.",
+        "description": "Used only when Charger power sensor is selected.",
     },
 )
 

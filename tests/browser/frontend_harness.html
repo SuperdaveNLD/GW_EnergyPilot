@@ -376,6 +376,15 @@
             description: "Soft EV charger load balancing.",
             fields: [
               { key: "enable_ev_load_balancing", label: "Load balancing for EV charger", type: "boolean", value: false, readonly: false },
+              { key: "enable_ev_coordination", label: "Enable EV coordination", type: "boolean", value: true, readonly: false },
+              { key: "ev_detection_method", label: "Charging detection", type: "select", value: "power", readonly: false, options: [
+                { value: "power", label: "Charger power sensor" },
+                { value: "state", label: "Charging status / boolean" },
+              ] },
+              { key: "ev_mode_entity", label: "Charging status / boolean entity", type: "entity", domains: ["binary_sensor", "switch", "sensor", "input_boolean"], value: "binary_sensor.tesla_wall_connector_opladen", readonly: false },
+              { key: "ev_power_entity", label: "EV power entity", type: "entity", domains: ["sensor"], device_classes: ["power"], value: "sensor.zaptec_charge_power", readonly: false },
+              { key: "ev_online_entity", label: "EV online entity", type: "entity", value: "binary_sensor.charger_online", readonly: false },
+              { key: "ev_deadband", label: "EV active power threshold", type: "number", value: 500, unit: "W", min: 0, max: 3000, step: 50, readonly: false },
               { key: "grid_connection_profile", label: "House connection", type: "select", value: "3x25", readonly: false, options: [
                 { value: "3x25", label: "3 × 25 A" },
                 { value: "custom_1_phase", label: "Custom · 1 phase" },

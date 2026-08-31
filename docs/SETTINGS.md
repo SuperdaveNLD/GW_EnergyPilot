@@ -58,11 +58,16 @@ appends a durable operational acknowledgement to
 `gw_energypilot.ev_load_balancing_audit.<entry_id>`. See
 `docs/EV_LOAD_BALANCING.md`.
 
-The anti-discharge EV mode/power/online inputs remain observation-only. The
-settings API accepts `binary_sensor` connectivity entities such as a Zaptec
-Online sensor. When the selected EV entities share one unambiguous Home Assistant
-device or config-entry relation, EnergyPilot proposes the matching Zaptec
-Available-current control and allocated-current feedback sensor.
+The anti-discharge EV inputs remain observation-only. **Charging detection**
+selects exactly one source: measured charger power above the configured watt
+threshold, or a charging status/boolean whose active value is `on`, `true`,
+`charging` or `connected_charging`. For Tesla Wall Connector history the correct
+status source is its `Opladen` binary sensor; plug and connectivity entities do
+not indicate charging. Allocated-current feedback is also not an activity signal
+because it may stay at its permitted limit while the EV is idle. The settings
+API accepts `binary_sensor` connectivity entities such as a Zaptec Online sensor
+and proposes the matching Zaptec Available-current control and allocated-current
+feedback sensor.
 
 During active EV charging:
 
@@ -72,7 +77,9 @@ P_batt is neutral         -> Battery Hold
 P_batt requests charge    -> mode 11 charge allowed
 ```
 
-When native orchestration is enabled, EV stop waits for a fresh optimization before normal Automatic Control resumes.
+When native orchestration is enabled, EV stop waits for a fresh optimization
+before normal Automatic Control resumes. Transient stop-optimization failures
+receive bounded retries while Battery Hold remains the safe fallback.
 
 When an online entity is configured, missing, `unknown` and `unavailable` mean unreachable. A `binary_sensor` uses `on`/`off` explicitly; another available entity state means the charger integration is reporting. If the charger remains unreachable for five minutes, EnergyPilot temporarily suspends effective EV coordination without changing the saved user setting. Five stable online minutes resume it only when the setting is still enabled. Both transitions and connectivity changes are written to the Home Assistant log and the opt-in debug session.
 

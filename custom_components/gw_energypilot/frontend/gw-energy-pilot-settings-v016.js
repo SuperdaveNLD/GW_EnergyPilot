@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v015.js?v=1.0.1-beta3";
+import "./gw-energy-pilot-v015.js?v=1.0.1-beta4";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -871,6 +871,20 @@ function syncExternalPvFields(form) {
 }
 
 function syncEvSafetyFields(form) {
+  const detection = form?.querySelector('[data-setting-key="ev_detection_method"]');
+  const status = form?.querySelector('[data-setting-key="ev_mode_entity"]');
+  const power = form?.querySelector('[data-setting-key="ev_power_entity"]');
+  const threshold = form?.querySelector('[data-setting-key="ev_deadband"]');
+  const useStatus = detection?.value === "state";
+  if (status) {
+    status.disabled = !useStatus;
+    status.closest(".ep-v016-field")?.classList.toggle("is-disabled", !useStatus);
+  }
+  for (const input of [power, threshold]) {
+    if (!input) continue;
+    input.disabled = useStatus;
+    input.closest(".ep-v016-field")?.classList.toggle("is-disabled", useStatus);
+  }
   const profile = form?.querySelector('[data-setting-key="grid_connection_profile"]');
   const custom = form?.querySelector('[data-setting-key="grid_custom_current"]');
   if (profile && custom) {
@@ -1079,7 +1093,7 @@ function renderSettingsPage(panel, root) {
       if (input.dataset.settingKey === "enable_external_pv") {
         input.addEventListener("change", () => syncExternalPvFields(form));
       }
-      if (["grid_connection_profile", "ev_charger_phases", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
+      if (["ev_detection_method", "grid_connection_profile", "ev_charger_phases", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
         input.addEventListener("change", () => syncEvSafetyFields(form));
         input.addEventListener("input", () => syncEvSafetyFields(form));
       }

@@ -1,10 +1,10 @@
-import "./gw-energy-pilot-v034.js?v=1.0.1-beta3";
-import { FLOW_THRESHOLD_W, flowMotionMap } from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta3";
-import { ensureV038Styles } from "./gw-energy-pilot-v038-styles.js?v=1.0.1-beta3";
+import "./gw-energy-pilot-v034.js?v=1.0.1-beta4";
+import { FLOW_THRESHOLD_W, flowMotionMap } from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta4";
+import { ensureV038Styles } from "./gw-energy-pilot-v038-styles.js?v=1.0.1-beta4";
 import {
   installV038CustomerStrategy,
   installV038DelegatedControls,
-} from "./gw-energy-pilot-v038-strategy.js?v=1.0.1-beta3";
+} from "./gw-energy-pilot-v038-strategy.js?v=1.0.1-beta4";
 
 const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";

@@ -3,7 +3,7 @@ import {
   PROFILE_KEYS,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta3";
+} from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta4";
 
 const TEXT = {
   en: {

@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.0.1-beta.3 runtime structure
+## Current v1.0.1-beta.4 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.0.1-beta.3 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.0.1-beta.4 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -26,6 +26,7 @@ connectivity.py         coordinator/entity-backed status, five-minute timer and 
 controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
 control_decision.py     pure shared Battery/Grid/Hybrid/EV command mapping
+ev_detection.py         exclusive power/status EV activity interpretation + legacy compatibility
 control_history.py      persistent latest successful EMS-setpoint update evidence
 execution_history.py    bounded plan/decision/write/read-back evidence Store
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
@@ -156,8 +157,8 @@ gw-energy-pilot-v101.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.1-beta.3 retains the presentation-only beta wrapper and advances one complete
-`1.0.1-beta3` active-graph cache boundary. The nested v0.51 feature layer owns
+v1.0.1-beta.4 retains the presentation-only beta wrapper and advances one complete
+`1.0.1-beta4` active-graph cache boundary. The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
 plan data/view owners implement Recorder attribution,
 wanted-SOC history and verified runtime-session-bounded EV underlays. v0.50 retains
@@ -225,12 +226,19 @@ Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 ```
 
+`ev_detection.py` is the single interpretation owner. Explicit power mode
+listens only to finite, unit-normalized measured power; explicit status mode
+listens only to `on`, `true`, `charging` or `connected_charging`. Never infer
+charging from allocated/maximum current. Missing method keys retain the exact
+legacy `connected_charging`-or-power behavior until the entry is saved.
+
 This anti-discharge override must not control the EV charger or create a second
 fast feedback loop. The separately owned `ev_load_balancing.py` runtime may call
 only the selected charger NumberEntity after its full minute-scale condition
 window; it never calls this controller or GoodWe. EV-stop fresh-plan protection
-remains unchanged. Manual commands never inherit or reinterpret the automatic
-strategy.
+keeps Battery Hold and retries a transient optimization failure after 5, 15, 30
+and 60 seconds; charging restart cancels the retry. Manual commands never
+inherit or reinterpret the automatic strategy.
 
 ## Persistent plan availability contract
 

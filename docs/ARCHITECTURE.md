@@ -1,6 +1,6 @@
 # GW EnergyPilot architecture
 
-This document describes the current runtime architecture of **GW EnergyPilot v1.0.1-beta.3**.
+This document describes the current runtime architecture of **GW EnergyPilot v1.0.1-beta.4**.
 
 ## High-level flow
 
@@ -191,7 +191,12 @@ Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 ```
 
-The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. EV-stop stale-plan protection remains unchanged.
+The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. `ev_detection.py` owns the exclusive power-versus-status interpretation used by the controller and event listener. Explicit status mode accepts `on`, `true`, `charging` and `connected_charging`; explicit power mode evaluates only finite, unit-normalized measured power above its threshold. Allocated or maximum charger current is not an activity signal. Entries without the method key retain the exact historical `connected_charging`-or-power interpretation until saved.
+
+EV-stop stale-plan protection keeps Battery Hold while a fresh optimization is
+required. `event_triggers.py` retries transient failures after 5, 15, 30 and 60
+seconds, cancels the sequence if charging restarts and otherwise leaves the
+normal wall-clock schedule authoritative after the bounded sequence.
 
 The optional charger-online guard is evaluated before this override. While that guard is suspended, the controller follows its normal configured Automatic Control strategy and does not infer EV activity from stale charger mode/power entities.
 
@@ -486,7 +491,7 @@ gw-energy-pilot-v101.js
                                                                              -> existing v0.34 feature chain
 ```
 
-The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card and source-attributed detailed plan graph. The existing settings module owns the two-deadband panel and zero-centered explanatory scale while backend config/controller modules own their semantics. v1.0.1-beta.3 owns beta presentation and the complete `1.0.1-beta3` active-graph cache boundary.
+The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37 stability wrappers in a fresh browser session. Their files remain for release history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are no longer active owners. v0.41 replaces normal telemetry renders with stable-DOM patches; v0.42-v0.44 add bounded settings, touch-presentation and Optimize behavior; v0.45-v0.50 add bounded release presentation/cache ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped history card and source-attributed detailed plan graph. The existing settings module owns the two-deadband panel and zero-centered explanatory scale while backend config/controller modules own their semantics. v1.0.1-beta.4 owns beta presentation and the complete `1.0.1-beta4` active-graph cache boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
 

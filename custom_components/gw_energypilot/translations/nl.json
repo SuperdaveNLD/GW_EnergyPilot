@@ -40,7 +40,8 @@
           "buy_price_adder": "Opslag importprijs",
           "sell_price_deduction": "Aftrek exportprijs",
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
-          "ev_mode_entity": "Entiteit voor EV-laadmodus",
+          "ev_detection_method": "Detectie van EV-laden",
+          "ev_mode_entity": "Entiteit voor laadstatus / boolean",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
           "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
@@ -66,8 +67,9 @@
           "buy_price_adder": "Variabele leverancierskosten, belastingen of toeslagen in EUR/kWh.",
           "sell_price_deduction": "Bedrag dat van de marktprijs voor teruglevering wordt afgetrokken in EUR/kWh.",
           "enable_ev_coordination": "Voorkomt ontladen van de thuisaccu tijdens actief EV-laden en optimaliseert opnieuw wanneer het laden stopt.",
-          "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
-          "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_detection_method": "Kies detectie via gemeten laadvermogen of via één laadstatus/boolean.",
+          "ev_mode_entity": "Voor statusdetectie. On, true, charging en connected_charging betekenen actief laden.",
+          "ev_power_entity": "Voor vermogensdetectie; selecteer het werkelijk gemeten laadvermogen.",
           "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
@@ -106,7 +108,8 @@
           "buy_price_adder": "Opslag importprijs",
           "sell_price_deduction": "Aftrek exportprijs",
           "enable_ev_coordination": "EV-ontlaadbeveiliging inschakelen",
-          "ev_mode_entity": "Entiteit voor EV-laadmodus",
+          "ev_detection_method": "Detectie van EV-laden",
+          "ev_mode_entity": "Entiteit voor laadstatus / boolean",
           "ev_power_entity": "Entiteit voor EV-laadvermogen",
           "ev_online_entity": "Entiteit voor EV-online-status",
           "ev_deadband": "Drempel voor actieve EV-lading"
@@ -132,11 +135,20 @@
           "buy_price_adder": "Extra importkosten in EUR/kWh.",
           "sell_price_deduction": "Aftrek op teruglevering in EUR/kWh.",
           "enable_ev_coordination": "Optionele EV-ontlaadbeveiliging en heroptimalisatie na stoppen met laden.",
-          "ev_mode_entity": "Optionele entiteit voor de EV-laadstatus.",
-          "ev_power_entity": "Optionele entiteit voor EV-laadvermogen in watt.",
+          "ev_detection_method": "Kies detectie via gemeten laadvermogen of via één laadstatus/boolean.",
+          "ev_mode_entity": "Voor statusdetectie. On, true, charging en connected_charging betekenen actief laden.",
+          "ev_power_entity": "Voor vermogensdetectie; selecteer het werkelijk gemeten laadvermogen.",
           "ev_online_entity": "Optionele entiteit die aangeeft of de laadpaal bereikbaar is.",
           "ev_deadband": "Vermogen boven deze drempel wordt beschouwd als actief EV-laden."
         }
+      }
+    }
+  },
+  "selector": {
+    "ev_detection_method": {
+      "options": {
+        "power": "Vermogenssensor laadpaal",
+        "state": "Laadstatus / boolean"
       }
     }
   },

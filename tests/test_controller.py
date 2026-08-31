@@ -114,8 +114,9 @@ controller_module, const, Event = _load_controller()
 
 
 class FakeState:
-    def __init__(self, state):
+    def __init__(self, state, **attributes):
         self.state = state
+        self.attributes = attributes
 
 
 class FakeStates:
@@ -467,6 +468,46 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(const.MODE_BATTERY_HOLD, 0)])
         self.assertEqual(controller.last_command, "ev_anti_discharge_hold")
         self.assertEqual(coordinator.refresh_count, 1)
+
+    async def test_status_detection_uses_attached_tesla_charging_boolean(self):
+        charging_id = "binary_sensor.tesla_wall_connector_opladen"
+        controller, hass, _, _ = self.make_controller(
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_DETECTION_METHOD: const.EV_DETECTION_METHOD_STATE,
+                const.CONF_EV_MODE_ENTITY: charging_id,
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+            },
+            states={
+                charging_id: "on",
+                "sensor.ev_power": "1200",
+            },
+        )
+
+        await controller.async_setup()
+
+        self.assertEqual(controller.ev_source_ids, {charging_id})
+        self.assertTrue(controller.ev_is_active())
+        hass.states.set(charging_id, "off")
+        self.assertFalse(controller.ev_is_active())
+
+    async def test_power_detection_ignores_active_status_source(self):
+        controller, _, _, _ = self.make_controller(
+            options={
+                const.CONF_ENABLE_EV_COORDINATION: True,
+                const.CONF_EV_DETECTION_METHOD: const.EV_DETECTION_METHOD_POWER,
+                const.CONF_EV_MODE_ENTITY: "binary_sensor.charging",
+                const.CONF_EV_POWER_ENTITY: "sensor.ev_power",
+                const.CONF_EV_DEADBAND: 500,
+            },
+            states={
+                "binary_sensor.charging": "on",
+                "sensor.ev_power": "0",
+            },
+        )
+
+        self.assertEqual(controller.ev_source_ids, {"sensor.ev_power"})
+        self.assertFalse(controller.ev_is_active())
 
     async def test_suspended_ev_coordination_does_not_apply_ev_override(self):
         controller, _, client, coordinator = self.make_controller(

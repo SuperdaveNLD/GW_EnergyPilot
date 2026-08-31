@@ -6,7 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "1.0.1-beta3"
+CACHE_KEY = "1.0.1-beta4"
 
 
 class FrontendV101ReleaseTests(unittest.TestCase):
@@ -20,12 +20,12 @@ class FrontendV101ReleaseTests(unittest.TestCase):
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "1.0.1-beta.3")
+        self.assertEqual(manifest["version"], "1.0.1-beta.4")
         self.assertIn(f"gw-energy-pilot-v101.js?v={CACHE_KEY}", init_source)
         self.assertIn(
             f'import "./gw-energy-pilot-v051.js?v={CACHE_KEY}"', self.release
         )
-        self.assertIn('const VERSION = "1.0.1-beta.3"', self.release)
+        self.assertIn('const VERSION = "1.0.1-beta.4"', self.release)
         self.assertIn("v${VERSION} BETA", self.release)
         self.assertIn("PanelClass.prototype.__epV101Installed = true", self.release)
 
@@ -43,10 +43,10 @@ class FrontendV101ReleaseTests(unittest.TestCase):
                 self.assertNotIn(forbidden, self.release)
 
     def test_beta_tag_notes_exist(self) -> None:
-        notes = ROOT / "docs" / "releases" / "v1.0.1-beta.3.md"
+        notes = ROOT / "docs" / "releases" / "v1.0.1-beta.4.md"
         self.assertTrue(notes.is_file())
         content = notes.read_text(encoding="utf-8")
-        self.assertIn("# GW EnergyPilot v1.0.1-beta.3", content)
+        self.assertIn("# GW EnergyPilot v1.0.1-beta.4", content)
         self.assertIn("**Channel:** Beta prerelease", content)
 
     def test_live_copy_updates_are_idempotent(self) -> None:

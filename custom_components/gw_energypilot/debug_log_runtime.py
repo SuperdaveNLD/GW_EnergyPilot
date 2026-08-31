@@ -14,6 +14,7 @@ from .const import (
     CONF_GOODWE_AUTO_DEADBAND,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_ENABLE_EV_COORDINATION,
+    CONF_EV_DETECTION_METHOD,
     CONF_EV_MODE_ENTITY,
     CONF_EV_ONLINE_ENTITY,
     CONF_EV_POWER_ENTITY,
@@ -114,6 +115,7 @@ class GWEnergyPilotDebugRuntime:
             "manual_power": controller.manual_power,
             "manual_charge_limit_soc": controller.manual_charge_limit_soc,
             "ev_active": controller.ev_is_active(),
+            "ev_detection_method": options.get(CONF_EV_DETECTION_METHOD),
             "deadband": float(options.get(CONF_DEADBAND, DEFAULT_DEADBAND)),
             "battery_hold_deadband": float(
                 options.get(CONF_DEADBAND, DEFAULT_DEADBAND)
