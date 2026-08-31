@@ -52,7 +52,8 @@ class GWEnergyPilotController(_BaseController):
     async def _async_apply_ev_anti_discharge_plan(
         self,
         p_batt: float,
-        deadband: float,
+        battery_deadband: float,
+        grid_deadband: float,
         max_power: int,
     ) -> None:
         """Block discharge during EV charging while allowing planned charging."""
@@ -64,7 +65,8 @@ class GWEnergyPilotController(_BaseController):
             strategy=strategy,
             p_batt=p_batt,
             p_grid=p_grid,
-            deadband=deadband,
+            battery_deadband=battery_deadband,
+            grid_deadband=grid_deadband,
             max_power=max_power,
             ev_active=True,
         )

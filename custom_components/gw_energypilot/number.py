@@ -14,17 +14,20 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
 from . import GWConfigEntry
-from .client import GWETAData, GWModbusError
-from .const import CONF_MAX_POWER, DEFAULT_MAX_POWER
+from .const import CONF_BATTERY_SAVER_MODE, CONF_MAX_POWER, DEFAULT_MAX_POWER
 from .emhass_config import async_get_emhass_config, async_write_emhass_config
 from .entity import GWEnergyPilotEntity
+from .soc_limits import (
+    GOODWE_ON_GRID_MINIMUM_SOC_KEY,
+    async_set_goodwe_minimum_soc,
+    goodwe_minimum_soc_pct,
+)
 
 _LOGGER = logging.getLogger(__name__)
 SOC_OPTIMIZE_DEBOUNCE_SECONDS = 3.0
 SOC_STARTUP_RETRY_SECONDS = 15
 SOC_STARTUP_ATTEMPTS = 4
 _SOC_OPTIMIZE_CANCEL: dict[str, Callable[[], None]] = {}
-GOODWE_ON_GRID_MINIMUM_SOC_KEY = "battery_discharge_depth_on_grid"
 
 
 async def async_setup_entry(
@@ -161,6 +164,11 @@ class _GWEMHASSSOCNumber(GWEnergyPilotEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Validate, save EMHASS config and debounce re-optimization."""
+        if self.entry.options.get(CONF_BATTERY_SAVER_MODE) is not None:
+            raise HomeAssistantError(
+                "Minimum and maximum SOC are managed by the active battery "
+                "profile; select Custom before changing an SOC limit"
+            )
         value = min(100.0, max(0.0, float(value)))
         config = await async_get_emhass_config(self.hass, self.entry)
         self._validate_against_peer(config, value)
@@ -197,42 +205,11 @@ class GWEMHASSMinimumSOCNumber(_GWEMHASSSOCNumber):
 
     def _goodwe_on_grid_floor(self) -> int | None:
         """Return the currently read GoodWe on-grid minimum SOC floor."""
-        coordinator = self.entry.runtime_data.coordinator
-        snapshot = coordinator.data
-        if snapshot is None:
-            return None
-        raw = snapshot.values.get(GOODWE_ON_GRID_MINIMUM_SOC_KEY)
-        if raw is None:
-            return None
-        try:
-            value = int(raw)
-        except (TypeError, ValueError):
-            return None
-        return value if 0 <= value <= 100 else None
-
-    def _publish_goodwe_on_grid_floor(self, value: int) -> None:
-        """Reflect verified register read-back in coordinator-backed entities."""
-        coordinator = self.entry.runtime_data.coordinator
-        snapshot = coordinator.data
-        if snapshot is None:
-            return
-        values = dict(snapshot.values)
-        values[GOODWE_ON_GRID_MINIMUM_SOC_KEY] = int(value)
-        coordinator.async_set_updated_data(GWETAData(values=values))
+        return goodwe_minimum_soc_pct(self.entry)
 
     async def _async_set_goodwe_on_grid_floor(self, value: int) -> int:
         """Write and verify the canonical GoodWe on-grid minimum SOC setting."""
-        try:
-            readback = await self.entry.runtime_data.client.async_set_beta_soc_floor(
-                GOODWE_ON_GRID_MINIMUM_SOC_KEY,
-                value,
-            )
-        except (GWModbusError, ValueError) as err:
-            raise HomeAssistantError(
-                f"Unable to set GoodWe on-grid minimum SOC to {value}%: {err}"
-            ) from err
-        self._publish_goodwe_on_grid_floor(readback)
-        return readback
+        return await async_set_goodwe_minimum_soc(self.entry, value)
 
     async def _async_refresh_from_emhass(self) -> dict:
         """Use GoodWe as startup source of truth and mirror its floor to EMHASS."""
@@ -263,6 +240,11 @@ class GWEMHASSMinimumSOCNumber(_GWEMHASSSOCNumber):
         floor. Keep both values identical, verify the inverter write first, and
         roll that hardware setting back if the subsequent EMHASS write fails.
         """
+        if self.entry.options.get(CONF_BATTERY_SAVER_MODE) is not None:
+            raise HomeAssistantError(
+                "Minimum and maximum SOC are managed by the active battery "
+                "profile; select Custom before changing an SOC limit"
+            )
         requested = min(100.0, max(0.0, float(value)))
         if not requested.is_integer():
             raise HomeAssistantError(

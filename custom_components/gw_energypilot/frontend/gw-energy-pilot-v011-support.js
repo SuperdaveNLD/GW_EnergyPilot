@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v011-motion.js?v=0.51-h1";
+import "./gw-energy-pilot-v011-motion.js?v=1.1.0-stable1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 
@@ -38,7 +38,8 @@ function snapshot(attrs) {
     ["Controller target", attrs.controller_target_power],
     ["Expected EMS mode", attrs.controller_expected_mode],
     ["Maximum power", attrs.controller_max_power],
-    ["Deadband", attrs.controller_deadband],
+    ["Battery Hold deadband", attrs.controller_deadband],
+    ["GoodWe Auto deadband", attrs.controller_goodwe_auto_deadband],
     ["P_batt entity", attrs.p_batt_entity],
     ["P_batt", attrs.p_batt_value],
     ["Optimization status entity", attrs.optim_status_entity],
@@ -104,7 +105,8 @@ function enrichDiagnostics(panel, root) {
     const targetRow = targetRows[2];
     const html =
       row(panel, "Maximum power", attrs.controller_max_power, true, "limits") +
-      row(panel, "Deadband", attrs.controller_deadband, true, "deadband");
+      row(panel, "Battery Hold deadband", attrs.controller_deadband, true, "deadband") +
+      row(panel, "GoodWe Auto deadband", attrs.controller_goodwe_auto_deadband, true, "auto-deadband");
     if (targetRow) targetRow.insertAdjacentHTML("afterend", html);
     else groups[1].insertAdjacentHTML("beforeend", html);
   }

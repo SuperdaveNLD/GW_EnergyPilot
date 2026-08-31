@@ -134,10 +134,15 @@ def _load_orchestrator():
 
 
 class FakeState:
-    def __init__(self, entity_id: str, attributes: dict | None = None) -> None:
+    def __init__(
+        self,
+        entity_id: str,
+        attributes: dict | None = None,
+        state: str = "0",
+    ) -> None:
         self.entity_id = entity_id
         self.attributes = dict(attributes or {})
-        self.state = "0"
+        self.state = state
 
 
 class FakeStates:
@@ -207,6 +212,47 @@ def _new_orchestrator(module, services, states=None):
 
 
 class OrchestratorPriceSourceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_only_enabled_legacy_automation_blocks_native_schedule(self):
+        module = _load_orchestrator()
+
+        script_only = _new_orchestrator(
+            module,
+            FakeServices(available=False),
+            [FakeState("script.energypilot_emhass_optimize_now", state="on")],
+        )
+        disabled_automation = _new_orchestrator(
+            module,
+            FakeServices(available=False),
+            [FakeState("automation.energypilot_emhass_orchestrator", state="off")],
+        )
+        enabled_automation = _new_orchestrator(
+            module,
+            FakeServices(available=False),
+            [FakeState("automation.energypilot_emhass_orchestrator", state="on")],
+        )
+        for orchestrator in (
+            script_only,
+            disabled_automation,
+            enabled_automation,
+        ):
+            orchestrator.entry.options["enable_emhass_orchestrator"] = True
+            orchestrator.entry.options["use_nordpool_prices"] = False
+
+        await script_only.async_setup()
+        await disabled_automation.async_setup()
+        await enabled_automation.async_setup()
+
+        self.assertEqual(script_only.status, "scheduled")
+        self.assertEqual(len(script_only._unsubs), 1)
+        self.assertEqual(disabled_automation.status, "scheduled")
+        self.assertEqual(len(disabled_automation._unsubs), 1)
+        self.assertEqual(enabled_automation.status, "legacy_yaml_detected")
+        self.assertEqual(enabled_automation._unsubs, [])
+        self.assertIn(
+            "automation.energypilot_emhass_orchestrator",
+            enabled_automation.last_error,
+        )
+
     async def test_transient_official_service_error_is_not_reported_as_missing(self):
         module = _load_orchestrator()
         services = FakeServices(

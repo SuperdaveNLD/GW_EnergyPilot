@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v013.js?v=0.51-h1";
+import "./gw-energy-pilot-v013.js?v=1.1.0-stable1";
 
 const VERSION = "0.14";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -47,7 +47,8 @@ function batterySnapshot(attrs) {
     ["Controller target", attrs.controller_target_power],
     ["Expected EMS mode", attrs.controller_expected_mode],
     ["Maximum power", attrs.controller_max_power],
-    ["Deadband", attrs.controller_deadband],
+    ["Battery Hold deadband", attrs.controller_deadband],
+    ["GoodWe Auto deadband", attrs.controller_goodwe_auto_deadband],
     ["P_batt entity", attrs.p_batt_entity],
     ["P_batt", attrs.p_batt_value],
     ["Optimization status entity", attrs.optim_status_entity],

@@ -206,14 +206,17 @@ class GWEnergyPilotOrchestrator:
             self._unsubs.pop()()
 
     def _legacy_yaml_present(self) -> bool:
-        """Prevent two schedulers from running at the same time."""
-        return any(
-            self.hass.states.get(entity_id) is not None
-            for entity_id in (
-                "script.energypilot_emhass_optimize_now",
-                "automation.energypilot_emhass_orchestrator",
-            )
+        """Return whether the enabled legacy automation can compete with us.
+
+        The legacy optimize-now script is a manually invoked helper, not a
+        scheduler. Its presence alone must not disable native orchestration.
+        Likewise an explicitly disabled legacy automation cannot publish a
+        competing plan.
+        """
+        state = self.hass.states.get(
+            "automation.energypilot_emhass_orchestrator"
         )
+        return state is not None and state.state == "on"
 
     def _discover_tomorrow_price_entities(self) -> list[str]:
         """Find official Nord Pool tomorrow-price availability binary sensors."""

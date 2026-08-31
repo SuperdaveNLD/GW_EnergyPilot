@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.0.0 runtime structure
+## Current v1.1.0 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.0.0 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.1.0 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 coordinator.py          periodic telemetry snapshot
@@ -26,6 +26,7 @@ connectivity.py         coordinator/entity-backed status, five-minute timer and 
 controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
 control_decision.py     pure shared Battery/Grid/Hybrid/EV command mapping
+ev_detection.py         exclusive power/status EV activity interpretation + legacy compatibility
 control_history.py      persistent latest successful EMS-setpoint update evidence
 execution_history.py    bounded plan/decision/write/read-back evidence Store
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
@@ -42,8 +43,9 @@ orchestrator_v033.py    persistent official-plan refresh + deterministic plan_re
 orchestrator_v044.py    bounded non-blocking post-restart optimization recovery
 plan_runtime.py         validated /api/v1/plan mirror + Store lifecycle/current-value lookup
 battery_plan.py         pure plan normalization/timestep/validity helpers
-battery_saver.py        four Battery Saver profiles + nine owned EMHASS policy fields
+battery_saver.py        five Battery Saver profiles + ten owned EMHASS policy fields
 battery_saver_api.py    admin Battery Saver read/apply/rollback API
+soc_limits.py           shared verified GoodWe minimum-SOC read/write/publish helper
 price_series.py         pure timestamped price-series helpers
 battery_price_api.py    read-only battery/price/plan chart WebSocket API
 accounting.py           persistent daily grid-accounting runtime
@@ -82,10 +84,10 @@ All layers are active runtime code. Check subclasses before changing a base meth
 Ownership by active layer:
 
 - v026: read-only dashboard/optimizer price-series caching;
-- v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries;
+- v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries and a pre-log Home Assistant `RUNNING` gate;
 - v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
-- v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup.
+- v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup or recording a slow Core startup as a failed optimization.
 
 Do not add release inheritance merely to change a label or constant when an existing bounded module can own the behavior.
 
@@ -126,7 +128,7 @@ The inherited base still owns normal Battery/Grid/Hybrid execution. The v033 sub
 Do not move either behavior into a second controller or duplicate the EMS write path.
 
 The pure mapping in `control_decision.py` is the one source for translating a
-finite plan plus strategy/deadband/maximum/EV state into an expected mode and
+finite plan plus strategy/two deadbands/maximum/EV state into an expected mode and
 setpoint. Live control and read-only future projections call it. It must remain
 side-effect-free and must not infer missing `P_grid`, future EV state or
 ownership. `execution_history.py` records the live controller context and
@@ -137,8 +139,9 @@ post-refresh read-back but can never own or retry a command.
 Top level:
 
 ```text
-gw-energy-pilot-v100.js
-    -> gw-energy-pilot-v051.js
+gw-energy-pilot-v110.js
+    -> gw-energy-pilot-v101.js
+         -> gw-energy-pilot-v051.js
          -> gw-energy-pilot-v051-history.js
          -> gw-energy-pilot-v050.js
               -> gw-energy-pilot-v049.js
@@ -156,10 +159,12 @@ gw-energy-pilot-v100.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.0.0 adds a presentation-only stable wrapper and `1.0.0-stable1` top-level
-cache boundary. The nested v0.51 feature layer owns the complete `0.51-h1`
-inner cache boundary, one canonical EMHASS-to-GoodWe card and targeted history
-refresh. The nested plan data/view owners implement Recorder attribution,
+v1.1.0 uses the final presentation-only stable wrapper and advances one
+complete `1.1.0-stable1` active-graph cache boundary. The bounded
+v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
+The nested v0.51 feature layer owns
+one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
+plan data/view owners implement Recorder attribution,
 wanted-SOC history and verified runtime-session-bounded EV underlays. v0.50 retains
 its release presentation and EV settings ownership; v0.49 retains its release
 presentation; v0.48 retains current Hybrid operator copy and stable-note
@@ -168,7 +173,16 @@ strategy/settings typography and field-tuned profile presentation; v0.46
 retains external-PV presentation, v0.44 owns the bounded Optimize
 listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS
 settings overview, and v0.41 ordinary telemetry patching, targeted plan
-refresh, PV presentation and static-flow DOM/CSS.
+refresh, PV presentation and static-flow DOM/CSS. The v0.41 PV flow keeps one
+combined group total while patching one internal ETA/DC node and one aggregated
+external AC/PCC node; it remains independent of control and EMHASS inputs.
+
+The existing settings module owns the two-deadband configuration panel and its
+zero-centered explanatory scale. Control behavior remains owned by the backend
+config and controller modules; the stable wrapper does not reinterpret it.
+The v0.41 stable-DOM EMHASS metric displays the backend controller's canonical
+expected mode/setpoint attributes; it must not grow a parallel Hybrid/EV
+decision implementation.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
 
@@ -177,53 +191,60 @@ refresh, PV presentation and static-flow DOM/CSS.
 Battery strategy:
 
 ```text
-P_batt < -deadband -> mode 11
-P_batt > +deadband -> mode 12
-P_batt near 0 W    -> mode 8
+P_batt < -Battery Hold deadband -> mode 11
+P_batt > +Battery Hold deadband -> mode 12
+P_batt inside Battery Hold deadband -> mode 8
 ```
 
 Grid strategy:
 
 ```text
-P_grid > +deadband -> mode 9
-P_grid < -deadband -> mode 10
-P_grid near 0 W    -> mode 1
+P_grid > +GoodWe Auto deadband -> mode 9
+P_grid < -GoodWe Auto deadband -> mode 10
+P_grid inside GoodWe Auto deadband -> mode 1
 ```
 
 Hybrid strategy:
 
 ```text
-P_batt near 0 W -> mode 8
-else P_grid near 0 W -> mode 1 GoodWe Auto / self-use
-else P_grid > +deadband -> mode 9 using abs(P_grid)
-else P_grid < -deadband -> mode 10 using abs(P_grid)
+abs(P_batt) <= Battery Hold deadband -> mode 8
+else abs(P_grid) <= GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
+else P_grid > +GoodWe Auto deadband -> mode 9 using abs(P_grid)
+else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 ```
 
-The Hybrid neutral-battery branch is evaluated first so ordinary forecast house import/export does not become an active PCC target while EMHASS asked the battery to remain idle. Every non-neutral plan is PCC-controlled: mode 1 owns a near-zero `P_grid`, while modes 9/10 own non-zero import/export targets. The variable configured deadband includes exact boundaries and classifies the branch only; never subtract it from the transmitted setpoint.
+The Hybrid neutral-battery branch is evaluated first so ordinary forecast house import/export does not become an active PCC target while EMHASS asked the battery to remain idle. Every non-neutral plan is PCC-controlled: mode 1 owns `P_grid` inside the separate GoodWe Auto deadband, while modes 9/10 own import/export targets outside it. Both variable boundaries are inclusive and classify the branch only; never subtract either threshold from the transmitted setpoint.
 
 ### EV anti-discharge override
 
 While the configured EV source is actively charging, `P_batt` remains the directional safety guard:
 
 ```text
-P_batt >= -deadband -> mode 8 Battery Hold
-P_batt < -deadband  -> charging remains allowed
+P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
+P_batt < -Battery Hold deadband  -> charging remains allowed
 ```
 
 For an explicit home-battery charge request:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
 ```
+
+`ev_detection.py` is the single interpretation owner. Explicit power mode
+listens only to finite, unit-normalized measured power; explicit status mode
+listens only to `on`, `true`, `charging` or `connected_charging`. Never infer
+charging from allocated/maximum current. Missing method keys retain the exact
+legacy `connected_charging`-or-power behavior until the entry is saved.
 
 This anti-discharge override must not control the EV charger or create a second
 fast feedback loop. The separately owned `ev_load_balancing.py` runtime may call
 only the selected charger NumberEntity after its full minute-scale condition
 window; it never calls this controller or GoodWe. EV-stop fresh-plan protection
-remains unchanged. Manual commands never inherit or reinterpret the automatic
-strategy.
+keeps Battery Hold and retries a transient optimization failure after 5, 15, 30
+and 60 seconds; charging restart cancels the retry. Manual commands never
+inherit or reinterpret the automatic strategy.
 
 ## Persistent plan availability contract
 
@@ -295,24 +316,29 @@ The public profile keys/names remain:
 ```text
 mad_steve    -> Mad-Steve
 gold_rush    -> Gold Rush
+chargegasm   -> Chargegasm
 balanced     -> Balanced
 battery_saver-> Battery Saver
 ```
 
 Battery Saver is opt-in for unmanaged installations. Do not silently adopt/overwrite existing custom EMHASS policy values on upgrade.
 
-Managed profile hard maxima are all 100%; the profile distinction above 95% is economic rather than physical:
+The complete profile ranges are:
 
 ```text
-Mad-Steve     100%
-Gold Rush     100%
-Balanced      100%
-Battery Saver 100%
+Mad-Steve      5–100%  comfort 10–95%
+Gold Rush      5–100%  comfort 10–95%
+Chargegasm     8–96%   comfort 13–91%
+Balanced      10–93%   comfort 15–88%
+Battery Saver 10–85%   comfort 20–80%
 ```
 
-All four use `battery_soc_surplus_threshold = 0.95`. Their surplus cost factors are 5% / 10% / 25% / 50% × dynamic price reference in mode order. Current EMHASS applies this as currency/kWh/hour, so every timestep above 95% adds dwell cost and reaching 100% remains possible when the modeled value is sufficient.
-
-The verified GoodWe-synchronized minimum SOC remains a separate hard lower boundary. All managed profile maxima are 100% and remain part of the EMHASS Battery Saver transaction and rollback path. The shared 95% surplus threshold is soft: EMHASS can enter 95–100% but pays the profile-specific surplus cost for every kWh/hour spent there.
+The low/high SOC cost factors are 2/5, 2/12, 2/18, 5/25 and 10/50
+percent × dynamic price reference in profile order. The profile minimum is a
+verified GoodWe `45356` plus EMHASS transaction; the maximum remains
+EMHASS-only. Existing v1.0 managed entries require explicit reselection before
+the new minimum is written, so installing the beta alone never mutates the
+hardware floor.
 
 ### Linear anti-churn versus quadratic power stress
 
@@ -335,18 +361,23 @@ weight_battery_charge    = 2.25% × dynamic price reference
 weight_battery_discharge = 2.25% × dynamic price reference
 ```
 
-Gold Rush, Balanced and Battery Saver use the field-tuned transaction floor:
+Gold Rush and Chargegasm use the field-tuned transaction factor:
 
 ```text
 weight_battery_charge    = 6% × dynamic price reference
 weight_battery_discharge = 6% × dynamic price reference
 ```
 
-Gold Rush separately uses `battery_stress_cost = 1% × dynamic price reference`; Balanced and Battery Saver retain 8% and 20%. Keep these distinctions explicit in payload metadata, tests and customer documentation. Battery efficiency remains installation-owned and must not be silently rewritten by a managed profile.
+Balanced raises anti-churn to 7% and Battery Saver to 9%. Power-stress factors
+are 0% / 0% / 2% / 6% / 20% in mode order. Keep these distinctions explicit
+in payload metadata, tests and customer documentation. Battery efficiency
+remains installation-owned and must not be silently rewritten by a managed
+profile.
 
-Battery Saver owns nine EMHASS fields:
+Battery Saver owns ten EMHASS fields:
 
 ```text
+battery_minimum_state_of_charge
 battery_maximum_state_of_charge
 battery_soc_deficit_threshold
 battery_soc_deficit_cost
@@ -360,7 +391,13 @@ weight_battery_discharge
 
 When extending this list, update apply, rollback, unmanaged/custom detection, diagnostics, tests and `docs/BATTERY_SAVER.md` together.
 
-The Custom editor intentionally exposes only the five economic cost fields already presented in the customer UI. Dashboard and Settings use the same administrator-only `battery_saver/custom_set` WebSocket transaction. Keep its validation finite and non-negative, retain EMHASS scalar/list shapes, preserve the complete unrelated EMHASS configuration and include the write plus first optimization in the rollback boundary. Do not duplicate the Minimum/Maximum SOC entity paths in this transaction.
+The Custom editor intentionally exposes only the five economic cost fields
+already presented in the customer UI. Dashboard and Settings use the same
+administrator-only `battery_saver/custom_set` WebSocket transaction. Keep its
+validation finite and non-negative, retain EMHASS scalar/list shapes, preserve
+the complete unrelated EMHASS configuration and include the write plus first
+optimization in the rollback boundary. The existing SOC NumberEntities remain
+the only slider path and must reject writes while a managed profile is active.
 
 Battery Saver currently supports one EMHASS battery model. Do not broadcast a scalar/list profile over multi-battery configurations without an explicit per-battery ownership design.
 
@@ -485,9 +522,12 @@ existing EnergyPilot runtime price-source path
 The chart API uses schema `6` and includes `plan_revision` plus bounded
 `execution` history/projection. The frontend should force-refresh the one
 canonical plan card and one canonical execution card when live evidence differs
-from the cached payload. `P_batt.last_updated` remains the compatibility
-fallback for changes outside EnergyPilot. Do not solve refresh bugs by allowing
-duplicate cards.
+from the cached payload. It also includes backend-derived Home Assistant-timezone
+windows for rolling 12h, fixed-today 24h and fixed-today-through-tomorrow-noon
+36h views. The frontend filters one shared cached dataset when the range changes.
+`P_batt.last_updated` remains the compatibility fallback for changes outside
+EnergyPilot. Do not solve range/refresh bugs by adding Recorder calls per click
+or allowing duplicate cards.
 
 Do not discover Nord Pool independently in the browser. Chart energy summaries are visualization only; persistent cost/revenue accounting must consume backend accounting deltas and effective prices.
 

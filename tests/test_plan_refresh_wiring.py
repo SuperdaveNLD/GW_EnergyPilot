@@ -24,6 +24,7 @@ class PlanRefreshWiringTests(unittest.TestCase):
 
         self.assertIn('"plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0)', source)
         self.assertIn('"chart_schema_version": 6', source)
+        self.assertIn('"chart_time": build_chart_time_payload(', source)
         self.assertIn('"battery_soc_plan": _battery_soc_plan_payload(entry)', source)
 
 

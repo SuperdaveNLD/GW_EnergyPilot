@@ -109,7 +109,10 @@ class PVInsightTests(unittest.TestCase):
             'const pvSnapshot = pvGenerationSnapshot(panel);\n  const pv = pvSnapshot.power;',
             stable,
         )
-        self.assertIn('patchFlow(panel, root, pv, load, grid, battery, soc)', stable)
+        self.assertIn('installPvFlowGroup(this.shadowRoot)', stable)
+        self.assertIn('patchFlow(panel, root, pvSnapshot, load, grid, battery, soc)', stable)
+        self.assertIn('ep-link-pv-internal', stable)
+        self.assertIn('ep-link-pv-external', stable)
         self.assertNotIn("scrollTop =", stable)
         self.assertNotIn("scrollLeft =", stable)
 

@@ -10,7 +10,7 @@ GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-
 
 ## Status
 
-**v1.0.0 · Stable**
+**v1.1.0 · Stable**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -27,15 +27,23 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v0.50` remains the final published historical 0.x Beta. `v1.0.0` is the first
-stable production release under the new contract. Normal users keep the HACS
-prerelease switch off. Testers explicitly enable the
-HACS prerelease switch for GW EnergyPilot and can then select a published beta.
+`v1.1.0` is the current stable production release. It promotes the approved
+`v1.1.0-beta.1` candidate unchanged apart from stable version presentation and
+combines every v1.0.1 beta fix with managed battery profiles, selectable
+plan-chart ranges and clearer internal/external PV flow. Normal users keep the
+HACS prerelease switch off. Testers explicitly enable the HACS prerelease switch
+for GW EnergyPilot when they want a future published beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.1.0.md` — current stable Chargegasm, plan-range and PV-flow release notes;
+- `docs/releases/v1.1.0-beta.1.md` — promoted beta-candidate notes;
+- `docs/releases/v1.0.1-beta.4.md` — earlier opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.3.md` — previous opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.2.md` — earlier opt-in beta release notes;
+- `docs/releases/v1.0.1-beta.1.md` — earlier opt-in beta release notes;
 - `docs/releases/v1.0.0.md` — first stable v1 release notes;
 - `docs/RELEASE_NOTES_V051.md` — development notes for the v0.51 feature layer promoted in v1.0.0;
 - `docs/RELEASE_WORKFLOW.md` — v1 stable/beta branches, tags, gates and HACS selection;
@@ -69,6 +77,86 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+
+## v1.1.0 highlights
+
+- Includes every change from v1.0.1-beta.4, including explicit EV charging
+  detection and bounded fresh-plan retries after charging stops.
+- Adds **Chargegasm** between Gold Rush and Balanced as the lighter
+  battery-preservation profile.
+- Every managed profile owns a complete hard SOC range, matching comfort zone
+  and price-relative low/high-SOC, power-stress and anti-churn costs.
+- Selecting a managed profile applies the EMHASS policy and verified GoodWe
+  Minimum SOC as one rollback-safe transaction; **Custom** returns both SOC
+  sliders and all cost controls to the operator.
+- Battery Strategy hides editable sliders for managed profiles and shows the
+  active policy values instead. Settings → EMHASS contains the complete
+  read-only profile comparison.
+- Battery · Plan · Price remembers a 12h rolling, 24h local-day or 36h extended
+  view without another Recorder query for each range click.
+- The compact PV group separates internal ETA/DC PV from aggregated external
+  AC/PCC PV while retaining one combined display total.
+- Automatic Control collapses the connected manual mode/power controls to a
+  compact ownership summary; manual ownership reveals the same controls again.
+- The desktop Chromium, iPad WebKit and iPhone WebKit matrix protects the
+  complete `1.1.0-stable1` frontend graph.
+
+## v1.0.1-beta.4 highlights
+
+- Settings → EV offers one explicit charging-detection choice: a measured
+  charger-power sensor or a charging status/boolean.
+- Only the selected source controls EV anti-discharge. Status detection accepts
+  `on`, `true`, `charging` and `connected_charging`; charger current limits and
+  allocated current remain excluded because they can stay non-zero while idle.
+- Existing entries without the new choice retain the exact former
+  `connected_charging`-or-power behavior until the operator saves a method.
+- If the fresh-plan request after EV charging stops fails transiently, the
+  battery remains safely held while EnergyPilot retries after 5, 15, 30 and 60
+  seconds. Charging restarting cancels the pending retry.
+- Tesla Wall Connector users can select the `Opladen` binary sensor; plug and
+  connectivity entities describe connection state, not active charging.
+- GoodWe registers, EMS writes, normal strategy decisions, entity identities
+  and persistent Store schemas remain unchanged.
+
+## v1.0.1-beta.3 highlights
+
+- Wall-clock and startup-recovery callbacks wait until Home Assistant Core is
+  running, avoiding false failed EMHASS runs during an ordinary restart.
+- Only an enabled historical recurring automation blocks native scheduling;
+  the manual optimize-now script and a disabled automation no longer cause a
+  false `legacy_yaml_detected` state (#115).
+- The live EMHASS Mapping metric now shows the backend controller's canonical
+  GoodWe mode and target, including Hybrid mode 1 around a zero grid target.
+- The v1.0.1-beta.2 two-deadband behavior and all earlier beta fixes remain
+  included; GoodWe writes and control decisions are unchanged.
+
+## v1.0.1-beta.2 highlights
+
+- Automatic Control now has separate thresholds for Battery Hold on `P_batt`
+  and GoodWe Auto on `P_grid`, with fresh defaults of 100 W and 1000 W.
+- Hybrid checks Battery Hold first, GoodWe Auto second and signed mode 9/10 PCC
+  control third without subtracting either threshold from the setpoint.
+- Settings → EP shows both values together with a central 0 W marker,
+  charge/discharge directions and the mode 10/1/8/1/9 bar.
+- Existing stored `deadband` values remain Battery Hold values; the upgrade does
+  not silently retune existing installations.
+- EV anti-discharge remains higher priority and uses each threshold only for
+  its matching battery or grid decision.
+- The v1.0.1-beta.1 interval and WebKit click fixes remain included.
+
+## v1.0.1-beta.1 highlights
+
+- Legacy integral optimization cadences stored as numbers such as `15.0` are
+  normalized to the selector's canonical `15` form, so opening and saving the
+  options flow does not reject an otherwise supported cadence (#111).
+- Optimize now and EMHASS strategy buttons keep their existing text nodes when
+  live telemetry does not change their label, preserving the native mobile
+  click that WebKit delivers after `pointerup` (#110).
+- The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix now holds
+  both affected controls through rapid telemetry patches and verifies one
+  delivered action without a full render or replaced control.
+- No GoodWe register, EMS command, Automatic Control decision, entity identity,
+  persistent Store or EMHASS ownership behavior changes.
 
 ## v1.0.0 highlights
 
@@ -221,7 +309,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - safe EMHASS required-config synchronization that preserves installation topology;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
 - deterministic Battery Plan refresh after EnergyPilot optimizations;
-- four EnergyPilot Battery Saver profiles with price-relative SOC/power preferences, profile-owned maximum SOC and anti-churn battery-throughput costs;
+- five EnergyPilot battery profiles with price-relative SOC/power preferences, profile-owned minimum/maximum SOC and anti-churn battery-throughput costs;
 - stateful EMHASS profit/cost/self-consumption strategy;
 - persistent optimization history and `last_success`;
 - persistent latest successful EMS-setpoint update evidence in Controller diagnostics;
@@ -428,19 +516,39 @@ validate request
 
 If `45356` is unavailable, neither system is changed. If EMHASS fails after a verified GoodWe write, EnergyPilot attempts to restore the previous GoodWe value.
 
-There is no startup/background SOC synchronization.
+There is no startup/background SOC synchronization for Custom. Selecting a
+managed battery profile is an explicit transaction that writes and verifies its
+GoodWe minimum before applying the matching EMHASS range.
 
-The old direct **Battery minimum SOC limits** dashboard panel is not exposed as a normal settings path. The low-level Beta SOC API remains available for diagnostics/backwards-compatible tooling. Maximum SOC remains an EMHASS hard limit; when a Battery Saver profile is managed, EnergyPilot owns that EMHASS maximum as part of the selected profile.
+The old direct **Battery minimum SOC limits** dashboard panel is not exposed as
+a normal settings path. The low-level Beta SOC API remains available for
+diagnostics/backwards-compatible tooling. A managed battery profile owns both
+hard SOC limits; Custom restores direct access to the existing synchronized
+NumberEntities.
 
 ## Battery Saver
 
-Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes a GoodWe mode directly. The public profiles are **Mad-Steve**, **Gold Rush**, **Balanced** and **Battery Saver**.
+Battery Saver is an opt-in EnergyPilot policy layer over EMHASS. It never writes
+a GoodWe EMS mode directly. The public profiles are **Mad-Steve**, **Gold
+Rush**, **Chargegasm**, **Balanced** and **Battery Saver**.
 
-Choose **Custom / Aangepast** to keep direct ownership of the active EMHASS battery policy. The dashboard and **Settings → EMHASS → Battery Saver** expose the same five editable raw cost values: low-SOC cost, high-SOC cost, battery power stress, charge cost and discharge cost. **Save and optimize** writes the complete intended EMHASS configuration without replacing unrelated settings and immediately builds a fresh plan. Custom editing currently requires one EMHASS battery model; Minimum and Maximum SOC continue to use their existing synchronized Home Assistant number entities.
+Choose **Custom / Aangepast** to keep direct ownership of the active EMHASS
+battery policy. The dashboard and **Settings → EMHASS → Battery Saver** expose
+the same five editable raw cost values plus the existing Minimum and Maximum
+SOC sliders. **Save and optimize** writes the complete intended EMHASS
+configuration without replacing unrelated settings and immediately builds a
+fresh plan. Custom editing currently requires one EMHASS battery model.
 
-Managed profiles use price-relative charge/discharge anti-churn costs and profile-specific SOC/power-stress behavior. All four profiles can reach **100%**. The range above **95%** is a soft red zone with an hourly high-SOC dwell cost, so EMHASS only uses it when the expected value is high enough and avoids remaining full unnecessarily. Minimum SOC remains the GoodWe-synchronized hard floor.
+Managed profiles hide the SOC sliders and show their hard range, comfort zone
+and preservation factors read-only. Selecting one first writes and verifies its
+whole-percentage GoodWe minimum, then applies the matching EMHASS minimum,
+maximum and economic profile before publishing a fresh plan. Failure restores
+the previous GoodWe minimum, mode and all owned EMHASS fields.
 
-Mad-Steve retains **2.25% × price reference per direction** for maximum trading freedom. Gold Rush, Balanced and Battery Saver use the field-tuned **6% × price reference per direction** anti-churn floor. Gold Rush also uses a lighter **1% × price reference** power-stress cost; Balanced and Battery Saver retain their existing 8% and 20% stress factors.
+The complete comparison and the cell-aging rationale behind lower average SOC,
+power stress and throughput costs are shown in **Settings → EMHASS → Battery
+Saver** and documented in `docs/BATTERY_SAVER.md`. The factors are transparent
+optimizer policy, not a battery-specific lifetime promise.
 
 See `docs/BATTERY_SAVER.md` for exact profile factors and ownership.
 
@@ -457,7 +565,9 @@ The chart is read-only.
 - every successful EnergyPilot-owned optimization advances `plan_revision`, allowing the frontend to force-refresh the canonical card immediately after the persistent plan refresh attempt;
 - `P_batt.last_updated` remains a compatibility invalidation fallback for plans changed outside EnergyPilot;
 - the market-price series comes from the same EnergyPilot runtime price source used for EMHASS and is rendered as interval steps;
-- the card supports S/M/L layouts and an expanded detail view;
+- `12h` is a rolling zoom from six hours before through six hours after now, `24h` remains fixed today, and `36h` runs from today 00:00 through tomorrow 12:00 in the configured Home Assistant timezone;
+- range clicks reuse one cached dataset without another Recorder query, while unavailable future plan/price coverage remains visibly unavailable rather than extrapolated;
+- the card supports persistent browser-local 12h/24h/36h and S/M/L choices plus an expanded detail view;
 - native GoodWe day counters `35208` / `35211` are preferred for the headline charged/discharged totals;
 - Recorder-integrated battery power remains a separate visualization comparison and is not calibrated to force a match with the native inverter counter;
 - if no usable plan exists, planned-energy summaries display `—` rather than a fabricated zero.

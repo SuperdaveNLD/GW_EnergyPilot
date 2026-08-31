@@ -3,6 +3,7 @@ export const FLOW_THRESHOLD_W = 50;
 export const PROFILE_KEYS = Object.freeze([
   "mad_steve",
   "gold_rush",
+  "chargegasm",
   "balanced",
   "battery_saver",
 ]);
@@ -18,6 +19,11 @@ const PROFILE_TEXT = {
       label: "Gold Rush",
       description:
         "Profit first, with anti-churn protection and light battery-preservation costs.",
+    },
+    chargegasm: {
+      label: "Chargegasm",
+      description:
+        "Strong trading opportunities with tighter limits for battery longevity.",
     },
     balanced: {
       label: "Balanced",
@@ -45,6 +51,11 @@ const PROFILE_TEXT = {
       label: "Gold Rush",
       description:
         "Winst voorop, met anti-churnbescherming en lichte kosten voor batterijbehoud.",
+    },
+    chargegasm: {
+      label: "Chargegasm",
+      description:
+        "Sterke handelskansen met strakkere grenzen voor een langere batterijlevensduur.",
     },
     balanced: {
       label: "Gebalanceerd",
@@ -75,6 +86,7 @@ export function localizedProfile(language, mode) {
   const source = typeof mode === "object" && mode ? mode : {};
   const localized = PROFILE_TEXT[normalizeLanguage(language)]?.[key];
   return {
+    ...source,
     key,
     label: localized?.label || source.label || String(key || ""),
     description: localized?.description || source.description || "",

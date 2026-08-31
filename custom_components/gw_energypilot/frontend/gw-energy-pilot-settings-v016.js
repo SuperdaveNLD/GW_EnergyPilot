@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v015.js?v=0.51-h1";
+import "./gw-energy-pilot-v015.js?v=1.1.0-stable1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -39,6 +39,37 @@ const PV_COPY = Object.freeze({
   }),
 });
 
+const DEADBAND_COPY = Object.freeze({
+  en: Object.freeze({
+    title: "Hybrid decision zones",
+    description: "Battery Hold is decided from P_batt first. Only outside that zone does P_grid decide between GoodWe Auto and PCC control.",
+    holdLabel: "Battery Hold deadband · P_batt",
+    holdDescription: "A genuinely neutral battery plan. Inside this zone EnergyPilot writes mode 8 Battery Hold.",
+    autoLabel: "GoodWe Auto deadband · P_grid",
+    autoDescription: "No meaningful grid target. Outside Battery Hold, this zone writes mode 1 GoodWe Auto.",
+    charge: "Charge",
+    chargeDetail: "negative P_batt",
+    discharge: "Discharge",
+    dischargeDetail: "positive P_batt",
+    rangeWord: "to",
+    invalid: "Battery Hold deadband must be smaller than the GoodWe Auto deadband.",
+  }),
+  nl: Object.freeze({
+    title: "Hybride besliszones",
+    description: "Battery Hold wordt eerst bepaald met P_batt. Alleen buiten die zone bepaalt P_grid de keuze tussen GoodWe Auto en PCC-regeling.",
+    holdLabel: "Battery Hold-deadband · P_batt",
+    holdDescription: "Een werkelijk neutraal batterijplan. Binnen deze zone schrijft EnergyPilot modus 8 Battery Hold.",
+    autoLabel: "GoodWe Auto-deadband · P_grid",
+    autoDescription: "Geen betekenisvol netdoel. Buiten Battery Hold schrijft deze zone modus 1 GoodWe Auto.",
+    charge: "Laden",
+    chargeDetail: "negatief P_batt",
+    discharge: "Ontladen",
+    dischargeDetail: "positief P_batt",
+    rangeWord: "tot",
+    invalid: "Battery Hold-deadband moet kleiner zijn dan de GoodWe Auto-deadband.",
+  }),
+});
+
 function settingsLanguage(panel) {
   const raw = panel?._hass?.locale?.language || panel?._hass?.language || "en";
   return String(raw).toLowerCase().split(/[-_]/)[0] === "nl" ? "nl" : "en";
@@ -46,6 +77,10 @@ function settingsLanguage(panel) {
 
 function pvCopy(panel) {
   return PV_COPY[settingsLanguage(panel)];
+}
+
+function deadbandCopy(panel) {
+  return DEADBAND_COPY[settingsLanguage(panel)];
 }
 
 function gearIcon() {
@@ -239,6 +274,132 @@ function ensureStyles(root) {
       display: grid;
       gap: 12px;
     }
+    .ep-v016-ep-fields {
+      display: grid;
+      gap: 14px;
+    }
+    .ep-v016-deadband-group {
+      min-width: 0;
+      padding: 15px;
+      border: 1px solid rgba(67,196,224,.16);
+      border-radius: 14px;
+      background: rgba(7,29,51,.44);
+    }
+    .ep-v016-deadband-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 13px;
+    }
+    .ep-v016-deadband-head h4 {
+      margin: 0;
+      color: #eaf9ff;
+      font-size: 13px;
+    }
+    .ep-v016-deadband-head p {
+      max-width: 670px;
+      margin: 4px 0 0;
+      color: #7895aa;
+      font-size: 9px;
+      line-height: 1.5;
+    }
+    .ep-v016-deadband-state {
+      color: #4bdeb2;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .ep-v016-deadband-inputs {
+      display: grid;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      gap: 12px;
+    }
+    .ep-v016-deadband-inputs .ep-v016-field:first-child {
+      border-color: rgba(233,189,75,.20);
+    }
+    .ep-v016-deadband-inputs .ep-v016-field:last-child {
+      border-color: rgba(36,216,177,.20);
+    }
+    .ep-v016-deadband-direction {
+      display: grid;
+      grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+      align-items: end;
+      gap: 10px;
+      margin-top: 14px;
+      color: #6f91a6;
+      font-size: 9px;
+    }
+    .ep-v016-deadband-direction span:last-child { text-align: right; }
+    .ep-v016-deadband-direction strong {
+      color: #42daf2;
+      font-weight: 800;
+    }
+    .ep-v016-deadband-zero {
+      color: #edf8ff !important;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .ep-v016-deadband-window {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5,minmax(0,1fr));
+      height: 42px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: 9px;
+      background: rgba(4,21,39,.72);
+    }
+    .ep-v016-deadband-window::after {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-1px);
+      background: rgba(237,248,255,.82);
+      pointer-events: none;
+    }
+    .ep-v016-deadband-window span {
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      padding: 0 4px;
+      border-right: 1px solid rgba(91,174,224,.10);
+      color: #42daf2;
+      text-align: center;
+      font-size: 9px;
+      font-weight: 750;
+    }
+    .ep-v016-deadband-window span:last-child { border-right: 0; }
+    .ep-v016-deadband-window .auto {
+      color: #4bdeb2;
+      background: rgba(36,216,177,.08);
+    }
+    .ep-v016-deadband-window .hold {
+      color: #e9bd4b;
+      background: rgba(233,189,75,.10);
+    }
+    .ep-v016-deadband-rules {
+      display: grid;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      gap: 10px;
+      margin-top: 10px;
+      color: #66869b;
+      font-size: 8px;
+    }
+    .ep-v016-deadband-rules strong { color: #cbe4ef; font-weight: 760; }
+    .ep-v016-deadband-validation {
+      margin-top: 10px;
+      color: #f0a29c;
+      font-size: 9px;
+      font-weight: 760;
+    }
     .ep-v016-external-group {
       min-width: 0;
       padding: 14px;
@@ -425,6 +586,8 @@ function ensureStyles(root) {
       .ep-v016-settings-head h2 { font-size: 20px; }
       .ep-v016-settings-content { padding: 17px 14px 24px; }
       .ep-v016-fields { grid-template-columns: 1fr; }
+      .ep-v016-deadband-inputs,
+      .ep-v016-deadband-rules { grid-template-columns: 1fr; }
       .ep-v016-external-inputs { grid-template-columns: 1fr; }
       .ep-v016-actions { flex-wrap: wrap; }
       .ep-v016-message { width: 100%; margin-bottom: 5px; }
@@ -613,6 +776,65 @@ function fieldHtml(panel, sectionId, field) {
   return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" autocomplete="off"${disabled}>${description}</label>`;
 }
 
+function energyPilotFieldsHtml(panel, sectionId, fields) {
+  const hold = fields.find((field) => field.key === "deadband");
+  const automatic = fields.find((field) => field.key === "goodwe_auto_deadband");
+  if (!hold || !automatic) {
+    return `<div class="ep-v016-fields">${fields.map((field) => fieldHtml(panel, sectionId, field)).join("")}</div>`;
+  }
+
+  const copy = deadbandCopy(panel);
+  const holdField = { ...hold, label: copy.holdLabel, description: copy.holdDescription };
+  const autoField = { ...automatic, label: copy.autoLabel, description: copy.autoDescription };
+  const remaining = fields.filter((field) => !["deadband", "goodwe_auto_deadband"].includes(field.key));
+  return `
+    <section class="ep-v016-deadband-group" aria-labelledby="ep-v016-deadband-title">
+      <div class="ep-v016-deadband-head">
+        <div><h4 id="ep-v016-deadband-title">${panel._escape(copy.title)}</h4><p>${panel._escape(copy.description)}</p></div>
+        <span class="ep-v016-deadband-state">Hybrid</span>
+      </div>
+      <div class="ep-v016-deadband-inputs">
+        ${fieldHtml(panel, sectionId, holdField)}
+        ${fieldHtml(panel, sectionId, autoField)}
+      </div>
+      <div class="ep-v016-deadband-direction" aria-label="P_batt direction">
+        <span>← <strong>${panel._escape(copy.charge)}</strong> · ${panel._escape(copy.chargeDetail)}</span>
+        <strong class="ep-v016-deadband-zero">0 W</strong>
+        <span>${panel._escape(copy.dischargeDetail)} · <strong>${panel._escape(copy.discharge)}</strong> →</span>
+      </div>
+      <div class="ep-v016-deadband-window" aria-label="Hybrid control modes around zero watts">
+        <span>mode 10</span><span class="auto">mode 1</span><span class="hold">mode 8</span><span class="auto">mode 1</span><span>mode 9</span>
+      </div>
+      <div class="ep-v016-deadband-rules">
+        <span><strong data-hold-range></strong> → mode 8 · Battery Hold</span>
+        <span><strong data-auto-range></strong> → mode 1 · GoodWe Auto</span>
+      </div>
+      <div class="ep-v016-deadband-validation" data-deadband-validation role="alert" hidden>${panel._escape(copy.invalid)}</div>
+    </section>
+    <div class="ep-v016-fields">${remaining.map((field) => fieldHtml(panel, sectionId, field)).join("")}</div>`;
+}
+
+function syncDeadbandPresentation(panel, form) {
+  const hold = form?.querySelector('[data-setting-key="deadband"]');
+  const automatic = form?.querySelector('[data-setting-key="goodwe_auto_deadband"]');
+  if (!hold || !automatic) return;
+  const holdValue = Number(hold.value);
+  const autoValue = Number(automatic.value);
+  const valid = Number.isFinite(holdValue) && Number.isFinite(autoValue) && holdValue >= 0 && autoValue >= 100 && holdValue < autoValue;
+  const copy = deadbandCopy(panel);
+  const message = copy.invalid;
+  hold.setCustomValidity(valid ? "" : message);
+  automatic.setCustomValidity(valid ? "" : message);
+  const validation = form.querySelector("[data-deadband-validation]");
+  if (validation) validation.hidden = valid;
+  const holdRange = form.querySelector("[data-hold-range]");
+  const autoRange = form.querySelector("[data-auto-range]");
+  if (holdRange) holdRange.textContent = `−${holdValue} ${copy.rangeWord} +${holdValue} W`;
+  if (autoRange) autoRange.textContent = `−${autoValue} ${copy.rangeWord} +${autoValue} W`;
+  const submit = form.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = panel.__epV016Saving || !valid;
+}
+
 function pvFieldsHtml(panel, sectionId, fields) {
   const internal = fields.find((field) => field.key === "enable_internal_pv");
   const externalToggle = fields.find((field) => field.key === "enable_external_pv");
@@ -649,6 +871,20 @@ function syncExternalPvFields(form) {
 }
 
 function syncEvSafetyFields(form) {
+  const detection = form?.querySelector('[data-setting-key="ev_detection_method"]');
+  const status = form?.querySelector('[data-setting-key="ev_mode_entity"]');
+  const power = form?.querySelector('[data-setting-key="ev_power_entity"]');
+  const threshold = form?.querySelector('[data-setting-key="ev_deadband"]');
+  const useStatus = detection?.value === "state";
+  if (status) {
+    status.disabled = !useStatus;
+    status.closest(".ep-v016-field")?.classList.toggle("is-disabled", !useStatus);
+  }
+  for (const input of [power, threshold]) {
+    if (!input) continue;
+    input.disabled = useStatus;
+    input.closest(".ep-v016-field")?.classList.toggle("is-disabled", useStatus);
+  }
   const profile = form?.querySelector('[data-setting-key="grid_connection_profile"]');
   const custom = form?.querySelector('[data-setting-key="grid_custom_current"]');
   if (profile && custom) {
@@ -778,8 +1014,14 @@ function renderSettingsPage(panel, root) {
     const sectionFields = section.fields || [];
     const fields = tabId === "pv"
       ? pvFieldsHtml(panel, tabId, sectionFields)
+      : tabId === "energypilot"
+      ? energyPilotFieldsHtml(panel, tabId, sectionFields)
       : sectionFields.map((field) => fieldHtml(panel, tabId, field)).join("");
-    const fieldsClass = tabId === "pv" ? "ep-v016-pv-fields" : "ep-v016-fields";
+    const fieldsClass = tabId === "pv"
+      ? "ep-v016-pv-fields"
+      : tabId === "energypilot"
+      ? "ep-v016-ep-fields"
+      : "ep-v016-fields";
     const message = panel.__epV016Message
       ? `<span class="ep-v016-message ${panel._escape(panel.__epV016Message.tone || "")}">${panel._escape(panel.__epV016Message.text)}</span>`
       : `<span class="ep-v016-message">Changes are stored in the existing Home Assistant config entry.</span>`;
@@ -835,6 +1077,7 @@ function renderSettingsPage(panel, root) {
   if (form) {
     syncExternalPvFields(form);
     syncEvSafetyFields(form);
+    syncDeadbandPresentation(panel, form);
     form.querySelectorAll("[data-setting-key]").forEach((input) => {
       const remember = () => {
         panel.__epV016Draft = panel.__epV016Draft || {};
@@ -844,10 +1087,13 @@ function renderSettingsPage(panel, root) {
         panel.__epV016Message = null;
       };
       input.addEventListener(input.type === "checkbox" ? "change" : "input", remember);
+      if (["deadband", "goodwe_auto_deadband"].includes(input.dataset.settingKey)) {
+        input.addEventListener("input", () => syncDeadbandPresentation(panel, form));
+      }
       if (input.dataset.settingKey === "enable_external_pv") {
         input.addEventListener("change", () => syncExternalPvFields(form));
       }
-      if (["grid_connection_profile", "ev_charger_phases", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
+      if (["ev_detection_method", "grid_connection_profile", "ev_charger_phases", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
         input.addEventListener("change", () => syncEvSafetyFields(form));
         input.addEventListener("input", () => syncEvSafetyFields(form));
       }

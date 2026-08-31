@@ -328,6 +328,18 @@ class MinimumSocSyncTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(entry.runtime_data.client.calls, [])
 
+    async def test_managed_profile_rejects_direct_minimum_and_maximum_writes(self):
+        minimum, entry = self.make_entity(goodwe_floor=5)
+        maximum = number_module.GWEMHASSMaximumSOCNumber(entry)
+        entry.options[number_module.CONF_BATTERY_SAVER_MODE] = "balanced"
+
+        with self.assertRaisesRegex(HomeAssistantError, "select Custom"):
+            await minimum.async_set_native_value(10)
+        with self.assertRaisesRegex(HomeAssistantError, "select Custom"):
+            await maximum.async_set_native_value(90)
+
+        self.assertEqual(entry.runtime_data.client.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

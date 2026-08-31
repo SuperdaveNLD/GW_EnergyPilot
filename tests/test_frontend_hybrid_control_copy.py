@@ -19,25 +19,25 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v100.js?v=1.0.0-stable1", init_source)
+        self.assertIn("gw-energy-pilot-v110.js?v=1.1.0-stable1", init_source)
         self.assertIn(
-            'import "./gw-energy-pilot-v048.js?v=0.51-h1";',
+            'import "./gw-energy-pilot-v048.js?v=1.1.0-stable1";',
             active,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v047.js?v=0.51-h1";',
+            'import "./gw-energy-pilot-v047.js?v=1.1.0-stable1";',
             self.source,
         )
         self.assertIn('panel._stateByKey?.("control_strategy")?.state', self.source)
         self.assertIn("PanelClass.prototype.__epV048Installed = true", self.source)
 
-    def test_copy_describes_neutral_hold_variable_deadband_and_full_setpoint(self) -> None:
+    def test_copy_describes_two_deadbands_and_full_setpoint(self) -> None:
         for expected in (
-            "neutral P_batt plan in mode 8",
-            "configured deadband",
+            "Battery Hold deadband on P_batt",
+            "separate GoodWe Auto deadband",
             "full grid target as setpoint",
-            "neutraal P_batt-plan vast in modus 8",
-            "ingestelde deadband",
+            "Battery Hold-deadband op P_batt",
+            "aparte GoodWe Auto-deadband",
             "volledige netdoel als setpoint",
         ):
             self.assertIn(expected, self.source)

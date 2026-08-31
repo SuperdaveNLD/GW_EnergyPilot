@@ -4,7 +4,7 @@ import {
   language,
   loadChartData,
   timestampMs,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=0.51-h1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-stable1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const CARD_ID = "emhass-goodwe-history";
@@ -232,7 +232,7 @@ function fullRow(panel, row) {
   return `<tr data-kind="${esc(panel, row?.kind || "history")}">
     <td>${esc(panel, formatTimestamp(panel, row.occurred_at, true))}</td>
     <td>${esc(panel, planText(row))}<small>${esc(panel, `${copy(panel).wantedSoc} ${wantedSoc === null ? "—" : `${wantedSoc.toFixed(1)}%`}`)}</small></td>
-    <td>${esc(panel, row?.configuration?.strategy || "—")}<small>${esc(panel, `${ownerText(panel, row)} · ${row?.configuration?.deadband_w ?? "—"} W deadband`)}</small></td>
+    <td>${esc(panel, row?.configuration?.strategy || "—")}<small>${esc(panel, `${ownerText(panel, row)} · Hold ${row?.configuration?.battery_hold_deadband_w ?? row?.configuration?.deadband_w ?? "—"} W · Auto ${row?.configuration?.goodwe_auto_deadband_w ?? "—"} W`)}</small></td>
     <td>${esc(panel, modeText(panel, outcome.expected_mode, outcome.expected_setpoint_w))}<small>${esc(panel, outcome.command || "—")}</small></td>
     <td>${esc(panel, modeText(panel, outcome.readback_mode, outcome.readback_setpoint_w))}</td>
     <td>${esc(panel, actualsText(row))}</td>

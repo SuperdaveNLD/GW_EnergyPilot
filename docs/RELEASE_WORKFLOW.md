@@ -91,9 +91,9 @@ git pull --ff-only origin beta
 python -m compileall -q custom_components/gw_energypilot scripts tests
 python -m unittest discover -s tests -v
 python scripts/validate_repo.py
-python scripts/release_contract.py --tag v1.0.0-beta.1
-git tag -a v1.0.0-beta.1 -m "GW EnergyPilot v1.0.0-beta.1"
-git push origin v1.0.0-beta.1
+python scripts/release_contract.py --tag v1.1.0-beta.1
+git tag -a v1.1.0-beta.1 -m "GW EnergyPilot v1.1.0-beta.1"
+git push origin v1.1.0-beta.1
 ```
 
 Push the `beta` branch before its tag. The workflow verifies the remote branch
@@ -114,9 +114,9 @@ git pull --ff-only origin main
 python -m compileall -q custom_components/gw_energypilot scripts tests
 python -m unittest discover -s tests -v
 python scripts/validate_repo.py
-python scripts/release_contract.py --tag v1.0.0
-git tag -a v1.0.0 -m "GW EnergyPilot v1.0.0"
-git push origin v1.0.0
+python scripts/release_contract.py --tag v1.1.0
+git tag -a v1.1.0 -m "GW EnergyPilot v1.1.0"
+git push origin v1.1.0
 ```
 
 The workflow verifies that the tag is the exact remote `main` head and creates
