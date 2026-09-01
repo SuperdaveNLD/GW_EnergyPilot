@@ -82,6 +82,11 @@ Sentinel/out-of-range values are omitted. Cloud lifetime energy totals, EMS
 mode/settings, meter phase currents and unverified fields are deliberately not
 mapped as substitutes for canonical GoodWe registers.
 
+The portal can briefly return `soc: 0` as a placeholder while battery data is
+transitioning. EnergyPilot rejects that sentinel, tries the selected inverter's
+SOC field next and otherwise makes battery SOC unavailable. An unavailable SOC
+blocks an EnergyPilot-owned EMHASS solve instead of initializing it at 0%.
+
 At a multi-inverter station, station-wide power-flow PV/load/battery aggregates
 are not mixed with the explicitly selected inverter. PV falls back to that
 inverter's own value; station-wide load and battery power remain unavailable.
@@ -111,6 +116,15 @@ renewal and rate-limit handling. EnergyPilot intentionally does not copy its
 undocumented inverter downtime/control switch.
 
 ## Troubleshooting
+
+For a redacted raw/mapped comparison, open dashboard settings -> **LOG**, start
+debug logging, reproduce one SEMS refresh and copy the debug report. Each SEMS
+poll contains only an explicit allowlist of power-flow/inverter values, the
+mapped EnergyPilot values and mapping decisions such as the selected/rejected
+SOC source. Account, password, API token and arbitrary portal fields are never
+included. The same credential-free summary is emitted at debug level by
+`custom_components.gw_energypilot.sems_api` when Home Assistant debug logging
+is enabled.
 
 - **Authentication rejected:** verify account/password and accept the latest
   EULA in the official portal/app.

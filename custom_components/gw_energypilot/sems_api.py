@@ -85,6 +85,12 @@ class GWSemsClient:
         self._token: dict[str, Any] | None = None
         self._preferred_login: str | None = None
         self._retry_not_before = 0.0
+        self._last_diagnostics: dict[str, Any] = {}
+
+    @property
+    def last_diagnostics(self) -> dict[str, Any]:
+        """Return the latest credential-free raw/mapped telemetry summary."""
+        return dict(self._last_diagnostics)
 
     async def async_close(self) -> None:
         """Keep the Home Assistant shared HTTP session open."""
@@ -326,6 +332,11 @@ class GWSemsClient:
             mapped = map_sems_telemetry(payload, self.inverter_serial)
         except SemsPayloadError as err:
             raise GWSemsError(str(err)) from err
+        self._last_diagnostics = mapped.diagnostics
+        _LOGGER.debug(
+            "SEMS telemetry mapped for configured station: %s",
+            self._last_diagnostics,
+        )
         return GWETAData(
             values=mapped.values,
             source="sems_api",

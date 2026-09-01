@@ -25,6 +25,44 @@ _POWER_RE = re.compile(
     re.IGNORECASE,
 )
 
+_DIAGNOSTIC_POWERFLOW_FIELDS = (
+    "pv",
+    "load",
+    "soc",
+    "bettery",
+    "betteryStatus",
+)
+_DIAGNOSTIC_INVERTER_FIELDS = (
+    "last_time",
+    "pv_power",
+    "pac",
+    "pmeter",
+    "vpv1",
+    "vpv2",
+    "vpv3",
+    "vpv4",
+    "ipv1",
+    "ipv2",
+    "ipv3",
+    "ipv4",
+    "vac1",
+    "vac2",
+    "vac3",
+    "iac1",
+    "iac2",
+    "iac3",
+    "fac1",
+    "fac2",
+    "fac3",
+    "tempperature",
+    "soc",
+    "soh",
+    "vbattery1",
+    "ibattery1",
+    "bms_charge_i_max",
+    "bms_discharge_i_max",
+)
+
 
 class SemsPayloadError(ValueError):
     """Raised when a SEMS payload cannot be used safely."""
@@ -45,6 +83,7 @@ class SemsMappedTelemetry:
     values: dict[str, int | float]
     inverter_serial: str
     source_updated_at: datetime
+    diagnostics: dict[str, Any]
 
 
 def encode_sems_plus_password(password: str) -> str:
@@ -126,6 +165,41 @@ def _bounded(value: Any, minimum: float, maximum: float) -> int | float | None:
     if number is None or number < minimum or number > maximum:
         return None
     return int(number) if number.is_integer() else number
+
+
+def _battery_soc(value: Any) -> int | float | None:
+    """Return a usable portal SOC, rejecting its observed zero sentinel.
+
+    A configured GoodWe battery has a verified positive hardware floor. The
+    monitor-detail endpoint can temporarily publish ``0`` while its other
+    battery fields are absent or transitioning, so accepting that placeholder
+    as a measured SOC can incorrectly initialize an EMHASS solve at 0%.
+    """
+    number = _bounded(value, 0, 100)
+    return None if number in (None, 0) else number
+
+
+def _diagnostic_scalar(value: Any) -> str | int | float | bool | None:
+    """Return a bounded scalar suitable for credential-free support output."""
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, str):
+        return value[:80]
+    return None
+
+
+def _diagnostic_subset(
+    source: Mapping[str, Any],
+    fields: tuple[str, ...],
+) -> dict[str, str | int | float | bool | None]:
+    """Copy only explicitly allowlisted monitor fields into diagnostics."""
+    return {
+        key: _diagnostic_scalar(source[key])
+        for key in fields
+        if key in source
+    }
 
 
 def _positive_power(value: Any) -> int | float | None:
@@ -291,10 +365,22 @@ def map_sems_telemetry(
     meter_power = _bounded(inverter.get("pmeter"), -100_000, 100_000)
     _put(values, "meter_total_power_fast", meter_power)
 
+    soc_source: str | None = None
+    rejected_soc_sources: list[str] = []
     if data.get("isShowBattery") is True:
-        soc = _bounded(powerflow.get("soc"), 0, 100)
+        raw_powerflow_soc = powerflow.get("soc")
+        soc = _battery_soc(raw_powerflow_soc)
+        if soc is not None:
+            soc_source = "powerflow.soc"
+        elif raw_powerflow_soc is not None:
+            rejected_soc_sources.append("powerflow.soc")
         if soc is None:
-            soc = _bounded(inverter.get("soc"), 0, 100)
+            raw_inverter_soc = inverter.get("soc")
+            soc = _battery_soc(raw_inverter_soc)
+            if soc is not None:
+                soc_source = "inverter.soc"
+            elif raw_inverter_soc is not None:
+                rejected_soc_sources.append("inverter.soc")
         _put(values, "battery_soc", soc)
         _put(values, "battery_soh", _bounded(inverter.get("soh"), 0, 100))
         _put(
@@ -345,4 +431,25 @@ def map_sems_telemetry(
         values=values,
         inverter_serial=serial,
         source_updated_at=updated_at,
+        diagnostics={
+            "inverter_serial": serial,
+            "source_updated_at": updated_at.isoformat(),
+            "multi_inverter": multi_inverter,
+            "is_show_battery": _diagnostic_scalar(data.get("isShowBattery")),
+            "raw": {
+                "powerflow": _diagnostic_subset(
+                    powerflow,
+                    _DIAGNOSTIC_POWERFLOW_FIELDS,
+                ),
+                "inverter": _diagnostic_subset(
+                    inverter,
+                    _DIAGNOSTIC_INVERTER_FIELDS,
+                ),
+            },
+            "mapped": dict(values),
+            "decisions": {
+                "battery_soc_source": soc_source,
+                "rejected_battery_soc_sources": rejected_soc_sources,
+            },
+        },
     )

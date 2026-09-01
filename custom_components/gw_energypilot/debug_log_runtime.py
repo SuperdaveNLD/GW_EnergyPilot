@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from homeassistant.core import Event, HomeAssistant, callback
@@ -149,13 +149,14 @@ class GWEnergyPilotDebugRuntime:
         runtime = self._runtime()
         coordinator = getattr(runtime, "coordinator", None)
         client = getattr(runtime, "client", None)
+        telemetry_client = getattr(runtime, "telemetry_client", None)
         if coordinator is None:
             return {}
         data = coordinator.data
         values = dict(data.values) if data is not None else {}
         last_exception = getattr(coordinator, "last_exception", None)
         modbus_client = getattr(client, "_client", None)
-        return {
+        snapshot = {
             "source": getattr(data, "source", getattr(coordinator, "source", None)),
             "source_updated_at": (
                 data.source_updated_at.isoformat()
@@ -176,6 +177,10 @@ class GWEnergyPilotDebugRuntime:
             "client_connected": bool(getattr(modbus_client, "connected", False)),
             "values": values,
         }
+        sems_diagnostics = getattr(telemetry_client, "last_diagnostics", None)
+        if isinstance(sems_diagnostics, Mapping) and sems_diagnostics:
+            snapshot["sems"] = dict(sems_diagnostics)
+        return snapshot
 
     def current_snapshot(self) -> dict[str, Any]:
         """Return a sanitized current-state snapshot for problem analysis."""
@@ -302,7 +307,8 @@ class GWEnergyPilotDebugRuntime:
     def _async_coordinator_updated(self) -> None:
         snapshot = self._coordinator_snapshot()
         event = "poll_success" if snapshot.get("last_update_success") else "poll_failed"
-        self.log.record("goodwe", event, snapshot)
+        category = "sems" if snapshot.get("source") == "sems_api" else "goodwe"
+        self.log.record(category, event, snapshot)
 
     @callback
     def _async_controller_updated(self) -> None:

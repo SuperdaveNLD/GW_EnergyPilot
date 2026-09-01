@@ -156,6 +156,12 @@ class SemsApiClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(session.calls), 2)
         self.assertNotIn("secret", str(session.calls))
         self.assertIn("eu.semsportal.com/api", session.calls[1][0])
+        self.assertEqual(
+            client.last_diagnostics["mapped"]["pv_total_power"],
+            2400,
+        )
+        self.assertNotIn("visitor@example.com", str(client.last_diagnostics))
+        self.assertNotIn("secret", str(client.last_diagnostics))
 
     async def test_expired_token_is_renewed_once(self) -> None:
         session = FakeSession(

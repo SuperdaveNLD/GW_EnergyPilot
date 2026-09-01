@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -131,6 +132,52 @@ class SemsTelemetryMappingTests(unittest.TestCase):
         )
         self.assertNotIn("battery_soc", mapped.values)
         self.assertNotIn("battery_power", mapped.values)
+
+    def test_zero_powerflow_soc_falls_back_to_positive_inverter_soc(self) -> None:
+        payload = _payload(_inverter(soc=66))
+        payload["powerflow"]["soc"] = 0
+
+        mapped = map_sems_telemetry(payload, now=NOW)
+
+        self.assertEqual(mapped.values["battery_soc"], 66)
+        self.assertEqual(
+            mapped.diagnostics["decisions"]["battery_soc_source"],
+            "inverter.soc",
+        )
+        self.assertEqual(
+            mapped.diagnostics["decisions"]["rejected_battery_soc_sources"],
+            ["powerflow.soc"],
+        )
+
+    def test_zero_soc_placeholders_are_unavailable_not_zero_percent(self) -> None:
+        payload = _payload(_inverter(soc=0))
+        payload["powerflow"]["soc"] = 0
+
+        mapped = map_sems_telemetry(payload, now=NOW)
+
+        self.assertNotIn("battery_soc", mapped.values)
+        self.assertIsNone(
+            mapped.diagnostics["decisions"]["battery_soc_source"]
+        )
+        self.assertEqual(
+            mapped.diagnostics["decisions"]["rejected_battery_soc_sources"],
+            ["powerflow.soc", "inverter.soc"],
+        )
+
+    def test_diagnostics_allowlist_excludes_unknown_payload_fields(self) -> None:
+        payload = _payload(_inverter())
+        payload["token"] = "portal-token"
+        payload["powerflow"]["password"] = "cloud-secret"
+        payload["inverter"][0]["invert_full"]["account"] = "owner@example.com"
+
+        mapped = map_sems_telemetry(payload, now=NOW)
+        diagnostics = str(mapped.diagnostics)
+
+        self.assertNotIn("portal-token", diagnostics)
+        self.assertNotIn("cloud-secret", diagnostics)
+        self.assertNotIn("owner@example.com", diagnostics)
+        self.assertEqual(mapped.diagnostics["raw"]["powerflow"]["soc"], 67)
+        json.dumps(mapped.diagnostics, allow_nan=False)
 
     def test_sentinel_ac_values_are_rejected(self) -> None:
         mapped = map_sems_telemetry(
