@@ -13,6 +13,35 @@ This run validates the browser interaction path only. It must not be used to
 change or infer GoodWe registers, EMS modes, setpoint signs, controller policy
 or EMHASS ownership.
 
+## Local Beta tests first pass
+
+Run this harmless isolation pass before operating a real EnergyPilot control:
+
+1. Open the dashboard layout menu and select **Beta tests**.
+2. Tap each of the eight variants twenty times. For the select and slider,
+   make twenty actual value changes.
+3. Open **Laatste events en export** and retain the JSON shown there. With a
+   Web Inspector console the same payload is available as
+   `__epBetaTests.json()`.
+4. Repeat in Safari and Home Assistant Companion, ideally once in portrait and
+   once in landscape.
+
+The page uses local browser state only. It sends no Home Assistant service or
+WebSocket call and cannot write GoodWe or start EMHASS. Interpret the counters
+as follows:
+
+- `pointerdown` absent: the physical event did not reach that target;
+- `pointerdown` and `pointerup` rise but `click` does not: WebKit cancelled the
+  native click before the action handler;
+- `click` rises but `actions` does not: the event arrived but the selected
+  handler path did not complete;
+- `actions` rises exactly once per use: that native control path is healthy.
+
+For the label-wrapped switch, one physical use can legitimately produce click
+events for both the label and its checkbox; `actions` remains the canonical
+completed-action count. The result narrows the failing browser path, but does
+not by itself close the real operational-control acceptance below.
+
 ## Safety prerequisites
 
 Battery quick actions and manual EMS modes can move significant real power.

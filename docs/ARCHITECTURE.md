@@ -1,7 +1,7 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.2.0-beta.1**. Stable v1.1.1 remains the production base.
+v1.2.0-beta.2**. Stable v1.1.1 remains the production base.
 
 ## High-level flow
 
@@ -485,25 +485,27 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes read-only chart data. The payload uses schema `6`, includes `plan_revision` plus authoritative Home Assistant-timezone chart windows, and uses future-plan source order:
+`battery_price_api.py` exposes read-only chart data. The payload uses schema `7`, includes `plan_revision` plus authoritative Home Assistant-timezone chart windows, and uses future-plan source order:
 
 ```text
 1. persistent validated official EMHASS plan mirror
 2. existing Home Assistant battery_scheduled_power / forecasts compatibility path
 ```
 
-Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. The dashed wanted-SOC line uses immutable execution snapshots for elapsed time and exact validated `SOC_opt` from the current official plan for current/future time; no output-entity fallback or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
+Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. The dashed wanted-SOC line uses immutable execution snapshots for elapsed time and exact validated `SOC_opt` from the current official plan for current/future time. EMHASS computes `SOC_opt` after each row's power interval, so schema 7 retains the row `start` but plots/persists explicit `target_at = start + inferred step`; no output-entity fallback, hardcoded 15-minute shift or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
 
 The same bounded Recorder request includes combined display-only PV, load and
 fast grid power. Large/expanded views apply a load-first balance and draw
 grid/solar charge plus battery/solar export with an explicit unknown residual.
 This attribution is approximate presentation, never accounting or control.
 
-The schema-6 `execution` section contains the last 48 elapsed hours of exact
+The schema-7 `execution` section contains the last 48 elapsed hours of exact
 ledger evidence and a 24-hour conditional projection. Future rows reuse the
 pure controller decision resolver against exact current-plan timestamps. They
 state that strategy/ownership remain unchanged and never predict EV/manual
-overrides, write success or read-back.
+overrides, write success or read-back. New ledger rows store
+`soc_opt_target_at`; retained legacy rows without that evidence remain valid
+for command history but are excluded from the Wanted-SOC graph.
 
 The frontend retains one shared cached dataset and selects a rolling `NOW - 6h .. NOW + 6h`, fixed local today, or fixed today-through-tomorrow-12:00 view. Range changes are local and add no Recorder request. The initial history request reaches at most six hours before local midnight; fixed windows and ticks come from `hass.config.time_zone`, so 23/25-hour DST days retain their local-day meaning.
 
@@ -552,8 +554,8 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the stable base;
-v1.2.0-beta.1 owns final beta presentation and the complete
-`1.2.0-beta.1-mobile-sems1` active-graph cache boundary.
+v1.2.0-beta.2 owns final beta presentation and the complete
+`1.2.0-beta.2-soc-end-sems2-beta-tests1` active-graph cache boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 

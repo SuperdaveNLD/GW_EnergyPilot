@@ -4,6 +4,33 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0-beta.2] - 2026-09-01
+
+### Fixed
+
+- Plot EMHASS `SOC_opt` at the end of its source power interval instead of at
+  the plan-row start (#122). The read-only chart payload now carries explicit
+  `target_at` evidence derived from the validated 15/30/60-minute plan step,
+  and new execution snapshots retain that same immutable target instant.
+- Reject the observed SEMS `soc: 0` placeholder, fall back to a positive
+  selected-inverter SOC and otherwise publish SOC as unavailable so an
+  EnergyPilot-owned EMHASS solve cannot be initialized at a false 0%.
+
+### Added
+
+- Add credential-free SEMS raw/mapped telemetry and SOC source decisions to the
+  opt-in LOG debug report and the Home Assistant debug logger.
+- Add a **Beta tests** page to the dashboard layout menu with eight local-only
+  native button, switch, select and slider variants. It exposes raw
+  pointer/click/change/input and completed-action counts without sending a Home
+  Assistant service, WebSocket, GoodWe or EMHASS command.
+
+### Changed
+
+- Advance the complete active frontend module cache boundary to
+  `1.2.0-beta.2-soc-end-sems2-beta-tests1` so upgraded/open browser sessions cannot
+  retain the pre-fix nested SOC chart module or omit the diagnostic page.
+
 ## [1.2.0-beta.1] - 2026-09-01
 
 ### Added

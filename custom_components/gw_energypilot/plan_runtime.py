@@ -22,6 +22,7 @@ from .battery_plan import (
     normalize_emhass_forecasts,
     normalized_timestamp,
     plan_percentage_at,
+    plan_percentage_target_at,
     plan_valid_until,
     plan_value_at,
 )
@@ -354,7 +355,7 @@ class GWEnergyPilotPlanRuntime:
         """Return the current persisted P_grid target."""
         return self.current_value("p_grid")
 
-    def current_soc_opt(self) -> float | None:
+    def current_soc_opt(self, now: datetime | None = None) -> float | None:
         """Return the current persisted desired SOC percentage."""
         snapshot = self._snapshot
         if snapshot is None:
@@ -366,7 +367,24 @@ class GWEnergyPilotPlanRuntime:
             step = int(snapshot.get("step_seconds"))
         except (TypeError, ValueError):
             return None
-        return plan_percentage_at(points, dt_util.utcnow(), step)
+        return plan_percentage_at(points, now or dt_util.utcnow(), step)
+
+    def current_soc_opt_target(
+        self,
+        now: datetime | None = None,
+    ) -> tuple[float, datetime] | None:
+        """Return the active desired SOC and its EMHASS interval end."""
+        snapshot = self._snapshot
+        if snapshot is None:
+            return None
+        points = snapshot.get("soc_opt")
+        if not isinstance(points, list):
+            return None
+        try:
+            step = int(snapshot.get("step_seconds"))
+        except (TypeError, ValueError):
+            return None
+        return plan_percentage_target_at(points, now or dt_util.utcnow(), step)
 
     def current_step_seconds(self) -> int | None:
         """Return the inferred timestep for a plan that is valid now."""

@@ -3414,6 +3414,7 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
         "forecast_soc_visible": False,
         "soc_axis_visible": False,
         "soc_values_valid": False,
+        "soc_targets_interval_end": False,
         "error": None,
     }
     try:
@@ -3475,6 +3476,13 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
                 """
                 previousRevision => {
                   const root = window.__epPanel.shadowRoot;
+                  const data = window.__epPanel.__epV027BatteryPlanData;
+                  const sourcePoint = data?.payload?.battery_soc_plan?.points?.find(
+                    point => point.value_pct >= 0 && point.value_pct <= 100
+                  );
+                  const normalizedPoint = data?.socPlanPoints?.find(
+                    point => point.t === Date.parse(sourcePoint?.target_at)
+                  );
                   return {
                     data_changed:
                       window.__epPanel.__epV027BatteryPlanData?.payload?.plan_revision !== previousRevision,
@@ -3505,14 +3513,21 @@ def exercise_plan_refresh(page: Page) -> dict[str, object]:
                       root.querySelectorAll('.ep-v027-battery-plan-card svg text')
                     ).some(node => node.textContent?.trim() === 'SOC (%)'),
                     soc_values_valid: Boolean(
-                      window.__epPanel.__epV027BatteryPlanData?.actualSocRows?.length &&
-                      window.__epPanel.__epV027BatteryPlanData?.socPlanPoints?.length &&
-                      window.__epPanel.__epV027BatteryPlanData.actualSocRows.every(
+                      data?.actualSocRows?.length &&
+                      data?.socPlanPoints?.length &&
+                      data.actualSocRows.every(
                         point => point.pct >= 0 && point.pct <= 100
                       ) &&
-                      window.__epPanel.__epV027BatteryPlanData.socPlanPoints.every(
+                      data.socPlanPoints.every(
                         point => point.pct >= 0 && point.pct <= 100
                       )
+                    ),
+                    soc_targets_interval_end: Boolean(
+                      sourcePoint && normalizedPoint &&
+                      data.payload.battery_soc_plan.timestamp_semantics === 'interval_end' &&
+                      Date.parse(sourcePoint.target_at) ===
+                        Date.parse(sourcePoint.start) +
+                          data.payload.battery_soc_plan.step_seconds * 1000
                     ),
                   };
                 }
@@ -4377,6 +4392,246 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
     return result
 
 
+def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
+    """Exercise the local-only control laboratory without touching HA services."""
+    enabled = EXPECTED_ENTRYPOINT == "v110"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "menu_entry": False,
+        "opened": False,
+        "dashboard_hidden": False,
+        "touch_targets": False,
+        "responsive": False,
+        "controls": {},
+        "telemetry_main_stable": False,
+        "telemetry_tests_stable": False,
+        "structural_tests_stable": False,
+        "structural_open_preserved": False,
+        "local_only": False,
+        "closed": False,
+        "dashboard_restored": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        before = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              window.__epBetaBrowserIdentity = {
+                main: root.querySelector('main'),
+                tests: panel.__epPermanentBetaTests,
+              };
+              return {
+                service: window.__epServiceCalls.length,
+                ws: window.__epWsCalls.length,
+              };
+            }
+            """
+        )
+
+        activate(page, profile, ".ep-layout-button")
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.shadowRoot.querySelector('.ep-layout-menu') &&
+              window.__epPanel.shadowRoot.querySelector('.ep-beta-tests-menu')
+            )
+            """,
+            timeout=10_000,
+        )
+        result["menu_entry"] = True
+        activate(page, profile, ".ep-beta-tests-menu")
+        page.wait_for_function(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const tests = panel.__epPermanentBetaTests;
+              return Boolean(
+                tests && tests.isConnected && !tests.hidden &&
+                tests.querySelector('[data-beta-control="native-range"]') &&
+                tests.querySelector('ep-beta-shadow-button')?.shadowRoot?.querySelector('button') &&
+                panel.shadowRoot.querySelector('main')?.hasAttribute(
+                  'data-ep-beta-tests-open'
+                )
+              );
+            }
+            """,
+            timeout=10_000,
+        )
+        opened = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const main = root.querySelector('main');
+              const tests = panel.__epPermanentBetaTests;
+              const activationTargets = [
+                tests.querySelector('[data-beta-control="lit-button"]'),
+                tests.querySelector('[data-beta-control="listener-button"]'),
+                tests.querySelector('[data-beta-control="icon-button"]'),
+                tests.querySelector('ep-beta-shadow-button')?.shadowRoot?.querySelector('button'),
+                tests.querySelector('[data-beta-card="checkbox-switch"] .ep-beta-switch-row'),
+                tests.querySelector('[data-beta-card="label-switch"] .ep-beta-switch-row'),
+                tests.querySelector('[data-beta-control="native-select"]'),
+                tests.querySelector('[data-beta-control="native-range"]'),
+              ];
+              const visibleDashboardChildren = [...main.children].filter(
+                child => child !== tests && !child.classList.contains('topbar') && !child.hidden
+              );
+              const rect = tests.getBoundingClientRect();
+              return {
+                opened: !tests.hidden,
+                dashboardHidden: visibleDashboardChildren.length === 0,
+                touchTargets: activationTargets.every(node => {
+                  const target = node?.getBoundingClientRect();
+                  return target && target.width >= 44 && target.height >= 44;
+                }),
+                responsive: tests.scrollWidth <= tests.clientWidth + 1 &&
+                  rect.left >= -1 && rect.right <= innerWidth + 1,
+              };
+            }
+            """
+        )
+        result["opened"] = opened["opened"]
+        result["dashboard_hidden"] = opened["dashboardHidden"]
+        result["touch_targets"] = opened["touchTargets"]
+        result["responsive"] = opened["responsive"]
+
+        repeated_controls = (
+            '[data-beta-control="lit-button"]',
+            '[data-beta-control="listener-button"]',
+            '[data-beta-control="icon-button"]',
+            'ep-beta-shadow-button button',
+            '[data-beta-control="checkbox-switch"]',
+            '[data-beta-card="label-switch"] .ep-beta-switch-row',
+        )
+        for selector in repeated_controls:
+            for _index in range(20):
+                activate(page, profile, selector)
+
+        select = shadow(page, '[data-beta-control="native-select"]')
+        for index in range(20):
+            select.select_option(("b", "c", "a")[index % 3])
+
+        range_control = shadow(page, '[data-beta-control="native-range"]')
+        range_control.scroll_into_view_if_needed(timeout=5_000)
+        range_control.focus()
+        for index in range(20):
+            range_control.press("ArrowRight" if index % 2 == 0 else "ArrowLeft")
+
+        page.evaluate(
+            """
+            async () => {
+              await window.__epPanel.__epPermanentBetaTests.updateComplete;
+              await window.__epPanel.__epPermanentBetaTests.querySelector(
+                'ep-beta-shadow-button'
+              ).updateComplete;
+            }
+            """
+        )
+        snapshot = page.evaluate("window.__epBetaTests.snapshot()")
+        result["controls"] = snapshot["controls"]
+
+        page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              window.__epBetaTelemetryMain = panel.shadowRoot.querySelector('main');
+              window.__epBetaTelemetryTests = panel.__epPermanentBetaTests;
+              return window.__epTelemetryBurst(50, 4);
+            }
+            """
+        )
+        page.wait_for_timeout(500)
+        telemetry = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              return {
+                main: window.__epBetaTelemetryMain === panel.shadowRoot.querySelector('main'),
+                tests: window.__epBetaTelemetryTests === panel.__epPermanentBetaTests &&
+                  panel.__epPermanentBetaTests.isConnected &&
+                  !panel.__epPermanentBetaTests.hidden,
+              };
+            }
+            """
+        )
+        result["telemetry_main_stable"] = telemetry["main"]
+        result["telemetry_tests_stable"] = telemetry["tests"]
+
+        page.evaluate(
+            """
+            () => {
+              window.__epBetaStructuralTests = window.__epPanel.__epPermanentBetaTests;
+              window.__epPanel._queueRender();
+            }
+            """
+        )
+        page.wait_for_function(
+            """
+            () => Boolean(
+              !window.__epPanel._renderQueued &&
+              window.__epPanel.__epPermanentBetaTests?.isConnected
+            )
+            """,
+            timeout=10_000,
+        )
+        structural = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const tests = panel.__epPermanentBetaTests;
+              return {
+                stable: window.__epBetaStructuralTests === tests,
+                open: !tests.hidden && panel.__epBetaTestsOpen === true,
+              };
+            }
+            """
+        )
+        result["structural_tests_stable"] = structural["stable"]
+        result["structural_open_preserved"] = structural["open"]
+
+        activate(page, profile, ".ep-beta-tests-close")
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.__epPermanentBetaTests?.hidden &&
+              !window.__epPanel.shadowRoot.querySelector('main')?.hasAttribute(
+                'data-ep-beta-tests-open'
+              )
+            )
+            """,
+            timeout=10_000,
+        )
+        after = page.evaluate(
+            """
+            () => {
+              const panel = window.__epPanel;
+              const root = panel.shadowRoot;
+              const firstCard = root.querySelector('[data-ep-card]');
+              return {
+                service: window.__epServiceCalls.length,
+                ws: window.__epWsCalls.length,
+                restored: Boolean(firstCard && !firstCard.hidden),
+                closed: panel.__epPermanentBetaTests.hidden,
+              };
+            }
+            """
+        )
+        result["local_only"] = (
+            after["service"] == before["service"] and after["ws"] == before["ws"]
+        )
+        result["closed"] = after["closed"]
+        result["dashboard_restored"] = after["restored"]
+    except (PlaywrightError, RuntimeError) as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
@@ -4511,6 +4766,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     chart_range_press = exercise_chart_range_press(page, profile)
     plan = exercise_plan_refresh(page)
     execution_history = exercise_execution_history(page, profile)
+    beta_tests = exercise_beta_tests(page, profile)
     language_result = exercise_language(page)
     structural = exercise_structural_rerender(page)
 
@@ -4548,6 +4804,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "chart_range_press": chart_range_press,
         "plan": plan,
         "execution_history": execution_history,
+        "beta_tests": beta_tests,
         "language": language_result,
         "structural": structural,
         "animation": animation_summary(page),
@@ -4589,6 +4846,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     chart_range_press = result["chart_range_press"]
     plan = result["plan"]
     execution_history = result["execution_history"]
+    beta_tests = result["beta_tests"]
     language_result = result["language"]
     structural = result["structural"]
     animation = result["animation"]
@@ -4605,7 +4863,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
         "v101": "v1.0.1-beta.4 BETA",
-        "v110": "v1.2.0-beta.1 BETA",
+        "v110": "v1.2.0-beta.2 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -4994,7 +5252,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "optimize_control_stable", "costfun_control_stable",
             "max_export_control_stable", "strategy_control_stable",
             "actual_soc_visible", "forecast_soc_visible", "soc_axis_visible",
-            "soc_values_valid",
+            "soc_values_valid", "soc_targets_interval_end",
         )
     ):
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
@@ -5015,6 +5273,40 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if execution_history["error"]:
         failures.append(f"{name}: execution-history interaction error")
+    if EXPECTED_ENTRYPOINT == "v110":
+        required_beta_tests = (
+            "ran", "menu_entry", "opened", "dashboard_hidden", "touch_targets",
+            "responsive", "telemetry_main_stable", "telemetry_tests_stable",
+            "structural_tests_stable", "structural_open_preserved", "local_only",
+            "closed", "dashboard_restored",
+        )
+        controls = beta_tests.get("controls", {})
+        button_controls = (
+            "lit-button", "listener-button", "icon-button", "shadow-button",
+            "checkbox-switch", "label-switch",
+        )
+        repeated_ok = all(
+            controls.get(key, {}).get("metrics", {}).get("pointerdown", 0) >= 20
+            and controls.get(key, {}).get("metrics", {}).get("pointerup", 0) >= 20
+            and controls.get(key, {}).get("metrics", {}).get("click", 0) >= 20
+            and controls.get(key, {}).get("metrics", {}).get("actions", 0) == 20
+            for key in button_controls
+        )
+        native_ok = all(
+            controls.get(key, {}).get("metrics", {}).get("actions", 0) >= 20
+            and controls.get(key, {}).get("connected") is True
+            for key in ("native-select", "native-range")
+        )
+        if (
+            not all(beta_tests.get(key) is True for key in required_beta_tests)
+            or not repeated_ok
+            or not native_ok
+        ):
+            failures.append(
+                f"{name}: Beta tests local control laboratory regressed: {beta_tests}"
+            )
+        if beta_tests["error"]:
+            failures.append(f"{name}: Beta tests interaction error")
     if (
         language_result["localized"] is not True
         or (not control_architecture and language_result["manual_summary_localized"] is not True)

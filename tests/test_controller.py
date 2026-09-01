@@ -8,6 +8,7 @@ controller decision logic can be tested without hardware or network access.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import importlib
 from pathlib import Path
 import sys
@@ -693,6 +694,34 @@ class ControllerSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome["write_status"], "completed")
         self.assertEqual(outcome["verification_status"], "verified")
         self.assertEqual(outcome["readback_mode"], const.MODE_GRID_IMPORT_TARGET)
+
+    def test_execution_context_records_soc_interval_end_evidence(self):
+        controller, _, _, _ = self.make_controller()
+        target_at = datetime(2026, 9, 1, 19, 15, tzinfo=timezone.utc)
+
+        class FakePlanRuntime:
+            diagnostics = {
+                "source": "emhass_api_v1_plan",
+                "step_seconds": 900,
+            }
+
+            @staticmethod
+            def current_soc_opt_target(_now):
+                return 50.0, target_at
+
+        controller.entry.runtime_data = types.SimpleNamespace(
+            plan_runtime=FakePlanRuntime(),
+            orchestrator=types.SimpleNamespace(plan_revision=12),
+        )
+
+        context = controller._execution_context()
+
+        self.assertEqual(context["plan"]["soc_opt_pct"], 50.0)
+        self.assertEqual(
+            context["plan"]["soc_opt_target_at"],
+            "2026-09-01T19:15:00+00:00",
+        )
+        self.assertEqual(context["plan"]["step_seconds"], 900)
 
     async def test_matching_readback_is_logged_as_verified_without_write(self):
         history = FakeExecutionHistory()

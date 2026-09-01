@@ -382,6 +382,7 @@ class GWEnergyPilotController:
         return timestamp.isoformat() if timestamp is not None else None
 
     def _execution_context(self) -> dict[str, object]:
+        occurred_at = datetime.now(timezone.utc)
         p_batt_entity = self._p_batt_entity_id()
         p_grid_entity = self._p_grid_entity_id()
         p_batt_state = self.hass.states.get(p_batt_entity)
@@ -397,18 +398,32 @@ class GWEnergyPilotController:
             dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
         )
         current_soc = getattr(plan_runtime, "current_soc_opt", None)
+        current_soc_target = getattr(plan_runtime, "current_soc_opt_target", None)
+        soc_target = (
+            current_soc_target(occurred_at) if callable(current_soc_target) else None
+        )
+        if soc_target is not None:
+            soc_opt_pct = soc_target[0]
+        elif callable(current_soc):
+            soc_opt_pct = current_soc(occurred_at)
+        else:
+            soc_opt_pct = None
         configured_strategy = (getattr(self.entry, "data", {}) or {}).get(
             CONF_CONTROL_STRATEGY
         )
         return {
-            "occurred_at": datetime.now(timezone.utc),
+            "occurred_at": occurred_at,
             "kind": "controller_decision",
             "runtime_session_id": self.execution_session_id,
             "owner": "automatic" if self.enabled else "manual",
             "plan": {
                 "p_batt_w": p_batt,
                 "p_grid_w": p_grid,
-                "soc_opt_pct": current_soc() if callable(current_soc) else None,
+                "soc_opt_pct": soc_opt_pct,
+                "soc_opt_target_at": (
+                    soc_target[1].isoformat() if soc_target is not None else None
+                ),
+                "step_seconds": diagnostics.get("step_seconds"),
                 "p_batt_source": (
                     "home_assistant"
                     if live_p_batt is not None

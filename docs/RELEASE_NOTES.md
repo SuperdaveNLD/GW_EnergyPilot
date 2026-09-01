@@ -17,6 +17,32 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0-beta.2 — SEMS SOC safety, plan timing and local touch diagnostics
+
+SEMS telemetry now rejects the observed transient `soc: 0` portal placeholder.
+EnergyPilot first tries the selected inverter's positive SOC and otherwise
+makes the battery SOC unavailable, which blocks an EnergyPilot-owned EMHASS
+solve instead of initializing it at a false 0%. The opt-in LOG debug report and
+Home Assistant debug logger contain only an explicit credential-free allowlist
+of raw SEMS values, mapped output and SOC source/rejection decisions.
+
+Battery · Plan · Price now places Wanted SOC at the end of the associated
+EMHASS power interval (#122). A 50% `SOC_opt` row starting at 19:00 in a
+15-minute plan is therefore shown at 19:15. The same contract is derived from
+15-, 30- or 60-minute plans and retained in new historical execution evidence;
+battery-power and price timestamps are unchanged.
+
+The dashboard layout menu additionally offers **Beta tests**, a harmless local
+control laboratory for physical Safari and Home Assistant Companion diagnosis.
+Eight native button, switch, select and slider variants expose separate
+pointer, click, change/input and completed-action counters. The page sends no
+Home Assistant service, WebSocket, GoodWe or EMHASS command; see
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md` for the short field protocol.
+
+Local Modbus remains the only transport for EMS and verified minimum-SOC
+writes/read-back. Entity IDs, device identity, config entries and persistent
+Store keys are unchanged. See `docs/releases/v1.2.0-beta.2.md`.
+
 # v1.2.0-beta.1 — Mobile control modernization and SEMS+ telemetry
 
 The operational dashboard controls now live in one permanent declarative Lit
@@ -212,6 +238,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0-beta.2** | 2026-09-01 | **Beta** | Rejects false SEMS 0% SOC, corrects Wanted-SOC interval timing and adds an isolated local mobile-control diagnostic page. |
 | **1.2.0-beta.1** | 2026-09-01 | **Beta** | Combines permanent mobile controls with guarded SEMS+ Beta telemetry while retaining local-only EMS/minimum-SOC writes. |
 | **1.1.1** | 2026-08-31 | **Stable** | Fixes EP/EMHASS settings saves for managed battery profiles while preserving SOC-limit ownership. |
 | **1.1.0-beta.2** | 2026-08-31 | **Beta** | Validates the managed-profile settings-save hotfix before stable promotion. |

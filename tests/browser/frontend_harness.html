@@ -518,6 +518,7 @@
       }));
       const socPlan = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
+        target_at: new Date(hour.getTime() + (index + 1) * 60 * 60 * 1000).toISOString(),
         value_pct: Math.min(95, 54 + index * 1.25),
       }));
       const pBattState = window.__epHass?.states?.["sensor.p_batt_forecast"];
@@ -539,7 +540,14 @@
           occurred_at: occurred.toISOString(),
           runtime_session_id: "browser-session",
           owner: "automatic",
-          plan: { p_batt_w: -3000, p_grid_w: 3000, soc_opt_pct: soc + 1, revision: planRevision },
+          plan: {
+            p_batt_w: -3000,
+            p_grid_w: 3000,
+            soc_opt_pct: soc + 1,
+            soc_opt_target_at: new Date(occurred.getTime() + 15 * 60 * 1000).toISOString(),
+            step_seconds: 900,
+            revision: planRevision,
+          },
           configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: evActive },
           actual: {
             battery_soc_pct: soc,
@@ -566,7 +574,16 @@
         kind: "projection",
         occurred_at: new Date(hour.getTime() + index * 15 * 60 * 1000).toISOString(),
         owner: "automatic",
-        plan: { p_batt_w: index < 4 ? -3000 : 0, p_grid_w: index < 4 ? 3000 : 0, soc_opt_pct: 56 + index, revision: planRevision },
+        plan: {
+          p_batt_w: index < 4 ? -3000 : 0,
+          p_grid_w: index < 4 ? 3000 : 0,
+          soc_opt_pct: 56 + index,
+          soc_opt_target_at: new Date(
+            hour.getTime() + (index + 1) * 15 * 60 * 1000
+          ).toISOString(),
+          step_seconds: 900,
+          revision: planRevision,
+        },
         configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: false },
         actual: {},
         outcome: {
@@ -578,7 +595,7 @@
         },
       }));
       return {
-        chart_schema_version: 6,
+        chart_schema_version: 7,
         chart_time: {
           time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
           now: now.toISOString(),
@@ -617,7 +634,13 @@
           source: "emhass_api_v1_plan",
           source_column: "SOC_opt",
           source_unit: "fraction_0_1",
-          points: [...socPlan, { start: hour.toISOString(), value_pct: 156 }],
+          timestamp_semantics: "interval_end",
+          step_seconds: 3600,
+          points: [...socPlan, {
+            start: hour.toISOString(),
+            target_at: new Date(hour.getTime() + 60 * 60 * 1000).toISOString(),
+            value_pct: 156,
+          }],
         },
         execution: {
           schema_version: 1,

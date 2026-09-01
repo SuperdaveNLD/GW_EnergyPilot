@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.2.0-beta.1 runtime structure
+## Current v1.2.0-beta.2 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.2.0-beta.1 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.2.0-beta.2 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -179,8 +179,8 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.1 uses the final presentation-only beta wrapper and advances one
-complete `1.2.0-beta.1-mobile-sems1` active-graph cache boundary. The bounded
+v1.2.0-beta.2 uses the final presentation-only beta wrapper and advances one
+complete `1.2.0-beta.2-soc-end-sems2-beta-tests1` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
@@ -207,6 +207,13 @@ must remain bypassed while `__epControlSurfaceArchitecture` is active.
 Historical modules may style compatible class names but must neither recreate
 nor mutate descendants of `ep-control-surface`.
 
+v0.41 additionally mounts `ep-beta-tests.js` as a local-only diagnostic page
+behind the dashboard layout menu. This component must remain isolated from the
+control gateway and retain the same node/counters through telemetry and
+structural renders. The active desktop Chromium, iPad WebKit and iPhone WebKit
+stability matrix exercises all eight variants and asserts that it creates no
+service or WebSocket call.
+
 The inherited renderer must use `_commitStructuralRender()` so a structural
 dashboard update keeps the exact ShadowRoot, `main`, control surface and child
 controls connected. Never restore `shadowRoot.innerHTML`. A control action is a
@@ -228,7 +235,7 @@ Run both frontend browser gates after a rendering, interaction or CSS change:
 
 ```text
 /private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_control_surface.py
-/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_stability_v101.py
+/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_stability_v110.py
 ```
 
 The first is the authoritative gate for 50 activations of every rendered
@@ -539,14 +546,22 @@ SOC visualization:
 actual: registry-resolved GoodWe battery_soc (%)
         -> separate Recorder 5-minute means
 
-wanted history: execution Store SOC_opt snapshot at decision time
+wanted history: execution Store SOC_opt snapshot
+                -> persist the active row's evidenced interval-end target_at
 
 current/future: official schema-1.x SOC_opt fraction 0..1
                 -> plan_runtime validates and normalizes to value_pct
-                -> battery_soc_plan payload
+                -> retain source start
+                -> derive target_at = start + inferred 15/30/60-minute step
+                -> schema-7 battery_soc_plan payload
 ```
 
 Do not reuse the power-schedule fallback for SOC. EnergyPilot has no configured EMHASS SOC-output entity, and multi-battery plans have no meaningful bare/fleet `SOC_opt`.
+
+Do not plot `SOC_opt` at the source row timestamp: EMHASS has already applied
+that row's power when reconstructing the value. Do not shift `P_batt`, prices
+or Recorder actuals, and do not guess a target time for old execution events
+that lack `soc_opt_target_at`.
 
 Historical active plan still uses configured `P_batt` Home Assistant history so the displayed past reflects the target that was actually published then.
 
@@ -570,7 +585,7 @@ existing EnergyPilot runtime price-source path
 -> frontend visualization
 ```
 
-The chart API uses schema `6` and includes `plan_revision` plus bounded
+The chart API uses schema `7` and includes `plan_revision` plus bounded
 `execution` history/projection. The frontend should force-refresh the one
 canonical plan card and one canonical execution card when live evidence differs
 from the cached payload. It also includes backend-derived Home Assistant-timezone

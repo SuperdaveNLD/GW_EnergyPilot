@@ -166,6 +166,62 @@ class PersistentPlanHelperTests(unittest.TestCase):
             )
         )
 
+    def test_soc_targets_use_the_inferred_interval_end(self):
+        point = {"start": "2026-08-25T04:00:00Z", "value_pct": 42}
+
+        for step_seconds, expected in (
+            (900, "2026-08-25T04:15:00+00:00"),
+            (1800, "2026-08-25T04:30:00+00:00"),
+            (3600, "2026-08-25T05:00:00+00:00"),
+        ):
+            with self.subTest(step_seconds=step_seconds):
+                self.assertEqual(
+                    module.soc_interval_end_points([point], step_seconds),
+                    [
+                        {
+                            "start": "2026-08-25T04:00:00+00:00",
+                            "target_at": expected,
+                            "value_pct": 42.0,
+                        }
+                    ],
+                )
+
+        self.assertEqual(module.soc_interval_end_points([point], None), [])
+
+    def test_active_soc_target_returns_end_of_its_own_slot(self):
+        points = [
+            {"start": "2026-08-25T04:00:00Z", "value_pct": 42},
+            {"start": "2026-08-25T04:15:00Z", "value_pct": 55},
+        ]
+
+        value, target_at = module.plan_percentage_target_at(
+            points,
+            datetime(2026, 8, 25, 4, 7, tzinfo=timezone.utc),
+            900,
+        )
+        self.assertEqual(value, 42.0)
+        self.assertEqual(
+            target_at,
+            datetime(2026, 8, 25, 4, 15, tzinfo=timezone.utc),
+        )
+        self.assertIsNone(
+            module.plan_percentage_target_at(
+                points,
+                datetime(2026, 8, 25, 4, 7, tzinfo=timezone.utc),
+                None,
+            )
+        )
+
+    def test_soc_interval_end_is_an_absolute_dst_safe_instant(self):
+        points = [
+            {"start": "2026-10-25T02:45:00+02:00", "value_pct": 60},
+        ]
+
+        self.assertEqual(
+            module.soc_interval_end_points(points, 900)[0]["target_at"],
+            "2026-10-25T01:00:00+00:00",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

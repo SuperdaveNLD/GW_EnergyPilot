@@ -297,3 +297,66 @@ def plan_percentage_at(
         if next_start is not None and start <= target < next_start:
             return value
     return None
+
+
+def plan_percentage_target_at(
+    points: list[dict[str, Any]],
+    when: datetime,
+    step_seconds: int | None,
+) -> tuple[float, datetime] | None:
+    """Return the active SOC value and its evidenced interval-end instant.
+
+    EMHASS reconstructs each ``SOC_opt`` row after applying that row's power
+    over one optimization timestep. The source timestamp still denotes the
+    start of the power interval, so the SOC target belongs at ``start + step``.
+    Missing or invalid timestep evidence fails closed instead of guessing.
+    """
+    if step_seconds is None or step_seconds <= 0:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    target = when.timestamp()
+    parsed_points: list[tuple[float, float]] = []
+    for point in points:
+        parsed = normalized_timestamp(point.get("start"))
+        value = finite_number(point.get("value_pct"))
+        if parsed is not None and value is not None and 0.0 <= value <= 100.0:
+            parsed_points.append((parsed[1], value))
+    parsed_points.sort(key=lambda item: item[0])
+    for start, value in parsed_points:
+        interval_end = start + step_seconds
+        if start <= target < interval_end:
+            return (
+                value,
+                datetime.fromtimestamp(interval_end, tz=timezone.utc),
+            )
+    return None
+
+
+def soc_interval_end_points(
+    points: list[dict[str, Any]],
+    step_seconds: int | None,
+) -> list[dict[str, Any]]:
+    """Return validated SOC targets with explicit interval-end timestamps."""
+    if step_seconds is None or step_seconds <= 0:
+        return []
+    result: list[tuple[float, dict[str, Any]]] = []
+    for point in points:
+        parsed = normalized_timestamp(point.get("start"))
+        value = finite_number(point.get("value_pct"))
+        if parsed is None or value is None or not 0.0 <= value <= 100.0:
+            continue
+        interval_end = parsed[1] + step_seconds
+        result.append(
+            (
+                parsed[1],
+                {
+                    "start": parsed[0],
+                    "target_at": datetime.fromtimestamp(
+                        interval_end, tz=timezone.utc
+                    ).isoformat(),
+                    "value_pct": round(value, 3),
+                },
+            )
+        )
+    return [point for _start, point in sorted(result, key=lambda item: item[0])]

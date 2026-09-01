@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.2.0-beta.1** and retained from v1.0.0 Stable.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.2.0-beta.2** and retained from v1.0.0 Stable.
 
 ## Purpose
 
@@ -86,10 +86,20 @@ Forecast SOC comes only from exact `SOC_opt` rows in the validated official EMHA
 GET /api/v1/plan SOC_opt fraction 0..1
 -> validate finite and inside 0..1
 -> normalize once to value_pct 0..100
+-> retain source start and derive target_at = start + validated plan timestep
 -> battery_soc_plan in battery_price/get
 ```
 
 EMHASS stores `SOC_opt` as a fraction in the plan and scales it by 100 only when publishing its separate Home Assistant forecast entity. EnergyPilot does not use that output entity for this chart because its runtime ID can be customized and EnergyPilot has no SOC-output entity option. This also prevents double-scaling.
+
+EMHASS reconstructs each `SOC_opt` value after applying that row's battery
+power over one optimization timestep. Its plan-row timestamp is therefore the
+power-interval start, while the SOC value is the interval-end target. The
+backend preserves the source `start` for evidence and exposes an explicit
+`target_at` calculated from the mirrored plan's inferred timestep. The
+frontend plots only `target_at`; it does not hardcode 15 minutes or shift
+`P_batt`, price or actual Recorder data. For example, a 50% `SOC_opt` row at
+19:00 in a 15-minute plan is drawn at 19:15.
 
 For `number_of_batteries > 1`, EMHASS intentionally has no meaningful bare/fleet `SOC_opt`; it exposes per-battery `SOC_opt_<k>` values. EnergyPilot does not select a battery or fabricate an aggregate. Planned SOC therefore remains unavailable until an explicit battery-selection contract is designed.
 
@@ -98,7 +108,9 @@ elapsed time the v0.51 feature layer uses the `SOC_opt` snapshot stored with eac
 the current/future segment uses the latest validated official plan. This keeps
 historical intent immutable when a later optimization changes the horizon. On
 an upgraded installation before execution events exist, the previous current
-plan fallback remains available.
+plan fallback remains available. New snapshots persist `soc_opt_target_at`;
+legacy snapshots without an evidenced interval end are not guessed and age out
+under the existing seven-day retention policy.
 
 Both lines use a fixed `0..100%` axis independent of the power and price axes.
 Missing Recorder statistics, missing execution history, missing `SOC_opt` or
@@ -210,13 +222,16 @@ The existing command remains:
 gw_energypilot/battery_price/get
 ```
 
-The current command uses chart schema version **`6`** and includes:
+The current command uses chart schema version **`7`** and includes:
 
 - `plan_revision` — the EnergyPilot optimization generation currently owning the mirrored plan;
 - `chart_time` — authoritative Home Assistant timezone, current instant, local-day/history/maximum boundaries and the rolling/fixed window ticks;
 - `battery_energy` — current GoodWe charged/discharged day counters;
 - `battery_plan` — configured entity id, current target/source, future points, persistent-plan source, `generated_at`, `valid_until` and restore diagnostics;
-- `battery_soc_plan` — optional normalized `value_pct` points, `%` unit and exact official source-column/unit evidence;
+- `battery_soc_plan` — optional normalized `value_pct` points, original
+  interval `start`, explicit interval-end `target_at`, inferred `step_seconds`,
+  `interval_end` timestamp semantics, `%` unit and exact official
+  source-column/unit evidence;
 - timestamped market/effective-price data from the existing EnergyPilot price runtime.
 - `execution` — UTC boundaries, Home Assistant timezone, retention metadata,
   exact 48-hour decision evidence, a conditional 24-hour projection and its
@@ -226,7 +241,9 @@ The future projection joins exact timestamped `P_batt`, `P_grid`, optional
 `P_PV`, optional `P_Load` and `SOC_opt` rows from the current validated plan.
 It uses the shared controller strategy mapping but does not predict manual/EV
 ownership changes, write success or GoodWe read-back. Optional `P_PV` and
-`P_Load` are dashboard-only and are never control sources.
+`P_Load` are dashboard-only and are never control sources. Its plan evidence
+retains `soc_opt_target_at` separately from the projection command's interval
+start.
 
 When `force=true`, or no current plan mirror exists, the read-only API may request a bounded refresh from the official EMHASS plan endpoint. It does not run an optimization, write an inverter register or modify controller ownership.
 
@@ -243,9 +260,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v1.2.0-beta.1 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v1.2.0-beta.2 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.2.0-beta.1 loads its presentation wrapper and every inner feature import through `1.2.0-beta.1-mobile-sems1`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.2.0-beta.2 loads its presentation wrapper and every inner feature import through `1.2.0-beta.2-soc-end-sems2-beta-tests1`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
 
 ## EV protection underlays
 

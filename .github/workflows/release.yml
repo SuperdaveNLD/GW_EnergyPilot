@@ -69,6 +69,7 @@ jobs:
         run: |
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v110.js
           node --check custom_components/gw_energypilot/frontend/ep-control-surface.js
+          node --check custom_components/gw_energypilot/frontend/ep-beta-tests.js
           node --check custom_components/gw_energypilot/frontend/vendor/lit-3.3.3.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v101.js
           node --check custom_components/gw_energypilot/frontend/gw-energy-pilot-v051.js

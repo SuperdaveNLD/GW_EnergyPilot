@@ -12,7 +12,7 @@ optimization.
 
 ## Status
 
-**v1.2.0-beta.1 · Beta**
+**v1.2.0-beta.2 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -29,16 +29,18 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` remains the stable production release. `v1.2.0-beta.1` is the opt-in
-candidate combining permanent mobile controls with selectable SEMS+ Beta
-telemetry. Local Modbus remains mandatory for every EMS and minimum-SOC
-write/read-back. Normal users keep the HACS prerelease switch off; testers
-explicitly enable it for GW EnergyPilot before selecting the beta.
+`v1.1.1` remains the stable production release. `v1.2.0-beta.2` is the opt-in
+candidate combining the beta.1 mobile/SEMS foundation with guarded SEMS SOC,
+correct EMHASS Wanted-SOC timing and a local-only mobile interaction lab. Local
+Modbus remains mandatory for every EMS and minimum-SOC write/read-back. Normal
+users keep the HACS prerelease switch off; testers explicitly enable it for GW
+EnergyPilot before selecting the beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0-beta.2.md` — SEMS SOC, Wanted-SOC timing and local Beta tests notes;
 - `docs/releases/v1.2.0-beta.1.md` — mobile-control and SEMS+ combined beta notes;
 - `docs/releases/v1.1.1.md` — current stable managed-profile settings-save hotfix notes;
 - `docs/releases/v1.1.0-beta.2.md` — validated prerelease hotfix notes;
@@ -85,23 +87,22 @@ Release documentation:
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
 
-## v1.2.0-beta.1 highlights
+## v1.2.0-beta.2 highlights
 
-- Moves Battery actions, Automatic Control, EMHASS/Battery Strategy, Optimize,
-  Custom SOC and manual EMS into one permanent declarative Lit surface so the
-  same native controls survive telemetry and structural updates.
-- Adds **Configuration → GoodWe data & control → Telemetry source** with Local
-  Modbus TCP and SEMS+ API Beta choices, write-only credentials, explicit
-  station/inverter selection and a bounded 60–300 second cloud cadence.
-- Supports regional SEMS+ authentication, one token renewal and local
-  rate-limit back-off while rejecting ambiguous, stale, future, unsupported or
-  sentinel responses.
-- Maps only the evidence-backed cloud subset; unsupported local counters and
-  phase currents remain unavailable instead of being inferred.
-- Keeps cloud health independent from the always-local Modbus control/read-back
-  path and preserves entity, device, config-entry and Store identities.
-- Protects the complete `1.2.0-beta.1-mobile-sems1` frontend graph with desktop
-  Chromium, iPad WebKit and iPhone WebKit regression gates.
+- Includes the permanent mobile controls and selectable SEMS+ telemetry from
+  beta.1 without changing GoodWe control ownership or persistent identities.
+- Rejects the observed transient SEMS `soc: 0` placeholder, falls back to the
+  selected inverter SOC and otherwise blocks an EnergyPilot-owned solve on an
+  unavailable SOC.
+- Adds credential-free raw/mapped SEMS evidence and SOC source decisions to the
+  opt-in LOG debug report and Home Assistant debug logger.
+- Places EMHASS Wanted SOC at the evidenced end of each 15/30/60-minute power
+  interval in the chart and immutable execution evidence.
+- Adds a local-only **Beta tests** page for physical Safari/Companion button,
+  switch, select and slider diagnosis; it cannot send HA, GoodWe or EMHASS
+  commands.
+- Protects the complete `1.2.0-beta.2-soc-end-sems2-beta-tests1` frontend graph
+  with desktop Chromium, iPad WebKit and iPhone WebKit regression gates.
 
 ## v1.1.1 highlights
 
@@ -163,6 +164,11 @@ Release documentation:
 - Automated software acceptance is complete. Physical iPhone Safari and Home
   Assistant Companion acceptance remains open and must follow
   `docs/FRONTEND_IPHONE_ACCEPTANCE.md`.
+- The dashboard layout menu now contains **Beta tests**, a local-only control
+  laboratory with eight native button, switch, select and slider variants.
+  Pointer/click/action counters help isolate a physical Safari or Companion
+  failure without sending a Home Assistant service, WebSocket, GoodWe or
+  EMHASS command.
 - This frontend-only work does not change GoodWe registers/writes, EMS mappings,
   controller decisions, EMHASS ownership, entities, configuration or Store
   schemas.
@@ -278,7 +284,10 @@ Release documentation:
 - The new `pv_generation_power` sensor and PV-card breakdown update from both coordinator telemetry and external entity changes, with supported power-unit normalization and invalid-source filtering.
 - The combined PV value is display-only: Automatic Control, EMS, EMHASS, plans and grid accounting continue using their established canonical inputs.
 - Battery Strategy SOC sliders keep the user's selected value and percentage during Chrome focus loss and telemetry, until Home Assistant confirms the saved value.
-- Battery · Plan · Price now overlays actual GoodWe SOC with validated single-battery EMHASS `SOC_opt` forecast on a separate 0–100% axis.
+- Battery · Plan · Price overlays actual GoodWe SOC with validated
+  single-battery EMHASS `SOC_opt` on a separate 0–100% axis. Because EMHASS
+  computes each target after its power interval, Wanted SOC is plotted at the
+  inferred 15/30/60-minute interval end rather than one slot early (#122).
 - Live power connectors use static physical-direction arrows, relative low/medium/high thickness and explicit idle/unavailable states without reintroducing motion.
 - **Optimize now** is one safe-area-aware floating action that remains reachable while scrolling and when the optional EMHASS card is hidden or Settings is open.
 - The complete active frontend graph uses one fresh v0.45 cache key so these changes and the PV/SOC-slider work load together after upgrade.
@@ -644,7 +653,7 @@ The plan Store is a bounded resilience mirror of EMHASS's canonical plan, not a 
 
 Open dashboard settings → **LOG** and select **Start debug logging** only when reproducing a problem. Stop capture after reproduction, then use **Copy debug report** for support.
 
-The debug buffer is bounded and memory-only. It observes the current EnergyPilot runtime rather than polling or controlling hardware independently. See `docs/DEBUG_LOG.md` for captured fields, privacy boundaries and lifecycle details.
+The debug buffer is bounded and memory-only. It observes the current EnergyPilot runtime rather than polling or controlling hardware independently. With SEMS+ selected it also records only an explicit credential-free allowlist of raw portal fields, mapped values and field-selection decisions. See `docs/DEBUG_LOG.md` for captured fields, privacy boundaries and lifecycle details.
 
 ## Safety boundary
 

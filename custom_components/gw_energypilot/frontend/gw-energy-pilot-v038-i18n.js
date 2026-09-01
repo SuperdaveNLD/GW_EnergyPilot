@@ -1,7 +1,7 @@
 import {
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.1-mobile-sems1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
 
 const EMS_MODE_TEXT = {
   en: {

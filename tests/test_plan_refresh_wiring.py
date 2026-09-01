@@ -23,9 +23,11 @@ class PlanRefreshWiringTests(unittest.TestCase):
         source = (INTEGRATION / "battery_price_api.py").read_text(encoding="utf-8")
 
         self.assertIn('"plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0)', source)
-        self.assertIn('"chart_schema_version": 6', source)
+        self.assertIn('"chart_schema_version": 7', source)
         self.assertIn('"chart_time": build_chart_time_payload(', source)
         self.assertIn('"battery_soc_plan": _battery_soc_plan_payload(entry)', source)
+        self.assertIn('"timestamp_semantics": "interval_end"', source)
+        self.assertIn("soc_interval_end_points", source)
 
 
 if __name__ == "__main__":

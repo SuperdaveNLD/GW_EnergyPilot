@@ -4,7 +4,7 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.2.0-beta.1**. The beta is based on stable v1.1.1 and retains all
+EnergyPilot v1.2.0-beta.2**. The beta is based on stable v1.1.1 and retains all
 earlier v1 behavior through presentation-only wrappers; its nested v0.51
 feature layer supplies the scoped execution-history card.
 
@@ -28,27 +28,27 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v110.js?v=1.2.0-beta.1-mobile-sems1
-       -> gw-energy-pilot-v101.js?v=1.2.0-beta.1-mobile-sems1
-            -> gw-energy-pilot-v051.js?v=1.2.0-beta.1-mobile-sems1
-                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.1-mobile-sems1
-                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.1-mobile-sems1
-                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.1-mobile-sems1
-                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.1-mobile-sems1
-                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.1-mobile-sems1
-                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.1-mobile-sems1
-                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.1-mobile-sems1
-                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.1-mobile-sems1
-                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.1-mobile-sems1
-                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.1-mobile-sems1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.1-mobile-sems1
-                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.1-mobile-sems1
-                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.1-mobile-sems1
-                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.1-mobile-sems1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.1-mobile-sems1
+  -> gw-energy-pilot-v110.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+       -> gw-energy-pilot-v101.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+            -> gw-energy-pilot-v051.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1
 ```
 
-Every import in the active graph uses `1.2.0-beta.1-mobile-sems1`. This ensures an
+Every import in the active graph uses `1.2.0-beta.2-soc-end-sems2-beta-tests1`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 
@@ -81,6 +81,24 @@ The panel supplies frozen, narrowly scoped models and a small action gateway;
 it does not pass the full Home Assistant object into the component tree.
 Telemetry and API responses update component properties. Lit then patches only
 the dynamic parts of the existing controls.
+
+## Local Beta tests diagnostic boundary
+
+v0.41 also mounts one reusable `ep-beta-tests` diagnostic component and exposes
+it from the dashboard layout menu as **Beta tests**. It is deliberately outside
+the operational control surface: its eight controls mutate local Lit/browser
+state only and have no access to the Home Assistant action gateway, GoodWe or
+EMHASS. Captured `pointerdown`, `pointermove`, `pointerup`, `pointercancel`,
+`click`, `input`, `change` and completed-action counts are available in the
+page and through `globalThis.__epBetaTests`.
+
+Opening the page locally hides the other `main` children without rendering or
+disconnecting them. Ordinary telemetry continues to patch the hidden dashboard
+and preserves both `main` and the test component. A genuine structural render
+may rebuild historical content, but it must reattach the same test component,
+retain its counters and preserve the open state. Closing restores only the
+dashboard children that were visible before opening. The diagnostic adds no
+pointer capture, synthetic click, gesture cancellation, motion or HA call.
 
 Every asynchronous control follows one state machine:
 
@@ -238,6 +256,10 @@ addition to the permanent-control assertions above.
 The same matrix requires the Local Modbus/SEMS+ selector, write-only password,
 source-scoped cloud fields, always-enabled local-control fields and explicit
 local EMS safety copy on all three viewport profiles.
+It also opens **Beta tests**, performs twenty activations or value changes per
+variant, verifies raw event/action counts, runs telemetry and a structural
+render, restores the dashboard and proves that the complete diagnostic session
+emits zero Home Assistant service and WebSocket calls.
 
 ## Contributor rules
 

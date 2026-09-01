@@ -51,6 +51,9 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("normalizeSocStatisticRows", data)
         self.assertIn("normalizeSocPlanPoints", data)
         self.assertIn("p.value_pct", data)
+        self.assertIn("p.target_at", data)
+        self.assertIn("event?.plan?.soc_opt_target_at", data)
+        self.assertNotIn("timestampMs(p.start), pct", data)
         self.assertNotIn("p.pct <= 1)", data)
         self.assertIn('data-series="actual-soc"', view)
         self.assertIn('data-series="forecast-soc"', view)
@@ -238,11 +241,11 @@ class FrontendDashboardCardTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            'gw-energy-pilot-v031-battery-saver.js?v=1.2.0-beta.1-mobile-sems1',
+            'gw-energy-pilot-v031-battery-saver.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1',
             release_v034,
         )
         self.assertIn(
-            'gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.1-mobile-sems1',
+            'gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1',
             release_v034,
         )
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)

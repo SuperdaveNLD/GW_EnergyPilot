@@ -1,20 +1,21 @@
-import "./gw-energy-pilot-v039.js?v=1.2.0-beta.1-mobile-sems1";
+import "./gw-energy-pilot-v039.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.1-mobile-sems1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.1-mobile-sems1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-beta.1-mobile-sems1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.1-mobile-sems1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.2.0-beta.1-mobile-sems1";
+} from "./ep-control-surface.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -2198,6 +2199,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     this.__epV038HoverTrackingInstalled = true;
     const result = previousRender.apply(this, args);
     mountEnergyPilotControlSurface(this, this.shadowRoot);
+    mountEnergyPilotBetaTests(this, this.shadowRoot);
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
     installPvFlowGroup(this.shadowRoot);
