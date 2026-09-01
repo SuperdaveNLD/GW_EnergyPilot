@@ -27,6 +27,7 @@ const CONTROL_DEFINITIONS = Object.freeze([
 
 const BETA_TESTS_CSS = `
   ep-beta-tests, ep-beta-shadow-button { display:block; min-width:0; }
+  ep-beta-tests[hidden] { display:none!important; }
   .ep-beta-tests {
     margin:14px 0 18px; padding:14px; border-radius:18px; color:#e9f8ff;
     border:1px solid rgba(104,202,239,.26);

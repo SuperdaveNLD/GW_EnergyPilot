@@ -76,6 +76,7 @@ class FrontendBetaTests(unittest.TestCase):
         self.assertIn("panel.__epPermanentBetaTests", self.source)
         self.assertIn("if (!tests.isConnected)", self.source)
         self.assertIn("tests.hidden = !open", self.source)
+        self.assertIn("ep-beta-tests[hidden]", self.source)
         self.assertNotIn("main.innerHTML", self.source)
         self.assertNotIn("root.innerHTML", self.source)
 

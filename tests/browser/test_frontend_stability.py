@@ -4397,6 +4397,7 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
     enabled = EXPECTED_ENTRYPOINT == "v110"
     result: dict[str, object] = {
         "ran": enabled,
+        "initially_hidden": False,
         "menu_entry": False,
         "opened": False,
         "dashboard_hidden": False,
@@ -4428,10 +4429,15 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
               return {
                 service: window.__epServiceCalls.length,
                 ws: window.__epWsCalls.length,
+                testsHidden: Boolean(
+                  panel.__epPermanentBetaTests?.hidden &&
+                  getComputedStyle(panel.__epPermanentBetaTests).display === 'none'
+                ),
               };
             }
             """
         )
+        result["initially_hidden"] = before["testsHidden"]
 
         activate(page, profile, ".ep-layout-button")
         page.wait_for_function(
@@ -4617,7 +4623,10 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
                 service: window.__epServiceCalls.length,
                 ws: window.__epWsCalls.length,
                 restored: Boolean(firstCard && !firstCard.hidden),
-                closed: panel.__epPermanentBetaTests.hidden,
+                closed: Boolean(
+                  panel.__epPermanentBetaTests.hidden &&
+                  getComputedStyle(panel.__epPermanentBetaTests).display === 'none'
+                ),
               };
             }
             """
@@ -5275,7 +5284,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: execution-history interaction error")
     if EXPECTED_ENTRYPOINT == "v110":
         required_beta_tests = (
-            "ran", "menu_entry", "opened", "dashboard_hidden", "touch_targets",
+            "ran", "initially_hidden", "menu_entry", "opened", "dashboard_hidden", "touch_targets",
             "responsive", "telemetry_main_stable", "telemetry_tests_stable",
             "structural_tests_stable", "structural_open_preserved", "local_only",
             "closed", "dashboard_restored",
