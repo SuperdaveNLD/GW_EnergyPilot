@@ -3995,6 +3995,114 @@ def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object
     return result
 
 
+def exercise_sems_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Verify the SEMS Beta selector, secret field and local-control boundary."""
+    enabled = EXPECTED_ENTRYPOINT == "v110"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "tab_present": False,
+        "choices_present": False,
+        "sems_disabled_in_local_mode": False,
+        "sems_enabled_in_cloud_mode": False,
+        "local_control_stays_enabled": False,
+        "password_protected": False,
+        "boundary_copy_present": False,
+        "submitted_complete": False,
+        "closed": False,
+        "error": None,
+    }
+    if not enabled:
+        return result
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        page.wait_for_selector(
+            'gw-energypilot-panel >> [data-settings-tab="goodwe"]',
+            timeout=10_000,
+        )
+        result["tab_present"] = True
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        page.wait_for_selector(
+            'gw-energypilot-panel >> .ep-v016-form[data-section="goodwe"]',
+            timeout=10_000,
+        )
+        state = page.evaluate(
+            """
+            async () => {
+              const root = window.__epPanel.shadowRoot;
+              const form = root.querySelector('.ep-v016-form[data-section="goodwe"]');
+              const source = form?.querySelector('[data-setting-key="telemetry_source"]');
+              const username = form?.querySelector('[data-setting-key="sems_username"]');
+              const password = form?.querySelector('[data-setting-key="sems_password"]');
+              const station = form?.querySelector('[data-setting-key="sems_station_id"]');
+              const serial = form?.querySelector('[data-setting-key="sems_inverter_serial"]');
+              const cadence = form?.querySelector('[data-setting-key="sems_scan_interval"]');
+              const local = ['host', 'port', 'slave'].map((key) =>
+                form?.querySelector(`[data-setting-key="${key}"]`)
+              );
+              const choicesPresent = source?.value === 'modbus' &&
+                [...source.options].some((option) => option.value === 'modbus') &&
+                [...source.options].some((option) => option.value === 'sems_api');
+              const semsDisabledInLocalMode = [username, password, station, serial, cadence]
+                .every((input) => input?.disabled === true);
+              source.value = 'sems_api';
+              source.dispatchEvent(new Event('change', { bubbles: true }));
+              const semsEnabledInCloudMode = [username, password, station, serial, cadence]
+                .every((input) => input?.disabled === false) && username?.required === true;
+              const localControlStaysEnabled = local.every((input) => input?.disabled === false);
+              const passwordProtected = password?.type === 'password' &&
+                password?.value === '' && password?.autocomplete === 'new-password';
+              const boundaryCopyPresent = root.querySelector('.ep-v016-goodwe-note')
+                ?.textContent?.includes('Every EMS mode/setpoint command still uses the local Modbus');
+              password.value = 'browser-secret';
+              form.dispatchEvent(new Event('submit', {
+                bubbles: true, composed: true, cancelable: true,
+              }));
+              await new Promise((resolve) => setTimeout(resolve, 120));
+              const call = [...window.__epWsCalls].reverse().find(
+                (item) => item.type === 'gw_energypilot/settings/update' &&
+                  item.section === 'goodwe'
+              );
+              return {
+                choicesPresent,
+                semsDisabledInLocalMode,
+                semsEnabledInCloudMode,
+                localControlStaysEnabled,
+                passwordProtected,
+                boundaryCopyPresent,
+                submittedComplete: call?.values?.telemetry_source === 'sems_api' &&
+                  call?.values?.sems_username === 'visitor@example.com' &&
+                  call?.values?.sems_password === 'browser-secret' &&
+                  call?.values?.sems_station_id === 'station-1' &&
+                  call?.values?.sems_inverter_serial === 'ETA15TEST0001' &&
+                  call?.values?.sems_scan_interval === 60 &&
+                  call?.values?.host === '192.0.2.10' &&
+                  call?.values?.port === 502 && call?.values?.slave === 247,
+              };
+            }
+            """
+        )
+        result.update(
+            {
+                "choices_present": state["choicesPresent"],
+                "sems_disabled_in_local_mode": state["semsDisabledInLocalMode"],
+                "sems_enabled_in_cloud_mode": state["semsEnabledInCloudMode"],
+                "local_control_stays_enabled": state["localControlStaysEnabled"],
+                "password_protected": state["passwordProtected"],
+                "boundary_copy_present": state["boundaryCopyPresent"],
+                "submitted_complete": state["submittedComplete"],
+            }
+        )
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        result["closed"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_ev_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the EV tab, entity filtering and >16 A acknowledgement path."""
     result: dict[str, object] = {
@@ -4371,6 +4479,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 
     pv_insight = exercise_pv_insight(page)
     deadband_settings = exercise_deadband_settings(page, profile)
+    sems_settings = exercise_sems_settings(page, profile)
     pv_settings = exercise_pv_settings(page, profile)
     ev_settings = exercise_ev_settings(page, profile)
     host_property_press = exercise_host_property_press(page, profile)
@@ -4407,6 +4516,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "motion": motion,
         "pv_insight": pv_insight,
         "deadband_settings": deadband_settings,
+        "sems_settings": sems_settings,
         "pv_settings": pv_settings,
         "ev_settings": ev_settings,
         "host_property_press": host_property_press,
@@ -4447,6 +4557,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     motion = result["motion"]
     pv_insight = result["pv_insight"]
     deadband_settings = result["deadband_settings"]
+    sems_settings = result["sems_settings"]
     pv_settings = result["pv_settings"]
     ev_settings = result["ev_settings"]
     host_property_press = result["host_property_press"]
@@ -4669,6 +4780,21 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if deadband_settings["error"]:
         failures.append(f"{name}: EP deadband settings interaction error")
+    if EXPECTED_ENTRYPOINT == "v110" and not all(
+        sems_settings.get(key) is True
+        for key in (
+            "ran", "tab_present", "choices_present",
+            "sems_disabled_in_local_mode", "sems_enabled_in_cloud_mode",
+            "local_control_stays_enabled", "password_protected",
+            "boundary_copy_present", "submitted_complete", "closed",
+        )
+    ):
+        failures.append(
+            f"{name}: SEMS telemetry settings/control boundary regressed: "
+            f"{sems_settings}"
+        )
+    if sems_settings["error"]:
+        failures.append(f"{name}: SEMS settings interaction error")
     if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
         if not all(
             ev_settings[key] is True

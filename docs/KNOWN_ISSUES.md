@@ -34,7 +34,7 @@ Do not invert, clamp or globally reinterpret register `35172` solely from this o
 - whether another/AC-coupled PV inverter or other generation source exists;
 - GoodWe `35172`, load-phase values, grid power, battery power and PV power from the same timestamp.
 
-## SEMS / SEMS+ with the official GoodWe plugin or integration
+## SEMS / SEMS+ session and station compatibility
 
 ### Symptom
 
@@ -47,11 +47,15 @@ This is treated as a GoodWe/SEMS integration issue rather than a GW EnergyPilot 
 If you depend on SEMS / SEMS+:
 
 - do **not** use the official GoodWe plugin/integration for the SEMS connection;
-- prefer a community/custom GoodWe integration that reads the inverter through the **SEMS API**;
-- keep GW EnergyPilot's local Modbus TCP connection separate from the SEMS cloud/API integration;
+- use EnergyPilot's built-in **SEMS+ API · Beta** telemetry option only for a
+  supported station, or a separate maintained custom SEMS integration;
+- keep GW EnergyPilot's local Modbus TCP connection available for EMS control;
 - avoid running multiple integrations that continuously poll the same local Modbus TCP endpoint when that is not required.
 
-GW EnergyPilot itself communicates locally with the inverter over Modbus TCP. A SEMS API integration is therefore complementary: it can provide SEMS/cloud information without taking over GW EnergyPilot's local EMS control path.
+GW EnergyPilot v1.1.0-beta.2 can obtain its supported telemetry subset directly
+from SEMS+, but local Modbus remains the only EMS/minimum-SOC control path.
+Station type 2 portal payloads without `inverter[].invert_full` are not yet
+supported. See `docs/SEMS_API.md`.
 
 ### Troubleshooting
 
@@ -59,7 +63,8 @@ If an inverter starts disappearing from GoodWe/SEMS software:
 
 1. disable the official GoodWe plugin/integration first;
 2. recover or re-add the inverter in SEMS / SEMS+ if necessary;
-3. use a custom GoodWe integration based on the SEMS API for SEMS/cloud data;
+3. use EnergyPilot SEMS+ Beta only on its supported portal shape, or a maintained
+   custom SEMS integration for broader cloud data;
 4. keep only the integrations that are actually needed for continuous local polling.
 
 When reporting this behaviour, mention that SEMS / SEMS+ is involved and list every active GoodWe-related integration. This helps separate a GoodWe/SEMS account or plugin problem from a GW EnergyPilot local Modbus problem.

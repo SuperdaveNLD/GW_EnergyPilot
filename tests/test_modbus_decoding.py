@@ -71,7 +71,8 @@ class FakeResponse:
 class FakeModbusClient:
     def __init__(self) -> None:
         self.connected = True
-        self.values = {45356: 10, 45358: 10}
+        self.values = {45356: 10, 45357: 0, 45358: 12, 47511: 8, 47512: 0}
+        self.fail_reads: set[int] = set()
         self.writes: list[tuple[int, int, int]] = []
 
     async def write_register(self, address: int, value: int, device_id: int):
@@ -80,6 +81,8 @@ class FakeModbusClient:
         return FakeResponse()
 
     async def read_holding_registers(self, start: int, count: int, device_id: int):
+        if start in self.fail_reads:
+            return FakeResponse(error=True)
         return FakeResponse([self.values[start + offset] for offset in range(count)])
 
     def close(self) -> None:
@@ -146,6 +149,31 @@ class ModbusDecodingTests(unittest.TestCase):
 
 
 class BetaSocWriteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cloud_control_readback_keeps_local_soc_floor_values(self):
+        instance = _beta_test_client()
+
+        snapshot = await instance.async_read_control_status()
+
+        self.assertEqual(snapshot.values["ems_mode"], 8)
+        self.assertEqual(snapshot.values["ems_setpoint"], 0)
+        self.assertEqual(snapshot.values["battery_discharge_depth_on_grid"], 10)
+        self.assertEqual(snapshot.values["battery_discharge_depth_off_grid"], 12)
+
+    async def test_optional_soc_floor_failure_does_not_hide_ems_readback(self):
+        instance = _beta_test_client()
+        instance._client.fail_reads.add(45356)
+
+        snapshot = await instance.async_read_control_status()
+
+        self.assertEqual(
+            snapshot.values,
+            {
+                "ems_mode": 8,
+                "ems_setpoint": 0,
+                "battery_discharge_depth_off_grid": 12,
+            },
+        )
+
     async def test_on_grid_soc_floor_write_is_verified(self):
         instance = _beta_test_client()
 

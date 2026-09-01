@@ -59,8 +59,14 @@ from .const import (
     CONF_P_BATT_ENTITY,
     CONF_P_GRID_ENTITY,
     CONF_SCAN_INTERVAL,
+    CONF_SEMS_INVERTER_SERIAL,
+    CONF_SEMS_PASSWORD,
+    CONF_SEMS_SCAN_INTERVAL,
+    CONF_SEMS_STATION_ID,
+    CONF_SEMS_USERNAME,
     CONF_SELL_PRICE_DEDUCTION,
     CONF_SLAVE,
+    CONF_TELEMETRY_SOURCE,
     CONF_USE_NORDPOOL_PRICES,
     DEFAULT_BUY_PRICE_ADDER,
     DEFAULT_DEADBAND,
@@ -91,8 +97,10 @@ from .const import (
     DEFAULT_P_GRID_ENTITY,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SEMS_SCAN_INTERVAL,
     DEFAULT_SELL_PRICE_DEDUCTION,
     DEFAULT_SLAVE,
+    DEFAULT_TELEMETRY_SOURCE,
     DEFAULT_USE_NORDPOOL_PRICES,
     DOMAIN,
     EMHASS_OPTIMIZATION_INTERVALS,
@@ -104,10 +112,16 @@ from .const import (
     EV_LOAD_BALANCE_WINDOW_OPTIONS,
     GRID_CONNECTION_CUSTOM_PROFILES,
     GRID_CONNECTION_PROFILES,
+    MAX_SEMS_SCAN_INTERVAL,
+    MIN_SEMS_SCAN_INTERVAL,
     NAME,
+    TELEMETRY_SOURCES,
+    TELEMETRY_SOURCE_MODBUS,
+    TELEMETRY_SOURCE_SEMS,
 )
 from .ev_load_balancing import EVLoadBalancingAudit, high_current_audit_record
 from .pv_insight import external_sources_enabled
+from .sems_api import GWSemsClient, GWSemsError
 
 SECTION_ENERGYPILOT = "energypilot"
 SECTION_EMHASS = "emhass"
@@ -203,12 +217,27 @@ PV_SCHEMA = vol.Schema(
 
 GOODWE_SCHEMA = vol.Schema(
     {
+        vol.Required(
+            CONF_TELEMETRY_SOURCE,
+            default=DEFAULT_TELEMETRY_SOURCE,
+        ): vol.In(TELEMETRY_SOURCES),
         vol.Required(CONF_HOST): vol.All(str, str.strip, vol.Length(min=1)),
         vol.Required(CONF_PORT): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=65535)
         ),
         vol.Required(CONF_SLAVE): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=247)
+        ),
+        vol.Optional(CONF_SEMS_USERNAME): vol.All(str, str.strip),
+        vol.Optional(CONF_SEMS_PASSWORD): str,
+        vol.Optional(CONF_SEMS_STATION_ID): vol.All(str, str.strip),
+        vol.Optional(CONF_SEMS_INVERTER_SERIAL): vol.All(str, str.strip),
+        vol.Required(
+            CONF_SEMS_SCAN_INTERVAL,
+            default=DEFAULT_SEMS_SCAN_INTERVAL,
+        ): vol.All(
+            vol.Coerce(int),
+            vol.Range(min=MIN_SEMS_SCAN_INTERVAL, max=MAX_SEMS_SCAN_INTERVAL),
         ),
     },
     extra=vol.PREVENT_EXTRA,
@@ -488,14 +517,17 @@ EP_FIELD_SPECS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": CONF_SCAN_INTERVAL,
-        "label": "GoodWe telemetry refresh",
+        "label": "Local Modbus telemetry refresh",
         "type": "number",
         "default": DEFAULT_SCAN_INTERVAL,
         "unit": "s",
         "min": 5,
         "max": 60,
         "step": 1,
-        "description": "Polling cadence for local GoodWe Modbus telemetry.",
+        "description": (
+            "Polling cadence when Local Modbus TCP is selected. SEMS+ uses its "
+            "separate interval under Data."
+        ),
     },
 )
 
@@ -925,6 +957,23 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
     )
     goodwe_fields = [
         {
+            "key": CONF_TELEMETRY_SOURCE,
+            "label": "Telemetry source",
+            "type": "select",
+            "value": str(
+                entry.data.get(CONF_TELEMETRY_SOURCE, DEFAULT_TELEMETRY_SOURCE)
+            ),
+            "options": [
+                {"value": TELEMETRY_SOURCE_MODBUS, "label": "Local Modbus TCP"},
+                {"value": TELEMETRY_SOURCE_SEMS, "label": "SEMS+ API · Beta"},
+            ],
+            "description": (
+                "Select where runtime telemetry is read. EMS commands always use "
+                "the local Modbus connection below."
+            ),
+            "readonly": False,
+        },
+        {
             "key": "hardware_target",
             "label": "Validated hardware target",
             "type": "text",
@@ -963,6 +1012,86 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
             "step": 1,
             "readonly": False,
         },
+        {
+            "key": CONF_SEMS_USERNAME,
+            "label": "SEMS+ account",
+            "type": "text",
+            "value": str(entry.data.get(CONF_SEMS_USERNAME, "")),
+            "description": (
+                "SEMS/SEMS+ email address. A read-only visitor account is recommended."
+            ),
+            "readonly": False,
+            "source": TELEMETRY_SOURCE_SEMS,
+        },
+        {
+            "key": CONF_SEMS_PASSWORD,
+            "label": "SEMS+ password",
+            "type": "password",
+            "value": "",
+            "placeholder": "Leave blank to keep the configured password",
+            "description": (
+                "Stored in the Home Assistant config entry and never returned to "
+                "the dashboard."
+            ),
+            "readonly": False,
+            "source": TELEMETRY_SOURCE_SEMS,
+        },
+        {
+            "key": "sems_password_status",
+            "label": "SEMS+ password status",
+            "type": "text",
+            "value": (
+                "Configured"
+                if bool(entry.data.get(CONF_SEMS_PASSWORD))
+                else "Not configured"
+            ),
+            "description": "The stored password itself is never exposed.",
+            "readonly": True,
+            "source": TELEMETRY_SOURCE_SEMS,
+        },
+        {
+            "key": CONF_SEMS_STATION_ID,
+            "label": "SEMS station ID",
+            "type": "text",
+            "value": str(entry.data.get(CONF_SEMS_STATION_ID, "")),
+            "placeholder": "Auto-detect when exactly one station is available",
+            "description": (
+                "Required when the account can access more than one power station."
+            ),
+            "readonly": False,
+            "source": TELEMETRY_SOURCE_SEMS,
+        },
+        {
+            "key": CONF_SEMS_INVERTER_SERIAL,
+            "label": "SEMS inverter serial",
+            "type": "text",
+            "value": str(entry.data.get(CONF_SEMS_INVERTER_SERIAL, "")),
+            "placeholder": "Auto-detect when the station has one inverter",
+            "description": (
+                "Required for multi-inverter stations so EnergyPilot never chooses "
+                "the wrong inverter silently."
+            ),
+            "readonly": False,
+            "source": TELEMETRY_SOURCE_SEMS,
+        },
+        {
+            "key": CONF_SEMS_SCAN_INTERVAL,
+            "label": "SEMS+ telemetry refresh",
+            "type": "number",
+            "value": int(
+                entry.data.get(CONF_SEMS_SCAN_INTERVAL, DEFAULT_SEMS_SCAN_INTERVAL)
+            ),
+            "unit": "s",
+            "min": MIN_SEMS_SCAN_INTERVAL,
+            "max": MAX_SEMS_SCAN_INTERVAL,
+            "step": 30,
+            "description": (
+                "Cloud polling is limited to 60–300 seconds; rate-limit responses "
+                "activate an additional five-minute local back-off."
+            ),
+            "readonly": False,
+            "source": TELEMETRY_SOURCE_SEMS,
+        },
     ]
 
     return {
@@ -979,7 +1108,7 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
             SECTION_ENERGYPILOT: {
                 "title": "EnergyPilot",
                 "short_title": "EP",
-                "description": "GoodWe controller boundaries and telemetry cadence.",
+                "description": "GoodWe controller boundaries and local polling cadence.",
                 "fields": _fields_from_specs(options, EP_FIELD_SPECS),
             },
             SECTION_EV: {
@@ -1002,11 +1131,11 @@ def _settings_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
                 "fields": _fields_from_specs(options, EMHASS_FIELD_SPECS),
             },
             SECTION_GOODWE: {
-                "title": "GoodWe",
-                "short_title": "GOODWE",
+                "title": "GoodWe data & control",
+                "short_title": "DATA",
                 "description": (
-                    "Local Modbus TCP connection. Changes are validated against the "
-                    "inverter before saving."
+                    "Choose local Modbus or SEMS+ Beta telemetry. Local Modbus "
+                    "remains the only EMS control transport."
                 ),
                 "fields": goodwe_fields,
             },
@@ -1104,18 +1233,68 @@ async def websocket_update_settings(
             host = validated[CONF_HOST]
             port = validated[CONF_PORT]
             slave = validated[CONF_SLAVE]
-            await _async_validate_connection(host, port, slave)
-        except (vol.Invalid, CannotConnect) as err:
+            telemetry_source = validated[CONF_TELEMETRY_SOURCE]
+        except vol.Invalid as err:
             connection.send_error(
                 msg["id"],
-                "cannot_connect"
-                if isinstance(err, CannotConnect)
-                else "invalid_settings",
-                "Unable to validate the GoodWe Modbus connection"
-                if isinstance(err, CannotConnect)
-                else str(err),
+                "invalid_settings",
+                str(err),
             )
             return
+
+        local_changed = any(
+            (
+                host != entry.data.get(CONF_HOST),
+                int(port) != int(entry.data.get(CONF_PORT, DEFAULT_PORT)),
+                int(slave) != int(entry.data.get(CONF_SLAVE, DEFAULT_SLAVE)),
+            )
+        )
+        if telemetry_source == TELEMETRY_SOURCE_MODBUS or local_changed:
+            try:
+                await _async_validate_connection(host, port, slave)
+            except CannotConnect:
+                connection.send_error(
+                    msg["id"],
+                    "cannot_connect",
+                    "Unable to validate the local GoodWe Modbus connection",
+                )
+                return
+
+        username = str(validated.get(CONF_SEMS_USERNAME, "")).strip()
+        submitted_password = str(validated.get(CONF_SEMS_PASSWORD, ""))
+        password = submitted_password or str(
+            entry.data.get(CONF_SEMS_PASSWORD, "")
+        )
+        station_id = str(validated.get(CONF_SEMS_STATION_ID, "")).strip()
+        inverter_serial = str(
+            validated.get(CONF_SEMS_INVERTER_SERIAL, "")
+        ).strip()
+        if telemetry_source == TELEMETRY_SOURCE_SEMS:
+            if not username or not password:
+                connection.send_error(
+                    msg["id"],
+                    "invalid_auth",
+                    "A SEMS+ account and password are required",
+                )
+                return
+            sems_client = GWSemsClient(
+                hass,
+                username,
+                password,
+                station_id,
+                inverter_serial,
+            )
+            try:
+                resolved = await sems_client.async_validate()
+            except GWSemsError as err:
+                connection.send_error(
+                    msg["id"],
+                    "cannot_connect",
+                    str(err),
+                )
+                return
+            station_id = resolved.station_id
+            inverter_serial = resolved.inverter_serial
 
         unique_id = f"{host}:{slave}"
         duplicate = next(
@@ -1137,8 +1316,21 @@ async def websocket_update_settings(
 
         new_data = dict(entry.data)
         new_data.update(
-            {CONF_HOST: host, CONF_PORT: port, CONF_SLAVE: slave}
+            {
+                CONF_HOST: host,
+                CONF_PORT: port,
+                CONF_SLAVE: slave,
+                CONF_TELEMETRY_SOURCE: telemetry_source,
+                CONF_SEMS_USERNAME: username,
+                CONF_SEMS_STATION_ID: station_id,
+                CONF_SEMS_INVERTER_SERIAL: inverter_serial,
+                CONF_SEMS_SCAN_INTERVAL: int(
+                    validated[CONF_SEMS_SCAN_INTERVAL]
+                ),
+            }
         )
+        if password:
+            new_data[CONF_SEMS_PASSWORD] = password
         hass.config_entries.async_update_entry(
             entry,
             data=new_data,

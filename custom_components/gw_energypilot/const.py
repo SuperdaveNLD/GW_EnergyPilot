@@ -47,6 +47,18 @@ CONF_EV_CHARGER_MAX_CURRENT = "ev_charger_max_current"
 CONF_EV_LOAD_BALANCE_WINDOW = "ev_load_balance_window"
 CONF_SCAN_INTERVAL = "scan_interval"
 
+# Telemetry source selection. EMS control always remains on the proven local
+# Modbus write path; SEMS is a Beta cloud telemetry alternative only.
+CONF_TELEMETRY_SOURCE = "telemetry_source"
+CONF_SEMS_USERNAME = "sems_username"
+CONF_SEMS_PASSWORD = "sems_password"
+CONF_SEMS_STATION_ID = "sems_station_id"
+CONF_SEMS_INVERTER_SERIAL = "sems_inverter_serial"
+CONF_SEMS_SCAN_INTERVAL = "sems_scan_interval"
+TELEMETRY_SOURCE_MODBUS = "modbus"
+TELEMETRY_SOURCE_SEMS = "sems_api"
+TELEMETRY_SOURCES = (TELEMETRY_SOURCE_MODBUS, TELEMETRY_SOURCE_SEMS)
+
 CONTROL_STRATEGY_BATTERY = "battery"
 CONTROL_STRATEGY_GRID = "grid"
 CONTROL_STRATEGY_HYBRID = "hybrid"
@@ -120,6 +132,10 @@ EV_CONNECTIVITY_GRACE_SECONDS = 300
 DEFAULT_ENABLE_INTERNAL_PV = True
 DEFAULT_ENABLE_EXTERNAL_PV = False
 DEFAULT_SCAN_INTERVAL = 10
+DEFAULT_TELEMETRY_SOURCE = TELEMETRY_SOURCE_MODBUS
+DEFAULT_SEMS_SCAN_INTERVAL = 60
+MIN_SEMS_SCAN_INTERVAL = 60
+MAX_SEMS_SCAN_INTERVAL = 300
 DEFAULT_P_BATT_ENTITY = "sensor.p_batt_forecast"
 DEFAULT_P_GRID_ENTITY = "sensor.p_grid_forecast"
 DEFAULT_OPTIM_STATUS_ENTITY = "sensor.optim_status"

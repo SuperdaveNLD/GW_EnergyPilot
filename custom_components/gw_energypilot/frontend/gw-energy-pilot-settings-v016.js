@@ -741,7 +741,7 @@ function fieldHtml(panel, sectionId, field) {
   field = pvFieldPresentation(panel, sectionId, field);
   const value = fieldValue(panel, sectionId, field);
   const disabled = field.disabled ? " disabled" : "";
-  const fieldClass = `ep-v016-field${field.disabled ? " is-disabled" : ""}`;
+  const fieldClass = `ep-v016-field${field.disabled ? " is-disabled" : ""}${field.source === "sems_api" ? " sems-source" : ""}`;
   const unit = field.unit ? `<span>${panel._escape(field.unit)}</span>` : "<span></span>";
   const description = field.description
     ? `<div class="ep-v016-field-description">${panel._escape(field.description)}</div>`
@@ -773,7 +773,12 @@ function fieldHtml(panel, sectionId, field) {
     const listId = `ep-v016-${field.key}-entities`;
     return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" list="${panel._escape(listId)}" placeholder="entity…" autocomplete="off"${disabled}><datalist id="${panel._escape(listId)}">${entityOptions(panel, field)}</datalist>${description}</label>`;
   }
-  return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="text" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" autocomplete="off"${disabled}>${description}</label>`;
+  const placeholder = field.placeholder
+    ? ` placeholder="${panel._escape(field.placeholder)}"`
+    : "";
+  const inputType = field.type === "password" ? "password" : "text";
+  const autocomplete = field.type === "password" ? "new-password" : "off";
+  return `<label class="${fieldClass}">${label}<input class="ep-v016-input" type="${inputType}" data-setting-key="${panel._escape(field.key)}" value="${panel._escape(value ?? "")}" autocomplete="${autocomplete}"${placeholder}${disabled}>${description}</label>`;
 }
 
 function energyPilotFieldsHtml(panel, sectionId, fields) {
@@ -904,6 +909,20 @@ function syncEvSafetyFields(form) {
   if (note) note.classList.toggle("danger", Number.isFinite(maximum) && maximum > 16);
 }
 
+function syncGoodWeSourceFields(form) {
+  const source = form?.querySelector('[data-setting-key="telemetry_source"]');
+  if (!source) return;
+  const semsEnabled = source.value === "sems_api";
+  form.querySelectorAll(".ep-v016-field.sems-source").forEach((field) => {
+    field.classList.toggle("is-disabled", !semsEnabled);
+    field.querySelectorAll("[data-setting-key]").forEach((input) => {
+      input.disabled = !semsEnabled;
+    });
+  });
+  const username = form.querySelector('[data-setting-key="sems_username"]');
+  if (username) username.required = semsEnabled;
+}
+
 function collectValues(form) {
   const values = {};
   form.querySelectorAll("[data-setting-key]").forEach((input) => {
@@ -933,7 +952,7 @@ async function saveSection(panel, form, sectionId) {
     }
   }
   panel.__epV016Saving = true;
-  panel.__epV016Message = { tone: "", text: sectionId === "goodwe" ? "Validating GoodWe connection…" : "Saving configuration…" };
+  panel.__epV016Message = { tone: "", text: sectionId === "goodwe" ? "Validating telemetry source and local control connection…" : "Saving configuration…" };
   panel._queueRender();
 
   try {
@@ -1003,7 +1022,7 @@ function renderSettingsPage(panel, root) {
     const sectionTitle = tabId === "pv" ? pvCopy(panel).title : section.title;
     const sectionDescription = tabId === "pv" ? pvCopy(panel).description : section.description;
     const note = tabId === "goodwe"
-      ? `<div class="ep-v016-goodwe-note"><strong>Connection safety:</strong> host, port and unit ID are tested against the inverter before they are saved. A successful change reloads the integration.</div>`
+      ? `<div class="ep-v016-goodwe-note"><strong>Beta boundary:</strong> choose local Modbus or SEMS+ for telemetry. Every EMS mode/setpoint command still uses the local Modbus host, port and unit ID. SEMS credentials are validated before saving and the password is never returned to this page.</div>`
       : tabId === "emhass"
       ? `<div class="ep-v016-emhass-note"><strong>EMHASS:</strong> this page owns EnergyPilot's EMHASS connection, scheduling, output mapping and price-source settings. Live SOC and cost-function controls remain available on the dashboard while they are migrated into this configuration area.</div>`
       : tabId === "pv"
@@ -1077,6 +1096,7 @@ function renderSettingsPage(panel, root) {
   if (form) {
     syncExternalPvFields(form);
     syncEvSafetyFields(form);
+    syncGoodWeSourceFields(form);
     syncDeadbandPresentation(panel, form);
     form.querySelectorAll("[data-setting-key]").forEach((input) => {
       const remember = () => {
@@ -1092,6 +1112,9 @@ function renderSettingsPage(panel, root) {
       }
       if (input.dataset.settingKey === "enable_external_pv") {
         input.addEventListener("change", () => syncExternalPvFields(form));
+      }
+      if (input.dataset.settingKey === "telemetry_source") {
+        input.addEventListener("change", () => syncGoodWeSourceFields(form));
       }
       if (["ev_detection_method", "grid_connection_profile", "ev_charger_phases", "ev_charger_max_current"].includes(input.dataset.settingKey)) {
         input.addEventListener("change", () => syncEvSafetyFields(form));

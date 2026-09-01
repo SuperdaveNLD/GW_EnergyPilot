@@ -240,6 +240,16 @@ class ManualMaxChargeLimitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(coordinator.refresh_count, 0)
         self.assertIsNone(controller.manual_charge_limit_soc)
 
+    async def test_max_charge_rejects_soc_after_failed_telemetry_refresh(self):
+        controller, _, client, coordinator = make_controller(80)
+        coordinator.last_update_success = False
+
+        with self.assertRaisesRegex(ValueError, "battery SOC is unavailable"):
+            await controller.async_manual_max_charge(15000, 95)
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(coordinator.refresh_count, 0)
+
     async def test_direct_manual_mode11_remains_direct_operator_command(self):
         controller, _, client, coordinator = make_controller(99)
 
