@@ -869,8 +869,24 @@ def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
         state = page.evaluate(
             """
             async () => {
+              const waitForStrategyLanguage = async (language) => {
+                const expectedKey = `${language}:hybrid`;
+                const deadline = performance.now() + 3_000;
+                while (performance.now() < deadline) {
+                  const note = window.__epPanel.shadowRoot.querySelector(
+                    '.ep-v022-strategy-note'
+                  );
+                  if (note?.dataset.epV048PresentationKey === expectedKey) {
+                    return note;
+                  }
+                  await new Promise((resolve) => setTimeout(resolve, 20));
+                }
+                return window.__epPanel.shadowRoot.querySelector(
+                  '.ep-v022-strategy-note'
+                );
+              };
               window.__epSetLanguage('nl');
-              await new Promise((resolve) => setTimeout(resolve, 180));
+              await waitForStrategyLanguage('nl');
               const root = window.__epPanel.shadowRoot;
               const note = root.querySelector('.ep-v022-strategy-note');
               const strong = note?.querySelector('strong');
@@ -902,10 +918,7 @@ def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
                 dutchCopy: Boolean(dutchCopy),
               };
               window.__epSetLanguage('en');
-              await new Promise((resolve) => setTimeout(resolve, 180));
-              const englishNote = window.__epPanel.shadowRoot.querySelector(
-                '.ep-v022-strategy-note'
-              );
+              const englishNote = await waitForStrategyLanguage('en');
               return {
                 ...stable,
                 contextRefresh:
