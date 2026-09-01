@@ -1,13 +1,14 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.1.0 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.2.0-beta.1 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
 EnergyPilot does not create a parallel settings database.
 
 - `ConfigEntry.options` owns EnergyPilot/EMHASS integration options.
-- `ConfigEntry.data` owns GoodWe connection data and the Automatic Control strategy.
+- `ConfigEntry.data` owns GoodWe connection data, SEMS credentials/source
+  selection and the Automatic Control strategy.
 - EMHASS `/get-config` and `/set-config` own live EMHASS configuration such as SOC constraints and `costfun`.
 - GoodWe registers own inverter-side hardware settings/state.
 - Home Assistant Stores own derived runtime/accounting/log history, not user configuration.
@@ -34,7 +35,7 @@ The EP section owns:
 - maximum controller/setpoint power;
 - Battery Hold deadband for `P_batt` (100 W fresh default);
 - GoodWe Auto deadband for `P_grid` (1000 W fresh default);
-- GoodWe telemetry interval;
+- local GoodWe telemetry interval;
 
 ## EV page
 
@@ -170,16 +171,29 @@ In **Settings → EMHASS → Battery Saver**, all five managed profiles are show
 
 The previous direct minimum-SOC field-test panel is intentionally not shown in the dashboard. This avoids a second operator path alongside the synchronized minimum-SOC control.
 
-## GOODWE page
+## GoodWe data & control page
 
-The GOODWE section owns:
+The GoodWe data/control section owns:
 
+- telemetry source: Local Modbus TCP or SEMS+ API Beta;
 - inverter host/IP;
 - Modbus TCP port;
 - Modbus unit ID;
+- SEMS/SEMS+ account and password;
+- optional explicit SEMS station ID and inverter serial;
+- SEMS cloud polling interval from 60 to 300 seconds;
 - Automatic Control strategy.
 
-Connection changes are validated with a temporary `GWModbusClient` before the existing config entry is updated/reloaded.
+Local mode and changed local connection values are validated with a temporary
+`GWModbusClient` before the existing config entry is updated/reloaded. SEMS
+mode validates its credentials and one unambiguous station/inverter first. A
+blank password preserves the stored secret; the settings read API never returns
+that secret.
+
+The source selector changes telemetry only. Local Modbus remains the single
+GoodWe EMS transport, including mode/setpoint and verified minimum-SOC writes.
+The local host, port and unit ID therefore stay visible and stored in SEMS mode.
+See `docs/SEMS_API.md` for mapped/unavailable entities and portal limits.
 
 ### Automatic Control strategies
 
@@ -301,7 +315,8 @@ Connection changes must not create a second EnergyPilot device. Existing entity 
 
 - Dashboard configuration write APIs require a Home Assistant administrator.
 - EP/EV/EMHASS/PV setting changes normally reload the existing entry where the settings API requires it.
-- GoodWe connection changes validate first, then reload.
+- GoodWe/SEMS source changes validate first, then reload. Selecting SEMS does
+  not remove the local Modbus control requirement.
 - Automatic strategy changes can be applied without a full reload and re-evaluate the active plan when Automatic Control is on.
 - Minimum-SOC synchronization is an explicit NumberEntity transaction and does not reload the integration.
 - Persistent runtime/accounting/log Stores survive config-entry reloads and Home Assistant restarts.

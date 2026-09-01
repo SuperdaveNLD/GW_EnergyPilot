@@ -52,7 +52,7 @@ If you depend on SEMS / SEMS+:
 - keep GW EnergyPilot's local Modbus TCP connection available for EMS control;
 - avoid running multiple integrations that continuously poll the same local Modbus TCP endpoint when that is not required.
 
-GW EnergyPilot v1.1.0-beta.2 can obtain its supported telemetry subset directly
+GW EnergyPilot v1.2.0-beta.1 can obtain its supported telemetry subset directly
 from SEMS+, but local Modbus remains the only EMS/minimum-SOC control path.
 Station type 2 portal payloads without `inverter[].invert_full` are not yet
 supported. See `docs/SEMS_API.md`.

@@ -1,16 +1,16 @@
-import "./gw-energy-pilot-v101.js?v=1.1.1-stable1";
+import "./gw-energy-pilot-v101.js?v=1.2.0-beta.1-mobile-sems1";
 
-const VERSION = "1.1.1";
+const VERSION = "1.2.0-beta.1";
 const PANEL_NAME = "gw-energypilot-panel";
 
-function patchStableReleaseVersion(panel) {
+function patchBetaReleaseVersion(panel) {
   const root = panel?.shadowRoot;
   if (!root) return;
   const versionBadge = root.querySelector(".version");
-  if (versionBadge) versionBadge.textContent = `v${VERSION} STABLE`;
+  if (versionBadge) versionBadge.textContent = `v${VERSION} BETA`;
   const footerItems = root.querySelectorAll("footer span");
   if (footerItems.length > 0) {
-    footerItems[0].textContent = `GW EnergyPilot v${VERSION} · STABLE`;
+    footerItems[0].textContent = `GW EnergyPilot v${VERSION} · BETA`;
   }
 }
 
@@ -19,9 +19,9 @@ const PanelClass = customElements.get(PANEL_NAME);
 
 if (PanelClass && !PanelClass.prototype.__epV110Installed) {
   const previousRender = PanelClass.prototype._render;
-  PanelClass.prototype._render = function energyPilotV110StableRender(...args) {
+  PanelClass.prototype._render = function energyPilotV110BetaRender(...args) {
     const result = previousRender.apply(this, args);
-    patchStableReleaseVersion(this);
+    patchBetaReleaseVersion(this);
     return result;
   };
 
@@ -35,7 +35,7 @@ if (PanelClass && !PanelClass.prototype.__epV110Installed) {
       },
       set(value) {
         descriptor.set.call(this, value);
-        patchStableReleaseVersion(this);
+        patchBetaReleaseVersion(this);
       },
     });
   }

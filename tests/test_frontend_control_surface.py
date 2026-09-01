@@ -92,7 +92,7 @@ class FrontendControlSurfaceTests(unittest.TestCase):
 
     def test_stable_layer_mounts_and_updates_one_surface(self) -> None:
         self.assertIn('import {', self.stable)
-        self.assertIn('from "./ep-control-surface.js?v=1.0.1-beta4"', self.stable)
+        self.assertIn('from "./ep-control-surface.js?v=1.2.0-beta.1-mobile-sems1"', self.stable)
         self.assertIn("mountEnergyPilotControlSurface", self.stable)
         self.assertIn("refreshEnergyPilotControlSurface", self.stable)
         self.assertIn("__epControlSurfaceArchitecture", self.stable)
@@ -119,6 +119,35 @@ class FrontendControlSurfaceTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('closest("ep-control-surface")', hybrid_note)
+        for name in ("gw-energy-pilot-v024.js", "gw-energy-pilot-v028.js"):
+            historical_note = (FRONTEND / name).read_text(encoding="utf-8")
+            self.assertIn('closest("ep-control-surface")', historical_note, name)
+
+    def test_lit_profile_presentation_has_single_dom_owner(self) -> None:
+        self.assertIn('class="ep-v038-managed"', self.component)
+        for metadata in (
+            "minimum_soc_pct",
+            "maximum_soc_pct",
+            "deficit_threshold_pct",
+            "surplus_threshold_pct",
+            "deficit_cost_factor_pct",
+            "surplus_cost_factor_pct",
+            "stress_cost_factor_pct",
+            "anti_churn_cost_factor_pct",
+        ):
+            self.assertIn(metadata, self.component)
+
+        for name, function in (
+            ("gw-energy-pilot-v038-i18n.js", "localizeStrategyProfiles"),
+            ("gw-energy-pilot-v038-strategy.js", "updateStrategyVisualState"),
+            ("gw-energy-pilot-v041.js", "patchStrategy"),
+        ):
+            source = (FRONTEND / name).read_text(encoding="utf-8")
+            start = source.index(f"function {function}")
+            guard = source.index(
+                "if (panel.__epControlSurfaceArchitecture) return;", start
+            )
+            self.assertLess(guard - start, 160, name)
 
     def test_trace_covers_physical_device_acceptance_events(self) -> None:
         combined = self.component + self.base

@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.0.1-beta4";
+} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.1-mobile-sems1";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.0.1-beta4";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.0.1-beta4";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.1-mobile-sems1";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.1-mobile-sems1";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -114,6 +114,13 @@ const COPY = Object.freeze({
     powerStress: "Power stress",
     chargeCost: "Charge cost",
     dischargeCost: "Discharge cost",
+    managedTitle: "Managed profile limits",
+    hardRange: "Hard SOC range",
+    comfortRange: "Comfort zone",
+    lowCost: "Low-SOC cost",
+    highCost: "High-SOC cost",
+    stressCost: "Power stress",
+    antiChurn: "Charge/discharge anti-churn",
     manual: "Manual EMS controls",
     manualLocked: "Automatic Control owns the inverter. Manual controls are locked.",
     manualReady: "Manual ownership · live GoodWe read-back",
@@ -152,6 +159,13 @@ const COPY = Object.freeze({
     powerStress: "Vermogensbelasting",
     chargeCost: "Laadkosten",
     dischargeCost: "Ontlaadkosten",
+    managedTitle: "Vaste profielgrenzen",
+    hardRange: "Harde SOC-range",
+    comfortRange: "Comfortzone",
+    lowCost: "Kosten lage SOC",
+    highCost: "Kosten hoge SOC",
+    stressCost: "Vermogensstress",
+    antiChurn: "Anti-pendel laden/ontladen",
     manual: "Handmatige EMS-bediening",
     manualLocked: "Automatische bediening beheert de omvormer. Handmatige controls zijn vergrendeld.",
     manualReady: "Handmatig eigenaarschap · actuele GoodWe-teruglezing",
@@ -240,6 +254,10 @@ const CONTROL_SURFACE_CSS = `
   .ep-v038-profile small { margin-top:4px; color:#7894a8; font-size:9px; font-weight:600; }
   .ep-v038-custom { margin-top:10px; padding-top:10px; border-top:1px solid rgba(78,174,214,.14); }
   .ep-v038-custom[hidden] { display:none; }
+  .ep-v038-managed { margin-top:10px; padding-top:10px; border-top:1px solid rgba(78,174,214,.14); }
+  .ep-v038-managed-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px 12px; margin-top:7px; }
+  .ep-v038-managed-grid span { color:#9db8c8; font-size:10px; }
+  .ep-v038-managed-grid strong { color:#eafaff; }
   .ep-v038-custom-grid, .ep-v038-custom-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
   .ep-v038-custom label, .ep-v021-power-label { display:grid; gap:5px; color:#9db8c8; font-size:10px; }
   .ep-v038-custom input[type="number"] { min-height:44px; width:100%; padding:8px 10px; border:1px solid rgba(80,177,218,.22); border-radius:10px; background:#061c31; color:#eafaff; }
@@ -315,6 +333,11 @@ function profileValues(data) {
     weight_battery_charge: first(values.weight_battery_charge),
     weight_battery_discharge: first(values.weight_battery_discharge),
   };
+}
+
+function profilePercent(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${number}%` : "—";
 }
 
 export function buildControlSurfaceModel(panel, gateway = controlGateway(panel)) {
@@ -735,6 +758,9 @@ class EpBatteryStrategy extends EpAcknowledgedControl {
     const copy = textFor(this.model);
     const busy = this.phase === "pending";
     const values = this.customDraft || this.model.values || {};
+    const activeProfile = (this.model.modes || []).find(
+      (mode) => mode.key === this.model.activeMode
+    );
     const fields = [
       ["battery_soc_deficit_cost", copy.lowSocCost],
       ["battery_soc_surplus_cost", copy.highSocCost],
@@ -802,6 +828,19 @@ class EpBatteryStrategy extends EpAcknowledgedControl {
             </div>
           </div>
         </div>
+        ${this.model.managed && activeProfile ? html`
+          <div class="ep-v038-managed">
+            <div class="ep-control-title">${copy.managedTitle}</div>
+            <div class="ep-v038-managed-grid">
+              <span>${copy.hardRange} <strong>${profilePercent(activeProfile.minimum_soc_pct)} – ${profilePercent(activeProfile.maximum_soc_pct)}</strong></span>
+              <span>${copy.comfortRange} <strong>${profilePercent(activeProfile.deficit_threshold_pct)} – ${profilePercent(activeProfile.surplus_threshold_pct)}</strong></span>
+              <span>${copy.lowCost} <strong>${profilePercent(activeProfile.deficit_cost_factor_pct)}</strong></span>
+              <span>${copy.highCost} <strong>${profilePercent(activeProfile.surplus_cost_factor_pct)}</strong></span>
+              <span>${copy.stressCost} <strong>${profilePercent(activeProfile.stress_cost_factor_pct)}</strong></span>
+              <span>${copy.antiChurn} <strong>${profilePercent(activeProfile.anti_churn_cost_factor_pct)}</strong></span>
+            </div>
+          </div>
+        ` : nothing}
         ${this._status(
           this.model.loading ? copy.profilesLoading : this.model.error || "",
           this.model.error ? "error" : ""

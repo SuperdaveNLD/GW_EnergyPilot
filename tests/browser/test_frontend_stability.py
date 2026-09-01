@@ -7,6 +7,7 @@ import contextlib
 import http.server
 import json
 import socket
+import sys
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -4591,7 +4592,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
         "v101": "v1.0.1-beta.4 BETA",
-        "v110": "v1.1.1 STABLE",
+        "v110": "v1.2.0-beta.1 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -5040,8 +5041,23 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
 def main() -> int:
     results: list[dict[str, object]] = []
     failures: list[str] = []
+    requested_profile = next(
+        (
+            argument.split("=", 1)[1]
+            for argument in sys.argv[1:]
+            if argument.startswith("--profile=")
+        ),
+        None,
+    )
+    profiles = [
+        profile
+        for profile in PROFILES
+        if requested_profile is None or profile.name == requested_profile
+    ]
+    if not profiles:
+        raise SystemExit(f"Unknown browser profile: {requested_profile}")
     with static_server() as base_url, sync_playwright() as playwright:
-        for profile in PROFILES:
+        for profile in profiles:
             engine = browser_type(playwright, profile.engine)
             browser = engine.launch(headless=True)
             context = browser.new_context(
@@ -5054,7 +5070,12 @@ def main() -> int:
             )
             page = context.new_page()
             page_errors: list[str] = []
-            page.on("pageerror", lambda error: page_errors.append(str(error)))
+            page.on(
+                "pageerror",
+                lambda error: page_errors.append(
+                    getattr(error, "stack", None) or str(error)
+                ),
+            )
             try:
                 result = exercise_profile(page, profile)
                 result["page_errors"] = page_errors

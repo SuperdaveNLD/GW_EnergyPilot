@@ -17,6 +17,28 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0-beta.1 — Mobile control modernization and SEMS+ telemetry
+
+The operational dashboard controls now live in one permanent declarative Lit
+tree. Battery actions, Automatic Control, EMHASS/Battery Strategy, Optimize,
+Custom SOC and manual EMS remain connected through telemetry and structural
+updates. Selected state follows confirmed backend publication, with one shared
+pending/acknowledged/error contract and duplicate-request protection.
+
+Configuration additionally offers **Local Modbus TCP** or **SEMS+ API · Beta**
+as telemetry source. SEMS credentials are write-only in the dashboard; station
+and inverter identity must be explicit when discovery is ambiguous. Regional
+authentication, one token renewal, bounded rate-limit back-off and strict
+freshness/shape/sentinel validation protect the cloud path.
+
+Only an evidence-backed PV/load/grid/inverter/battery subset is mapped. Cloud
+lifetime counters and missing meter phase currents never impersonate canonical
+local registers. Local Modbus remains mandatory and solely owns every EMS and
+minimum-SOC write/read-back; its health remains independent from SEMS health.
+Existing entries default to Local Modbus. See
+`docs/releases/v1.2.0-beta.1.md`, `docs/SEMS_API.md` and
+`docs/FRONTEND_CONTROL_ARCHITECTURE.md`.
+
 # v1.1.1 — Managed-profile settings-save hotfix
 
 This stable patch fixes EP and EMHASS settings saves after a managed Battery
@@ -65,28 +87,6 @@ The documentation explains the lower-average-SOC, SOC-window, power and
 throughput rationale and its limits. The profile factors are transparent
 price-relative optimizer policy, not a battery-specific lifetime guarantee.
 See `docs/releases/v1.1.0.md` and `docs/BATTERY_SAVER.md`.
-# v1.2.0-beta.1 — Permanent declarative mobile controls
-
-The dashboard's operational controls now live in one permanent Lit component
-tree. Battery actions, Automatic Control, EMHASS and Battery strategies,
-Optimize, Custom/SOC and manual EMS use native buttons/events and one common
-pending/acknowledged/error contract. A successful request changes selected
-state only after the matching Home Assistant state or API payload is confirmed;
-rapid duplicate taps while pending cannot start a second request.
-
-The exact controls remain connected through normal telemetry, plan refreshes,
-Settings and genuine language/layout/panel structural updates. Automated
-desktop Chromium, iPad WebKit and iPhone WebKit acceptance executes 50 actions
-for every rendered control across ten critical groups (1,500 per profile,
-4,500 total) and includes failure/reordering, scroll,
-keyboard/focus, geometry and 1,000-update identity cases. Physical iPhone Safari
-and Home Assistant Companion acceptance is still open; use
-`docs/FRONTEND_IPHONE_ACCEPTANCE.md` and the built-in passive trace.
-
-This work changes frontend ownership only. GoodWe registers/writes, EMS mode
-semantics, Automatic Control decisions, EMHASS ownership, entity/device
-identity, configuration and persistent Store schemas are unchanged.
-
 # v1.0.1-beta.4 — Explicit charging detection and safe EV-stop recovery
 
 Settings → EV now asks the operator to choose one charging signal: measured
@@ -212,6 +212,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0-beta.1** | 2026-09-01 | **Beta** | Combines permanent mobile controls with guarded SEMS+ Beta telemetry while retaining local-only EMS/minimum-SOC writes. |
 | **1.1.1** | 2026-08-31 | **Stable** | Fixes EP/EMHASS settings saves for managed battery profiles while preserving SOC-limit ownership. |
 | **1.1.0-beta.2** | 2026-08-31 | **Beta** | Validates the managed-profile settings-save hotfix before stable promotion. |
 | **1.1.0** | 2026-08-31 | **Stable** | Promotes v1.1.0-beta.1 with Chargegasm, complete managed SOC ranges, 12h/24h/36h plan views, compact manual ownership and separate internal/external PV routes. |

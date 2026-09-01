@@ -4,13 +4,15 @@
 
 # GW EnergyPilot
 
-GW EnergyPilot is an unofficial Home Assistant integration for local GoodWe ETA-G20 telemetry, GoodWe EMS control and EMHASS optimization.
+GW EnergyPilot is an unofficial Home Assistant integration for selectable local
+or SEMS+ GoodWe ETA-G20 telemetry, local GoodWe EMS control and EMHASS
+optimization.
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
 ## Status
 
-**v1.1.1 · Stable**
+**v1.2.0-beta.1 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -27,16 +29,17 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` is the current stable production release. It fixes dashboard EP and
-EMHASS saves for managed battery profiles and retains every v1.1.0 feature.
-Normal users keep the HACS prerelease switch off. Testers explicitly enable the
-HACS prerelease switch for GW EnergyPilot when they want a future published
-beta.
+`v1.1.1` remains the stable production release. `v1.2.0-beta.1` is the opt-in
+candidate combining permanent mobile controls with selectable SEMS+ Beta
+telemetry. Local Modbus remains mandatory for every EMS and minimum-SOC
+write/read-back. Normal users keep the HACS prerelease switch off; testers
+explicitly enable it for GW EnergyPilot before selecting the beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0-beta.1.md` — mobile-control and SEMS+ combined beta notes;
 - `docs/releases/v1.1.1.md` — current stable managed-profile settings-save hotfix notes;
 - `docs/releases/v1.1.0-beta.2.md` — validated prerelease hotfix notes;
 - `docs/releases/v1.1.0.md` — previous stable Chargegasm, plan-range and PV-flow release notes;
@@ -80,6 +83,25 @@ Release documentation:
 - `docs/BATTERY_PLAN_CHART.md` — plan-versus-actual graph/data ownership;
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
+- `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.2.0-beta.1 highlights
+
+- Moves Battery actions, Automatic Control, EMHASS/Battery Strategy, Optimize,
+  Custom SOC and manual EMS into one permanent declarative Lit surface so the
+  same native controls survive telemetry and structural updates.
+- Adds **Configuration → GoodWe data & control → Telemetry source** with Local
+  Modbus TCP and SEMS+ API Beta choices, write-only credentials, explicit
+  station/inverter selection and a bounded 60–300 second cloud cadence.
+- Supports regional SEMS+ authentication, one token renewal and local
+  rate-limit back-off while rejecting ambiguous, stale, future, unsupported or
+  sentinel responses.
+- Maps only the evidence-backed cloud subset; unsupported local counters and
+  phase currents remain unavailable instead of being inferred.
+- Keeps cloud health independent from the always-local Modbus control/read-back
+  path and preserves entity, device, config-entry and Store identities.
+- Protects the complete `1.2.0-beta.1-mobile-sems1` frontend graph with desktop
+  Chromium, iPad WebKit and iPhone WebKit regression gates.
 
 ## v1.1.1 highlights
 

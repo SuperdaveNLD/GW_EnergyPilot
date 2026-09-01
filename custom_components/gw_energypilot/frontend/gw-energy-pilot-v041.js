@@ -1,20 +1,20 @@
-import "./gw-energy-pilot-v039.js?v=1.1.1-stable1";
+import "./gw-energy-pilot-v039.js?v=1.2.0-beta.1-mobile-sems1";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.1.1-stable1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.1-mobile-sems1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.1.1-stable1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.1-stable1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.1.1-stable1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.1-mobile-sems1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-beta.1-mobile-sems1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.1-mobile-sems1";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.1.1-stable1";
+} from "./ep-control-surface.js?v=1.2.0-beta.1-mobile-sems1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -1685,6 +1685,7 @@ function patchEmhass(panel, root) {
 }
 
 function patchStrategy(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const strategy = root.querySelector(".ep-v038-strategy");
   if (!strategy) return;
   for (const input of strategy.querySelectorAll("input[data-ep-v038-soc]")) {

@@ -1,20 +1,16 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.1.1**, the stable production release. All v1.0.1-beta.4 behavior and the
-validated v1.1.0-beta.1 candidate are included.
+v1.2.0-beta.1**. Stable v1.1.1 remains the production base.
 
 ## High-level flow
 
 ```text
-GoodWe ETA-G20
-    |
-    | Modbus TCP
-    v
-GWModbusClient
-    |
-    v
-GWEnergyPilotCoordinator
+Local Modbus full telemetry --+
+                              | selected source
+SEMS+ Beta telemetry ---------+
+                              v
+                     GWEnergyPilotCoordinator
     |----------------------> Home Assistant telemetry/entities
     |----------------------> GWEnergyPilotAccounting
     |----------------------> GWEnergyPilotConnectivity
@@ -37,9 +33,20 @@ GWEnergyPilotCoordinator
                                   |
                                   v
                            Automatic Control
+
+Local GWModbusClient (always present)
+    |----> EMS mode/setpoint and optional SOC-floor read-back
+    `----> every EMS/minimum-SOC write
 ```
 
 EMHASS remains an external prerequisite and remains the canonical owner of the optimization plan. The EnergyPilot plan Store is only a resilience mirror.
+
+SEMS+ is an optional telemetry source only. `sems_api.py` owns asynchronous
+portal authentication, token renewal, station discovery and rate limiting;
+`sems_model.py` owns pure identity/freshness/value normalization. The
+coordinator can merge the small local control read-back into a cloud snapshot,
+but local success never changes failed SEMS telemetry health and local failure
+never discards a valid cloud snapshot. See `docs/SEMS_API.md`.
 
 Read-only PV insight is a separate presentation path:
 
@@ -94,7 +101,8 @@ No Home Assistant Store is a second configuration database or optimizer.
 
 `__init__.py` creates per config entry:
 
-- `GWModbusClient`;
+- `GWModbusClient` (always the control/write client);
+- selected telemetry client: the same `GWModbusClient` or `GWSemsClient`;
 - `GWEnergyPilotCoordinator`;
 - `GWEnergyPilotControlHistory`;
 - `GWEnergyPilotController` from `controller_v033.py`;
@@ -112,7 +120,12 @@ During setup, the last valid plan mirror is restored before the normal control/o
 
 ### Connectivity runtime
 
-`connectivity.py` derives one canonical status from the existing coordinator poll result and an optional Home Assistant charger-online entity. It never opens a second Modbus connection or starts another polling loop: GoodWe reachability therefore updates on the configured coordinator interval. A configured charger source also updates on its normal Home Assistant state-change signal.
+`connectivity.py` derives separate telemetry and local-control status from the
+existing coordinator cycle plus an optional Home Assistant charger-online
+entity. It does not start a separate health-check loop. In local mode telemetry
+and Modbus status share the full coordinator result; in SEMS mode cloud and
+bounded local control read-back remain individually visible. A configured
+charger source also updates on its normal Home Assistant state-change signal.
 
 Missing, `unknown` and `unavailable` sources are unreachable. A binary sensor is explicit (`on` online, `off` unreachable); any usable state from another domain means that integration is reporting, so an idle `switch.* = off` remains reachable.
 
@@ -538,9 +551,9 @@ ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped
 history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
-chain as its bounded presentation layer. v1.1.1 owns final stable
-presentation and the complete `1.1.1-stable1` active-graph cache
-boundary.
+chain as its bounded presentation layer. v1.1.1 remains the stable base;
+v1.2.0-beta.1 owns final beta presentation and the complete
+`1.2.0-beta.1-mobile-sems1` active-graph cache boundary.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 

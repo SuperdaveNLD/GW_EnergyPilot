@@ -4,9 +4,8 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.1.1**. The stable release retains the complete validated
-v1.1.0-beta.1 behavior and all v1.0.1-beta.4 fixes through presentation-only
-wrappers; its nested v0.51
+EnergyPilot v1.2.0-beta.1**. The beta is based on stable v1.1.1 and retains all
+earlier v1 behavior through presentation-only wrappers; its nested v0.51
 feature layer supplies the scoped execution-history card.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
@@ -29,27 +28,27 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v110.js?v=1.1.1-stable1
-       -> gw-energy-pilot-v101.js?v=1.1.1-stable1
-            -> gw-energy-pilot-v051.js?v=1.1.1-stable1
-                 -> gw-energy-pilot-v051-history.js?v=1.1.1-stable1
-                 -> gw-energy-pilot-v050.js?v=1.1.1-stable1
-                 -> gw-energy-pilot-v049.js?v=1.1.1-stable1
-                      -> gw-energy-pilot-v048.js?v=1.1.1-stable1
-                           -> gw-energy-pilot-v047.js?v=1.1.1-stable1
-                                -> gw-energy-pilot-v046.js?v=1.1.1-stable1
-                                     -> gw-energy-pilot-v045.js?v=1.1.1-stable1
-                                          -> gw-energy-pilot-v044.js?v=1.1.1-stable1
-                                               -> gw-energy-pilot-v043.js?v=1.1.1-stable1
-                                                    -> gw-energy-pilot-v042.js?v=1.1.1-stable1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.1.1-stable1
-                                                              -> gw-energy-pilot-v041.js?v=1.1.1-stable1
-                                                                   -> gw-energy-pilot-v039.js?v=1.1.1-stable1
-                                                                        -> gw-energy-pilot-v038.js?v=1.1.1-stable1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.1.1-stable1
+  -> gw-energy-pilot-v110.js?v=1.2.0-beta.1-mobile-sems1
+       -> gw-energy-pilot-v101.js?v=1.2.0-beta.1-mobile-sems1
+            -> gw-energy-pilot-v051.js?v=1.2.0-beta.1-mobile-sems1
+                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.1-mobile-sems1
+                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.1-mobile-sems1
+                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.1-mobile-sems1
+                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.1-mobile-sems1
+                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.1-mobile-sems1
+                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.1-mobile-sems1
+                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.1-mobile-sems1
+                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.1-mobile-sems1
+                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.1-mobile-sems1
+                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.1-mobile-sems1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.1-mobile-sems1
+                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.1-mobile-sems1
+                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.1-mobile-sems1
+                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.1-mobile-sems1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.1-mobile-sems1
 ```
 
-Every import in the active graph uses `1.1.1-stable1`. This ensures an
+Every import in the active graph uses `1.2.0-beta.1-mobile-sems1`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 
@@ -236,6 +235,9 @@ active release by `tests/browser/test_frontend_stability_v110.py`. It retains
 the established PV topology, 12h/24h/36h chart, settings, connectivity,
 history, EV protection, native scrolling, static-flow and no-motion gates in
 addition to the permanent-control assertions above.
+The same matrix requires the Local Modbus/SEMS+ selector, write-only password,
+source-scoped cloud fields, always-enabled local-control fields and explicit
+local EMS safety copy on all three viewport profiles.
 
 ## Contributor rules
 

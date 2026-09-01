@@ -4,6 +4,45 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0-beta.1] - 2026-09-01
+
+### Added
+
+- Add one permanent declarative Lit control surface with fixed child components
+  for Battery actions, Automatic Control, EMHASS strategy, Battery Strategy,
+  Optimize, Custom SOC and manual EMS, backed by one confirmed-state
+  interaction contract and a bounded passive diagnostic trace.
+- Add a Local Modbus TCP / SEMS+ API Beta telemetry selector to GoodWe data &
+  control, including a write-only password, explicit ambiguous station/inverter
+  selection and a 60–300 second cloud cadence.
+- Add asynchronous SEMS+/legacy authentication, regional gateway rewriting,
+  one expired-token renewal, five-minute `GY0429` back-off and strict runtime
+  sample-age, shape, sentinel, unit and sign validation.
+- Add dedicated desktop Chromium, iPad WebKit and iPhone WebKit control-surface
+  and settings gates, including delayed/reordered publication, failures,
+  native scrolling, keyboard/focus and one thousand telemetry updates.
+
+### Changed
+
+- Preserve the exact ShadowRoot, `main`, permanent surface and operational
+  controls through telemetry, plan, language, layout and Settings updates.
+- Bypass historical operational listeners while retaining their card,
+  Settings, diagnostics, flow and history presentation responsibilities.
+- Keep all EMS and minimum-SOC writes on the canonical local Modbus client;
+  cloud telemetry and local-control health are tracked independently.
+
+### Safety and compatibility
+
+- Preserve existing entity unique IDs, device identity, config entries and
+  Stores. Existing installations remain on Local Modbus until explicitly
+  changed.
+- Do not map SEMS cloud lifetime totals, meter phase currents or settings as
+  local-register equivalents. Accounting and phase-aware EV load balancing
+  fail safely while canonical inputs are unavailable.
+- Preserve GoodWe register/write semantics, EMHASS plan/config ownership and
+  Battery Saver profile behavior. Physical iPhone/Companion and live
+  SEMS+/GoodWe acceptance remain required before stable promotion.
+
 ## [1.1.1] - 2026-08-31
 
 ### Fixed
@@ -75,51 +114,6 @@ All notable changes to GW EnergyPilot are documented here.
   Automatic Control, GoodWe writes, EMHASS, plans, accounting, entity identity
   and Store schemas are unchanged. Desktop Chromium, iPad WebKit touch and
   iPhone WebKit cover route geometry, values, totals and stable node identity.
-## [1.2.0-beta.1] - 2026-09-01
-
-### Added
-
-- Add one permanent declarative Lit control surface with fixed child components
-  for Battery actions, Automatic Control, EMHASS strategy, Battery Strategy,
-  Optimize and manual EMS. The panel supplies frozen narrow models through the
-  existing entity/WebSocket gateway rather than passing the complete Home
-  Assistant object.
-- Add an `idle -> pending -> acknowledged | error` interaction contract. Every
-  native click starts at most one request, confirmed backend state remains the
-  sole selection owner, reordered service/publication completion is supported,
-  and missing acknowledgement produces visible timeout feedback.
-- Add a passive bounded trace for pointer/click order, node identity,
-  connectivity, backend request lifecycle, Home Assistant publication and
-  structural renders, plus a physical iPhone Safari/Companion acceptance
-  protocol.
-- Add an authoritative browser gate that executes 50 successful activations of
-  every rendered control across ten critical groups on desktop Chromium, iPad
-  WebKit touch and iPhone WebKit touch: 1,500 activations per profile and 4,500
-  total. It also covers pending duplicates, delayed/reordered
-  publication, failures, unknown state, scrolling, keyboard/focus,
-  portrait/landscape geometry and 1,000 telemetry updates.
-
-### Changed
-
-- Make structural rendering preserve the exact ShadowRoot, `main`, permanent
-  surface and control nodes. Historical dashboard content may still be rebuilt
-  around the surface, but the active renderer no longer assigns
-  `shadowRoot.innerHTML`.
-- Bypass historical base/v0.10/v0.16/v0.21/v0.38/v0.44 operational listeners
-  and prevent localization/presentation layers from mutating Lit descendants.
-  Remaining historical modules continue to own cards, Settings, modals,
-  diagnostics, layout/window controls and graph/history presentation.
-
-### Validation and compatibility
-
-- Pass the permanent-control gate and complete v1.0.1-beta.4 dashboard matrix
-  on all three browser profiles, plus 103 frontend unit/contract tests.
-- Automated status is software ready; physical iPhone Safari and Home Assistant
-  Companion acceptance remains open.
-- Preserve GoodWe registers and write order, EMS mappings and controller
-  semantics, EMHASS configuration/plan ownership, entity IDs, unique IDs,
-  config-entry data and persistent Store schemas.
-
 ## [1.0.1-beta.4] - 2026-08-31
 
 ### Added

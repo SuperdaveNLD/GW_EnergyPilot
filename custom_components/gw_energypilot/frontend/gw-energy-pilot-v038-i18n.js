@@ -1,7 +1,7 @@
 import {
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.1.1-stable1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.1-mobile-sems1";
 
 const EMS_MODE_TEXT = {
   en: {
@@ -131,6 +131,7 @@ function replaceTrailingButtonText(button, text) {
 }
 
 function localizeStrategyProfiles(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const strategy = root.querySelector(".ep-v038-strategy");
   if (!strategy) return;
   const profiles = canonicalProfiles(

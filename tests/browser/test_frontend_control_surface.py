@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_frontend_stability as stability  # noqa: E402
 
 
-HARNESS = "/tests/browser/frontend_harness.html?entry=v101"
+HARNESS = "/tests/browser/frontend_harness.html?entry=v110"
 REPETITIONS = 50
 
 
