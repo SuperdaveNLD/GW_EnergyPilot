@@ -136,7 +136,11 @@ async def websocket_set_beta_soc(
     if snapshot is not None:
         updated_values = dict(snapshot.values)
         updated_values[key] = readback
-        coordinator.async_set_updated_data(GWETAData(values=updated_values))
+        publish_local = getattr(coordinator, "async_publish_local_readback", None)
+        if callable(publish_local):
+            publish_local(GWETAData(values={key: readback}))
+        else:
+            coordinator.async_set_updated_data(GWETAData(values=updated_values))
 
     connection.send_result(
         msg["id"],

@@ -30,6 +30,12 @@ The existing Home Assistant lifetime entities backed by `36015/36017` keep their
 
 v0.23 introduced one per-config-entry accounting runtime. It listens to decoded lifetime counters from the normal coordinator and persists its own accounting state in Home Assistant storage.
 
+SEMS+ Beta telemetry deliberately does not map portal lifetime totals into these
+canonical keys. While SEMS+ is selected, accounting receives no coherent source
+pair and does not accumulate cloud-derived deltas. Returning to a valid local
+pair follows the existing source/restart re-baseline rules; the Store is not
+deleted and counters from different layouts/sources are never subtracted.
+
 Initial outputs are:
 
 - `grid_energy_imported_today`;

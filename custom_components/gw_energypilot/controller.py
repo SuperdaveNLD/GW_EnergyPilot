@@ -503,6 +503,8 @@ class GWEnergyPilotController:
 
     def _battery_soc(self) -> float | None:
         """Return the latest finite GoodWe battery SOC percentage."""
+        if getattr(self.coordinator, "last_update_success", True) is False:
+            return None
         data = self.coordinator.data
         values = getattr(data, "values", {}) if data is not None else {}
         raw = values.get("battery_soc") if isinstance(values, dict) else None
@@ -626,7 +628,15 @@ class GWEnergyPilotController:
         self._notify_state()
         refresh_error: Exception | None = None
         try:
-            await self.coordinator.async_request_refresh()
+            refresh_control = getattr(
+                self.coordinator,
+                "async_refresh_control_readback",
+                None,
+            )
+            if callable(refresh_control):
+                await refresh_control()
+            else:
+                await self.coordinator.async_request_refresh()
         except Exception as err:  # preserve the established propagation contract
             refresh_error = err
         readback_at = datetime.now(timezone.utc)

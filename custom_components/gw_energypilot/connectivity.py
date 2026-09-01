@@ -21,7 +21,9 @@ from .const import (
     CONF_EV_ONLINE_ENTITY,
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TELEMETRY_SOURCE,
     DOMAIN,
+    TELEMETRY_SOURCE_SEMS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,6 +51,8 @@ class GWEnergyPilotConnectivity:
         self._timer_cancel: Callable[[], None] | None = None
         self.last_modbus_success: datetime | None = None
         self.last_modbus_failure: datetime | None = None
+        self.last_telemetry_success: datetime | None = None
+        self.last_telemetry_failure: datetime | None = None
 
     @property
     def signal(self) -> str:
@@ -69,6 +73,20 @@ class GWEnergyPilotConnectivity:
         return self._guard.effective(self.ev_coordination_requested)
 
     def _modbus_status(self) -> str:
+        success = (
+            getattr(self.coordinator, "last_control_update_success", None)
+            if self.telemetry_source == TELEMETRY_SOURCE_SEMS
+            else self.coordinator.last_update_success
+        )
+        if success is False:
+            return "unreachable"
+        return "online" if success is True and self.coordinator.data is not None else "checking"
+
+    @property
+    def telemetry_source(self) -> str:
+        return str(getattr(self.coordinator, "source", DEFAULT_TELEMETRY_SOURCE))
+
+    def _telemetry_status(self) -> str:
         if not self.coordinator.last_update_success:
             return "unreachable"
         return "online" if self.coordinator.data is not None else "checking"
@@ -82,10 +100,16 @@ class GWEnergyPilotConnectivity:
     @property
     def state(self) -> str:
         modbus = self._modbus_status()
+        telemetry = self._telemetry_status()
         ev_online = self._ev_online()
-        if modbus == "unreachable" or ev_online is False or self._guard.suspended:
+        if (
+            modbus == "unreachable"
+            or telemetry == "unreachable"
+            or ev_online is False
+            or self._guard.suspended
+        ):
             return "issue"
-        if modbus == "checking":
+        if modbus == "checking" or telemetry == "checking":
             return "checking"
         return "all_ok"
 
@@ -97,15 +121,31 @@ class GWEnergyPilotConnectivity:
     def attributes(self) -> dict[str, Any]:
         now = self._now_fn()
         ev_online = self._ev_online()
-        last_exception = getattr(self.coordinator, "last_exception", None)
+        telemetry_exception = getattr(self.coordinator, "last_exception", None)
+        control_exception = (
+            getattr(self.coordinator, "last_control_exception", None)
+            if self.telemetry_source == TELEMETRY_SOURCE_SEMS
+            else telemetry_exception
+        )
+        interval = getattr(self.coordinator, "update_interval", None)
+        refresh_seconds = (
+            int(interval.total_seconds())
+            if interval is not None and hasattr(interval, "total_seconds")
+            else int(self.entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+        )
         return {
+            "telemetry_source": self.telemetry_source,
+            "telemetry_status": self._telemetry_status(),
+            "telemetry_last_success": self._iso(self.last_telemetry_success),
+            "telemetry_last_failure": self._iso(self.last_telemetry_failure),
+            "telemetry_last_error": (
+                str(telemetry_exception) if telemetry_exception else None
+            ),
             "modbus_status": self._modbus_status(),
             "modbus_last_success": self._iso(self.last_modbus_success),
             "modbus_last_failure": self._iso(self.last_modbus_failure),
-            "modbus_last_error": str(last_exception) if last_exception else None,
-            "refresh_seconds": int(
-                self.entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-            ),
+            "modbus_last_error": str(control_exception) if control_exception else None,
+            "refresh_seconds": refresh_seconds,
             "ev_online_entity": self.ev_online_entity,
             "ev_status": (
                 "not_configured"
@@ -137,8 +177,12 @@ class GWEnergyPilotConnectivity:
             )
         now = self._now_fn()
         if self.coordinator.last_update_success and self.coordinator.data is not None:
-            self.last_modbus_success = now
+            self.last_telemetry_success = now
         elif not self.coordinator.last_update_success:
+            self.last_telemetry_failure = now
+        if self._modbus_status() == "online":
+            self.last_modbus_success = now
+        elif self._modbus_status() == "unreachable":
             self.last_modbus_failure = now
         self._evaluate()
 
@@ -226,8 +270,12 @@ class GWEnergyPilotConnectivity:
     def _async_coordinator_updated(self) -> None:
         now = self._now_fn()
         if self.coordinator.last_update_success and self.coordinator.data is not None:
-            self.last_modbus_success = now
+            self.last_telemetry_success = now
         else:
+            self.last_telemetry_failure = now
+        if self._modbus_status() == "online":
+            self.last_modbus_success = now
+        elif self._modbus_status() == "unreachable":
             self.last_modbus_failure = now
         self._evaluate()
 

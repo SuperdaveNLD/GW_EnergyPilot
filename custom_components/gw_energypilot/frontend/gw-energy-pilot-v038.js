@@ -1,5 +1,5 @@
-import "./gw-energy-pilot-v038-runtime.js?v=1.1.0-beta.2-settings1";
-import { localizeV038Controller } from "./gw-energy-pilot-v038-i18n.js?v=1.1.0-beta.2-settings1";
+import "./gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.1-mobile-sems1";
+import { localizeV038Controller } from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.1-mobile-sems1";
 
 const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -77,12 +77,14 @@ if (!PanelClass.prototype.__epV038HoverStabilityInstalled) {
     const root = this.shadowRoot;
     if (!root) return;
 
-    localizeV038Controller(this, root);
-    ensureHoverStabilityStyle(root);
-    installHoverTracking(this, root);
+    if (!this.__epControlSurfaceArchitecture) {
+      localizeV038Controller(this, root);
+      ensureHoverStabilityStyle(root);
+      installHoverTracking(this, root);
 
-    const hoveredAfter = root.querySelector(`${PROFILE_SELECTOR}:hover`);
-    if (hoveredAfter) setStableHover(root, hoveredAfter);
+      const hoveredAfter = root.querySelector(`${PROFILE_SELECTOR}:hover`);
+      if (hoveredAfter) setStableHover(root, hoveredAfter);
+    }
   };
   PanelClass.prototype.__epV038HoverStabilityInstalled = true;
 }

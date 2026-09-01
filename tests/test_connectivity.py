@@ -127,8 +127,12 @@ class FakeEntry:
 class FakeCoordinator:
     def __init__(self) -> None:
         self.data = object()
+        self.source = "modbus"
+        self.update_interval = None
         self.last_update_success = True
         self.last_exception = None
+        self.last_control_update_success = None
+        self.last_control_exception = None
         self.listeners = []
 
     def async_add_listener(self, callback_func):
@@ -239,6 +243,43 @@ class EVConnectivityGuardTests(unittest.TestCase):
 
 
 class ConnectivityRuntimeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cloud_telemetry_and_local_control_health_stay_separate(self) -> None:
+        hass = FakeHass()
+        entry = FakeEntry({const.CONF_SCAN_INTERVAL: 10})
+        coordinator = FakeCoordinator()
+        coordinator.source = const.TELEMETRY_SOURCE_SEMS
+        coordinator.update_interval = timedelta(seconds=60)
+        coordinator.last_control_update_success = False
+        coordinator.last_control_exception = RuntimeError("local control timeout")
+        runtime = runtime_module.GWEnergyPilotConnectivity(
+            hass,
+            entry,
+            coordinator,
+            FakeDebugLog(),
+        )
+
+        await runtime.async_start()
+
+        self.assertEqual(runtime.state, "issue")
+        self.assertEqual(runtime.attributes["telemetry_status"], "online")
+        self.assertEqual(runtime.attributes["modbus_status"], "unreachable")
+        self.assertEqual(
+            runtime.attributes["modbus_last_error"], "local control timeout"
+        )
+        self.assertEqual(runtime.attributes["refresh_seconds"], 60)
+
+        coordinator.last_control_update_success = True
+        coordinator.last_control_exception = None
+        coordinator.listeners[0]()
+        self.assertEqual(runtime.state, "all_ok")
+
+        coordinator.last_update_success = False
+        coordinator.last_exception = RuntimeError("SEMS stale")
+        coordinator.listeners[0]()
+        self.assertEqual(runtime.state, "issue")
+        self.assertEqual(runtime.attributes["telemetry_status"], "unreachable")
+        self.assertEqual(runtime.attributes["modbus_status"], "online")
+
     async def test_runtime_follows_poll_interval_and_logs_guard_transitions(self) -> None:
         clock = [datetime(2026, 8, 30, 10, 0, tzinfo=timezone.utc)]
         hass = FakeHass({"binary_sensor.charger_online": "off"})

@@ -41,7 +41,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=1.1.0-beta.2-settings1"', self.source
+            'import "./gw-energy-pilot-v039.js?v=1.2.0-beta.1-mobile-sems1"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -62,9 +62,9 @@ class FrontendV041StableDomTests(unittest.TestCase):
     def test_host_properties_ignore_semantically_identical_assignments(self) -> None:
         self.assertIn("function plainJsonEqual(left, right)", self.source)
         self.assertIn("equal = Object.is", self.source)
-        self.assertIn(
-            'installStableHostProperty(PanelClass, "narrow", Boolean)', self.source
-        )
+        self.assertIn("function installReactiveNarrowProperty(PanelClass)", self.source)
+        self.assertIn("installReactiveNarrowProperty(PanelClass)", self.source)
+        self.assertIn("patchNarrowControlSurface(this, next)", self.source)
         self.assertIn(
             'installStableHostProperty(PanelClass, "panel", (value) => value, plainJsonEqual)',
             self.source,

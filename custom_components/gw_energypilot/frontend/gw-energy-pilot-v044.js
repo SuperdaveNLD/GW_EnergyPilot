@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v043.js?v=1.1.0-beta.2-settings1";
+import "./gw-energy-pilot-v043.js?v=1.2.0-beta.1-mobile-sems1";
 
 const VERSION = "0.44";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -197,6 +197,7 @@ function installStableOptimizeButton(panel, root) {
 }
 
 function patchOptimizeUi(panel) {
+  if (panel?.__epControlSurfaceArchitecture) return;
   const root = panel?.shadowRoot;
   if (!root) return;
 

@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v047.js?v=1.1.0-beta.2-settings1";
+import "./gw-energy-pilot-v047.js?v=1.2.0-beta.1-mobile-sems1";
 
 const VERSION = "0.48";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -37,6 +37,7 @@ function patchReleasePresentation(panel) {
   const cache = panel.__epV022SmartMeter || {};
   const strategy = cache.data?.strategy || panel._stateByKey?.("control_strategy")?.state;
   const note = root.querySelector(".ep-v022-strategy-note");
+  const declarativeNote = Boolean(note?.closest("ep-control-surface"));
   if (strategy !== "hybrid") {
     if (note?.dataset.epReleasePresentationOwner === "v048-hybrid") {
       delete note.dataset.epReleasePresentationOwner;
@@ -54,7 +55,7 @@ function patchReleasePresentation(panel) {
   }
 
   const presentationKey = `${language(panel)}:${strategy}`;
-  if (note && note.dataset.epV048PresentationKey !== presentationKey) {
+  if (note && !declarativeNote && note.dataset.epV048PresentationKey !== presentationKey) {
     note.innerHTML = `<strong>${copy.strategyNote}</strong> ${copy.hybridLabel} · ${copy.hybridDescription} ${copy.evOverride}`;
     note.dataset.epReleasePresentationOwner = "v048-hybrid";
     note.dataset.epV048PresentationKey = presentationKey;

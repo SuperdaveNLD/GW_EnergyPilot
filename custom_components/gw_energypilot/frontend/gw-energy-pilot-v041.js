@@ -1,15 +1,20 @@
-import "./gw-energy-pilot-v039.js?v=1.1.0-beta.2-settings1";
+import "./gw-energy-pilot-v039.js?v=1.2.0-beta.1-mobile-sems1";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.1.0-beta.2-settings1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.1-mobile-sems1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.1.0-beta.2-settings1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.1.0-beta.2-settings1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.1.0-beta.2-settings1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.1-mobile-sems1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-beta.1-mobile-sems1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.1-mobile-sems1";
+import {
+  mountEnergyPilotControlSurface,
+  patchNarrowControlSurface,
+  refreshEnergyPilotControlSurface,
+} from "./ep-control-surface.js?v=1.2.0-beta.1-mobile-sems1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -1407,7 +1412,8 @@ function patchController(panel, root, automaticOn) {
   const card = root.querySelector(".panel-card.controller");
   if (!card) return;
   const t = copy(panel);
-  const button = card.querySelector("#auto-toggle");
+  const legacyControls = !panel.__epControlSurfaceArchitecture;
+  const button = legacyControls ? card.querySelector("#auto-toggle") : null;
   if (button) {
     button.classList.toggle("on", automaticOn);
     button.classList.toggle("off", !automaticOn);
@@ -1438,7 +1444,7 @@ function patchController(panel, root, automaticOn) {
   );
   patchMetric(card, ["Command", "Commando"], panel._textByKey?.("control_command") || "—");
 
-  const manual = card.querySelector(".ep-v021-manual-pad");
+  const manual = legacyControls ? card.querySelector(".ep-v021-manual-pad") : null;
   if (manual) {
     button?.setAttribute("aria-controls", manual.id);
     const controlsReady = Boolean(panel._entityId?.("manual_mode") && panel._entityId?.("manual_power"));
@@ -1505,7 +1511,7 @@ function patchController(panel, root, automaticOn) {
     }
   }
 
-  localizeV038Controller(panel, root);
+  if (legacyControls) localizeV038Controller(panel, root);
   patchEvProtectionBanner(panel, root);
 }
 
@@ -1595,7 +1601,7 @@ function socLimitValue(panel, kind) {
 function patchEmhass(panel, root) {
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
-  patchCostFunctionSelector(panel, root);
+  if (!panel.__epControlSurfaceArchitecture) patchCostFunctionSelector(panel, root);
   const t = copy(panel);
   const pBattState = externalState(
     panel,
@@ -1679,6 +1685,7 @@ function patchEmhass(panel, root) {
 }
 
 function patchStrategy(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const strategy = root.querySelector(".ep-v038-strategy");
   if (!strategy) return;
   for (const input of strategy.querySelectorAll("input[data-ep-v038-soc]")) {
@@ -1972,7 +1979,10 @@ function patchLiveDom(panel) {
   patchMetric(batteryCard, ["Current", "Stroom"], panel._formatState(panel._stateByKey?.("battery_current")));
   patchMetric(batteryCard, ["Max cell temp", "Maximale celtemperatuur"], panel._formatState(panel._stateByKey?.("battery_max_cell_temperature")));
 
-  patchBatteryQuickActions(panel, root, automaticOn);
+  refreshEnergyPilotControlSurface(panel);
+  if (!panel.__epControlSurfaceArchitecture) {
+    patchBatteryQuickActions(panel, root, automaticOn);
+  }
   patchController(panel, root, automaticOn);
   patchEmhass(panel, root);
   patchStrategy(panel, root);
@@ -2147,6 +2157,24 @@ function installStableHostProperty(
   });
 }
 
+function installReactiveNarrowProperty(PanelClass) {
+  const descriptor = Object.getOwnPropertyDescriptor(PanelClass.prototype, "narrow");
+  if (!descriptor?.set) return;
+  Object.defineProperty(PanelClass.prototype, "narrow", {
+    configurable: descriptor.configurable,
+    enumerable: descriptor.enumerable,
+    get() {
+      return descriptor.get ? descriptor.get.call(this) : this._narrow;
+    },
+    set(value) {
+      const next = Boolean(value);
+      const current = descriptor.get ? descriptor.get.call(this) : this._narrow;
+      if (Object.is(current, next)) return;
+      patchNarrowControlSurface(this, next);
+    },
+  });
+}
+
 await customElements.whenDefined(PANEL_NAME);
 const PanelClass = customElements.get(PANEL_NAME);
 
@@ -2154,9 +2182,9 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
   // Home Assistant assigns hass, narrow, route and panel during host updates.
   // The inherited narrow/panel setters queue a complete ShadowRoot render even
   // when their values are unchanged. Keep those assignments idempotent so a
-  // pressed control remains connected until native click; real layout/config
-  // changes still delegate to the inherited structural-render path.
-  installStableHostProperty(PanelClass, "narrow", Boolean);
+  // pressed control remains connected until native click. Real narrow changes
+  // patch layout/model; real panel-config changes keep the structural path.
+  installReactiveNarrowProperty(PanelClass);
   installStableHostProperty(PanelClass, "panel", (value) => value, plainJsonEqual);
 
   const previousRender = PanelClass.prototype._render;
@@ -2165,8 +2193,11 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     // v0.38 press guard and delayed mobile scroll restoration are therefore
     // explicitly bypassed only in this release path.
     this.__epV041StableRuntime = true;
+    this.__epControlSurfaceArchitecture = true;
     this.__epV038InteractionGuardInstalled = true;
+    this.__epV038HoverTrackingInstalled = true;
     const result = previousRender.apply(this, args);
+    mountEnergyPilotControlSurface(this, this.shadowRoot);
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
     installPvFlowGroup(this.shadowRoot);

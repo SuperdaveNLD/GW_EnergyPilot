@@ -4,7 +4,46 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
-## [1.1.0-beta.2] - 2026-08-31
+## [1.2.0-beta.1] - 2026-09-01
+
+### Added
+
+- Add one permanent declarative Lit control surface with fixed child components
+  for Battery actions, Automatic Control, EMHASS strategy, Battery Strategy,
+  Optimize, Custom SOC and manual EMS, backed by one confirmed-state
+  interaction contract and a bounded passive diagnostic trace.
+- Add a Local Modbus TCP / SEMS+ API Beta telemetry selector to GoodWe data &
+  control, including a write-only password, explicit ambiguous station/inverter
+  selection and a 60–300 second cloud cadence.
+- Add asynchronous SEMS+/legacy authentication, regional gateway rewriting,
+  one expired-token renewal, five-minute `GY0429` back-off and strict runtime
+  sample-age, shape, sentinel, unit and sign validation.
+- Add dedicated desktop Chromium, iPad WebKit and iPhone WebKit control-surface
+  and settings gates, including delayed/reordered publication, failures,
+  native scrolling, keyboard/focus and one thousand telemetry updates.
+
+### Changed
+
+- Preserve the exact ShadowRoot, `main`, permanent surface and operational
+  controls through telemetry, plan, language, layout and Settings updates.
+- Bypass historical operational listeners while retaining their card,
+  Settings, diagnostics, flow and history presentation responsibilities.
+- Keep all EMS and minimum-SOC writes on the canonical local Modbus client;
+  cloud telemetry and local-control health are tracked independently.
+
+### Safety and compatibility
+
+- Preserve existing entity unique IDs, device identity, config entries and
+  Stores. Existing installations remain on Local Modbus until explicitly
+  changed.
+- Do not map SEMS cloud lifetime totals, meter phase currents or settings as
+  local-register equivalents. Accounting and phase-aware EV load balancing
+  fail safely while canonical inputs are unavailable.
+- Preserve GoodWe register/write semantics, EMHASS plan/config ownership and
+  Battery Saver profile behavior. Physical iPhone/Companion and live
+  SEMS+/GoodWe acceptance remain required before stable promotion.
+
+## [1.1.1] - 2026-08-31
 
 ### Fixed
 
@@ -15,8 +54,8 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Changed
 
-- Advance the presentation-only beta wrapper and complete frontend cache
-  boundary to `1.1.0-beta.2-settings1`.
+- Advance the presentation-only stable wrapper and complete frontend cache
+  boundary to `1.1.1-stable1`.
 
 ### Safety and compatibility
 
@@ -24,7 +63,7 @@ All notable changes to GW EnergyPilot are documented here.
   GoodWe register, change EMHASS policy, migrate config entries or alter entity
   and persistent-Store identity.
 
-## [1.1.0-beta.1] - 2026-08-31
+## [1.1.0] - 2026-08-31
 
 ### Added
 
@@ -43,7 +82,9 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Changed
 
-- Include all functional changes from v1.0.1-beta.4 as the base for this beta.
+- Promote the validated v1.1.0-beta.1 candidate to stable without changing
+  runtime, optimizer or control behavior.
+- Include all functional changes from v1.0.1-beta.4 as the release base.
 - Managed profile hard ranges are now Mad-Steve 5–100%, Gold Rush 5–100%,
   Chargegasm 8–96%, Balanced 10–93% and Battery Saver 10–85%, with matching
   comfort zones and price-relative factors documented in `docs/BATTERY_SAVER.md`.
@@ -52,8 +93,8 @@ All notable changes to GW EnergyPilot are documented here.
   selected.
 - Balanced anti-churn/power stress move to 7%/6%; Battery Saver to 9%/20%;
   Gold Rush uses 6%/0%; Chargegasm 6%/2%; Mad-Steve remains 2.25%/0%.
-- Advanced the active frontend to the presentation-only v1.1.0-beta.1 wrapper
-  above the v1.0.1-beta.4 layer and a complete `1.1.0-beta.1-charge1` cache
+- Advanced the active frontend to the presentation-only v1.1.0 stable wrapper
+  above the v1.0.1-beta.4 layer and a complete `1.1.0-stable1` cache
   boundary.
 - Split the live PV flow into one internal GoodWe/ETA node and one aggregated
   external-PV node while retaining one small combined PV group total (#116).
@@ -73,7 +114,6 @@ All notable changes to GW EnergyPilot are documented here.
   Automatic Control, GoodWe writes, EMHASS, plans, accounting, entity identity
   and Store schemas are unchanged. Desktop Chromium, iPad WebKit touch and
   iPhone WebKit cover route geometry, values, totals and stable node identity.
-
 ## [1.0.1-beta.4] - 2026-08-31
 
 ### Added

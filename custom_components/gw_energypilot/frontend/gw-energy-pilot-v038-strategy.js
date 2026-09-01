@@ -3,7 +3,7 @@ import {
   PROFILE_KEYS,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.1.0-beta.2-settings1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.1-mobile-sems1";
 
 const TEXT = {
   en: {
@@ -173,6 +173,7 @@ function strategySignature(panel, cache) {
 }
 
 function updateStrategyVisualState(panel, commitSignature = false) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const root = panel.shadowRoot;
   if (!root) return;
   const cache = batterySaverCache(panel);
@@ -400,6 +401,7 @@ function eventElement(event, selector) {
 }
 
 export function installV038DelegatedControls(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   if (panel.__epV038DelegatedControlsInstalled) return;
   panel.__epV038DelegatedControlsInstalled = true;
 
@@ -495,6 +497,7 @@ function renderCustomerStrategy(panel, wrap, cache) {
 }
 
 export function installV038CustomerStrategy(panel, root, reusableStrategy = null) {
+  if (panel.__epControlSurfaceArchitecture) return null;
   const card = root.querySelector(".panel-card.controller");
   if (!card) return null;
   removeLowLevelCommand(card);

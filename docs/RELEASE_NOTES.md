@@ -17,22 +17,50 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
-# v1.1.0-beta.2 — Managed-profile settings-save hotfix
+# v1.2.0-beta.1 — Mobile control modernization and SEMS+ telemetry
 
-This beta fixes EP and EMHASS settings saves after a managed Battery Strategy
-profile has been selected. The dedicated
+The operational dashboard controls now live in one permanent declarative Lit
+tree. Battery actions, Automatic Control, EMHASS/Battery Strategy, Optimize,
+Custom SOC and manual EMS remain connected through telemetry and structural
+updates. Selected state follows confirmed backend publication, with one shared
+pending/acknowledged/error contract and duplicate-request protection.
+
+Configuration additionally offers **Local Modbus TCP** or **SEMS+ API · Beta**
+as telemetry source. SEMS credentials are write-only in the dashboard; station
+and inverter identity must be explicit when discovery is ambiguous. Regional
+authentication, one token renewal, bounded rate-limit back-off and strict
+freshness/shape/sentinel validation protect the cloud path.
+
+Only an evidence-backed PV/load/grid/inverter/battery subset is mapped. Cloud
+lifetime counters and missing meter phase currents never impersonate canonical
+local registers. Local Modbus remains mandatory and solely owns every EMS and
+minimum-SOC write/read-back; its health remains independent from SEMS health.
+Existing entries default to Local Modbus. See
+`docs/releases/v1.2.0-beta.1.md`, `docs/SEMS_API.md` and
+`docs/FRONTEND_CONTROL_ARCHITECTURE.md`.
+
+# v1.1.1 — Managed-profile settings-save hotfix
+
+This stable patch fixes EP and EMHASS settings saves after a managed Battery
+Strategy profile has been selected. The dedicated
 `battery_saver_soc_limits_managed` ownership flag is now removed before the
 generic dashboard schema validates the remaining options and restored
 unchanged afterward. The prior `extra keys not allowed` error no longer blocks
 unrelated configuration changes.
 
 The fix does not change the selected profile, GoodWe minimum SOC, EMHASS
-policy, automatic control, entities or persistent Stores. It retains all
-v1.1.0-beta.1 features. See `docs/releases/v1.1.0-beta.2.md`.
+policy, automatic control, entities or persistent Stores. It was published and
+validated first as v1.1.0-beta.2. See `docs/releases/v1.1.1.md`.
 
-# v1.1.0-beta.1 — Chargegasm, chart ranges and clearer PV flow
+# v1.1.0-beta.2 — Managed-profile settings-save hotfix candidate
 
-This beta includes every v1.0.1-beta.1 through beta.4 change and adds the new
+This prerelease contains the same bounded settings-save fix promoted in
+v1.1.1. See `docs/releases/v1.1.0-beta.2.md`.
+
+# v1.1.0 — Chargegasm, chart ranges and clearer PV flow
+
+This stable release promotes the validated v1.1.0-beta.1 candidate. It includes
+every v1.0.1-beta.1 through beta.4 change and adds the new
 Battery Saver policy layer. Battery Strategy now offers **Mad-Steve**, **Gold
 Rush**, **Chargegasm**, **Balanced**, **Battery Saver** and **Custom**. The five
 managed modes have explicit hard minimum/maximum SOC ranges, comfort zones,
@@ -53,13 +81,12 @@ plan. A failure restores the previous GoodWe minimum, mode and all ten owned
 EMHASS fields. Direct SOC slider/service writes are rejected while a managed
 profile is active; **Custom** preserves current values and restores the two
 sliders. Existing v1.0 managed selections require explicit reselection, so
-installing the beta alone does not change the inverter minimum.
+installing the release alone does not change the inverter minimum.
 
 The documentation explains the lower-average-SOC, SOC-window, power and
 throughput rationale and its limits. The profile factors are transparent
 price-relative optimizer policy, not a battery-specific lifetime guarantee.
-See `docs/releases/v1.1.0-beta.1.md` and `docs/BATTERY_SAVER.md`.
-
+See `docs/releases/v1.1.0.md` and `docs/BATTERY_SAVER.md`.
 # v1.0.1-beta.4 — Explicit charging detection and safe EV-stop recovery
 
 Settings → EV now asks the operator to choose one charging signal: measured
@@ -185,7 +212,10 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
-| **1.1.0-beta.2** | 2026-08-31 | **Beta** | Fixes EP/EMHASS settings saves for managed battery profiles while preserving SOC-limit ownership. |
+| **1.2.0-beta.1** | 2026-09-01 | **Beta** | Combines permanent mobile controls with guarded SEMS+ Beta telemetry while retaining local-only EMS/minimum-SOC writes. |
+| **1.1.1** | 2026-08-31 | **Stable** | Fixes EP/EMHASS settings saves for managed battery profiles while preserving SOC-limit ownership. |
+| **1.1.0-beta.2** | 2026-08-31 | **Beta** | Validates the managed-profile settings-save hotfix before stable promotion. |
+| **1.1.0** | 2026-08-31 | **Stable** | Promotes v1.1.0-beta.1 with Chargegasm, complete managed SOC ranges, 12h/24h/36h plan views, compact manual ownership and separate internal/external PV routes. |
 | **1.1.0-beta.1** | 2026-08-31 | **Beta** | Includes v1.0.1-beta.4 and adds Chargegasm, complete managed SOC ranges, 12h/24h/36h plan views, compact manual ownership and separate internal/external PV routes. |
 | **1.0.1-beta.4** | 2026-08-31 | **Beta** | Adds an exclusive power-or-status EV charging detector and bounded fresh-plan retries after charging stops. |
 | **1.0.1-beta.3** | 2026-08-31 | **Beta** | Makes scheduling restart-safe, fixes false legacy-scheduler detection and displays the backend controller's canonical GoodWe mapping. |

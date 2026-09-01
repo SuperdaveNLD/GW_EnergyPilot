@@ -24,6 +24,7 @@ from .const import (
     CONF_P_BATT_ENTITY,
     CONF_P_GRID_ENTITY,
     CONF_SCAN_INTERVAL,
+    CONF_TELEMETRY_SOURCE,
     DEFAULT_DEADBAND,
     DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
@@ -32,6 +33,7 @@ from .const import (
     DEFAULT_P_BATT_ENTITY,
     DEFAULT_P_GRID_ENTITY,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TELEMETRY_SOURCE,
 )
 from .debug_log import GWEnergyPilotDebugLog
 from .registers import REGISTER_DEFINITIONS
@@ -154,8 +156,23 @@ class GWEnergyPilotDebugRuntime:
         last_exception = getattr(coordinator, "last_exception", None)
         modbus_client = getattr(client, "_client", None)
         return {
+            "source": getattr(data, "source", getattr(coordinator, "source", None)),
+            "source_updated_at": (
+                data.source_updated_at.isoformat()
+                if data is not None
+                and getattr(data, "source_updated_at", None) is not None
+                else None
+            ),
             "last_update_success": bool(coordinator.last_update_success),
             "last_exception": str(last_exception) if last_exception else None,
+            "last_control_update_success": getattr(
+                coordinator, "last_control_update_success", None
+            ),
+            "last_control_exception": (
+                str(getattr(coordinator, "last_control_exception", None))
+                if getattr(coordinator, "last_control_exception", None)
+                else None
+            ),
             "client_connected": bool(getattr(modbus_client, "connected", False)),
             "values": values,
         }
@@ -177,6 +194,12 @@ class GWEnergyPilotDebugRuntime:
                 "time_zone": self.hass.config.time_zone,
             },
             "runtime_config": {
+                "telemetry_source": str(
+                    entry.data.get(
+                        CONF_TELEMETRY_SOURCE,
+                        DEFAULT_TELEMETRY_SOURCE,
+                    )
+                ),
                 "scan_interval_seconds": int(
                     options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
                 ),

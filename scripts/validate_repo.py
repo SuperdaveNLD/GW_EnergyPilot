@@ -26,7 +26,7 @@ RELEASE_NOTES = ROOT / "docs" / "RELEASE_NOTES.md"
 HACS = ROOT / "hacs.json"
 
 JS_IMPORT_RE = re.compile(
-    r"^\s*import\s+[\"'](?P<path>\./[^\"']+)[\"']\s*;?",
+    r"^\s*import(?:\s+[^;\"']+?\s+from)?\s+[\"'](?P<path>\./[^\"']+)[\"']\s*;?",
     re.MULTILINE,
 )
 PANEL_MODULE_RE = re.compile(
