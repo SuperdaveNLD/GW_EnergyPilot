@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.2.0-beta.4 runtime structure
+## Current v1.2.0-beta.5 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.2.0-beta.4 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.2.0-beta.5 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -180,12 +180,16 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.4 uses the final presentation-only beta wrapper and advances one
-complete `1.2.0-beta.4-touch-methods1` active-graph cache boundary. The bounded
+v1.2.0-beta.5 uses the final presentation-only beta wrapper and advances one
+complete `1.2.0-beta.5-touch-fallback1` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The local-only Beta tests component additionally buffers pointer/click evidence
 until after the synthesis window and compares five guarded activation methods;
-it is diagnostic only and never routes an operational command.
+its numbered controls remain diagnostic-only and never route an operational
+command. `ep-touch-click-fallback.js` owns the single root-scoped iOS recovery
+adapter. It recognizes enabled buttons and menu switches, rejects a moved or
+cancelled touch, waits 120 ms for native click and otherwise calls only the
+same element's existing `.click()` path with late-click deduplication.
 The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
 plan data/view owners implement Recorder attribution,
@@ -221,7 +225,7 @@ service or WebSocket call.
 The inherited renderer must use `_commitStructuralRender()` so a structural
 dashboard update keeps the exact ShadowRoot, `main`, control surface and child
 controls connected. Never restore `shadowRoot.innerHTML`. A control action is a
-native `click` and one gateway request. Its selected state comes only from the
+native or bounded recovered `click` and one gateway request. Its selected state comes only from the
 confirmed Home Assistant/API model; service completion and backend publication
 may arrive in either order. See `FRONTEND_CONTROL_ARCHITECTURE.md` and
 `FRONTEND_STABLE_DOM.md`.

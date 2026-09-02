@@ -51,6 +51,28 @@ label and its checkbox; `actions` remains the canonical completed-action count.
 The result narrows the failing browser path, but does not by itself close the
 real operational-control acceptance below.
 
+## Beta.5 production-fallback pass
+
+Beta.5 keeps the five numbered method buttons raw, but applies method 4's
+120 ms recovery to the rest of the EnergyPilot panel. After installing beta.5
+in Companion:
+
+1. tap the dashboard layout button, Beta Tests entry and close button once;
+2. reopen the layout menu and toggle one harmless card-visibility switch, then
+   reset the dashboard layout;
+3. open Settings, change tabs and return without saving;
+4. test an operational action only when its real hardware effect is safe and
+   reconcile it with the Home Assistant service/action log;
+5. export `__epBetaTests.json()` and retain its
+   `production_touch_fallback.metrics` and `targets` sections.
+
+For every deliberate tap, `fallback_clicks` may rise when Companion omitted
+native click. `late_clicks_suppressed` may rise if WebKit delivered it later.
+Neither is an error. One physical tap must still cause exactly one visible
+action and, for operational controls, exactly one matching backend request.
+Starting a vertical scroll on a control must raise neither the completed action
+nor its target fallback count.
+
 ## Safety prerequisites
 
 Battery quick actions and manual EMS modes can move significant real power.
@@ -94,6 +116,10 @@ native `click`, service/WebSocket start/end/error, Home Assistant publication,
 surface mounting and structural renders. Every pointer/click row contains the
 canonical control ID, stable node identity and `isConnected`; every row also
 contains the permanent surface identity and connection state.
+Beta.5 additionally records `touch-fallback-native_clicks`,
+`touch-fallback-fallback_clicks` and
+`touch-fallback-late_clicks_suppressed` without storing credentials or entity
+values.
 
 Export `__epControlTrace.json()` before reloading or closing the page. Store it
 with the matching Home Assistant action/service audit and a screen recording.

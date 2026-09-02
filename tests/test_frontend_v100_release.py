@@ -20,9 +20,9 @@ class FrontendV100ReleaseTests(unittest.TestCase):
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "1.2.0-beta.4")
+        self.assertEqual(manifest["version"], "1.2.0-beta.5")
         self.assertIn(
-            "gw-energy-pilot-v110.js?v=1.2.0-beta.4-touch-methods1", init_source
+            "gw-energy-pilot-v110.js?v=1.2.0-beta.5-touch-fallback1", init_source
         )
         self.assertIn(
             f'import "./gw-energy-pilot-v051.js?v={CACHE_KEY}"', self.release

@@ -4697,6 +4697,202 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, object]:
+    """Prove missing iOS clicks recover once across controls and menus."""
+    enabled = EXPECTED_ENTRYPOINT == "v110"
+    result: dict[str, object] = {
+        "ran": enabled,
+        "installed": False,
+        "operational_fallback": False,
+        "late_click_deduped": False,
+        "movement_rejected": False,
+        "cancel_rejected": False,
+        "menu_opened": False,
+        "menu_switch": False,
+        "menu_reset": False,
+        "beta_opened": False,
+        "beta_raw_control_excluded": False,
+        "beta_closed": False,
+        "settings_opened": False,
+        "settings_tab": False,
+        "settings_closed": False,
+        "metrics": {},
+        "error": None,
+    }
+    if not enabled:
+        return result
+
+    try:
+        page.evaluate(
+            """
+            () => {
+              window.__epTouchClickFallback.reset();
+              window.__epResetActionLogs();
+              window.__epSetEntityByKey('automatic_control', 'off');
+              window.__epSetEntityByKey('control_command', 'battery_pause');
+              window.__epMissingTouchSequence = 1200;
+              window.__epDispatchMissingTouch = async (selector, options = {}) => {
+                const root = window.__epPanel.shadowRoot;
+                const node = root.querySelector(selector);
+                if (!node) throw new Error(`Missing touch target: ${selector}`);
+                const pointerId = ++window.__epMissingTouchSequence;
+                const common = {
+                  bubbles: true,
+                  composed: true,
+                  pointerId,
+                  pointerType: 'touch',
+                  isPrimary: true,
+                  button: 0,
+                  clientX: 24,
+                  clientY: 24,
+                };
+                node.dispatchEvent(new PointerEvent('pointerdown', common));
+                if (options.move) {
+                  node.dispatchEvent(new PointerEvent('pointermove', {
+                    ...common,
+                    clientY: 64,
+                  }));
+                }
+                node.dispatchEvent(new PointerEvent(
+                  options.cancel ? 'pointercancel' : 'pointerup',
+                  options.move ? {...common, clientY: 64} : common,
+                ));
+                await new Promise(resolve => setTimeout(resolve, 180));
+                if (options.lateClick) {
+                  node.dispatchEvent(new MouseEvent('click', {
+                    bubbles: true,
+                    composed: true,
+                    cancelable: true,
+                    detail: 1,
+                  }));
+                  await new Promise(resolve => setTimeout(resolve, 40));
+                }
+                return node;
+              };
+            }
+            """
+        )
+        page.wait_for_timeout(120)
+        result["installed"] = page.evaluate(
+            "() => window.__epTouchClickFallback?.snapshot?.().enabled === true"
+        )
+
+        quick_id = page.evaluate("window.__epPanel._entityId('max_charge')")
+        page.evaluate(
+            "window.__epDispatchMissingTouch('[data-action=\"max_charge\"]', {lateClick:true})"
+        )
+        wait_service_count(page, quick_id, 1)
+        page.wait_for_timeout(100)
+        quick_calls = page.evaluate(
+            """
+            entityId => window.__epServiceCalls.filter(
+              call => call.data?.entity_id === entityId
+            ).length
+            """,
+            quick_id,
+        )
+        result["operational_fallback"] = quick_calls == 1
+        result["late_click_deduped"] = (
+            quick_calls == 1
+            and page.evaluate(
+                "() => window.__epTouchClickFallback.snapshot().metrics.late_clicks_suppressed"
+            )
+            == 1
+        )
+
+        page.evaluate(
+            "window.__epDispatchMissingTouch('.ep-layout-button', {move:true})"
+        )
+        result["movement_rejected"] = not page.evaluate(
+            "() => Boolean(window.__epPanel.shadowRoot.querySelector('.ep-layout-menu'))"
+        )
+        page.evaluate(
+            "window.__epDispatchMissingTouch('.ep-layout-button', {cancel:true})"
+        )
+        result["cancel_rejected"] = not page.evaluate(
+            "() => Boolean(window.__epPanel.shadowRoot.querySelector('.ep-layout-menu'))"
+        )
+
+        page.evaluate(
+            "window.__epDispatchMissingTouch('.ep-layout-button', {lateClick:true})"
+        )
+        page.wait_for_function(
+            "() => Boolean(window.__epPanel.shadowRoot.querySelector('.ep-layout-menu'))",
+            timeout=2_000,
+        )
+        result["menu_opened"] = True
+        switch_before = page.evaluate(
+            "() => window.__epPanel.shadowRoot.querySelector('[data-ep-visible=\"solar\"]')?.checked"
+        )
+        page.evaluate(
+            "window.__epDispatchMissingTouch('[data-ep-visible=\"solar\"]')"
+        )
+        page.wait_for_timeout(100)
+        switch_after = page.evaluate(
+            "() => window.__epPanel.shadowRoot.querySelector('[data-ep-visible=\"solar\"]')?.checked"
+        )
+        result["menu_switch"] = switch_after is not None and switch_after != switch_before
+
+        page.evaluate("window.__epDispatchMissingTouch('.ep-menu-reset')")
+        page.wait_for_timeout(100)
+        result["menu_reset"] = page.evaluate(
+            "() => window.__epPanel.shadowRoot.querySelector('[data-ep-visible=\"solar\"]')?.checked === true"
+        )
+        page.evaluate("window.__epDispatchMissingTouch('.ep-beta-tests-menu')")
+        page.wait_for_function(
+            "() => window.__epPanel.__epBetaTestsOpen === true",
+            timeout=2_000,
+        )
+        result["beta_opened"] = True
+        raw_before = page.evaluate(
+            "() => window.__epBetaTests.snapshot().methods['method-native-click'].metrics.actions"
+        )
+        page.evaluate(
+            "window.__epDispatchMissingTouch('[data-beta-control=\"method-native-click\"]')"
+        )
+        raw_after = page.evaluate(
+            "() => window.__epBetaTests.snapshot().methods['method-native-click'].metrics.actions"
+        )
+        result["beta_raw_control_excluded"] = raw_after == raw_before
+        page.evaluate("window.__epDispatchMissingTouch('.ep-beta-tests-close')")
+        page.wait_for_function(
+            "() => window.__epPanel.__epBetaTestsOpen !== true",
+            timeout=2_000,
+        )
+        result["beta_closed"] = True
+
+        page.evaluate("window.__epDispatchMissingTouch('.ep-v016-settings-button')")
+        page.wait_for_function(
+            "() => Boolean(window.__epPanel.shadowRoot.querySelector('.ep-v016-settings'))",
+            timeout=5_000,
+        )
+        result["settings_opened"] = True
+        page.evaluate(
+            "window.__epDispatchMissingTouch('[data-settings-tab=\"goodwe\"]')"
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '[data-settings-tab="goodwe"]'
+            )?.classList.contains('active')
+            """,
+            timeout=2_000,
+        )
+        result["settings_tab"] = True
+        page.evaluate("window.__epDispatchMissingTouch('.ep-v016-back')")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=2_000,
+        )
+        result["settings_closed"] = True
+        result["metrics"] = page.evaluate(
+            "() => window.__epTouchClickFallback.snapshot().metrics"
+        )
+    except (PlaywrightError, RuntimeError) as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
@@ -4832,6 +5028,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     plan = exercise_plan_refresh(page)
     execution_history = exercise_execution_history(page, profile)
     beta_tests = exercise_beta_tests(page, profile)
+    touch_click_fallback = exercise_touch_click_fallback(page, profile)
     language_result = exercise_language(page)
     structural = exercise_structural_rerender(page)
 
@@ -4870,6 +5067,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "plan": plan,
         "execution_history": execution_history,
         "beta_tests": beta_tests,
+        "touch_click_fallback": touch_click_fallback,
         "language": language_result,
         "structural": structural,
         "animation": animation_summary(page),
@@ -4912,6 +5110,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     plan = result["plan"]
     execution_history = result["execution_history"]
     beta_tests = result["beta_tests"]
+    touch_click_fallback = result["touch_click_fallback"]
     language_result = result["language"]
     structural = result["structural"]
     animation = result["animation"]
@@ -4928,7 +5127,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
         "v101": "v1.0.1-beta.4 BETA",
-        "v110": "v1.2.0-beta.4 BETA",
+        "v110": "v1.2.0-beta.5 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -5402,6 +5601,18 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             )
         if beta_tests["error"]:
             failures.append(f"{name}: Beta tests interaction error")
+        required_fallback = (
+            "ran", "installed", "operational_fallback", "late_click_deduped",
+            "movement_rejected", "cancel_rejected", "menu_opened", "menu_switch",
+            "menu_reset", "beta_opened", "beta_raw_control_excluded", "beta_closed",
+            "settings_opened", "settings_tab", "settings_closed",
+        )
+        if not all(touch_click_fallback.get(key) is True for key in required_fallback):
+            failures.append(
+                f"{name}: iOS touch click fallback regressed: {touch_click_fallback}"
+            )
+        if touch_click_fallback["error"]:
+            failures.append(f"{name}: iOS touch click fallback interaction error")
     if (
         language_result["localized"] is not True
         or (not control_architecture and language_result["manual_summary_localized"] is not True)

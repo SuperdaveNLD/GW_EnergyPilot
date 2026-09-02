@@ -4,7 +4,7 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.2.0-beta.4**. The beta is based on stable v1.1.1 and retains all
+EnergyPilot v1.2.0-beta.5**. The beta is based on stable v1.1.1 and retains all
 earlier v1 behavior through presentation-only wrappers; its nested v0.51
 feature layer supplies the scoped execution-history card.
 
@@ -28,32 +28,33 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v110.js?v=1.2.0-beta.4-touch-methods1
-       -> gw-energy-pilot-v101.js?v=1.2.0-beta.4-touch-methods1
-            -> gw-energy-pilot-v051.js?v=1.2.0-beta.4-touch-methods1
-                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.4-touch-methods1
-                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.4-touch-methods1
-                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.4-touch-methods1
-                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.4-touch-methods1
-                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.4-touch-methods1
-                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.4-touch-methods1
-                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.4-touch-methods1
-                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.4-touch-methods1
-                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.4-touch-methods1
-                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.4-touch-methods1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.4-touch-methods1
-                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.4-touch-methods1
-                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.4-touch-methods1
-                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.4-touch-methods1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.4-touch-methods1
+  -> gw-energy-pilot-v110.js?v=1.2.0-beta.5-touch-fallback1
+       -> gw-energy-pilot-v101.js?v=1.2.0-beta.5-touch-fallback1
+            -> gw-energy-pilot-v051.js?v=1.2.0-beta.5-touch-fallback1
+                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.5-touch-fallback1
+                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.5-touch-fallback1
+                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.5-touch-fallback1
+                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.5-touch-fallback1
+                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.5-touch-fallback1
+                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.5-touch-fallback1
+                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.5-touch-fallback1
+                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.5-touch-fallback1
+                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.5-touch-fallback1
+                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.5-touch-fallback1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.5-touch-fallback1
+                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.5-touch-fallback1
+                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.5-touch-fallback1
+                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.5-touch-fallback1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.5-touch-fallback1
 ```
 
-Every import in the active graph uses `1.2.0-beta.4-touch-methods1`. This ensures an
+Every import in the active graph uses `1.2.0-beta.5-touch-fallback1`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 
-The graph additionally imports a vendored Lit 3.3.3 production bundle and
-`ep-control-surface.js` with the same cache boundary. The versioned files remain
+The graph additionally imports a vendored Lit 3.3.3 production bundle,
+`ep-control-surface.js` and `ep-touch-click-fallback.js` with the same cache
+boundary. The versioned files remain
 the Home Assistant panel entry and presentation chain; v0.41 now mounts and
 feeds the permanent component boundary.
 
@@ -107,6 +108,34 @@ retain its counters and preserve the open state. Closing restores only the
 dashboard children that were visible before opening. The diagnostic adds no
 pointer capture, synthetic click, gesture cancellation, motion or HA call.
 
+## iOS missing-click compatibility boundary
+
+Physical beta.4 evidence from Home Assistant Companion build 2026.2805 showed
+that touch `pointerdown`/`pointerup` reached every clean test target while a
+substantial share of native clicks was missing. Method 4 recovered every valid
+pointerup exactly once; immediate pointerup action with later deduplication
+over-activated and is not used.
+
+Beta.5 therefore installs one capture-phase adapter on the unchanged panel
+ShadowRoot. It considers enabled native buttons, checkbox/radio menu controls,
+their labels, native `summary` controls and semantic `role="button"` elements.
+The numbered `[data-beta-control]` controls remain explicitly outside this
+adapter as the raw diagnostic reference.
+
+For a primary touch that stays within 12 px on the same element, the adapter
+waits 120 ms for native click. A timely native click proceeds untouched and
+cancels the timer. If no click arrives, the adapter invokes that same
+element's `.click()` method; existing click/form/change listeners and, for the
+permanent surface, the existing pending/acknowledgement state machine remain
+the only action route. One late physical click for that fallback is stopped at
+the root. New touch sequences, mouse/pen activation, Enter/Space and unrelated
+programmatic clicks retain normal semantics.
+
+Pointer listeners are passive. The adapter never captures a pointer, calls
+`preventDefault()` on pointer events, writes scroll position or invokes a Home
+Assistant/GoodWe/EMHASS API directly. Movement beyond 12 px and
+`pointercancel` discard the candidate without scheduling an action.
+
 Every asynchronous control follows one state machine:
 
 ```text
@@ -150,7 +179,7 @@ native `hidden` state and a compact ownership summary remains visible. When
 manual control becomes available, those same mode-button and slider nodes are
 revealed and enabled; they are not removed, replaced or reconstructed.
 
-Home Assistant also assigns `narrow`, `route` and `panel` during host updates. The stable-DOM layer ignores repeated normalized values and semantically identical plain-JSON `panel` values, including a newly allocated clone of unchanged panel configuration. A real narrow-layout change patches `main` layout and the immutable control model only. A real nested panel-config/context change may still request structural legacy-content rendering, while preserving `main` and the complete permanent control tree. This keeps a pressed control connected between `pointerdown` and its native `click` without intercepting or synthesizing touch events.
+Home Assistant also assigns `narrow`, `route` and `panel` during host updates. The stable-DOM layer ignores repeated normalized values and semantically identical plain-JSON `panel` values, including a newly allocated clone of unchanged panel configuration. A real narrow-layout change patches `main` layout and the immutable control model only. A real nested panel-config/context change may still request structural legacy-content rendering, while preserving `main` and the complete permanent control tree. This keeps a pressed control connected between `pointerdown` and native click; the beta.5 compatibility boundary can supply the same element's click only after the native event is proven missing for 120 ms.
 
 ### Header connectivity status
 
@@ -202,9 +231,11 @@ The active v0.41 normal telemetry path never writes `scrollTop` or `scrollLeft`,
 Legacy v0.38 interaction and scroll-restoration functions remain available for historical entrypoints, but `__epV041StableRuntime` bypasses them before installation or use. The active architecture also bypasses the old base Automatic Control listener, v0.10/v0.16/v0.21/v0.38/v0.44 operational creators and the delegated v0.38 strategy listener. Historical localization and presentation passes must skip descendants of `ep-control-surface`.
 
 All permanent actions are native `button[type="button"]` controls with native
-`click` and keyboard semantics. EnergyPilot does not synthesize clicks, capture
-pointers, call `preventDefault()` for these controls or add `touchstart` /
-`touchend` action routes. Targets are at least 44 by 44 CSS pixels, pseudo
+`click` and keyboard semantics. Beta.5's bounded adapter may call the same
+element's `.click()` after a missing touch click; it does not dispatch a custom
+event or bypass the existing handler. EnergyPilot does not capture pointers,
+call `preventDefault()` on pointer events or add `touchstart` / `touchend`
+action routes. Targets are at least 44 by 44 CSS pixels, pseudo
 elements cannot receive pointer events, controls use `touch-action:
 manipulation`, and containers preserve vertical `pan-y` scrolling.
 
@@ -268,14 +299,20 @@ legacy variant, proves the delayed fallback and movement rejection branches,
 verifies raw event/action/deduplication counts, runs telemetry and a structural
 render, restores the dashboard and proves that the complete diagnostic session
 emits zero Home Assistant service and WebSocket calls.
+For beta.5 the same three-profile matrix additionally removes the native click
+after pointerup and proves exact-once recovery for an operational service
+button, late-click suppression, movement/cancel rejection, layout-menu
+open/close, a menu checkbox, Beta Tests navigation and Settings navigation.
 
 ## Contributor rules
 
 - Do not call `_queueRender()` for normal v0.41 telemetry feedback when an existing scoped callback owns the update.
 - Do not add scroll-position writes as a visual correction for render movement.
 - Do not add pointer capture or global gesture cancellation to protect a control from telemetry.
-- Do not install an operational listener outside the permanent Lit component
-  tree or mutate its descendants from a historical module.
+- Do not install another operational listener outside the permanent Lit
+  component tree. The single root-scoped `ep-touch-click-fallback.js` adapter
+  is the bounded iOS compatibility exception and may only re-enter existing
+  native element handlers.
 - Do not interpret a resolved service call as confirmed selected state; wait
   for the matching Home Assistant/API model.
 - Do not re-enable motion without a separately documented ownership model and browser regressions on all three profiles.

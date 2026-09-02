@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v022-flow-direction.js?v=1.2.0-beta.4-touch-methods1";
+import "./gw-energy-pilot-v022-flow-direction.js?v=1.2.0-beta.5-touch-fallback1";
 
 const VERSION = "0.23";
 const PANEL_NAME = "gw-energypilot-panel";

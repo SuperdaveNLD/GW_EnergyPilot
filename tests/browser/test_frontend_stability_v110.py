@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run the v1.2.0-beta.4 frontend regression matrix."""
+"""Run the v1.2.0-beta.5 frontend regression matrix."""
 
 from __future__ import annotations
 
-import test_frontend_stability_v101  # noqa: F401 - keeps beta-4 matrix in chain
+import test_frontend_stability_v101  # noqa: F401 - keeps the historical beta matrix in chain
 import test_frontend_stability as stability
 
 

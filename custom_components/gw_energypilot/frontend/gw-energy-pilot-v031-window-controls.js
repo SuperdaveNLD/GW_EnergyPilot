@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v031.js?v=1.2.0-beta.4-touch-methods1";
+import "./gw-energy-pilot-v031.js?v=1.2.0-beta.5-touch-fallback1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const DASHBOARD_STORAGE_KEY = "gw_energypilot_dashboard_v008";

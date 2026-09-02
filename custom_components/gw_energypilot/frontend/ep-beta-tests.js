@@ -1,7 +1,7 @@
 import {
   LitElement,
   html,
-} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.4-touch-methods1";
+} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.5-touch-fallback1";
 
 const METRIC_KEYS = Object.freeze([
   "pointerdown",
@@ -463,6 +463,7 @@ class EpBetaTests extends LitElement {
       user_agent: navigator.userAgent,
       viewport: { width: innerWidth, height: innerHeight, device_pixel_ratio: devicePixelRatio },
       no_home_assistant_calls: true,
+      production_touch_fallback: globalThis.__epTouchClickFallback?.snapshot?.() || null,
       measurement: {
         display_deferred_ms: DISPLAY_SETTLE_MS,
         move_threshold_px: MOVE_THRESHOLD_PX,

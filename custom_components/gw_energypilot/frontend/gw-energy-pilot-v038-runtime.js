@@ -1,10 +1,10 @@
-import "./gw-energy-pilot-v034.js?v=1.2.0-beta.4-touch-methods1";
-import { FLOW_THRESHOLD_W, flowMotionMap } from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.4-touch-methods1";
-import { ensureV038Styles } from "./gw-energy-pilot-v038-styles.js?v=1.2.0-beta.4-touch-methods1";
+import "./gw-energy-pilot-v034.js?v=1.2.0-beta.5-touch-fallback1";
+import { FLOW_THRESHOLD_W, flowMotionMap } from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.5-touch-fallback1";
+import { ensureV038Styles } from "./gw-energy-pilot-v038-styles.js?v=1.2.0-beta.5-touch-fallback1";
 import {
   installV038CustomerStrategy,
   installV038DelegatedControls,
-} from "./gw-energy-pilot-v038-strategy.js?v=1.2.0-beta.4-touch-methods1";
+} from "./gw-energy-pilot-v038-strategy.js?v=1.2.0-beta.5-touch-fallback1";
 
 const VERSION = "0.38";
 const PANEL_NAME = "gw-energypilot-panel";

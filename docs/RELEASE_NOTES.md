@@ -17,6 +17,27 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0-beta.5 — Companion touch-click recovery
+
+The 120 ms method that completed every valid beta.4 Companion pointer sequence
+is now applied once at the EnergyPilot panel boundary. Buttons in the permanent
+EMS surface, Settings, dashboard layout, diagnostics, graphs, history and
+modals all retain their original click handlers. Dashboard-menu checkbox/radio
+controls use that same bounded recovery.
+
+A native click arriving in time proceeds normally. If it is absent after a
+primary touch that moved no more than 12 px, EnergyPilot calls only the same
+element's existing `.click()` route. One later physical click is deduplicated.
+Movement, pointer cancellation, disabled/disconnected targets, mouse/pen and
+keyboard use do not enter this fallback path. Pointer listeners remain passive;
+the adapter never captures a pointer, cancels scrolling or directly calls Home
+Assistant, GoodWe or EMHASS.
+
+The five numbered Beta Tests methods remain raw and excluded from production
+adaptation. Their JSON export now also includes production fallback counters.
+See `docs/releases/v1.2.0-beta.5.md` and
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md`.
+
 # v1.2.0-beta.4 — Isolated iOS activation-method tests
 
 **Beta tests** now starts with five numbered local buttons that compare a clean
@@ -269,6 +290,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0-beta.5** | 2026-09-02 | **Beta** | Applies the measured 120 ms missing-click recovery to all EnergyPilot buttons and dashboard-menu switches with scroll rejection and late-click deduplication. |
 | **1.2.0-beta.4** | 2026-09-02 | **Beta** | Adds observer-neutral native-click and guarded pointerup/fallback/deduplication comparisons for the Companion iOS defect. |
 | **1.2.0-beta.3** | 2026-09-02 | **Beta** | Adds AUTO/CUSTOM EMHASS load forecasting with a horizon-aware fixed-watt runtime request. |
 | **1.2.0-beta.2** | 2026-09-01 | **Beta** | Rejects false SEMS 0% SOC, corrects Wanted-SOC interval timing and adds an isolated local mobile-control diagnostic page. |

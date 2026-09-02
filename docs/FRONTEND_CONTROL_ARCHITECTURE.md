@@ -81,10 +81,15 @@ plan/history refresh, host state publication and real `narrow` changes update
 properties only. Historical creators must not install parallel controls or
 listeners once the boundary is active.
 
-The implemented event route is:
+The implemented event route, including the beta.5 iOS compatibility boundary,
+is:
 
 ```text
-native button click or native input change
+primary touch on an enabled control
+  -> native click arrives within 120 ms: proceed unchanged
+  -> native click is missing: call the same element's existing click path
+  -> one late physical click after fallback: suppress as the same activation
+native/recovered button click or native/recovered checkbox change
   -> one Lit child state machine enters pending
   -> narrow ControlGateway invokes the existing HA service/WebSocket route once
   -> service result and confirmed HA/API model may arrive in either order
@@ -98,6 +103,14 @@ stored `manual_power` value and applies the established controller command; the
 manual power slider remains its own `number.set_value` action. This removes a
 frontend-generated two-service activation without changing EMS semantics or
 write ownership.
+
+The root-scoped compatibility adapter does not know any service, entity,
+GoodWe mode or WebSocket route. It rejects pointer movement beyond 12 px and
+`pointercancel`, keeps pointer listeners passive and never captures a pointer,
+cancels vertical scrolling or writes scroll position. Settings, layout,
+diagnostics, chart/history and modal buttons enter their unchanged historical
+handlers; the permanent operational controls retain their shared pending and
+confirmation state machine.
 
 ## Hardware evidence boundary
 

@@ -12,7 +12,7 @@ optimization.
 
 ## Status
 
-**v1.2.0-beta.4 · Beta**
+**v1.2.0-beta.5 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -29,18 +29,20 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` remains the stable production release. `v1.2.0-beta.4` is the opt-in
-candidate that adds five isolated iOS activation-method comparisons and removes
-live diagnostic rerenders from the pointer-to-click window. It retains the
-beta.3 EMHASS **Load forecast · AUTO / CUSTOM** setting and all earlier beta
-behavior. Local Modbus remains mandatory for every EMS and minimum-SOC
-write/read-back. Normal users keep the HACS prerelease switch off; testers
-explicitly enable it for GW EnergyPilot before selecting the beta.
+`v1.1.1` remains the stable production release. `v1.2.0-beta.5` is the opt-in
+candidate that applies beta.4's physically measured 120 ms missing-click
+recovery to EnergyPilot buttons, settings/navigation buttons and dashboard-menu
+switches. Every recovered touch still enters the existing native click,
+form-submit or change route exactly once. Local Modbus remains mandatory for
+every EMS and minimum-SOC write/read-back. Normal users keep the HACS prerelease
+switch off; testers explicitly enable it for GW EnergyPilot before selecting
+the beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0-beta.5.md` — Companion touch-click recovery notes;
 - `docs/releases/v1.2.0-beta.4.md` — isolated iOS activation-method comparison notes;
 - `docs/releases/v1.2.0-beta.3.md` — EMHASS AUTO/CUSTOM fixed load-forecast notes;
 - `docs/releases/v1.2.0-beta.2.md` — SEMS SOC, Wanted-SOC timing and local Beta tests notes;
@@ -89,6 +91,24 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.2.0-beta.5 highlights
+
+- Applies the proven native-click plus 120 ms fallback to every enabled native
+  button in the EnergyPilot panel, including operational controls, settings
+  tabs/actions, layout controls, diagnostics, chart/history and modal buttons.
+- Covers dashboard-menu checkbox/radio labels and native `summary`/semantic
+  button controls through the same root-scoped adapter.
+- Uses the existing `.click()` route only; it never calls Home Assistant,
+  GoodWe or EMHASS directly and therefore retains the permanent control
+  surface's pending, acknowledgement and error guards.
+- Rejects movement beyond 12 px and `pointercancel`, never captures a pointer or
+  cancels vertical scrolling, and suppresses one late physical click after a
+  fallback so one touch cannot become two actions.
+- Keeps the numbered Beta Tests controls unadapted as a raw comparison and adds
+  production fallback metrics to their JSON export.
+- Advances the complete frontend cache boundary to
+  `1.2.0-beta.5-touch-fallback1`.
 
 ## v1.2.0-beta.4 highlights
 

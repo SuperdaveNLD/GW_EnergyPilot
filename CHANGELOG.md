@@ -4,6 +4,31 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0-beta.5] - 2026-09-02
+
+### Fixed
+
+- Recover an iOS Home Assistant Companion touch when `pointerdown` and
+  `pointerup` reach an enabled EnergyPilot control but the native `click` is
+  still absent after 120 ms.
+- Apply the same recovery to operational buttons, Settings and navigation,
+  layout/window controls, diagnostics, graph/history/modal buttons and
+  dashboard-menu checkbox/radio controls.
+
+### Safety and compatibility
+
+- Route recovery only through the target element's existing `.click()` path;
+  the adapter has no Home Assistant, GoodWe or EMHASS action route and retains
+  all existing pending, acknowledgement, form and error guards.
+- Reject movement beyond 12 px, secondary touches, changed/disconnected or
+  disabled targets and `pointercancel`; keep pointer listeners passive and do
+  not capture pointers, cancel vertical gestures or write scroll position.
+- Suppress one late physical click after each fallback while preserving a new
+  pointer sequence, mouse/pen and keyboard activation. Keep numbered Beta Tests
+  methods outside the adapter and export production recovery metrics.
+- Advance the complete frontend cache boundary to
+  `1.2.0-beta.5-touch-fallback1`.
+
 ## [1.2.0-beta.4] - 2026-09-02
 
 ### Added

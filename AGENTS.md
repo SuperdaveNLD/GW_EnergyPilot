@@ -27,8 +27,8 @@ Current release lines:
 
 ```text
 v1.1.1 Stable
-v1.2.0-beta.2 Previous beta
-v1.2.0-beta.3 Current beta
+v1.2.0-beta.4 Previous beta
+v1.2.0-beta.5 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -67,6 +67,9 @@ EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
 - The active v1.2.0 beta telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The beta.5 iOS adapter may recover a missing touch click after 120 ms only
+  through the same native element's existing click path, with a 12 px movement
+  guard and late-click deduplication.
 - Operational controls must remain in the permanent Lit surface and must not be
   recreated or mutated by historical presentation layers.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
@@ -414,9 +417,10 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.3 owns final beta presentation and the complete
-`1.2.0-beta.3-load-forecast1` cache boundary. It retains the beta.2 safety and
-diagnostics, and adds the EMHASS AUTO/CUSTOM runtime load-forecast control. v1.1.1
+v1.2.0-beta.5 owns final beta presentation and the complete
+`1.2.0-beta.5-touch-fallback1` cache boundary. It retains the earlier safety,
+diagnostics and EMHASS AUTO/CUSTOM load-forecast control, and adds the bounded
+iOS missing-click recovery. v1.1.1
 remains the stable base and v1.0.1-beta.4 remains in the chain as its bounded
 historical beta presentation layer. v0.51 remains the bounded feature layer
 that owns the scoped EMHASS-to-GoodWe history card. The settings module owns

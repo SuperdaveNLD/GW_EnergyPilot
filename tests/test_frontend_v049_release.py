@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "1.2.0-beta.4-touch-methods1"
+CACHE_KEY = "1.2.0-beta.5-touch-fallback1"
 
 
 class FrontendV049ReleaseTests(unittest.TestCase):
@@ -24,8 +24,8 @@ class FrontendV049ReleaseTests(unittest.TestCase):
         active = (FRONTEND / "gw-energy-pilot-v051.js").read_text(encoding="utf-8")
         v050 = (FRONTEND / "gw-energy-pilot-v050.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "1.2.0-beta.4")
-        self.assertIn("gw-energy-pilot-v110.js?v=1.2.0-beta.4-touch-methods1", init_source)
+        self.assertEqual(manifest["version"], "1.2.0-beta.5")
+        self.assertIn("gw-energy-pilot-v110.js?v=1.2.0-beta.5-touch-fallback1", init_source)
         self.assertIn(
             f'import "./gw-energy-pilot-v050.js?v={CACHE_KEY}"',
             active,
