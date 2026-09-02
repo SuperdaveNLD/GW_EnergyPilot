@@ -12,7 +12,7 @@ optimization.
 
 ## Status
 
-**v1.2.0-beta.5 · Beta**
+**v1.2.0-beta.6 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -29,19 +29,20 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` remains the stable production release. `v1.2.0-beta.5` is the opt-in
-candidate that applies beta.4's physically measured 120 ms missing-click
-recovery to EnergyPilot buttons, settings/navigation buttons and dashboard-menu
-switches. Every recovered touch still enters the existing native click,
-form-submit or change route exactly once. Local Modbus remains mandatory for
-every EMS and minimum-SOC write/read-back. Normal users keep the HACS prerelease
-switch off; testers explicitly enable it for GW EnergyPilot before selecting
-the beta.
+`v1.1.1` remains the stable production release. `v1.2.0-beta.6` is the opt-in
+candidate that retains beta.5's measured missing-click recovery and enlarges
+the remaining Battery · Plan · Price and execution-history controls for a
+reliable coarse-pointer hit area. Every recovered touch still enters the
+existing native click, form-submit or change route exactly once. Local Modbus
+remains mandatory for every EMS and minimum-SOC write/read-back. Normal users
+keep the HACS prerelease switch off; testers explicitly enable it for GW
+EnergyPilot before selecting the beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0-beta.6.md` — chart/history mobile touch-target notes;
 - `docs/releases/v1.2.0-beta.5.md` — Companion touch-click recovery notes;
 - `docs/releases/v1.2.0-beta.4.md` — isolated iOS activation-method comparison notes;
 - `docs/releases/v1.2.0-beta.3.md` — EMHASS AUTO/CUSTOM fixed load-forecast notes;
@@ -91,6 +92,19 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.2.0-beta.6 highlights
+
+- Expands the real coarse-pointer/narrow-display targets for `S/M/L`,
+  `12h/24h/36h`, chart expand/footer actions and execution-history open/close
+  controls to at least 44 × 44 CSS pixels.
+- Retains the compact desktop presentation and proves the larger mobile groups
+  fit without horizontal card overflow.
+- Exercises the production 120 ms missing-click recovery on the real chart
+  size/range and full-history controls, including late-click deduplication and
+  a close button removed from the DOM by its own action.
+- Advances the complete frontend cache boundary to
+  `1.2.0-beta.6-chart-touch1`.
 
 ## v1.2.0-beta.5 highlights
 

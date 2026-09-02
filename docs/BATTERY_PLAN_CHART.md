@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.2.0-beta.5** and retained from v1.0.0 Stable.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.2.0-beta.6** and retained from v1.0.0 Stable.
 
 ## Purpose
 
@@ -206,6 +206,12 @@ The chart offers separate Apple-style segmented selectors for range (`12h / 24h 
 
 The selection is stored in the existing browser-local dashboard preference object. It does not add a Home Assistant entity or configuration-entry field.
 
+On coarse-pointer and narrow displays, every range and size segment has a real
+minimum 44 × 44 CSS-pixel button box. The visible segmented styling remains
+compact, but the browser no longer has to land a touch inside the earlier
+27-pixel-high target. The chart expand/footer actions and execution-history
+open/close controls use the same minimum target size.
+
 Traffic-light controls remain:
 
 - **red** — hide/close;
@@ -260,9 +266,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v1.2.0-beta.4 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v1.2.0-beta.6 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.2.0-beta.4 loads its presentation wrapper and every inner feature import through `1.2.0-beta.5-touch-fallback1`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.2.0-beta.6 loads its presentation wrapper and every inner feature import through `1.2.0-beta.6-chart-touch1`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
 
 ## EV protection underlays
 

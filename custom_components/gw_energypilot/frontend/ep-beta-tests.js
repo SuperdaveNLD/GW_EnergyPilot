@@ -1,7 +1,7 @@
 import {
   LitElement,
   html,
-} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.5-touch-fallback1";
+} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.6-chart-touch1";
 
 const METRIC_KEYS = Object.freeze([
   "pointerdown",

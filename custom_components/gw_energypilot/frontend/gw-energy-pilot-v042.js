@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.5-touch-fallback1";
+import "./gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.6-chart-touch1";
 
 const VERSION = "0.42";
 const PANEL_NAME = "gw-energypilot-panel";

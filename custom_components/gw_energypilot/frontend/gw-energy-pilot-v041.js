@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.2.0-beta.5-touch-fallback1";
+import "./gw-energy-pilot-v039.js?v=1.2.0-beta.6-chart-touch1";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.5-touch-fallback1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.6-chart-touch1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.5-touch-fallback1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-beta.5-touch-fallback1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.5-touch-fallback1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.6-chart-touch1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-beta.6-chart-touch1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.6-chart-touch1";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.2.0-beta.5-touch-fallback1";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.2.0-beta.5-touch-fallback1";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.2.0-beta.5-touch-fallback1";
+} from "./ep-control-surface.js?v=1.2.0-beta.6-chart-touch1";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.2.0-beta.6-chart-touch1";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.2.0-beta.6-chart-touch1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";

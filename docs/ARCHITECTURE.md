@@ -1,7 +1,7 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.2.0-beta.5**. Stable v1.1.1 remains the production base.
+v1.2.0-beta.6**. Stable v1.1.1 remains the production base.
 
 ## High-level flow
 
@@ -554,14 +554,17 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the stable base;
-v1.2.0-beta.5 owns final beta presentation and the complete
-`1.2.0-beta.5-touch-fallback1` active-graph cache boundary. Its EMHASS settings
+v1.2.0-beta.6 owns final beta presentation and the complete
+`1.2.0-beta.6-chart-touch1` active-graph cache boundary. Its EMHASS settings
 select AUTO or a fixed CUSTOM household load at the final runtime request-body
 boundary; unrelated optimization parameters remain untouched. Its isolated
 Beta tests compare five iOS activation methods with deferred, observer-neutral
 metrics. The measured winning native-click plus 120 ms fallback is installed
 once on the panel ShadowRoot for buttons and menu switches; it routes only
 through existing element handlers and does not own any backend action.
+The same final presentation gives the compact chart size/range and
+execution-history open/close controls real 44 CSS-pixel touch targets on
+coarse-pointer/narrow displays.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 

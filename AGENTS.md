@@ -27,8 +27,8 @@ Current release lines:
 
 ```text
 v1.1.1 Stable
-v1.2.0-beta.4 Previous beta
-v1.2.0-beta.5 Current beta
+v1.2.0-beta.5 Previous beta
+v1.2.0-beta.6 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -417,10 +417,11 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.5 owns final beta presentation and the complete
-`1.2.0-beta.5-touch-fallback1` cache boundary. It retains the earlier safety,
-diagnostics and EMHASS AUTO/CUSTOM load-forecast control, and adds the bounded
-iOS missing-click recovery. v1.1.1
+v1.2.0-beta.6 owns final beta presentation and the complete
+`1.2.0-beta.6-chart-touch1` cache boundary. It retains the earlier safety,
+diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
+missing-click recovery, and expands the remaining graph/history touch targets
+to at least 44 CSS pixels on coarse-pointer/narrow displays. v1.1.1
 remains the stable base and v1.0.1-beta.4 remains in the chain as its bounded
 historical beta presentation layer. v0.51 remains the bounded feature layer
 that owns the scoped EMHASS-to-GoodWe history card. The settings module owns

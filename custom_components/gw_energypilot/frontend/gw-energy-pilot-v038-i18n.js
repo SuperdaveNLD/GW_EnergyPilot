@@ -1,7 +1,7 @@
 import {
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.5-touch-fallback1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.6-chart-touch1";
 
 const EMS_MODE_TEXT = {
   en: {

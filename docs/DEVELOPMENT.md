@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.2.0-beta.5 runtime structure
+## Current v1.2.0-beta.6 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.2.0-beta.5 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.2.0-beta.6 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -180,8 +180,8 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.5 uses the final presentation-only beta wrapper and advances one
-complete `1.2.0-beta.5-touch-fallback1` active-graph cache boundary. The bounded
+v1.2.0-beta.6 uses the final presentation-only beta wrapper and advances one
+complete `1.2.0-beta.6-chart-touch1` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The local-only Beta tests component additionally buffers pointer/click evidence
 until after the synthesis window and compares five guarded activation methods;
@@ -190,6 +190,9 @@ command. `ep-touch-click-fallback.js` owns the single root-scoped iOS recovery
 adapter. It recognizes enabled buttons and menu switches, rejects a moved or
 cancelled touch, waits 120 ms for native click and otherwise calls only the
 same element's existing `.click()` path with late-click deduplication.
+The final beta presentation additionally gives chart size/range, expand/footer
+and execution-history open/close controls real 44 CSS-pixel minimum targets on
+coarse-pointer or narrow displays, without altering the compact desktop layout.
 The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
 plan data/view owners implement Recorder attribution,

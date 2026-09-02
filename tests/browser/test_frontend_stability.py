@@ -4716,6 +4716,12 @@ def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, obj
         "settings_opened": False,
         "settings_tab": False,
         "settings_closed": False,
+        "chart_touch_targets": False,
+        "chart_controls_fit": False,
+        "chart_size_fallback": False,
+        "chart_range_fallback": False,
+        "history_fallback": False,
+        "history_close_fallback": False,
         "metrics": {},
         "error": None,
     }
@@ -4885,6 +4891,144 @@ def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, obj
             timeout=2_000,
         )
         result["settings_closed"] = True
+
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.__epV027BatteryPlanData &&
+              !window.__epPanel.__epV027BatteryPlanPromise &&
+              window.__epPanel.shadowRoot.querySelector('[data-chart-size="compact"]') &&
+              window.__epPanel.shadowRoot.querySelector('[data-chart-range="12h"]') &&
+              window.__epPanel.shadowRoot.querySelector('[data-action="full-history"]')
+            )
+            """,
+            timeout=10_000,
+        )
+        if profile.touch:
+            touch_layout = page.evaluate(
+                """
+                () => {
+                  const root = window.__epPanel.shadowRoot;
+                  const card = root.querySelector('.ep-v027-battery-plan-card');
+                  const actions = card?.querySelector('.ep-v027-head-actions');
+                  const targets = [
+                    '[data-chart-size="compact"]',
+                    '[data-chart-size="normal"]',
+                    '[data-chart-size="large"]',
+                    '[data-chart-range="12h"]',
+                    '[data-chart-range="24h"]',
+                    '[data-chart-range="36h"]',
+                    '[data-action="full-history"]',
+                  ].every((selector) => {
+                    const rect = root.querySelector(selector)?.getBoundingClientRect();
+                    return Boolean(rect && rect.width >= 44 && rect.height >= 44);
+                  });
+                  return {
+                    targets,
+                    fits: Boolean(card && actions) &&
+                      card.scrollWidth <= card.clientWidth + 1 &&
+                      actions.scrollWidth <= actions.clientWidth + 1,
+                  };
+                }
+                """
+            )
+            result["chart_touch_targets"] = touch_layout["targets"]
+            result["chart_controls_fit"] = touch_layout["fits"]
+        else:
+            result["chart_touch_targets"] = True
+            result["chart_controls_fit"] = True
+
+        page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              window.__epMissingChartClicks = Object.create(null);
+              const targets = {
+                compact: '[data-chart-size="compact"]',
+                normal: '[data-chart-size="normal"]',
+                range12: '[data-chart-range="12h"]',
+                range24: '[data-chart-range="24h"]',
+                range36: '[data-chart-range="36h"]',
+                full: '[data-action="full-history"]',
+              };
+              for (const [key, selector] of Object.entries(targets)) {
+                window.__epMissingChartClicks[key] = 0;
+                root.querySelector(selector)?.addEventListener('click', () => {
+                  window.__epMissingChartClicks[key] += 1;
+                });
+              }
+            }
+            """
+        )
+        page.evaluate(
+            "window.__epDispatchMissingTouch('[data-chart-size=\"compact\"]', {lateClick:true})"
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v027-battery-plan-card'
+            )?.classList.contains('size-compact')
+            """,
+            timeout=2_000,
+        )
+        page.evaluate(
+            "window.__epDispatchMissingTouch('[data-chart-size=\"normal\"]')"
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector(
+              '.ep-v027-battery-plan-card'
+            )?.classList.contains('size-normal')
+            """,
+            timeout=2_000,
+        )
+        result["chart_size_fallback"] = page.evaluate(
+            """
+            () => window.__epMissingChartClicks.compact === 1 &&
+              window.__epMissingChartClicks.normal === 1
+            """
+        )
+
+        for value in ("12h", "36h", "24h"):
+            page.evaluate(
+                f"window.__epDispatchMissingTouch('[data-chart-range=\"{value}\"]')"
+            )
+            page.wait_for_function(
+                "() => window.__epPanel.shadowRoot.querySelector("
+                f"'[data-chart-range=\"{value}\"]'"
+                ")?.getAttribute('aria-pressed') === 'true'",
+                timeout=2_000,
+            )
+        result["chart_range_fallback"] = page.evaluate(
+            """
+            () => window.__epMissingChartClicks.range12 === 1 &&
+              window.__epMissingChartClicks.range36 === 1 &&
+              window.__epMissingChartClicks.range24 === 1
+            """
+        )
+
+        page.evaluate(
+            "window.__epDispatchMissingTouch('[data-action=\"full-history\"]', {lateClick:true})"
+        )
+        page.wait_for_function(
+            """
+            () => Boolean(window.__epPanel.shadowRoot.querySelector(
+              '.ep-v051-history-modal'
+            ))
+            """,
+            timeout=2_000,
+        )
+        result["history_fallback"] = page.evaluate(
+            "() => window.__epMissingChartClicks.full === 1"
+        )
+        page.evaluate(
+            "window.__epDispatchMissingTouch('.ep-v051-history-modal [data-action=\"close\"]', {lateClick:true})"
+        )
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v051-history-modal')",
+            timeout=2_000,
+        )
+        result["history_close_fallback"] = True
         result["metrics"] = page.evaluate(
             "() => window.__epTouchClickFallback.snapshot().metrics"
         )
@@ -5127,7 +5271,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
         "v101": "v1.0.1-beta.4 BETA",
-        "v110": "v1.2.0-beta.5 BETA",
+        "v110": "v1.2.0-beta.6 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -5606,6 +5750,9 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "movement_rejected", "cancel_rejected", "menu_opened", "menu_switch",
             "menu_reset", "beta_opened", "beta_raw_control_excluded", "beta_closed",
             "settings_opened", "settings_tab", "settings_closed",
+            "chart_touch_targets", "chart_controls_fit", "chart_size_fallback",
+            "chart_range_fallback",
+            "history_fallback", "history_close_fallback",
         )
         if not all(touch_click_fallback.get(key) is True for key in required_fallback):
             failures.append(

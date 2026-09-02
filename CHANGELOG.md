@@ -4,6 +4,17 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0-beta.6] - 2026-09-02
+
+### Fixed
+
+- Expand the coarse-pointer touch targets for Battery · Plan · Price `S/M/L`,
+  `12h/24h/36h`, expand/footer actions and execution-history open/close
+  controls to at least 44 CSS pixels, while retaining the compact desktop
+  presentation.
+- Exercise missing native clicks on the real chart-size, chart-range and full
+  history controls, including late-click deduplication and modal removal.
+
 ## [1.2.0-beta.5] - 2026-09-02
 
 ### Fixed

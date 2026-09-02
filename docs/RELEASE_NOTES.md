@@ -17,6 +17,20 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0-beta.6 — Larger chart and history touch targets
+
+The remaining compact Battery · Plan · Price controls now expose real minimum
+44 × 44 CSS-pixel targets on coarse-pointer or narrow displays. This covers
+`S/M/L`, `12h/24h/36h`, chart expand/footer actions and execution-history
+open/close controls while retaining the compact desktop presentation.
+
+The browser matrix now removes native click from the real chart-size,
+chart-range and full-history buttons and proves exactly one fallback action,
+late-click deduplication, modal close after its node is removed, no horizontal
+card overflow and no JavaScript/page errors. Beta.5's bounded 120 ms adapter
+and all GoodWe/EMS/EMHASS semantics are unchanged. See
+`docs/releases/v1.2.0-beta.6.md`.
+
 # v1.2.0-beta.5 — Companion touch-click recovery
 
 The 120 ms method that completed every valid beta.4 Companion pointer sequence
@@ -290,6 +304,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0-beta.6** | 2026-09-02 | **Beta** | Enlarges the remaining chart/history touch targets and adds real missing-click coverage for S/M/L, 12h/24h/36h and full history. |
 | **1.2.0-beta.5** | 2026-09-02 | **Beta** | Applies the measured 120 ms missing-click recovery to all EnergyPilot buttons and dashboard-menu switches with scroll rejection and late-click deduplication. |
 | **1.2.0-beta.4** | 2026-09-02 | **Beta** | Adds observer-neutral native-click and guarded pointerup/fallback/deduplication comparisons for the Companion iOS defect. |
 | **1.2.0-beta.3** | 2026-09-02 | **Beta** | Adds AUTO/CUSTOM EMHASS load forecasting with a horizon-aware fixed-watt runtime request. |

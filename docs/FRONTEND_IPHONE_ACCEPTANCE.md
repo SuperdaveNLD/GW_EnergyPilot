@@ -73,6 +73,16 @@ action and, for operational controls, exactly one matching backend request.
 Starting a vertical scroll on a control must raise neither the completed action
 nor its target fallback count.
 
+## Beta.6 chart-control touch pass
+
+The next beta additionally enlarges the real coarse-pointer targets for
+`S/M/L`, `12h/24h/36h`, chart expand/footer actions and execution-history
+open/close controls to at least 44 × 44 CSS pixels. Verify every segment with
+one ordinary tap, then open and close the full 48-hour history once. Each tap
+must visibly take effect once; starting a vertical scroll within the same
+controls must not activate them. Confirm that the two segmented groups wrap
+without horizontal card overflow in portrait and landscape.
+
 ## Safety prerequisites
 
 Battery quick actions and manual EMS modes can move significant real power.

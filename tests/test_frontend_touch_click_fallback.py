@@ -22,6 +22,9 @@ class FrontendTouchClickFallbackTests(unittest.TestCase):
         cls.beta_tests = (FRONTEND / "ep-beta-tests.js").read_text(
             encoding="utf-8"
         )
+        cls.release = (FRONTEND / "gw-energy-pilot-v110.js").read_text(
+            encoding="utf-8"
+        )
 
     def test_one_root_scoped_adapter_owns_the_iphone_fallback(self) -> None:
         self.assertIn("installEnergyPilotTouchClickFallback", self.adapter)
@@ -64,6 +67,20 @@ class FrontendTouchClickFallbackTests(unittest.TestCase):
             self.assertIn(token, self.adapter)
         self.assertIn('node.hasAttribute("data-beta-control")', self.adapter)
         self.assertIn("production_touch_fallback", self.beta_tests)
+
+    def test_chart_and_history_controls_have_coarse_pointer_touch_targets(self) -> None:
+        self.assertIn('@media (pointer: coarse), (max-width: 720px)', self.release)
+        for selector in (
+            '.ep-v027-size-control button',
+            '.ep-v027-range-control button',
+            '.ep-v027-expand,',
+            '.ep-v027-footer button,',
+            '.ep-v051-full,',
+            '.ep-v051-history-modal [data-action="close"]',
+        ):
+            self.assertIn(selector, self.release)
+        self.assertGreaterEqual(self.release.count("min-height: 44px !important;"), 3)
+        self.assertIn("min-width: 48px !important;", self.release)
 
 
 if __name__ == "__main__":

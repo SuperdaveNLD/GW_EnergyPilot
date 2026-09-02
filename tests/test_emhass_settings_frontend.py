@@ -22,19 +22,19 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v110.js?v=1.2.0-beta.5-touch-fallback1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.2.0-beta.5-touch-fallback1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.2.0-beta.5-touch-fallback1"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.2.0-beta.5-touch-fallback1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.2.0-beta.5-touch-fallback1"', v045)
+        self.assertIn("gw-energy-pilot-v110.js?v=1.2.0-beta.6-chart-touch1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.2.0-beta.6-chart-touch1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.2.0-beta.6-chart-touch1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.2.0-beta.6-chart-touch1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.2.0-beta.6-chart-touch1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=1.2.0-beta.5-touch-fallback1"',
+            'import "./gw-energy-pilot-v043.js?v=1.2.0-beta.6-chart-touch1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.2.0-beta.5-touch-fallback1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.5-touch-fallback1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.2.0-beta.5-touch-fallback1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.2.0-beta.6-chart-touch1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.6-chart-touch1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.2.0-beta.6-chart-touch1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:
