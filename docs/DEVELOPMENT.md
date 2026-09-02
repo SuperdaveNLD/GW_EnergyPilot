@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.2.0-beta.2 runtime structure
+## Current v1.2.0-beta.3 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.2.0-beta.2 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.2.0-beta.3 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -33,6 +33,7 @@ control_history.py      persistent latest successful EMS-setpoint update evidenc
 execution_history.py    bounded plan/decision/write/read-back evidence Store
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
 emhass_config.py        safe full EMHASS config read/write helpers
+emhass_load_forecast.py pure AUTO/CUSTOM runtime load-forecast horizon/override helper
 emhass_sync.py          canonical EnergyPilot runtime contract + safe required-config synchronization
 emhass_sync_api.py      admin sync/readback API using canonical sync ownership keys
 orchestrator.py         base EMHASS orchestration
@@ -105,7 +106,7 @@ Ownership by active layer:
 
 - v026: read-only dashboard/optimizer price-series caching;
 - v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries and a pre-log Home Assistant `RUNNING` gate;
-- v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
+- v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment, final runtime load-forecast selection and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
 - v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup or recording a slow Core startup as a failed optimization.
 
@@ -179,8 +180,8 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.2 uses the final presentation-only beta wrapper and advances one
-complete `1.2.0-beta.2-soc-end-sems2-beta-tests1` active-graph cache boundary. The bounded
+v1.2.0-beta.3 uses the final presentation-only beta wrapper and advances one
+complete `1.2.0-beta.3-load-forecast1` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested

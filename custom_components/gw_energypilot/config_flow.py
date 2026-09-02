@@ -18,6 +18,8 @@ from .const import (
     CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
     CONF_BUY_PRICE_ADDER,
     CONF_DEADBAND,
+    CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+    CONF_EMHASS_CUSTOM_LOAD_POWER,
     CONF_EMHASS_FALLBACK_LOAD,
     CONF_EMHASS_OPTIMIZATION_INTERVAL,
     CONF_EMHASS_SOC_FINAL,
@@ -56,6 +58,8 @@ from .const import (
     CONF_USE_NORDPOOL_PRICES,
     DEFAULT_BUY_PRICE_ADDER,
     DEFAULT_DEADBAND,
+    DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+    DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
     DEFAULT_EMHASS_FALLBACK_LOAD,
     DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     DEFAULT_EMHASS_SOC_FINAL,
@@ -242,6 +246,22 @@ def _controller_schema(
                 )
             ),
             vol.Required(
+                CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+                default=DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+            ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_EMHASS_CUSTOM_LOAD_POWER,
+                default=DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=30000,
+                    step=50,
+                    mode=selector.NumberSelectorMode.BOX,
+                    unit_of_measurement="W",
+                )
+            ),
+            vol.Required(
                 CONF_USE_NORDPOOL_PRICES,
                 default=DEFAULT_USE_NORDPOOL_PRICES,
             ): selector.BooleanSelector(),
@@ -372,6 +392,14 @@ def _options_for_form(options: dict[str, Any]) -> dict[str, Any]:
     form_options.setdefault(
         CONF_EMHASS_FALLBACK_LOAD,
         DEFAULT_EMHASS_FALLBACK_LOAD,
+    )
+    form_options.setdefault(
+        CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+        DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+    )
+    form_options.setdefault(
+        CONF_EMHASS_CUSTOM_LOAD_POWER,
+        DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
     )
     form_options.setdefault(CONF_USE_NORDPOOL_PRICES, DEFAULT_USE_NORDPOOL_PRICES)
     form_options.setdefault(

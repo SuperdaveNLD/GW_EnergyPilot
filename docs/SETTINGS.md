@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.2.0-beta.2 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.2.0-beta.3 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -93,6 +93,8 @@ The EMHASS section owns EnergyPilot's EMHASS integration settings:
 - wall-clock optimization interval: 15, 30 or 60 minutes, with 15 minutes recommended;
 - EnergyPilot runtime final SOC target;
 - fallback load;
+- load forecast mode: AUTO or CUSTOM;
+- fixed CUSTOM load power, shown only while CUSTOM is selected;
 - `P_batt` and `P_grid` output entities;
 - optimization status entity/required state;
 - Nord Pool/runtime-price settings.
@@ -100,6 +102,14 @@ The EMHASS section owns EnergyPilot's EMHASS integration settings:
 Supported integral cadences stored by an older release as a float, for example
 `15.0`, are normalized to `15` when the options form opens. Unsupported
 fractional values remain invalid instead of being silently rounded.
+
+**AUTO** preserves the existing GoodWe register 35172 plus Recorder-history
+forecast. **CUSTOM** replaces only `load_power_forecast` in the runtime request
+to `/action/dayahead-optim`; SOC, prices, battery limits and any existing
+runtime `prediction_horizon` remain intact. The fixed list length follows that
+runtime horizon when present, otherwise the active EMHASS
+`delta_forecast_daily` and `optimization_time_step`. Returning the switch to
+AUTO is the rollback and does not erase the saved CUSTOM wattage.
 
 The stateful EMHASS optimization strategy remains the active `costfun` value:
 

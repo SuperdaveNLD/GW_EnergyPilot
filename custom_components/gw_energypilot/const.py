@@ -74,6 +74,8 @@ CONF_EMHASS_URL = "emhass_url"
 CONF_EMHASS_OPTIMIZATION_INTERVAL = "emhass_optimization_interval"
 CONF_EMHASS_SOC_FINAL = "emhass_soc_final"
 CONF_EMHASS_FALLBACK_LOAD = "emhass_fallback_load"
+CONF_EMHASS_CUSTOM_LOAD_FORECAST = "emhass_custom_load_forecast"
+CONF_EMHASS_CUSTOM_LOAD_POWER = "emhass_custom_load_power"
 CONF_USE_NORDPOOL_PRICES = "use_nordpool_prices"
 CONF_OPTIMIZE_ON_TOMORROW_PRICES = "optimize_on_tomorrow_prices"
 CONF_NORDPOOL_AREA = "nordpool_area"
@@ -155,6 +157,10 @@ EMHASS_OPTIMIZATION_INTERVALS = (15, 30, 60)
 DEFAULT_EMHASS_OPTIMIZATION_INTERVAL = 15
 DEFAULT_EMHASS_SOC_FINAL = 0.10
 DEFAULT_EMHASS_FALLBACK_LOAD = 700
+# Existing installations remain on the Recorder/history based AUTO forecast.
+# CUSTOM is an explicit operator choice and defaults to the requested 700 W.
+DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST = False
+DEFAULT_EMHASS_CUSTOM_LOAD_POWER = 700
 DEFAULT_USE_NORDPOOL_PRICES = True
 DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES = True
 DEFAULT_NORDPOOL_AREA = ""

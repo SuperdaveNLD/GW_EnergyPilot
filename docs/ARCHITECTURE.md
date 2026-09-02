@@ -1,7 +1,7 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.2.0-beta.2**. Stable v1.1.1 remains the production base.
+v1.2.0-beta.3**. Stable v1.1.1 remains the production base.
 
 ## High-level flow
 
@@ -554,8 +554,10 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the stable base;
-v1.2.0-beta.2 owns final beta presentation and the complete
-`1.2.0-beta.2-soc-end-sems2-beta-tests1` active-graph cache boundary.
+v1.2.0-beta.3 owns final beta presentation and the complete
+`1.2.0-beta.3-load-forecast1` active-graph cache boundary. Its EMHASS settings
+select AUTO or a fixed CUSTOM household load at the final runtime request-body
+boundary; unrelated optimization parameters remain untouched.
 
 The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 

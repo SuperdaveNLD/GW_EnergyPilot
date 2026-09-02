@@ -12,7 +12,7 @@ optimization.
 
 ## Status
 
-**v1.2.0-beta.2 · Beta**
+**v1.2.0-beta.3 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -29,10 +29,10 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` remains the stable production release. `v1.2.0-beta.2` is the opt-in
-candidate combining the beta.1 mobile/SEMS foundation with guarded SEMS SOC,
-correct EMHASS Wanted-SOC timing and a local-only mobile interaction lab. Local
-Modbus remains mandatory for every EMS and minimum-SOC write/read-back. Normal
+`v1.1.1` remains the stable production release. `v1.2.0-beta.3` is the opt-in
+candidate that adds an EMHASS **Load forecast · AUTO / CUSTOM** setting on top
+of the beta.2 mobile, SEMS, SOC-timing and diagnostic foundation. Local Modbus
+remains mandatory for every EMS and minimum-SOC write/read-back. Normal
 users keep the HACS prerelease switch off; testers explicitly enable it for GW
 EnergyPilot before selecting the beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
@@ -40,6 +40,7 @@ See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0-beta.3.md` — EMHASS AUTO/CUSTOM fixed load-forecast notes;
 - `docs/releases/v1.2.0-beta.2.md` — SEMS SOC, Wanted-SOC timing and local Beta tests notes;
 - `docs/releases/v1.2.0-beta.1.md` — mobile-control and SEMS+ combined beta notes;
 - `docs/releases/v1.1.1.md` — current stable managed-profile settings-save hotfix notes;
@@ -86,6 +87,20 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.2.0-beta.3 highlights
+
+- Adds **Load forecast · AUTO / CUSTOM** to Settings → EMHASS.
+- Keeps the existing GoodWe/Recorder load forecast unchanged in **AUTO**, which
+  remains the upgrade default for existing installations.
+- Shows a fixed-watt field only in **CUSTOM** and replaces only the runtime
+  `load_power_forecast` sent to `/action/dayahead-optim`.
+- Derives the list length from an existing runtime `prediction_horizon` or from
+  the active EMHASS `delta_forecast_daily` and `optimization_time_step`. One day
+  at 15 minutes therefore sends 96 equal values; the default custom value is
+  700 W.
+- Advances the complete frontend cache boundary to
+  `1.2.0-beta.3-load-forecast1`.
 
 ## v1.2.0-beta.2 highlights
 

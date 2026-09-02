@@ -27,8 +27,8 @@ Current release lines:
 
 ```text
 v1.1.1 Stable
-v1.2.0-beta.1 Previous beta
-v1.2.0-beta.2 Current beta
+v1.2.0-beta.2 Previous beta
+v1.2.0-beta.3 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -414,10 +414,9 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.2 owns final beta presentation and the complete
-`1.2.0-beta.2-soc-end-sems2-beta-tests1` cache boundary. It retains the
-permanent mobile control surface from beta.1, places EMHASS `SOC_opt` at the
-evidenced interval end and adds the isolated local-only Beta tests page. v1.1.1
+v1.2.0-beta.3 owns final beta presentation and the complete
+`1.2.0-beta.3-load-forecast1` cache boundary. It retains the beta.2 safety and
+diagnostics, and adds the EMHASS AUTO/CUSTOM runtime load-forecast control. v1.1.1
 remains the stable base and v1.0.1-beta.4 remains in the chain as its bounded
 historical beta presentation layer. v0.51 remains the bounded feature layer
 that owns the scoped EMHASS-to-GoodWe history card. The settings module owns

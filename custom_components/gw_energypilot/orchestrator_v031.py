@@ -22,10 +22,15 @@ from .battery_saver import (
 from .const import (
     CONF_BATTERY_SAVER_MODE,
     CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
+    CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+    CONF_EMHASS_CUSTOM_LOAD_POWER,
     CONF_P_BATT_ENTITY,
+    DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+    DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
     DEFAULT_P_BATT_ENTITY,
 )
 from .emhass_config import async_get_emhass_config, async_write_emhass_config
+from .emhass_load_forecast import apply_custom_load_forecast
 from .emhass_sync import apply_emhass_runtime_contract
 from .orchestrator import OUTPUT_TIMEOUT
 from .orchestrator_v026 import GWEnergyPilotOrchestrator as _V026Orchestrator
@@ -230,6 +235,26 @@ class GWEnergyPilotOrchestrator(_V026Orchestrator):
                 payload["battery_maximum_state_of_charge"] = updated[
                     "battery_maximum_state_of_charge"
                 ]
+
+        try:
+            custom_load_steps = apply_custom_load_forecast(
+                payload,
+                updated,
+                enabled=bool(
+                    self.entry.options.get(
+                        CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+                        DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+                    )
+                ),
+                power_w=self.entry.options.get(
+                    CONF_EMHASS_CUSTOM_LOAD_POWER,
+                    DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
+                ),
+            )
+        except ValueError as err:
+            raise HomeAssistantError(str(err)) from err
+        if custom_load_steps is not None:
+            self.last_load_points = custom_load_steps
 
         self.last_battery_saver_profile = profile
         self.last_effective_soc_final = effective_soc_final

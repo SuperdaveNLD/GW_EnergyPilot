@@ -17,6 +17,21 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0-beta.3 — Selectable EMHASS load forecast
+
+Settings → EMHASS now offers **Load forecast · AUTO / CUSTOM**. AUTO remains
+the default and preserves the existing GoodWe/Recorder forecast. CUSTOM reveals
+a fixed-watt field, initially 700 W, and applies that value to every step of an
+EnergyPilot-owned day-ahead solve.
+
+The runtime list follows an existing `prediction_horizon` when present.
+Otherwise EnergyPilot derives its length from the active EMHASS
+`delta_forecast_daily` and `optimization_time_step`; one day at 15 minutes is
+therefore 96 equal values. The final request-body boundary replaces only
+`load_power_forecast`, preserving SOC, prices, battery limits and unrelated
+runtime values. Switching back to AUTO is the rollback and retains the saved
+CUSTOM wattage. See `docs/releases/v1.2.0-beta.3.md`.
+
 # v1.2.0-beta.2 — SEMS SOC safety, plan timing and local touch diagnostics
 
 SEMS telemetry now rejects the observed transient `soc: 0` portal placeholder.
@@ -238,6 +253,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0-beta.3** | 2026-09-02 | **Beta** | Adds AUTO/CUSTOM EMHASS load forecasting with a horizon-aware fixed-watt runtime request. |
 | **1.2.0-beta.2** | 2026-09-01 | **Beta** | Rejects false SEMS 0% SOC, corrects Wanted-SOC interval timing and adds an isolated local mobile-control diagnostic page. |
 | **1.2.0-beta.1** | 2026-09-01 | **Beta** | Combines permanent mobile controls with guarded SEMS+ Beta telemetry while retaining local-only EMS/minimum-SOC writes. |
 | **1.1.1** | 2026-08-31 | **Stable** | Fixes EP/EMHASS settings saves for managed battery profiles while preserving SOC-limit ownership. |

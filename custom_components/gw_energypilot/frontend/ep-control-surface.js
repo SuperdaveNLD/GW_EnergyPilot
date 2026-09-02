@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
+} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.3-load-forecast1";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.0-beta.3-load-forecast1";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-beta.3-load-forecast1";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;

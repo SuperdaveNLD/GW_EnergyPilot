@@ -27,6 +27,8 @@ from .const import (
     CONF_BATTERY_SAVER_SOC_LIMITS_MANAGED,
     CONF_BUY_PRICE_ADDER,
     CONF_DEADBAND,
+    CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+    CONF_EMHASS_CUSTOM_LOAD_POWER,
     CONF_EMHASS_FALLBACK_LOAD,
     CONF_EMHASS_OPTIMIZATION_INTERVAL,
     CONF_EMHASS_URL,
@@ -70,6 +72,8 @@ from .const import (
     CONF_USE_NORDPOOL_PRICES,
     DEFAULT_BUY_PRICE_ADDER,
     DEFAULT_DEADBAND,
+    DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+    DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
     DEFAULT_EMHASS_FALLBACK_LOAD,
     DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     DEFAULT_EMHASS_SOC_FINAL,
@@ -173,6 +177,8 @@ EMHASS_KEYS = {
     CONF_EMHASS_OPTIMIZATION_INTERVAL,
     CONF_EMHASS_SOC_FINAL_PCT,
     CONF_EMHASS_FALLBACK_LOAD,
+    CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+    CONF_EMHASS_CUSTOM_LOAD_POWER,
     CONF_P_BATT_ENTITY,
     CONF_P_GRID_ENTITY,
     CONF_OPTIM_STATUS_ENTITY,
@@ -800,6 +806,29 @@ EMHASS_FIELD_SPECS: tuple[dict[str, Any], ...] = (
         "max": 20000,
         "step": 50,
         "description": "Used when a valid current/history load value is unavailable.",
+    },
+    {
+        "key": CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+        "label": "Load forecast · AUTO / CUSTOM",
+        "type": "boolean",
+        "default": DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+        "description": (
+            "AUTO uses the existing GoodWe/Recorder forecast. CUSTOM replaces only "
+            "the runtime load_power_forecast with the fixed value below."
+        ),
+    },
+    {
+        "key": CONF_EMHASS_CUSTOM_LOAD_POWER,
+        "label": "Custom load forecast",
+        "type": "number",
+        "default": DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
+        "unit": "W",
+        "min": 0,
+        "max": 30000,
+        "step": 50,
+        "description": (
+            "Fixed load used for every active EMHASS forecast step while CUSTOM is selected."
+        ),
     },
     {
         "key": CONF_P_BATT_ENTITY,

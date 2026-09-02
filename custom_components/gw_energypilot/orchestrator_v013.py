@@ -12,10 +12,14 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+    CONF_EMHASS_CUSTOM_LOAD_POWER,
     CONF_EMHASS_FALLBACK_LOAD,
     CONF_EMHASS_OPTIMIZATION_INTERVAL,
     CONF_EMHASS_SOC_FINAL,
     CONF_SCAN_INTERVAL,
+    DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+    DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
     DEFAULT_EMHASS_FALLBACK_LOAD,
     DEFAULT_EMHASS_OPTIMIZATION_INTERVAL,
     DEFAULT_EMHASS_SOC_FINAL,
@@ -60,6 +64,18 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
     def attributes(self) -> dict[str, Any]:
         """Return diagnostics used by Home Assistant and the dashboard."""
         attrs = super().attributes
+        custom_load_forecast = bool(
+            self.entry.options.get(
+                CONF_EMHASS_CUSTOM_LOAD_FORECAST,
+                DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST,
+            )
+        )
+        custom_load_power = float(
+            self.entry.options.get(
+                CONF_EMHASS_CUSTOM_LOAD_POWER,
+                DEFAULT_EMHASS_CUSTOM_LOAD_POWER,
+            )
+        )
         # v0.12 called the power balance a calculated house load. On the tested
         # GW15K-ETA-G20, register 35172 agrees almost exactly with the sum of
         # load L1/L2/L3, while the full power balance also contains inverter,
@@ -68,7 +84,12 @@ class GWEnergyPilotOrchestrator(_V012Orchestrator):
         attrs.update(
             {
                 "system_balance_power": balance,
-                "load_forecast_source": "GoodWe load register 35172 + Recorder history",
+                "load_forecast_mode": "custom" if custom_load_forecast else "auto",
+                "load_forecast_source": (
+                    f"Fixed custom load ({custom_load_power:g} W)"
+                    if custom_load_forecast
+                    else "GoodWe load register 35172 + Recorder history"
+                ),
                 # Keep the configured EnergyPilot target separate from the last
                 # value actually used by a successful EnergyPilot optimization.
                 # External/manual EMHASS publishing must not make a configured

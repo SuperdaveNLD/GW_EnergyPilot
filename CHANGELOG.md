@@ -4,6 +4,26 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0-beta.3] - 2026-09-02
+
+### Added
+
+- Add **Load forecast · AUTO / CUSTOM** to Settings → EMHASS. AUTO preserves
+  the existing GoodWe/Recorder forecast and remains the compatibility default;
+  CUSTOM reveals a fixed-watt field with an initial value of 700 W.
+- Build the CUSTOM `load_power_forecast` list from an existing runtime
+  `prediction_horizon`, or from EMHASS `delta_forecast_daily` and
+  `optimization_time_step` when no explicit horizon is present.
+
+### Changed
+
+- Override only `load_power_forecast` in the final day-ahead runtime body while
+  CUSTOM is selected. Existing SOC, price, battery-limit and other runtime
+  parameters remain unchanged, and switching back to AUTO is an immediate
+  rollback without losing the saved custom wattage.
+- Advance the complete active frontend module cache boundary to
+  `1.2.0-beta.3-load-forecast1`.
+
 ## [1.2.0-beta.2] - 2026-09-01
 
 ### Fixed

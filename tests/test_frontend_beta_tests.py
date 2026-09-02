@@ -15,7 +15,7 @@ class FrontendBetaTests(unittest.TestCase):
 
     def test_page_is_mounted_from_the_stable_functional_layer(self) -> None:
         self.assertIn(
-            'from "./ep-beta-tests.js?v=1.2.0-beta.2-soc-end-sems2-beta-tests1"',
+            'from "./ep-beta-tests.js?v=1.2.0-beta.3-load-forecast1"',
             self.v041,
         )
         self.assertIn("mountEnergyPilotControlSurface(this, this.shadowRoot);", self.v041)
