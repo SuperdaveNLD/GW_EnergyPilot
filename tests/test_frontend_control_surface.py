@@ -92,7 +92,7 @@ class FrontendControlSurfaceTests(unittest.TestCase):
 
     def test_stable_layer_mounts_and_updates_one_surface(self) -> None:
         self.assertIn('import {', self.stable)
-        self.assertIn('from "./ep-control-surface.js?v=1.2.0-beta.6-chart-touch1"', self.stable)
+        self.assertIn('from "./ep-control-surface.js?v=1.2.0-beta.7-chart-touch1"', self.stable)
         self.assertIn("mountEnergyPilotControlSurface", self.stable)
         self.assertIn("refreshEnergyPilotControlSurface", self.stable)
         self.assertIn("__epControlSurfaceArchitecture", self.stable)

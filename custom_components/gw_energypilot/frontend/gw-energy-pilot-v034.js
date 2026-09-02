@@ -1,5 +1,5 @@
-import "./gw-energy-pilot-v031-battery-saver.js?v=1.2.0-beta.6-chart-touch1";
-import "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.6-chart-touch1";
+import "./gw-energy-pilot-v031-battery-saver.js?v=1.2.0-beta.7-chart-touch1";
+import "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-beta.7-chart-touch1";
 
 const VERSION = "0.34";
 const PANEL_NAME = "gw-energypilot-panel";

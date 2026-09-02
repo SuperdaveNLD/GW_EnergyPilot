@@ -24,17 +24,17 @@ class FrontendV044OptimizeStabilityTests(unittest.TestCase):
         v047 = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "1.2.0-beta.6")
+        self.assertEqual(manifest["version"], "1.2.0-beta.7")
         self.assertIn(
-            "gw-energy-pilot-v110.js?v=1.2.0-beta.6-chart-touch1",
+            "gw-energy-pilot-v110.js?v=1.2.0-beta.7-chart-touch1",
             init_source,
         )
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.2.0-beta.6-chart-touch1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.2.0-beta.6-chart-touch1"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.2.0-beta.6-chart-touch1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.2.0-beta.6-chart-touch1"', v045)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.2.0-beta.7-chart-touch1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.2.0-beta.7-chart-touch1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.2.0-beta.7-chart-touch1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.2.0-beta.7-chart-touch1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=1.2.0-beta.6-chart-touch1"',
+            'import "./gw-energy-pilot-v043.js?v=1.2.0-beta.7-chart-touch1"',
             self.source,
         )
         self.assertIn('const VERSION = "0.44"', self.source)

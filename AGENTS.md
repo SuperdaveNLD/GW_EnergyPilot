@@ -27,8 +27,8 @@ Current release lines:
 
 ```text
 v1.1.1 Stable
-v1.2.0-beta.5 Previous beta
-v1.2.0-beta.6 Current beta
+v1.2.0-beta.6 Previous beta
+v1.2.0-beta.7 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -417,8 +417,8 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.6 owns final beta presentation and the complete
-`1.2.0-beta.6-chart-touch1` cache boundary. It retains the earlier safety,
+v1.2.0-beta.7 owns final beta presentation and the complete
+`1.2.0-beta.7-chart-touch1` cache boundary. It retains the earlier safety,
 diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
 missing-click recovery, and expands the remaining graph/history touch targets
 to at least 44 CSS pixels on coarse-pointer/narrow displays. v1.1.1

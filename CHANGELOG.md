@@ -4,6 +4,16 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0-beta.7] - 2026-09-02
+
+### Changed
+
+- Publish the fully revalidated beta.6 mobile-control behavior as a new
+  immutable prerelease and advance the complete active frontend module graph
+  to cache boundary `1.2.0-beta.7-chart-touch1`.
+- Preserve all GoodWe, EMS, EMHASS, Battery Saver and persistent-state
+  semantics unchanged.
+
 ## [1.2.0-beta.6] - 2026-09-02
 
 ### Fixed

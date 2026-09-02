@@ -12,7 +12,7 @@ optimization.
 
 ## Status
 
-**v1.2.0-beta.6 · Beta**
+**v1.2.0-beta.7 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -29,19 +29,20 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` remains the stable production release. `v1.2.0-beta.6` is the opt-in
-candidate that retains beta.5's measured missing-click recovery and enlarges
-the remaining Battery · Plan · Price and execution-history controls for a
-reliable coarse-pointer hit area. Every recovered touch still enters the
-existing native click, form-submit or change route exactly once. Local Modbus
-remains mandatory for every EMS and minimum-SOC write/read-back. Normal users
-keep the HACS prerelease switch off; testers explicitly enable it for GW
-EnergyPilot before selecting the beta.
+`v1.1.1` remains the stable production release. `v1.2.0-beta.7` is the opt-in
+validated roll-forward of beta.6's mobile-control improvements. It retains the
+measured missing-click recovery and the enlarged Battery · Plan · Price and
+execution-history controls behind a new complete frontend cache boundary.
+Every recovered touch still enters the existing native click, form-submit or
+change route exactly once. Local Modbus remains mandatory for every EMS and
+minimum-SOC write/read-back. Normal users keep the HACS prerelease switch off;
+testers explicitly enable it for GW EnergyPilot before selecting the beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0-beta.7.md` — validated beta.6 touch-control roll-forward notes;
 - `docs/releases/v1.2.0-beta.6.md` — chart/history mobile touch-target notes;
 - `docs/releases/v1.2.0-beta.5.md` — Companion touch-click recovery notes;
 - `docs/releases/v1.2.0-beta.4.md` — isolated iOS activation-method comparison notes;
@@ -92,6 +93,15 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.2.0-beta.7 highlights
+
+- Reissues the complete beta.6 mobile-control behavior as the next immutable
+  prerelease after another full repository and browser validation pass.
+- Retains the 120 ms missing-click recovery and the 44 CSS-pixel chart/history
+  touch targets without changing GoodWe, EMS, EMHASS or Battery Saver logic.
+- Advances the complete frontend cache boundary to
+  `1.2.0-beta.7-chart-touch1` so Home Assistant loads one coherent module graph.
 
 ## v1.2.0-beta.6 highlights
 

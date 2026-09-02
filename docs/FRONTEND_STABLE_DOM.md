@@ -4,7 +4,7 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.2.0-beta.6**. The beta is based on stable v1.1.1 and retains all
+EnergyPilot v1.2.0-beta.7**. The beta is based on stable v1.1.1 and retains all
 earlier v1 behavior through presentation-only wrappers; its nested v0.51
 feature layer supplies the scoped execution-history card.
 
@@ -28,27 +28,27 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v110.js?v=1.2.0-beta.6-chart-touch1
-       -> gw-energy-pilot-v101.js?v=1.2.0-beta.6-chart-touch1
-            -> gw-energy-pilot-v051.js?v=1.2.0-beta.6-chart-touch1
-                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.6-chart-touch1
-                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.6-chart-touch1
-                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.6-chart-touch1
-                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.6-chart-touch1
-                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.6-chart-touch1
-                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.6-chart-touch1
-                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.6-chart-touch1
-                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.6-chart-touch1
-                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.6-chart-touch1
-                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.6-chart-touch1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.6-chart-touch1
-                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.6-chart-touch1
-                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.6-chart-touch1
-                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.6-chart-touch1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.6-chart-touch1
+  -> gw-energy-pilot-v110.js?v=1.2.0-beta.7-chart-touch1
+       -> gw-energy-pilot-v101.js?v=1.2.0-beta.7-chart-touch1
+            -> gw-energy-pilot-v051.js?v=1.2.0-beta.7-chart-touch1
+                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.7-chart-touch1
+                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.7-chart-touch1
+                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.7-chart-touch1
+                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.7-chart-touch1
+                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.7-chart-touch1
+                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.7-chart-touch1
+                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.7-chart-touch1
+                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.7-chart-touch1
+                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.7-chart-touch1
+                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.7-chart-touch1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.7-chart-touch1
+                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.7-chart-touch1
+                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.7-chart-touch1
+                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.7-chart-touch1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.7-chart-touch1
 ```
 
-Every import in the active graph uses `1.2.0-beta.6-chart-touch1`. This ensures an
+Every import in the active graph uses `1.2.0-beta.7-chart-touch1`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 
