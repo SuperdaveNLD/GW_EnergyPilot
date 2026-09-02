@@ -1,7 +1,7 @@
 import {
   LitElement,
   html,
-} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.3-load-forecast1";
+} from "./vendor/lit-3.3.3.js?v=1.2.0-beta.4-touch-methods1";
 
 const METRIC_KEYS = Object.freeze([
   "pointerdown",
@@ -12,6 +12,38 @@ const METRIC_KEYS = Object.freeze([
   "change",
   "input",
   "actions",
+  "native_actions",
+  "pointer_actions",
+  "fallback_actions",
+  "deduped",
+]);
+
+const METHOD_DEFINITIONS = Object.freeze([
+  Object.freeze({
+    key: "method-native-click",
+    label: "1 · Schone native click",
+    detail: "Alleen click; tellers verversen pas na de klikperiode",
+  }),
+  Object.freeze({
+    key: "method-pointerup-direct",
+    label: "2 · Directe pointerup",
+    detail: "Handler op de knop; actie na maximaal 12 px beweging",
+  }),
+  Object.freeze({
+    key: "method-pointerup-delegated",
+    label: "3 · Gedelegeerde pointerup",
+    detail: "Centrale capture-handler; dezelfde bewegingsdrempel",
+  }),
+  Object.freeze({
+    key: "method-click-fallback",
+    label: "4 · Click + 120 ms fallback",
+    detail: "Native click wint; ontbrekende click wordt na 120 ms hersteld",
+  }),
+  Object.freeze({
+    key: "method-pointerup-dedupe",
+    label: "5 · Pointerup + dedupe",
+    detail: "Pointerup activeert direct; een latere click wordt genegeerd",
+  }),
 ]);
 
 const CONTROL_DEFINITIONS = Object.freeze([
@@ -24,6 +56,13 @@ const CONTROL_DEFINITIONS = Object.freeze([
   Object.freeze({ key: "native-select", label: "Native select", detail: "Keuzelijst met change-event" }),
   Object.freeze({ key: "native-range", label: "Native range", detail: "Slider met input- en change-event" }),
 ]);
+
+const ALL_DEFINITIONS = Object.freeze([...METHOD_DEFINITIONS, ...CONTROL_DEFINITIONS]);
+const METHOD_KEYS = new Set(METHOD_DEFINITIONS.map(({ key }) => key));
+const DISPLAY_SETTLE_MS = 650;
+const CLICK_FALLBACK_MS = 120;
+const CLICK_DEDUPE_MS = 700;
+const MOVE_THRESHOLD_PX = 12;
 
 const BETA_TESTS_CSS = `
   ep-beta-tests, ep-beta-shadow-button { display:block; min-width:0; }
@@ -42,6 +81,12 @@ const BETA_TESTS_CSS = `
   .ep-beta-tests h2 { margin:4px 0 0; font-size:19px; }
   .ep-beta-tests-intro { max-width:760px; margin:9px 0 13px; color:#9eb9ca; font-size:12px; line-height:1.55; }
   .ep-beta-tests-safe { margin:0 0 14px; padding:9px 11px; border-radius:11px; color:#9de9c6; background:rgba(18,94,72,.25); border:1px solid rgba(71,222,166,.18); font-size:11px; }
+  .ep-beta-tests-method-note { margin:0 0 11px; color:#cae8f2; font-size:11px; line-height:1.5; }
+  .ep-beta-tests-method-note strong { color:#70ead0; }
+  .ep-beta-tests-methods { margin-bottom:14px; }
+  .ep-beta-tests-methods .ep-beta-test-card { border-color:rgba(72,220,184,.24); background:rgba(5,49,56,.52); }
+  .ep-beta-tests-legacy { margin-top:12px; border-top:1px solid rgba(104,202,239,.16); }
+  .ep-beta-tests-legacy > summary { min-height:48px; display:flex; align-items:center; color:#8eabba; cursor:pointer; touch-action:manipulation; font-size:11px; font-weight:800; }
   .ep-beta-tests-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; touch-action:pan-y; }
   .ep-beta-test-card { min-width:0; padding:11px; border-radius:13px; border:1px solid rgba(84,180,220,.15); background:rgba(4,25,45,.62); }
   .ep-beta-test-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; min-height:38px; }
@@ -85,7 +130,25 @@ function emptyMetric() {
 }
 
 function emptyMetrics() {
-  return Object.fromEntries(CONTROL_DEFINITIONS.map(({ key }) => [key, emptyMetric()]));
+  return Object.fromEntries(ALL_DEFINITIONS.map(({ key }) => [key, emptyMetric()]));
+}
+
+function initialValues() {
+  return {
+    "method-native-click": false,
+    "method-pointerup-direct": false,
+    "method-pointerup-delegated": false,
+    "method-click-fallback": false,
+    "method-pointerup-dedupe": false,
+    "lit-button": false,
+    "listener-button": false,
+    "icon-button": false,
+    "shadow-button": false,
+    "checkbox-switch": false,
+    "label-switch": false,
+    "native-select": "a",
+    "native-range": 50,
+  };
 }
 
 function eventControl(event) {
@@ -147,18 +210,17 @@ class EpBetaTests extends LitElement {
   constructor() {
     super();
     this.closeAction = null;
-    this.values = {
-      "lit-button": false,
-      "listener-button": false,
-      "icon-button": false,
-      "shadow-button": false,
-      "checkbox-switch": false,
-      "label-switch": false,
-      "native-select": "a",
-      "native-range": 50,
-    };
+    this.values = initialValues();
     this.metrics = emptyMetrics();
     this.recent = [];
+    this._valuesBuffer = initialValues();
+    this._metricsBuffer = emptyMetrics();
+    this._recentBuffer = [];
+    this._displayTimer = null;
+    this._fallbackSequence = 0;
+    this._pendingFallbacks = new Map();
+    this._pointerStarts = new Map();
+    this._lastMethodActions = new Map();
     this._plainListenerInstalled = false;
     this._recordEvent = (event) => this._record(event);
   }
@@ -194,6 +256,13 @@ class EpBetaTests extends LitElement {
     this._installPlainListener();
   }
 
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    clearTimeout(this._displayTimer);
+    for (const pending of this._pendingFallbacks.values()) clearTimeout(pending.timer);
+    this._pendingFallbacks.clear();
+  }
+
   _installPlainListener() {
     if (this._plainListenerInstalled) return;
     const button = this.querySelector('[data-beta-control="listener-button"]');
@@ -202,72 +271,207 @@ class EpBetaTests extends LitElement {
     this._plainListenerInstalled = true;
   }
 
+  _bumpMetric(key, metric) {
+    if (!this._metricsBuffer[key] || !METRIC_KEYS.includes(metric)) return;
+    this._metricsBuffer[key][metric] += 1;
+  }
+
+  _pointerToken(key, event) {
+    return `${key}:${event.pointerId}`;
+  }
+
+  _trackMethodPointer(key, event) {
+    const token = this._pointerToken(key, event);
+    if (event.type === "pointerdown") {
+      this._pointerStarts.set(token, {
+        x: Number(event.clientX) || 0,
+        y: Number(event.clientY) || 0,
+        moved: false,
+        primary: event.isPrimary !== false,
+      });
+      return;
+    }
+    const state = this._pointerStarts.get(token);
+    if (!state) return;
+    if (event.type === "pointermove") {
+      const distance = Math.hypot(
+        (Number(event.clientX) || 0) - state.x,
+        (Number(event.clientY) || 0) - state.y,
+      );
+      if (distance > MOVE_THRESHOLD_PX) state.moved = true;
+    } else if (event.type === "pointercancel") {
+      this._pointerStarts.delete(token);
+    }
+  }
+
+  _pointerActivationAllowed(key, event) {
+    const state = this._pointerStarts.get(this._pointerToken(key, event));
+    return Boolean(state && state.primary && !state.moved);
+  }
+
+  _finishPointer(key, event) {
+    this._pointerStarts.delete(this._pointerToken(key, event));
+  }
+
+  _scheduleDisplayFlush() {
+    clearTimeout(this._displayTimer);
+    this._displayTimer = setTimeout(() => this._flushDisplay(), DISPLAY_SETTLE_MS);
+  }
+
+  _flushDisplay() {
+    this._displayTimer = null;
+    this.values = { ...this._valuesBuffer };
+    this.metrics = Object.fromEntries(
+      Object.entries(this._metricsBuffer).map(([key, metric]) => [key, { ...metric }]),
+    );
+    this.recent = [...this._recentBuffer];
+  }
+
+  _recordRow(key, type, detail = "-") {
+    const row = `${new Date().toISOString().slice(11, 23)} · ${key} · ${type} · ${detail} · connected=${this.isConnected}`;
+    this._recentBuffer = [row, ...this._recentBuffer].slice(0, 36);
+  }
+
   _record(event) {
     const control = eventControl(event);
-    if (!control || !this.metrics[control] || !METRIC_KEYS.includes(event.type)) return;
-    const metrics = {
-      ...this.metrics,
-      [control]: {
-        ...this.metrics[control],
-        [event.type]: this.metrics[control][event.type] + 1,
-      },
-    };
+    if (!control || !this._metricsBuffer[control] || !METRIC_KEYS.includes(event.type)) return;
+    this._bumpMetric(control, event.type);
+    if (METHOD_KEYS.has(control)) this._trackMethodPointer(control, event);
     const pointer = "pointerId" in event
       ? `${event.pointerType || "pointer"}#${event.pointerId}`
       : "-";
     const row = `${new Date().toISOString().slice(11, 23)} · ${control} · ${event.type} · ${pointer} · trusted=${event.isTrusted} · connected=${this.isConnected}`;
-    this.metrics = metrics;
-    this.recent = [row, ...this.recent].slice(0, 24);
+    this._recentBuffer = [row, ...this._recentBuffer].slice(0, 36);
+    if (control === "method-pointerup-delegated" && event.type === "pointerup") {
+      this._activatePointerMethod(control, event, "pointer");
+    }
+    if (METHOD_KEYS.has(control) && ["pointerup", "pointercancel"].includes(event.type)) {
+      setTimeout(() => this._finishPointer(control, event), 0);
+    }
+    this._scheduleDisplayFlush();
   }
 
-  _action(key, value) {
-    this.values = { ...this.values, [key]: value };
-    this.metrics = {
-      ...this.metrics,
-      [key]: {
-        ...this.metrics[key],
-        actions: this.metrics[key].actions + 1,
-      },
-    };
+  _action(key, value, source = "native") {
+    this._valuesBuffer[key] = value;
+    this._bumpMetric(key, "actions");
+    if (source === "native") this._bumpMetric(key, "native_actions");
+    if (source === "pointer") this._bumpMetric(key, "pointer_actions");
+    if (source === "fallback") this._bumpMetric(key, "fallback_actions");
+    this._scheduleDisplayFlush();
   }
 
   _toggle(key) {
-    this._action(key, !this.values[key]);
+    this._action(key, !this._valuesBuffer[key]);
+  }
+
+  _setBufferedValue(key, value) {
+    this._valuesBuffer[key] = value;
+    this._scheduleDisplayFlush();
+  }
+
+  _commitMethodAction(key, source) {
+    this._lastMethodActions.set(key, performance.now());
+    this._action(key, !this._valuesBuffer[key], source);
+    this._recordRow(key, "method-action", source);
+  }
+
+  _activatePointerMethod(key, event, source = "pointer") {
+    if (!this._pointerActivationAllowed(key, event)) return;
+    this._finishPointer(key, event);
+    this._commitMethodAction(key, source);
+  }
+
+  _nativeMethodClick(key) {
+    this._commitMethodAction(key, "native");
+  }
+
+  _scheduleClickFallback(key, event) {
+    if (!this._pointerActivationAllowed(key, event)) return;
+    this._finishPointer(key, event);
+    const id = `${key}:${++this._fallbackSequence}`;
+    const timer = setTimeout(() => {
+      this._pendingFallbacks.delete(id);
+      this._commitMethodAction(key, "fallback");
+    }, CLICK_FALLBACK_MS);
+    this._pendingFallbacks.set(id, { id, key, sequence: this._fallbackSequence, timer });
+  }
+
+  _latestPendingFallback(key) {
+    let latest = null;
+    for (const pending of this._pendingFallbacks.values()) {
+      if (pending.key === key && (!latest || pending.sequence > latest.sequence)) latest = pending;
+    }
+    return latest;
+  }
+
+  _recentMethodAction(key) {
+    const at = this._lastMethodActions.get(key);
+    return Number.isFinite(at) && performance.now() - at <= CLICK_DEDUPE_MS;
+  }
+
+  _markDeduped(key, reason) {
+    this._bumpMetric(key, "deduped");
+    this._recordRow(key, "deduped", reason);
+    this._scheduleDisplayFlush();
+  }
+
+  _clickWithFallback(key) {
+    const pending = this._latestPendingFallback(key);
+    if (pending) {
+      clearTimeout(pending.timer);
+      this._pendingFallbacks.delete(pending.id);
+      this._commitMethodAction(key, "native");
+    } else if (this._recentMethodAction(key)) {
+      this._markDeduped(key, "late-click");
+    } else {
+      this._commitMethodAction(key, "native");
+    }
+  }
+
+  _clickAfterPointerup(key) {
+    if (this._recentMethodAction(key)) {
+      this._markDeduped(key, "pointerup-click");
+    } else {
+      this._commitMethodAction(key, "native");
+    }
   }
 
   reset() {
-    this.values = {
-      "lit-button": false,
-      "listener-button": false,
-      "icon-button": false,
-      "shadow-button": false,
-      "checkbox-switch": false,
-      "label-switch": false,
-      "native-select": "a",
-      "native-range": 50,
-    };
-    this.metrics = emptyMetrics();
-    this.recent = [];
+    clearTimeout(this._displayTimer);
+    for (const pending of this._pendingFallbacks.values()) clearTimeout(pending.timer);
+    this._pendingFallbacks.clear();
+    this._pointerStarts.clear();
+    this._lastMethodActions.clear();
+    this._valuesBuffer = initialValues();
+    this._metricsBuffer = emptyMetrics();
+    this._recentBuffer = [];
+    this._flushDisplay();
   }
 
   snapshot() {
-    const controls = {};
-    for (const definition of CONTROL_DEFINITIONS) {
+    const collect = (definitions) => Object.fromEntries(definitions.map((definition) => {
       const node = this.querySelector(`[data-beta-control="${definition.key}"]`)
         || this.querySelector("ep-beta-shadow-button")?.shadowRoot?.querySelector("button");
-      controls[definition.key] = {
-        value: this.values[definition.key],
-        metrics: { ...this.metrics[definition.key] },
+      return [definition.key, {
+        value: this._valuesBuffer[definition.key],
+        metrics: { ...this._metricsBuffer[definition.key] },
         connected: Boolean(node?.isConnected),
-      };
-    }
+      }];
+    }));
     return {
       generated_at: new Date().toISOString(),
       user_agent: navigator.userAgent,
       viewport: { width: innerWidth, height: innerHeight, device_pixel_ratio: devicePixelRatio },
       no_home_assistant_calls: true,
-      controls,
-      recent: [...this.recent],
+      measurement: {
+        display_deferred_ms: DISPLAY_SETTLE_MS,
+        move_threshold_px: MOVE_THRESHOLD_PX,
+        click_fallback_ms: CLICK_FALLBACK_MS,
+        click_dedupe_ms: CLICK_DEDUPE_MS,
+      },
+      methods: collect(METHOD_DEFINITIONS),
+      controls: collect(CONTROL_DEFINITIONS),
+      recent: [...this._recentBuffer],
     };
   }
 
@@ -310,12 +514,51 @@ class EpBetaTests extends LitElement {
             @click=${() => this.closeAction?.()}>×</button>
         </div>
         <p class="ep-beta-tests-intro">
-          Tik iedere variant bijvoorbeeld twintig keer. Vergelijk pointerdown/up met click en actions:
-          wanneer down/up stijgt maar click niet, verdwijnt de native click vóór de handler. Deze pagina
-          gebruikt uitsluitend lokale browserstate.
+          Tik de vijf genummerde knoppen elk vijf keer en wacht daarna één seconde. De tellers blijven
+          tijdens een tik bewust stil, zodat de meting zelf geen native click kan verstoren.
         </p>
         <p class="ep-beta-tests-safe"><strong>Veilig:</strong> geen Home Assistant-service, WebSocket, GoodWe-write of EMHASS-actie.</p>
-        <div class="ep-beta-tests-grid">
+        <p class="ep-beta-tests-method-note">
+          <strong>Doel:</strong> vergelijk native click, directe/gedelegeerde pointerup, een vertraagde
+          click-fallback en onmiddellijke pointerup met klik-deduplicatie. Een verticale veeg mag nooit
+          als actie meetellen.
+        </p>
+        <div class="ep-beta-tests-grid ep-beta-tests-methods">
+          ${this._card(METHOD_DEFINITIONS[0], html`
+            <button type="button" class="ep-beta-test-wide" data-beta-control="method-native-click"
+              aria-pressed=${this.values["method-native-click"] ? "true" : "false"}
+              @click=${() => this._nativeMethodClick("method-native-click")}>
+              Native click · ${this.values["method-native-click"] ? "AAN" : "UIT"}
+            </button>`)}
+          ${this._card(METHOD_DEFINITIONS[1], html`
+            <button type="button" class="ep-beta-test-wide" data-beta-control="method-pointerup-direct"
+              aria-pressed=${this.values["method-pointerup-direct"] ? "true" : "false"}
+              @pointerup=${(event) => this._activatePointerMethod("method-pointerup-direct", event)}>
+              Direct pointerup · ${this.values["method-pointerup-direct"] ? "AAN" : "UIT"}
+            </button>`)}
+          ${this._card(METHOD_DEFINITIONS[2], html`
+            <button type="button" class="ep-beta-test-wide" data-beta-control="method-pointerup-delegated"
+              aria-pressed=${this.values["method-pointerup-delegated"] ? "true" : "false"}>
+              Delegated pointerup · ${this.values["method-pointerup-delegated"] ? "AAN" : "UIT"}
+            </button>`)}
+          ${this._card(METHOD_DEFINITIONS[3], html`
+            <button type="button" class="ep-beta-test-wide" data-beta-control="method-click-fallback"
+              aria-pressed=${this.values["method-click-fallback"] ? "true" : "false"}
+              @pointerup=${(event) => this._scheduleClickFallback("method-click-fallback", event)}
+              @click=${() => this._clickWithFallback("method-click-fallback")}>
+              Click + fallback · ${this.values["method-click-fallback"] ? "AAN" : "UIT"}
+            </button>`)}
+          ${this._card(METHOD_DEFINITIONS[4], html`
+            <button type="button" class="ep-beta-test-wide" data-beta-control="method-pointerup-dedupe"
+              aria-pressed=${this.values["method-pointerup-dedupe"] ? "true" : "false"}
+              @pointerup=${(event) => this._activatePointerMethod("method-pointerup-dedupe", event)}
+              @click=${() => this._clickAfterPointerup("method-pointerup-dedupe")}>
+              Pointerup + dedupe · ${this.values["method-pointerup-dedupe"] ? "AAN" : "UIT"}
+            </button>`)}
+        </div>
+        <details class="ep-beta-tests-legacy">
+          <summary>Oude acht controletests tonen</summary>
+          <div class="ep-beta-tests-grid">
           ${this._card(definition["lit-button"], html`
             <button type="button" class="ep-beta-test-wide" data-beta-control="lit-button"
               aria-pressed=${this.values["lit-button"] ? "true" : "false"}
@@ -354,9 +597,10 @@ class EpBetaTests extends LitElement {
           ${this._card(definition["native-range"], html`
             <input type="range" min="0" max="100" step="1" data-beta-control="native-range"
               .value=${String(this.values["native-range"])}
-              @input=${(event) => { this.values = { ...this.values, "native-range": Number(event.currentTarget.value) }; }}
+              @input=${(event) => this._setBufferedValue("native-range", Number(event.currentTarget.value))}
               @change=${(event) => this._action("native-range", Number(event.currentTarget.value))}>`)}
-        </div>
+          </div>
+        </details>
         <div class="ep-beta-test-actions">
           <button type="button" @click=${() => this.reset()}>Reset tellers</button>
         </div>

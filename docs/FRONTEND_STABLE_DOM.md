@@ -4,7 +4,7 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.2.0-beta.3**. The beta is based on stable v1.1.1 and retains all
+EnergyPilot v1.2.0-beta.4**. The beta is based on stable v1.1.1 and retains all
 earlier v1 behavior through presentation-only wrappers; its nested v0.51
 feature layer supplies the scoped execution-history card.
 
@@ -28,27 +28,27 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v110.js?v=1.2.0-beta.3-load-forecast1
-       -> gw-energy-pilot-v101.js?v=1.2.0-beta.3-load-forecast1
-            -> gw-energy-pilot-v051.js?v=1.2.0-beta.3-load-forecast1
-                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.3-load-forecast1
-                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.3-load-forecast1
-                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.3-load-forecast1
-                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.3-load-forecast1
-                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.3-load-forecast1
-                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.3-load-forecast1
-                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.3-load-forecast1
-                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.3-load-forecast1
-                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.3-load-forecast1
-                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.3-load-forecast1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.3-load-forecast1
-                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.3-load-forecast1
-                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.3-load-forecast1
-                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.3-load-forecast1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.3-load-forecast1
+  -> gw-energy-pilot-v110.js?v=1.2.0-beta.4-touch-methods1
+       -> gw-energy-pilot-v101.js?v=1.2.0-beta.4-touch-methods1
+            -> gw-energy-pilot-v051.js?v=1.2.0-beta.4-touch-methods1
+                 -> gw-energy-pilot-v051-history.js?v=1.2.0-beta.4-touch-methods1
+                 -> gw-energy-pilot-v050.js?v=1.2.0-beta.4-touch-methods1
+                 -> gw-energy-pilot-v049.js?v=1.2.0-beta.4-touch-methods1
+                      -> gw-energy-pilot-v048.js?v=1.2.0-beta.4-touch-methods1
+                           -> gw-energy-pilot-v047.js?v=1.2.0-beta.4-touch-methods1
+                                -> gw-energy-pilot-v046.js?v=1.2.0-beta.4-touch-methods1
+                                     -> gw-energy-pilot-v045.js?v=1.2.0-beta.4-touch-methods1
+                                          -> gw-energy-pilot-v044.js?v=1.2.0-beta.4-touch-methods1
+                                               -> gw-energy-pilot-v043.js?v=1.2.0-beta.4-touch-methods1
+                                                    -> gw-energy-pilot-v042.js?v=1.2.0-beta.4-touch-methods1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-beta.4-touch-methods1
+                                                              -> gw-energy-pilot-v041.js?v=1.2.0-beta.4-touch-methods1
+                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-beta.4-touch-methods1
+                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-beta.4-touch-methods1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-beta.4-touch-methods1
 ```
 
-Every import in the active graph uses `1.2.0-beta.3-load-forecast1`. This ensures an
+Every import in the active graph uses `1.2.0-beta.4-touch-methods1`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 
@@ -86,11 +86,18 @@ the dynamic parts of the existing controls.
 
 v0.41 also mounts one reusable `ep-beta-tests` diagnostic component and exposes
 it from the dashboard layout menu as **Beta tests**. It is deliberately outside
-the operational control surface: its eight controls mutate local Lit/browser
-state only and have no access to the Home Assistant action gateway, GoodWe or
-EMHASS. Captured `pointerdown`, `pointermove`, `pointerup`, `pointercancel`,
-`click`, `input`, `change` and completed-action counts are available in the
-page and through `globalThis.__epBetaTests`.
+the operational control surface and has no access to the Home Assistant action
+gateway, GoodWe or EMHASS. Beta.4 adds five numbered method comparisons ahead
+of the original eight native controls: observer-neutral native click, direct
+and delegated guarded pointerup, a 120 ms missing-click fallback and immediate
+pointerup with 700 ms late-click deduplication.
+
+Captured `pointerdown`, `pointermove`, `pointerup`, `pointercancel`, `click`,
+`input`, `change`, completed actions and their native/pointer/fallback sources
+are available through `globalThis.__epBetaTests`. Raw evidence is buffered and
+the Lit display is updated only after 650 ms of inactivity, so no diagnostic
+render occurs between pointerdown/up and native click synthesis. Pointerup test
+methods require a primary pointer within a 12 px movement radius.
 
 Opening the page locally hides the other `main` children without rendering or
 disconnecting them. Ordinary telemetry continues to patch the hidden dashboard
@@ -256,8 +263,9 @@ addition to the permanent-control assertions above.
 The same matrix requires the Local Modbus/SEMS+ selector, write-only password,
 source-scoped cloud fields, always-enabled local-control fields and explicit
 local EMS safety copy on all three viewport profiles.
-It also opens **Beta tests**, performs twenty activations or value changes per
-variant, verifies raw event/action counts, runs telemetry and a structural
+It also opens **Beta tests**, performs twenty activations per new method and per
+legacy variant, proves the delayed fallback and movement rejection branches,
+verifies raw event/action/deduplication counts, runs telemetry and a structural
 render, restores the dashboard and proves that the complete diagnostic session
 emits zero Home Assistant service and WebSocket calls.
 

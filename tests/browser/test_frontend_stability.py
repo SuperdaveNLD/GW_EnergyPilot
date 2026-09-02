@@ -4403,6 +4403,7 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
         "dashboard_hidden": False,
         "touch_targets": False,
         "responsive": False,
+        "methods": {},
         "controls": {},
         "telemetry_main_stable": False,
         "telemetry_tests_stable": False,
@@ -4476,14 +4477,11 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
               const main = root.querySelector('main');
               const tests = panel.__epPermanentBetaTests;
               const activationTargets = [
-                tests.querySelector('[data-beta-control="lit-button"]'),
-                tests.querySelector('[data-beta-control="listener-button"]'),
-                tests.querySelector('[data-beta-control="icon-button"]'),
-                tests.querySelector('ep-beta-shadow-button')?.shadowRoot?.querySelector('button'),
-                tests.querySelector('[data-beta-card="checkbox-switch"] .ep-beta-switch-row'),
-                tests.querySelector('[data-beta-card="label-switch"] .ep-beta-switch-row'),
-                tests.querySelector('[data-beta-control="native-select"]'),
-                tests.querySelector('[data-beta-control="native-range"]'),
+                tests.querySelector('[data-beta-control="method-native-click"]'),
+                tests.querySelector('[data-beta-control="method-pointerup-direct"]'),
+                tests.querySelector('[data-beta-control="method-pointerup-delegated"]'),
+                tests.querySelector('[data-beta-control="method-click-fallback"]'),
+                tests.querySelector('[data-beta-control="method-pointerup-dedupe"]'),
               ];
               const visibleDashboardChildren = [...main.children].filter(
                 child => child !== tests && !child.classList.contains('topbar') && !child.hidden
@@ -4506,6 +4504,63 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
         result["dashboard_hidden"] = opened["dashboardHidden"]
         result["touch_targets"] = opened["touchTargets"]
         result["responsive"] = opened["responsive"]
+
+        method_controls = (
+            '[data-beta-control="method-native-click"]',
+            '[data-beta-control="method-pointerup-direct"]',
+            '[data-beta-control="method-pointerup-delegated"]',
+            '[data-beta-control="method-click-fallback"]',
+            '[data-beta-control="method-pointerup-dedupe"]',
+        )
+        for selector in method_controls:
+            for _index in range(20):
+                activate(page, profile, selector)
+
+        page.evaluate(
+            """
+            () => {
+              const tests = window.__epPanel.__epPermanentBetaTests;
+              const fallback = tests.querySelector(
+                '[data-beta-control="method-click-fallback"]'
+              );
+              fallback.dispatchEvent(new PointerEvent('pointerdown', {
+                bubbles: true, composed: true, pointerId: 901,
+                pointerType: 'touch', isPrimary: true, clientX: 10, clientY: 10,
+              }));
+              fallback.dispatchEvent(new PointerEvent('pointerup', {
+                bubbles: true, composed: true, pointerId: 901,
+                pointerType: 'touch', isPrimary: true, clientX: 10, clientY: 10,
+              }));
+
+              const direct = tests.querySelector(
+                '[data-beta-control="method-pointerup-direct"]'
+              );
+              direct.dispatchEvent(new PointerEvent('pointerdown', {
+                bubbles: true, composed: true, pointerId: 902,
+                pointerType: 'touch', isPrimary: true, clientX: 10, clientY: 10,
+              }));
+              direct.dispatchEvent(new PointerEvent('pointermove', {
+                bubbles: true, composed: true, pointerId: 902,
+                pointerType: 'touch', isPrimary: true, clientX: 10, clientY: 40,
+              }));
+              direct.dispatchEvent(new PointerEvent('pointerup', {
+                bubbles: true, composed: true, pointerId: 902,
+                pointerType: 'touch', isPrimary: true, clientX: 10, clientY: 40,
+              }));
+            }
+            """
+        )
+        page.wait_for_timeout(200)
+
+        page.evaluate(
+            """
+            () => {
+              window.__epPanel.__epPermanentBetaTests.querySelector(
+                '.ep-beta-tests-legacy'
+              ).open = true;
+            }
+            """
+        )
 
         repeated_controls = (
             '[data-beta-control="lit-button"]',
@@ -4540,6 +4595,7 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
             """
         )
         snapshot = page.evaluate("window.__epBetaTests.snapshot()")
+        result["methods"] = snapshot["methods"]
         result["controls"] = snapshot["controls"]
 
         page.evaluate(
@@ -4872,7 +4928,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
         "v101": "v1.0.1-beta.4 BETA",
-        "v110": "v1.2.0-beta.3 BETA",
+        "v110": "v1.2.0-beta.4 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -5290,6 +5346,34 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "closed", "dashboard_restored",
         )
         controls = beta_tests.get("controls", {})
+        methods = beta_tests.get("methods", {})
+        method_keys = (
+            "method-native-click", "method-pointerup-direct",
+            "method-pointerup-delegated", "method-click-fallback",
+            "method-pointerup-dedupe",
+        )
+        methods_ok = all(
+            methods.get(key, {}).get("metrics", {}).get("pointerdown", 0) >= 20
+            and methods.get(key, {}).get("metrics", {}).get("pointerup", 0) >= 20
+            and methods.get(key, {}).get("metrics", {}).get("actions", 0)
+            == (21 if key == "method-click-fallback" else 20)
+            and methods.get(key, {}).get("connected") is True
+            for key in method_keys
+        )
+        dedupe_ok = (
+            methods.get("method-pointerup-dedupe", {}).get("metrics", {}).get(
+                "pointer_actions", 0
+            ) == 20
+            and methods.get("method-pointerup-dedupe", {}).get("metrics", {}).get(
+                "deduped", 0
+            ) == 20
+            and methods.get("method-click-fallback", {}).get("metrics", {}).get(
+                "fallback_actions", 0
+            ) == 1
+            and methods.get("method-pointerup-direct", {}).get("metrics", {}).get(
+                "pointer_actions", 0
+            ) == 20
+        )
         button_controls = (
             "lit-button", "listener-button", "icon-button", "shadow-button",
             "checkbox-switch", "label-switch",
@@ -5308,6 +5392,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
         if (
             not all(beta_tests.get(key) is True for key in required_beta_tests)
+            or not methods_ok
+            or not dedupe_ok
             or not repeated_ok
             or not native_ok
         ):

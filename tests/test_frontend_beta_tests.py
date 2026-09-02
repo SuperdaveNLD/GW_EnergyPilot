@@ -15,7 +15,7 @@ class FrontendBetaTests(unittest.TestCase):
 
     def test_page_is_mounted_from_the_stable_functional_layer(self) -> None:
         self.assertIn(
-            'from "./ep-beta-tests.js?v=1.2.0-beta.3-load-forecast1"',
+            'from "./ep-beta-tests.js?v=1.2.0-beta.4-touch-methods1"',
             self.v041,
         )
         self.assertIn("mountEnergyPilotControlSurface(this, this.shadowRoot);", self.v041)
@@ -41,6 +41,37 @@ class FrontendBetaTests(unittest.TestCase):
             self.assertIn(f'key: "{control}"', self.source)
             self.assertIn(f'"{control}"', self.source)
 
+    def test_clean_comparison_methods_are_exposed(self) -> None:
+        for method in (
+            "method-native-click",
+            "method-pointerup-direct",
+            "method-pointerup-delegated",
+            "method-click-fallback",
+            "method-pointerup-dedupe",
+        ):
+            self.assertIn(f'key: "{method}"', self.source)
+            self.assertIn(f'data-beta-control="{method}"', self.source)
+        self.assertIn("CLICK_FALLBACK_MS = 120", self.source)
+        self.assertIn("CLICK_DEDUPE_MS = 700", self.source)
+        self.assertIn("MOVE_THRESHOLD_PX = 12", self.source)
+        self.assertIn("fallback_actions", self.source)
+        self.assertIn("pointer_actions", self.source)
+        self.assertIn("deduped", self.source)
+
+    def test_event_measurement_does_not_rerender_during_click_synthesis(self) -> None:
+        record_body = self.source.split("  _record(event) {", 1)[1].split(
+            "\n  _action(", 1
+        )[0]
+        self.assertIn("this._metricsBuffer", record_body)
+        self.assertIn("this._recentBuffer", record_body)
+        self.assertIn("this._scheduleDisplayFlush()", record_body)
+        self.assertNotIn("this.metrics =", record_body)
+        self.assertNotIn("this.recent =", record_body)
+        self.assertNotIn("queueMicrotask", record_body)
+        self.assertIn("setTimeout(() => this._finishPointer", record_body)
+        self.assertIn("DISPLAY_SETTLE_MS = 650", self.source)
+        self.assertIn("methods: collect(METHOD_DEFINITIONS)", self.source)
+
     def test_diagnostics_track_native_events_and_action_completion(self) -> None:
         for metric in (
             "pointerdown",
@@ -64,6 +95,7 @@ class FrontendBetaTests(unittest.TestCase):
             "preventDefault(",
             "setPointerCapture(",
             "releasePointerCapture(",
+            ".click()",
             'addEventListener("touchstart"',
             'addEventListener("touchend"',
         ):

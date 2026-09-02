@@ -17,6 +17,22 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0-beta.4 — Isolated iOS activation-method tests
+
+**Beta tests** now starts with five numbered local buttons that compare a clean
+native click, direct pointerup, delegated pointerup, native click with a 120 ms
+fallback and immediate pointerup with late-click deduplication. Test evidence is
+buffered during the complete pointer-to-click window and appears after 650 ms
+of inactivity, preventing the diagnostic's own Lit render from influencing the
+native click under investigation.
+
+Pointerup-based methods require the primary pointer to remain within 12 px and
+never capture the pointer, cancel a gesture or synthesize a click. The original
+eight native control variants remain available in a collapsed comparison. The
+page stays strictly local and cannot call Home Assistant, GoodWe or EMHASS.
+See `docs/releases/v1.2.0-beta.4.md` and
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md`.
+
 # v1.2.0-beta.3 — Selectable EMHASS load forecast
 
 Settings → EMHASS now offers **Load forecast · AUTO / CUSTOM**. AUTO remains
@@ -253,6 +269,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0-beta.4** | 2026-09-02 | **Beta** | Adds observer-neutral native-click and guarded pointerup/fallback/deduplication comparisons for the Companion iOS defect. |
 | **1.2.0-beta.3** | 2026-09-02 | **Beta** | Adds AUTO/CUSTOM EMHASS load forecasting with a horizon-aware fixed-watt runtime request. |
 | **1.2.0-beta.2** | 2026-09-01 | **Beta** | Rejects false SEMS 0% SOC, corrects Wanted-SOC interval timing and adds an isolated local mobile-control diagnostic page. |
 | **1.2.0-beta.1** | 2026-09-01 | **Beta** | Combines permanent mobile controls with guarded SEMS+ Beta telemetry while retaining local-only EMS/minimum-SOC writes. |

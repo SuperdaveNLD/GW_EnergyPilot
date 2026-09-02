@@ -18,12 +18,16 @@ or EMHASS ownership.
 Run this harmless isolation pass before operating a real EnergyPilot control:
 
 1. Open the dashboard layout menu and select **Beta tests**.
-2. Tap each of the eight variants twenty times. For the select and slider,
-   make twenty actual value changes.
-3. Open **Laatste events en export** and retain the JSON shown there. With a
+2. Tap each of the five numbered method buttons five times, at a normal pace.
+   Wait one second after the final tap so the deliberately delayed counters are
+   displayed.
+3. Make one vertical scroll gesture starting on methods 2–5. That gesture must
+   not increase `actions`. The original eight control variants remain under
+   **Oude acht controletests tonen** when a legacy comparison is useful.
+4. Open **Laatste events en export** and retain the JSON shown there. With a
    Web Inspector console the same payload is available as
    `__epBetaTests.json()`.
-4. Repeat in Safari and Home Assistant Companion, ideally once in portrait and
+5. Repeat in Safari and Home Assistant Companion, ideally once in portrait and
    once in landscape.
 
 The page uses local browser state only. It sends no Home Assistant service or
@@ -33,14 +37,19 @@ as follows:
 - `pointerdown` absent: the physical event did not reach that target;
 - `pointerdown` and `pointerup` rise but `click` does not: WebKit cancelled the
   native click before the action handler;
-- `click` rises but `actions` does not: the event arrived but the selected
-  handler path did not complete;
+- methods 2 and 3 should produce one `pointer_action` per valid pointerup;
+- method 4 reports `native_actions` when click arrives and `fallback_actions`
+  when the 120 ms recovery supplies the missing action;
+- method 5 should produce one `pointer_action` and at most one `deduped` click
+  per tap, while `actions` remains exactly one per valid pointerup;
 - `actions` rises exactly once per use: that native control path is healthy.
 
-For the label-wrapped switch, one physical use can legitimately produce click
-events for both the label and its checkbox; `actions` remains the canonical
-completed-action count. The result narrows the failing browser path, but does
-not by itself close the real operational-control acceptance below.
+The counters are buffered without a reactive render during native click
+synthesis and refresh after 650 ms of inactivity. For the legacy label-wrapped
+switch, one physical use can legitimately produce click events for both the
+label and its checkbox; `actions` remains the canonical completed-action count.
+The result narrows the failing browser path, but does not by itself close the
+real operational-control acceptance below.
 
 ## Safety prerequisites
 

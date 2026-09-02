@@ -12,7 +12,7 @@ optimization.
 
 ## Status
 
-**v1.2.0-beta.3 · Beta**
+**v1.2.0-beta.4 · Beta**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -29,17 +29,19 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` remains the stable production release. `v1.2.0-beta.3` is the opt-in
-candidate that adds an EMHASS **Load forecast · AUTO / CUSTOM** setting on top
-of the beta.2 mobile, SEMS, SOC-timing and diagnostic foundation. Local Modbus
-remains mandatory for every EMS and minimum-SOC write/read-back. Normal
-users keep the HACS prerelease switch off; testers explicitly enable it for GW
-EnergyPilot before selecting the beta.
+`v1.1.1` remains the stable production release. `v1.2.0-beta.4` is the opt-in
+candidate that adds five isolated iOS activation-method comparisons and removes
+live diagnostic rerenders from the pointer-to-click window. It retains the
+beta.3 EMHASS **Load forecast · AUTO / CUSTOM** setting and all earlier beta
+behavior. Local Modbus remains mandatory for every EMS and minimum-SOC
+write/read-back. Normal users keep the HACS prerelease switch off; testers
+explicitly enable it for GW EnergyPilot before selecting the beta.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0-beta.4.md` — isolated iOS activation-method comparison notes;
 - `docs/releases/v1.2.0-beta.3.md` — EMHASS AUTO/CUSTOM fixed load-forecast notes;
 - `docs/releases/v1.2.0-beta.2.md` — SEMS SOC, Wanted-SOC timing and local Beta tests notes;
 - `docs/releases/v1.2.0-beta.1.md` — mobile-control and SEMS+ combined beta notes;
@@ -87,6 +89,21 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.2.0-beta.4 highlights
+
+- Adds five numbered local test methods: clean native click, direct pointerup,
+  delegated pointerup, native click with a 120 ms fallback, and immediate
+  pointerup with late-click deduplication.
+- Buffers event and action evidence without a Lit render during the native
+  pointer-to-click synthesis window; visible counters refresh after 650 ms of
+  inactivity.
+- Rejects pointerup activation after more than 12 px movement and retains zero
+  Home Assistant, GoodWe and EMHASS calls from the diagnostic page.
+- Keeps the previous eight native control comparisons available under a
+  collapsed section and exports both `methods` and `controls` evidence.
+- Advances the complete frontend cache boundary to
+  `1.2.0-beta.4-touch-methods1`.
 
 ## v1.2.0-beta.3 highlights
 

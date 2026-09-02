@@ -4,6 +4,27 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0-beta.4] - 2026-09-02
+
+### Added
+
+- Add five isolated **Beta tests** activation comparisons for clean native
+  click, direct pointerup, delegated pointerup, native click with a 120 ms
+  fallback and immediate pointerup with late-click deduplication.
+- Export per-method native, pointer, fallback and deduplicated action counts,
+  plus the exact display delay, movement threshold and timing windows.
+
+### Changed
+
+- Buffer diagnostic events and values without reactive rendering during the
+  pointer-to-click synthesis window; refresh visible evidence only after 650 ms
+  of inactivity so the test observer cannot suppress the click being measured.
+- Require a primary pointer and no more than 12 px movement for pointerup test
+  activation, without pointer capture, gesture cancellation or synthetic click.
+- Keep the original eight native controls available as a collapsed comparison
+  and advance the complete frontend cache boundary to
+  `1.2.0-beta.4-touch-methods1`.
+
 ## [1.2.0-beta.3] - 2026-09-02
 
 ### Added

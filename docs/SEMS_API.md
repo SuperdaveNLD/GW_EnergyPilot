@@ -1,6 +1,6 @@
 # SEMS+ API Beta telemetry
 
-GW EnergyPilot v1.2.0-beta.3 can use either local Modbus TCP or the GoodWe
+GW EnergyPilot v1.2.0-beta.4 can use either local Modbus TCP or the GoodWe
 SEMS/SEMS+ portal as its coordinator-backed telemetry source.
 
 This is a **Beta telemetry option**, not a cloud control transport and not an
