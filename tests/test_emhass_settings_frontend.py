@@ -22,19 +22,19 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v110.js?v=1.1.1-stable1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.1.1-stable1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.1.1-stable1"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.1.1-stable1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.1.1-stable1"', v045)
+        self.assertIn("gw-energy-pilot-v110.js?v=1.2.0-stable1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.2.0-stable1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.2.0-stable1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.2.0-stable1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.2.0-stable1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=1.1.1-stable1"',
+            'import "./gw-energy-pilot-v043.js?v=1.2.0-stable1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.1.1-stable1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.1.1-stable1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.1.1-stable1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.2.0-stable1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-stable1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.2.0-stable1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:
@@ -44,6 +44,8 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
             "emhass_optimization_interval",
             "emhass_soc_final_pct",
             "emhass_fallback_load",
+            "emhass_custom_load_forecast",
+            "emhass_custom_load_power",
             "p_batt_entity",
             "p_grid_entity",
             "optim_status_entity",
@@ -63,6 +65,16 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         self.assertIn("2. Outputs", self.source)
         self.assertIn("3. Price settings", self.source)
         self.assertIn("4. EMHASS configuration check", self.source)
+
+    def test_custom_load_power_is_visible_only_in_custom_mode(self) -> None:
+        self.assertIn("syncCustomLoadForecastField(form)", self.source)
+        self.assertIn("field.hidden = !custom", self.source)
+        self.assertIn("power.disabled = !custom", self.source)
+        self.assertIn('badge.textContent = custom ? "CUSTOM" : "AUTO"', self.source)
+        self.assertIn(
+            'customLoadToggle.addEventListener("change"',
+            self.source,
+        )
 
     def test_configuration_check_uses_existing_sync_api_payload(self) -> None:
         self.assertIn("panel.__epV028Sync", self.source)

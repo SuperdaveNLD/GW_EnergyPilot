@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from homeassistant.core import Event, HomeAssistant, callback
@@ -24,6 +24,7 @@ from .const import (
     CONF_P_BATT_ENTITY,
     CONF_P_GRID_ENTITY,
     CONF_SCAN_INTERVAL,
+    CONF_TELEMETRY_SOURCE,
     DEFAULT_DEADBAND,
     DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
@@ -32,6 +33,7 @@ from .const import (
     DEFAULT_P_BATT_ENTITY,
     DEFAULT_P_GRID_ENTITY,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TELEMETRY_SOURCE,
 )
 from .debug_log import GWEnergyPilotDebugLog
 from .registers import REGISTER_DEFINITIONS
@@ -147,18 +149,38 @@ class GWEnergyPilotDebugRuntime:
         runtime = self._runtime()
         coordinator = getattr(runtime, "coordinator", None)
         client = getattr(runtime, "client", None)
+        telemetry_client = getattr(runtime, "telemetry_client", None)
         if coordinator is None:
             return {}
         data = coordinator.data
         values = dict(data.values) if data is not None else {}
         last_exception = getattr(coordinator, "last_exception", None)
         modbus_client = getattr(client, "_client", None)
-        return {
+        snapshot = {
+            "source": getattr(data, "source", getattr(coordinator, "source", None)),
+            "source_updated_at": (
+                data.source_updated_at.isoformat()
+                if data is not None
+                and getattr(data, "source_updated_at", None) is not None
+                else None
+            ),
             "last_update_success": bool(coordinator.last_update_success),
             "last_exception": str(last_exception) if last_exception else None,
+            "last_control_update_success": getattr(
+                coordinator, "last_control_update_success", None
+            ),
+            "last_control_exception": (
+                str(getattr(coordinator, "last_control_exception", None))
+                if getattr(coordinator, "last_control_exception", None)
+                else None
+            ),
             "client_connected": bool(getattr(modbus_client, "connected", False)),
             "values": values,
         }
+        sems_diagnostics = getattr(telemetry_client, "last_diagnostics", None)
+        if isinstance(sems_diagnostics, Mapping) and sems_diagnostics:
+            snapshot["sems"] = dict(sems_diagnostics)
+        return snapshot
 
     def current_snapshot(self) -> dict[str, Any]:
         """Return a sanitized current-state snapshot for problem analysis."""
@@ -177,6 +199,12 @@ class GWEnergyPilotDebugRuntime:
                 "time_zone": self.hass.config.time_zone,
             },
             "runtime_config": {
+                "telemetry_source": str(
+                    entry.data.get(
+                        CONF_TELEMETRY_SOURCE,
+                        DEFAULT_TELEMETRY_SOURCE,
+                    )
+                ),
                 "scan_interval_seconds": int(
                     options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
                 ),
@@ -279,7 +307,8 @@ class GWEnergyPilotDebugRuntime:
     def _async_coordinator_updated(self) -> None:
         snapshot = self._coordinator_snapshot()
         event = "poll_success" if snapshot.get("last_update_success") else "poll_failed"
-        self.log.record("goodwe", event, snapshot)
+        category = "sems" if snapshot.get("source") == "sems_api" else "goodwe"
+        self.log.record(category, event, snapshot)
 
     @callback
     def _async_controller_updated(self) -> None:

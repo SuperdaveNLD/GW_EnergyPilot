@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v009.js?v=1.1.1-stable1";
+import "./gw-energy-pilot-v009.js?v=1.2.0-stable1";
 
 const VERSION = "0.10";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -286,6 +286,7 @@ async function pressNativeButton(panel, buttonElement, entityId, busyText) {
 }
 
 function installOptimizeNow(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
 
@@ -337,6 +338,7 @@ function installOptimizeNow(panel, root) {
 }
 
 function installBatteryQuickActions(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const card = root.querySelector(".energy-card.battery");
   if (!card) return;
 

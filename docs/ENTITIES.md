@@ -53,6 +53,11 @@ Important enabled-by-default telemetry includes concepts such as:
 
 A number of raw or diagnostic values are intentionally disabled by default.
 
+With **SEMS+ API · Beta** selected, these same entity unique IDs are retained,
+but only the explicitly mapped cloud subset has a value. Local-register-only
+entities become unavailable rather than retaining a misleading old value or
+receiving a guessed cloud equivalent. See `docs/SEMS_API.md`.
+
 ## Connectivity status sensor
 
 The enabled diagnostic enum sensor uses stable unique-ID suffix:
@@ -61,7 +66,11 @@ The enabled diagnostic enum sensor uses stable unique-ID suffix:
 {config_entry_id}_connectivity_status
 ```
 
-Its states are `checking`, `all_ok` and `issue`. It remains available when a GoodWe poll fails so it can report Modbus unreachability rather than disappearing with coordinator-backed telemetry. Attributes expose the coordinator-derived Modbus status and configured refresh interval, optional charger reachability, requested/effective EV coordination, five-minute transition state/countdown and last Modbus success/failure/error evidence.
+Its states are `checking`, `all_ok` and `issue`. It remains available when a
+poll fails. Attributes expose the selected telemetry source/status/error and
+the independent local Modbus control status/error, configured refresh interval,
+optional charger reachability, requested/effective EV coordination, five-minute
+transition state/countdown and last success/failure evidence.
 
 The sensor does not poll or control either device. The dashboard header pill consumes this single entity and patches its existing DOM node on state changes.
 
@@ -98,6 +107,10 @@ negative = planned export
 ```
 
 Do not interchange these two values without applying their documented conventions.
+
+The SEMS `pmeter` mapping uses the same EnergyPilot grid sign. It is a runtime
+power measurement only and is not a substitute for either canonical lifetime
+energy-counter pair.
 
 ### Battery
 

@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v020.js?v=1.1.1-stable1";
+import "./gw-energy-pilot-v020.js?v=1.2.0-stable1";
 
 const VERSION = "0.21";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -411,6 +411,7 @@ async function applyManualMode(panel, definition) {
 }
 
 function installManualModePad(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const card = root.querySelector(".panel-card.controller");
   if (!card || card.querySelector(".ep-v021-manual-pad")) return;
 

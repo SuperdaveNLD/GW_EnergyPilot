@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.1.1 runtime structure
+## Current v1.2.0 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,10 +17,12 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.1.1 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.2.0 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
-coordinator.py          periodic telemetry snapshot
+sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
+sems_model.py           pure cloud identity/freshness/telemetry normalization
+coordinator.py          selected telemetry snapshot + independent local control read-back
 connectivity_model.py   pure charger reachability debounce/state machine
 connectivity.py         coordinator/entity-backed status, five-minute timer and transition logging
 controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
@@ -31,6 +33,7 @@ control_history.py      persistent latest successful EMS-setpoint update evidenc
 execution_history.py    bounded plan/decision/write/read-back evidence Store
 number.py               manual power, EMHASS SOC numbers, synchronized min-SOC transaction
 emhass_config.py        safe full EMHASS config read/write helpers
+emhass_load_forecast.py pure AUTO/CUSTOM runtime load-forecast horizon/override helper
 emhass_sync.py          canonical EnergyPilot runtime contract + safe required-config synchronization
 emhass_sync_api.py      admin sync/readback API using canonical sync ownership keys
 orchestrator.py         base EMHASS orchestration
@@ -55,7 +58,7 @@ runtime_store.py        persistent last_success evidence
 optimization_log.py     bounded optimization-attempt history
 optimization_log_api.py read-only optimization history API
 ev_load_balancing.py    GoodWe phase-aware EV charger control/feedback + audit Store
-settings_api.py         EP/EV/EMHASS/PV/GoodWe settings
+settings_api.py         EP/EV/EMHASS/PV/GoodWe source, credentials and control settings
 smart_meter_api.py      automatic control-strategy API
 beta_soc_api.py         bounded verified 45356/45358 low-level field-test API
 debug_log_runtime.py    bounded memory-only runtime diagnostic capture
@@ -65,7 +68,25 @@ frontend/               layered dashboard/settings assets
 tests/                  hardware-independent regressions
 ```
 
-Connectivity must reuse `coordinator.last_update_success` and the configured scan interval. Do not substitute the transport client's socket flag or add a health-check poll. The charger timer may only change whether the existing EV override is effective; it must not write the saved user option or create another EMS owner.
+Connectivity must reuse coordinator telemetry/control results and the selected
+configured scan interval. Do not substitute a transport socket flag or add a
+health-check poll. The charger timer may only change whether the existing EV
+override is effective; it must not write the saved user option or create another
+EMS owner.
+
+## SEMS+ Beta boundary
+
+`GWSemsClient` may replace only the normal coordinator telemetry client.
+`GWModbusClient` remains present and is the only object passed to the controller
+for EMS/minimum-SOC writes. Cloud and local read-back results may be merged for
+entities, but their health must remain independent.
+
+Do not map a portal field by name alone. Every accepted field needs captured or
+maintained-upstream evidence, an explicit unit/range/sign conversion and a pure
+`sems_model.py` regression. Do not map cloud energy totals into accounting or
+phase values into EV load balancing without a separately reviewed contract.
+Station/inverter ambiguity, stale `last_time`, unsupported station shapes and
+sentinel values must fail explicitly. See `docs/SEMS_API.md`.
 
 ## Active orchestrator chain
 
@@ -85,7 +106,7 @@ Ownership by active layer:
 
 - v026: read-only dashboard/optimizer price-series caching;
 - v012: one reload-safe local wall-clock callback for full optimization and active-plan-step publication, with optimization priority at coincident boundaries and a pre-log Home Assistant `RUNNING` gate;
-- v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment and fresh `P_batt` publication validation;
+- v031: Battery Saver EMHASS policy, canonical runtime-contract application, hard-SOC alignment, final runtime load-forecast selection and fresh `P_batt` publication validation;
 - v033: refresh the persistent canonical EMHASS plan after a successful optimize/publish cycle and advance `plan_revision` after the refresh attempt.
 - v044: schedule the cancellable 60-second post-restart recovery attempt and bounded 15/30/60-second retry back-off without blocking config-entry setup or recording a slow Core startup as a failed optimization.
 
@@ -159,9 +180,19 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.1.1 uses the final presentation-only stable wrapper and advances one
-complete `1.1.1-stable1` active-graph cache boundary. The bounded
+v1.2.0 uses the final presentation-only stable wrapper and advances one
+complete `1.2.0-stable1` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
+The local-only Beta tests component additionally buffers pointer/click evidence
+until after the synthesis window and compares five guarded activation methods;
+its numbered controls remain diagnostic-only and never route an operational
+command. `ep-touch-click-fallback.js` owns the single root-scoped iOS recovery
+adapter. It recognizes enabled buttons and menu switches, rejects a moved or
+cancelled touch, waits 120 ms for native click and otherwise calls only the
+same element's existing `.click()` path with late-click deduplication.
+The final stable presentation additionally gives chart size/range, expand/footer
+and execution-history open/close controls real 44 CSS-pixel minimum targets on
+coarse-pointer or narrow displays, without altering the compact desktop layout.
 The nested v0.51 feature layer owns
 one canonical EMHASS-to-GoodWe card and targeted history refresh. The nested
 plan data/view owners implement Recorder attribution,
@@ -177,6 +208,31 @@ refresh, PV presentation and static-flow DOM/CSS. The v0.41 PV flow keeps one
 combined group total while patching one internal ETA/DC node and one aggregated
 external AC/PCC node; it remains independent of control and EMHASS inputs.
 
+For the current issue #84 architecture, v0.41 also mounts
+`ep-control-surface.js` and supplies it with frozen control-only models. The
+surface and its six Lit child components own all operational dashboard actions:
+Battery quick actions, Automatic Control, EMHASS strategy, Battery Strategy
+including Custom/SOC, Optimize and manual EMS. The old v0.10/v0.16/v0.21,
+v0.38 delegated-strategy, v0.44 Optimize and base Automatic Control listeners
+must remain bypassed while `__epControlSurfaceArchitecture` is active.
+Historical modules may style compatible class names but must neither recreate
+nor mutate descendants of `ep-control-surface`.
+
+v0.41 additionally mounts `ep-beta-tests.js` as a local-only diagnostic page
+behind the dashboard layout menu. This component must remain isolated from the
+control gateway and retain the same node/counters through telemetry and
+structural renders. The active desktop Chromium, iPad WebKit and iPhone WebKit
+stability matrix exercises all eight variants and asserts that it creates no
+service or WebSocket call.
+
+The inherited renderer must use `_commitStructuralRender()` so a structural
+dashboard update keeps the exact ShadowRoot, `main`, control surface and child
+controls connected. Never restore `shadowRoot.innerHTML`. A control action is a
+native or bounded recovered `click` and one gateway request. Its selected state comes only from the
+confirmed Home Assistant/API model; service completion and backend publication
+may arrive in either order. See `FRONTEND_CONTROL_ARCHITECTURE.md` and
+`FRONTEND_STABLE_DOM.md`.
+
 The existing settings module owns the two-deadband configuration panel and its
 zero-centered explanatory scale. Control behavior remains owned by the backend
 config and controller modules; the stable wrapper does not reinterpret it.
@@ -185,6 +241,19 @@ expected mode/setpoint attributes; it must not grow a parallel Hybrid/EV
 decision implementation.
 
 **Do not add another behavioral release monkey-patch layer by default.** A compatibility wrapper must stay narrowly scoped and have executable browser-level regression coverage on every required profile.
+
+Run both frontend browser gates after a rendering, interaction or CSS change:
+
+```text
+/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_control_surface.py
+/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_stability_v110.py
+```
+
+The first is the authoritative gate for 50 activations of every rendered
+permanent control (1,500 per profile). The second protects the complete
+historical dashboard presentation and scoped
+cards. Passing Playwright WebKit does not close physical iPhone acceptance;
+follow `FRONTEND_IPHONE_ACCEPTANCE.md` for Safari and Home Assistant Companion.
 
 ## Automatic-control contract
 
@@ -488,14 +557,22 @@ SOC visualization:
 actual: registry-resolved GoodWe battery_soc (%)
         -> separate Recorder 5-minute means
 
-wanted history: execution Store SOC_opt snapshot at decision time
+wanted history: execution Store SOC_opt snapshot
+                -> persist the active row's evidenced interval-end target_at
 
 current/future: official schema-1.x SOC_opt fraction 0..1
                 -> plan_runtime validates and normalizes to value_pct
-                -> battery_soc_plan payload
+                -> retain source start
+                -> derive target_at = start + inferred 15/30/60-minute step
+                -> schema-7 battery_soc_plan payload
 ```
 
 Do not reuse the power-schedule fallback for SOC. EnergyPilot has no configured EMHASS SOC-output entity, and multi-battery plans have no meaningful bare/fleet `SOC_opt`.
+
+Do not plot `SOC_opt` at the source row timestamp: EMHASS has already applied
+that row's power when reconstructing the value. Do not shift `P_batt`, prices
+or Recorder actuals, and do not guess a target time for old execution events
+that lack `soc_opt_target_at`.
 
 Historical active plan still uses configured `P_batt` Home Assistant history so the displayed past reflects the target that was actually published then.
 
@@ -519,7 +596,7 @@ existing EnergyPilot runtime price-source path
 -> frontend visualization
 ```
 
-The chart API uses schema `6` and includes `plan_revision` plus bounded
+The chart API uses schema `7` and includes `plan_revision` plus bounded
 `execution` history/projection. The frontend should force-refresh the one
 canonical plan card and one canonical execution card when live evidence differs
 from the cached payload. It also includes backend-derived Home Assistant-timezone
@@ -596,7 +673,7 @@ Do not fix a presentation issue by changing Modbus semantics unless the data its
 
 ## Current technical debt priorities
 
-1. **Frontend layering** — consolidate versioned monkey-patch layers into functional components under browser-level regression tests.
+1. **Frontend layering** — continue the completed operational-control boundary by consolidating remaining dashboard cards, Settings, modals, diagnostics and layout/window presentation into functional components under browser-level regression tests.
 2. **Orchestrator inheritance** — eventually replace release-version inheritance with composable policy/forecast/price/runner services under existing tests.
 3. **Home Assistant lifecycle tests** — add config-entry/WebSocket/Recorder fixtures for integration-level startup/reload coverage, especially persistent-plan recovery.
 4. **Control policy extraction** — separate pure Battery/Grid/Hybrid decision logic from Home Assistant state reading and Modbus execution when the next control refactor is scheduled.

@@ -11,7 +11,11 @@ This file defines working rules for AI coding assistants and contributors. The r
 
 ## Current scope
 
-GW EnergyPilot is an unofficial Home Assistant custom integration for local GoodWe ETA-G20 telemetry, EMS control, EMHASS orchestration, optional runtime pricing, EV anti-discharge protection, persistent grid accounting, persistent EMHASS plan resilience and a built-in dashboard.
+GW EnergyPilot is an unofficial Home Assistant custom integration for selectable
+local GoodWe ETA-G20 or SEMS+ Beta telemetry, local EMS control, EMHASS
+orchestration, optional runtime pricing, EV anti-discharge protection,
+persistent grid accounting, persistent EMHASS plan resilience and a built-in
+dashboard.
 
 Primary tested inverter:
 
@@ -22,8 +26,8 @@ GoodWe GW15K-ETA-G20
 Current release lines:
 
 ```text
-v1.1.1 Stable
-v1.1.0-beta.2 Published hotfix candidate
+v1.2.0 Stable
+v1.2.0-beta.7 Previous beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -40,11 +44,33 @@ Follow `docs/RELEASE_WORKFLOW.md`; do not reuse or move published tags.
 
 EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must not install or silently replace it.
 
-## Frontend stability contract (v0.41+, active v1.1.1 stable)
+## SEMS+ Beta telemetry policy
+
+- SEMS/SEMS+ is an optional telemetry source, not an EMS control transport and
+  not EMHASS.
+- Local `GWModbusClient` remains the only owner of EMS and verified minimum-SOC
+  writes/read-back.
+- Cloud and local-control health must remain independent; one success must not
+  make the other source look fresh or reachable.
+- Require explicit station/inverter identity when discovery is ambiguous.
+- Reject stale/future timestamps, unsupported station shapes, sentinel values
+  and fields without explicit unit/sign evidence.
+- Never map SEMS cloud energy totals into canonical accounting or missing meter
+  phase currents into EV load balancing by name alone.
+- The settings API must never return the stored SEMS password and runtime/debug
+  reports must exclude all credentials.
+- See `docs/SEMS_API.md` for the current mapped subset and limits.
+
+## Frontend stability contract (v0.41+, active v1.2.0 Stable)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.1.1 stable telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.2.0 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The beta.5 iOS adapter may recover a missing touch click after 120 ms only
+  through the same native element's existing click path, with a 12 px movement
+  guard and late-click deduplication.
+- Operational controls must remain in the permanent Lit surface and must not be
+  recreated or mutated by historical presentation layers.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
 - EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
@@ -390,7 +416,28 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.1.1 owns final stable presentation and the complete `1.1.1-stable1` cache boundary. v1.0.1-beta.4 remains in the chain as its bounded historical beta presentation layer. v0.51 remains the bounded feature layer that owns the scoped EMHASS-to-GoodWe history card. The settings module owns the two-deadband configuration panel and explanatory scale; backend controller/config modules remain the only owners of its control semantics. The nested plan data/view modules own Recorder source attribution, immutable wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50 retains its release presentation; v0.49 retains its release presentation; v0.48 retains current Hybrid operator copy and its stable-note ownership; v0.47 retains the Custom Battery Saver presentation. The existing Battery Saver and strategy modules own Custom editing, typography and managed-profile presentation. v0.46 retains external-PV presentation, v0.45 its integrated release presentation, v0.44 the bounded Optimize-now listener plus floating presentation, v0.43 touch-hover presentation, v0.42 the EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow presentation. Do not move GoodWe/EMS/EMHASS control semantics into a frontend release wrapper.
+v1.2.0 owns final stable presentation and the complete `1.2.0-stable1` cache
+boundary. It promotes beta.7 unchanged and retains the earlier safety,
+diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
+missing-click recovery, and expands the remaining graph/history touch targets
+to at least 44 CSS pixels on coarse-pointer/narrow displays. v1.1.1
+remains the previous stable base and v1.0.1-beta.4 remains in the chain as its bounded
+historical beta presentation layer. v0.51 remains the bounded feature layer
+that owns the scoped EMHASS-to-GoodWe history card. The settings module owns
+the two-deadband configuration panel and explanatory scale; backend
+controller/config modules remain the only owners of its control semantics. The
+nested plan data/view modules own Recorder source attribution, immutable
+wanted-SOC history and verified runtime-session-bounded EV overlays. v0.50
+retains its release presentation; v0.49 retains its release presentation;
+v0.48 retains current Hybrid operator copy and its stable-note ownership;
+v0.47 retains the Custom Battery Saver presentation. The existing Battery
+Saver and strategy modules own Custom editing, typography and managed-profile
+presentation. v0.46 retains external-PV presentation, v0.45 its integrated
+release presentation, v0.44 its historical presentation while permanent Lit
+owns operational Optimize behavior, v0.43 touch-hover presentation, v0.42 the
+EMHASS settings overview, and v0.41 stable-DOM telemetry/plan/PV/static-flow
+plus the permanent control surface. Do not move GoodWe/EMS/EMHASS control
+semantics into a frontend release wrapper.
 
 Historical versioned frontend files remain in the repository for dependency compatibility. Do not delete them based on filenames alone; trace imports first. Avoid new behavioral monkey-patch release layers unless a bounded compatibility fix requires one.
 

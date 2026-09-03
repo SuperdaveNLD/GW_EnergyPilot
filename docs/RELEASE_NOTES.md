@@ -17,6 +17,145 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0 — Stable mobile controls and resilient EnergyPilot operation
+
+This normal/latest production release promotes the exact v1.2.0-beta.7 runtime
+behavior. It includes the permanent Lit control surface, bounded 120 ms iOS
+missing-click recovery, 44 CSS-pixel graph/history touch targets, optional
+SEMS+ Beta telemetry, persistent EMHASS plan resilience and selectable
+AUTO/CUSTOM fixed-load forecasting.
+
+GoodWe register definitions, EMS mode/setpoint signs, local-only control
+ownership, Battery Saver profiles, entity unique IDs and persistent stores are
+unchanged by the promotion itself. The stable release uses the complete
+`1.2.0-stable1` frontend cache boundary. See `docs/releases/v1.2.0.md`.
+
+# v1.2.0-beta.7 — Validated mobile-control roll-forward
+
+This prerelease republishes beta.6's complete mobile-control behavior on a new
+immutable version and frontend cache boundary. The bounded 120 ms missing-click
+recovery, 44 CSS-pixel chart/history touch targets and existing permanent Lit
+control surface are unchanged.
+
+The complete Quality, HACS, hassfest and desktop Chromium/iPad WebKit/iPhone
+WebKit matrix is repeated for the beta.7 commit. GoodWe, EMS, EMHASS, Battery
+Saver, entity identity and persistent-state semantics are unchanged. See
+`docs/releases/v1.2.0-beta.7.md`.
+
+# v1.2.0-beta.6 — Larger chart and history touch targets
+
+The remaining compact Battery · Plan · Price controls now expose real minimum
+44 × 44 CSS-pixel targets on coarse-pointer or narrow displays. This covers
+`S/M/L`, `12h/24h/36h`, chart expand/footer actions and execution-history
+open/close controls while retaining the compact desktop presentation.
+
+The browser matrix now removes native click from the real chart-size,
+chart-range and full-history buttons and proves exactly one fallback action,
+late-click deduplication, modal close after its node is removed, no horizontal
+card overflow and no JavaScript/page errors. Beta.5's bounded 120 ms adapter
+and all GoodWe/EMS/EMHASS semantics are unchanged. See
+`docs/releases/v1.2.0-beta.6.md`.
+
+# v1.2.0-beta.5 — Companion touch-click recovery
+
+The 120 ms method that completed every valid beta.4 Companion pointer sequence
+is now applied once at the EnergyPilot panel boundary. Buttons in the permanent
+EMS surface, Settings, dashboard layout, diagnostics, graphs, history and
+modals all retain their original click handlers. Dashboard-menu checkbox/radio
+controls use that same bounded recovery.
+
+A native click arriving in time proceeds normally. If it is absent after a
+primary touch that moved no more than 12 px, EnergyPilot calls only the same
+element's existing `.click()` route. One later physical click is deduplicated.
+Movement, pointer cancellation, disabled/disconnected targets, mouse/pen and
+keyboard use do not enter this fallback path. Pointer listeners remain passive;
+the adapter never captures a pointer, cancels scrolling or directly calls Home
+Assistant, GoodWe or EMHASS.
+
+The five numbered Beta Tests methods remain raw and excluded from production
+adaptation. Their JSON export now also includes production fallback counters.
+See `docs/releases/v1.2.0-beta.5.md` and
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md`.
+
+# v1.2.0-beta.4 — Isolated iOS activation-method tests
+
+**Beta tests** now starts with five numbered local buttons that compare a clean
+native click, direct pointerup, delegated pointerup, native click with a 120 ms
+fallback and immediate pointerup with late-click deduplication. Test evidence is
+buffered during the complete pointer-to-click window and appears after 650 ms
+of inactivity, preventing the diagnostic's own Lit render from influencing the
+native click under investigation.
+
+Pointerup-based methods require the primary pointer to remain within 12 px and
+never capture the pointer, cancel a gesture or synthesize a click. The original
+eight native control variants remain available in a collapsed comparison. The
+page stays strictly local and cannot call Home Assistant, GoodWe or EMHASS.
+See `docs/releases/v1.2.0-beta.4.md` and
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md`.
+
+# v1.2.0-beta.3 — Selectable EMHASS load forecast
+
+Settings → EMHASS now offers **Load forecast · AUTO / CUSTOM**. AUTO remains
+the default and preserves the existing GoodWe/Recorder forecast. CUSTOM reveals
+a fixed-watt field, initially 700 W, and applies that value to every step of an
+EnergyPilot-owned day-ahead solve.
+
+The runtime list follows an existing `prediction_horizon` when present.
+Otherwise EnergyPilot derives its length from the active EMHASS
+`delta_forecast_daily` and `optimization_time_step`; one day at 15 minutes is
+therefore 96 equal values. The final request-body boundary replaces only
+`load_power_forecast`, preserving SOC, prices, battery limits and unrelated
+runtime values. Switching back to AUTO is the rollback and retains the saved
+CUSTOM wattage. See `docs/releases/v1.2.0-beta.3.md`.
+
+# v1.2.0-beta.2 — SEMS SOC safety, plan timing and local touch diagnostics
+
+SEMS telemetry now rejects the observed transient `soc: 0` portal placeholder.
+EnergyPilot first tries the selected inverter's positive SOC and otherwise
+makes the battery SOC unavailable, which blocks an EnergyPilot-owned EMHASS
+solve instead of initializing it at a false 0%. The opt-in LOG debug report and
+Home Assistant debug logger contain only an explicit credential-free allowlist
+of raw SEMS values, mapped output and SOC source/rejection decisions.
+
+Battery · Plan · Price now places Wanted SOC at the end of the associated
+EMHASS power interval (#122). A 50% `SOC_opt` row starting at 19:00 in a
+15-minute plan is therefore shown at 19:15. The same contract is derived from
+15-, 30- or 60-minute plans and retained in new historical execution evidence;
+battery-power and price timestamps are unchanged.
+
+The dashboard layout menu additionally offers **Beta tests**, a harmless local
+control laboratory for physical Safari and Home Assistant Companion diagnosis.
+Eight native button, switch, select and slider variants expose separate
+pointer, click, change/input and completed-action counters. The page sends no
+Home Assistant service, WebSocket, GoodWe or EMHASS command; see
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md` for the short field protocol.
+
+Local Modbus remains the only transport for EMS and verified minimum-SOC
+writes/read-back. Entity IDs, device identity, config entries and persistent
+Store keys are unchanged. See `docs/releases/v1.2.0-beta.2.md`.
+
+# v1.2.0-beta.1 — Mobile control modernization and SEMS+ telemetry
+
+The operational dashboard controls now live in one permanent declarative Lit
+tree. Battery actions, Automatic Control, EMHASS/Battery Strategy, Optimize,
+Custom SOC and manual EMS remain connected through telemetry and structural
+updates. Selected state follows confirmed backend publication, with one shared
+pending/acknowledged/error contract and duplicate-request protection.
+
+Configuration additionally offers **Local Modbus TCP** or **SEMS+ API · Beta**
+as telemetry source. SEMS credentials are write-only in the dashboard; station
+and inverter identity must be explicit when discovery is ambiguous. Regional
+authentication, one token renewal, bounded rate-limit back-off and strict
+freshness/shape/sentinel validation protect the cloud path.
+
+Only an evidence-backed PV/load/grid/inverter/battery subset is mapped. Cloud
+lifetime counters and missing meter phase currents never impersonate canonical
+local registers. Local Modbus remains mandatory and solely owns every EMS and
+minimum-SOC write/read-back; its health remains independent from SEMS health.
+Existing entries default to Local Modbus. See
+`docs/releases/v1.2.0-beta.1.md`, `docs/SEMS_API.md` and
+`docs/FRONTEND_CONTROL_ARCHITECTURE.md`.
+
 # v1.1.1 — Managed-profile settings-save hotfix
 
 This stable patch fixes EP and EMHASS settings saves after a managed Battery
@@ -65,7 +204,6 @@ The documentation explains the lower-average-SOC, SOC-window, power and
 throughput rationale and its limits. The profile factors are transparent
 price-relative optimizer policy, not a battery-specific lifetime guarantee.
 See `docs/releases/v1.1.0.md` and `docs/BATTERY_SAVER.md`.
-
 # v1.0.1-beta.4 — Explicit charging detection and safe EV-stop recovery
 
 Settings → EV now asks the operator to choose one charging signal: measured
@@ -191,6 +329,14 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |
+| **1.2.0-beta.7** | 2026-09-02 | **Beta** | Republishes the fully validated beta.6 mobile-control behavior behind a new complete frontend cache boundary. |
+| **1.2.0-beta.6** | 2026-09-02 | **Beta** | Enlarges the remaining chart/history touch targets and adds real missing-click coverage for S/M/L, 12h/24h/36h and full history. |
+| **1.2.0-beta.5** | 2026-09-02 | **Beta** | Applies the measured 120 ms missing-click recovery to all EnergyPilot buttons and dashboard-menu switches with scroll rejection and late-click deduplication. |
+| **1.2.0-beta.4** | 2026-09-02 | **Beta** | Adds observer-neutral native-click and guarded pointerup/fallback/deduplication comparisons for the Companion iOS defect. |
+| **1.2.0-beta.3** | 2026-09-02 | **Beta** | Adds AUTO/CUSTOM EMHASS load forecasting with a horizon-aware fixed-watt runtime request. |
+| **1.2.0-beta.2** | 2026-09-01 | **Beta** | Rejects false SEMS 0% SOC, corrects Wanted-SOC interval timing and adds an isolated local mobile-control diagnostic page. |
+| **1.2.0-beta.1** | 2026-09-01 | **Beta** | Combines permanent mobile controls with guarded SEMS+ Beta telemetry while retaining local-only EMS/minimum-SOC writes. |
 | **1.1.1** | 2026-08-31 | **Stable** | Fixes EP/EMHASS settings saves for managed battery profiles while preserving SOC-limit ownership. |
 | **1.1.0-beta.2** | 2026-08-31 | **Beta** | Validates the managed-profile settings-save hotfix before stable promotion. |
 | **1.1.0** | 2026-08-31 | **Stable** | Promotes v1.1.0-beta.1 with Chargegasm, complete managed SOC ranges, 12h/24h/36h plan views, compact manual ownership and separate internal/external PV routes. |

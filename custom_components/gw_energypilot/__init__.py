@@ -22,7 +22,23 @@ from .beta_soc_api import async_register_beta_soc_api
 from .client import GWModbusClient
 from .connectivity import GWEnergyPilotConnectivity
 from .control_history import GWEnergyPilotControlHistory
-from .const import CONF_SCAN_INTERVAL, CONF_SLAVE, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_SCAN_INTERVAL,
+    CONF_SEMS_INVERTER_SERIAL,
+    CONF_SEMS_PASSWORD,
+    CONF_SEMS_SCAN_INTERVAL,
+    CONF_SEMS_STATION_ID,
+    CONF_SEMS_USERNAME,
+    CONF_SLAVE,
+    CONF_TELEMETRY_SOURCE,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SEMS_SCAN_INTERVAL,
+    DEFAULT_TELEMETRY_SOURCE,
+    DOMAIN,
+    MAX_SEMS_SCAN_INTERVAL,
+    MIN_SEMS_SCAN_INTERVAL,
+    TELEMETRY_SOURCE_SEMS,
+)
 from .controller_v033 import GWEnergyPilotController
 from .coordinator import GWEnergyPilotCoordinator
 from .debug_log_api import async_register_debug_log_api
@@ -36,6 +52,7 @@ from .orchestrator_v044 import GWEnergyPilotOrchestrator
 from .plan_runtime import GWEnergyPilotPlanRuntime
 from .settings_api import async_register_settings_api
 from .smart_meter_api import async_register_smart_meter_api
+from .sems_api import GWSemsClient
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -48,7 +65,7 @@ PLATFORMS: list[Platform] = [
 PANEL_URL = "gw-energypilot"
 PANEL_COMPONENT = "gw-energypilot-panel"
 PANEL_STATIC_URL = "/gw_energypilot_static"
-PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v110.js?v=1.1.1-stable1"
+PANEL_MODULE = f"{PANEL_STATIC_URL}/gw-energy-pilot-v110.js?v=1.2.0-stable1"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
@@ -57,6 +74,7 @@ class GWRuntimeData:
     """Runtime data for one EnergyPilot config entry."""
 
     client: GWModbusClient
+    telemetry_client: GWModbusClient | GWSemsClient
     coordinator: GWEnergyPilotCoordinator
     controller: GWEnergyPilotController
     orchestrator: GWEnergyPilotOrchestrator
@@ -135,10 +153,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         port=int(entry.data[CONF_PORT]),
         slave=int(entry.data[CONF_SLAVE]),
     )
+    telemetry_source = str(
+        entry.data.get(CONF_TELEMETRY_SOURCE, DEFAULT_TELEMETRY_SOURCE)
+    )
+    if telemetry_source == TELEMETRY_SOURCE_SEMS:
+        telemetry_client: GWModbusClient | GWSemsClient = GWSemsClient(
+            hass,
+            str(entry.data.get(CONF_SEMS_USERNAME, "")),
+            str(entry.data.get(CONF_SEMS_PASSWORD, "")),
+            str(entry.data.get(CONF_SEMS_STATION_ID, "")),
+            str(entry.data.get(CONF_SEMS_INVERTER_SERIAL, "")),
+        )
+        scan_interval = min(
+            MAX_SEMS_SCAN_INTERVAL,
+            max(
+                MIN_SEMS_SCAN_INTERVAL,
+                int(
+                    entry.data.get(
+                        CONF_SEMS_SCAN_INTERVAL,
+                        DEFAULT_SEMS_SCAN_INTERVAL,
+                    )
+                ),
+            ),
+        )
+    else:
+        telemetry_source = DEFAULT_TELEMETRY_SOURCE
+        telemetry_client = client
+        scan_interval = int(
+            entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        )
     coordinator = GWEnergyPilotCoordinator(
         hass,
-        client,
-        scan_interval=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
+        telemetry_client,
+        scan_interval=scan_interval,
+        source=telemetry_source,
+        control_client=client,
     )
     control_history = GWEnergyPilotControlHistory(hass, entry.entry_id)
     await control_history.async_restore()
@@ -165,6 +214,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
     )
     entry.runtime_data = GWRuntimeData(
         client=client,
+        telemetry_client=telemetry_client,
         coordinator=coordinator,
         controller=controller,
         orchestrator=orchestrator,
@@ -213,5 +263,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: GWConfigEntry) -> bool:
         await entry.runtime_data.orchestrator.async_unload()
         await entry.runtime_data.ev_load_balancer.async_unload()
         await entry.runtime_data.controller.async_unload()
+        if entry.runtime_data.telemetry_client is not entry.runtime_data.client:
+            await entry.runtime_data.telemetry_client.async_close()
         await entry.runtime_data.client.async_close()
     return unload_ok

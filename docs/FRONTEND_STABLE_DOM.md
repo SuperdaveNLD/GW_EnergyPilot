@@ -4,10 +4,10 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.1.1**. The stable release retains the complete validated
-v1.1.0-beta.1 behavior and all v1.0.1-beta.4 fixes through presentation-only
-wrappers; its nested v0.51
-feature layer supplies the scoped execution-history card.
+EnergyPilot v1.2.0**. The stable release promotes the validated beta.7
+candidate, is based on v1.1.1 and retains all earlier v1 behavior through
+presentation-only wrappers; its nested v0.51 feature layer supplies the scoped
+execution-history card.
 
 No GoodWe register, Modbus, EMS or EMHASS backend behavior is defined here.
 
@@ -17,33 +17,148 @@ The inherited base panel builds its complete ShadowRoot with `innerHTML`. Older 
 
 The v0.38-v0.40 stack attempted to compensate with interaction guards, delayed renders, button reuse, scroll snapshots/restoration and transition suppression. Those mechanisms reduced individual symptoms but could not make a destructive telemetry render equivalent to a stable page.
 
+Issue #84 exposed the remaining architectural gap after v0.41: normal
+telemetry no longer replaced the dashboard, but operational controls were still
+created and mutated by multiple historical modules. A native click could
+therefore cross a later Home Assistant publication while an inherited listener,
+local busy flag, localization pass or targeted `innerHTML` update still owned
+part of the same control. The permanent control boundary below removes that
+shared ownership instead of adding another press-specific workaround.
+
 ## Active entrypoint chain
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v110.js?v=1.1.1-stable1
-       -> gw-energy-pilot-v101.js?v=1.1.1-stable1
-            -> gw-energy-pilot-v051.js?v=1.1.1-stable1
-                 -> gw-energy-pilot-v051-history.js?v=1.1.1-stable1
-                 -> gw-energy-pilot-v050.js?v=1.1.1-stable1
-                 -> gw-energy-pilot-v049.js?v=1.1.1-stable1
-                      -> gw-energy-pilot-v048.js?v=1.1.1-stable1
-                           -> gw-energy-pilot-v047.js?v=1.1.1-stable1
-                                -> gw-energy-pilot-v046.js?v=1.1.1-stable1
-                                     -> gw-energy-pilot-v045.js?v=1.1.1-stable1
-                                          -> gw-energy-pilot-v044.js?v=1.1.1-stable1
-                                               -> gw-energy-pilot-v043.js?v=1.1.1-stable1
-                                                    -> gw-energy-pilot-v042.js?v=1.1.1-stable1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.1.1-stable1
-                                                              -> gw-energy-pilot-v041.js?v=1.1.1-stable1
-                                                                   -> gw-energy-pilot-v039.js?v=1.1.1-stable1
-                                                                        -> gw-energy-pilot-v038.js?v=1.1.1-stable1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.1.1-stable1
+  -> gw-energy-pilot-v110.js?v=1.2.0-stable1
+       -> gw-energy-pilot-v101.js?v=1.2.0-stable1
+            -> gw-energy-pilot-v051.js?v=1.2.0-stable1
+                 -> gw-energy-pilot-v051-history.js?v=1.2.0-stable1
+                 -> gw-energy-pilot-v050.js?v=1.2.0-stable1
+                 -> gw-energy-pilot-v049.js?v=1.2.0-stable1
+                      -> gw-energy-pilot-v048.js?v=1.2.0-stable1
+                           -> gw-energy-pilot-v047.js?v=1.2.0-stable1
+                                -> gw-energy-pilot-v046.js?v=1.2.0-stable1
+                                     -> gw-energy-pilot-v045.js?v=1.2.0-stable1
+                                          -> gw-energy-pilot-v044.js?v=1.2.0-stable1
+                                               -> gw-energy-pilot-v043.js?v=1.2.0-stable1
+                                                    -> gw-energy-pilot-v042.js?v=1.2.0-stable1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-stable1
+                                                              -> gw-energy-pilot-v041.js?v=1.2.0-stable1
+                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-stable1
+                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-stable1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-stable1
 ```
 
-Every import in the active graph uses `1.1.1-stable1`. This ensures an
+Every import in the active graph uses `1.2.0-stable1`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
+
+The graph additionally imports a vendored Lit 3.3.3 production bundle,
+`ep-control-surface.js` and `ep-touch-click-fallback.js` with the same cache
+boundary. The versioned files remain
+the Home Assistant panel entry and presentation chain; v0.41 now mounts and
+feeds the permanent component boundary.
+
+## Permanent declarative control boundary
+
+The operational controls are one fixed light-DOM Lit tree:
+
+```text
+ep-control-surface
+├── ep-battery-actions
+├── ep-automatic-control
+├── ep-emhass-strategy
+├── ep-battery-strategy
+├── ep-optimize-action
+└── ep-manual-ems-controls
+```
+
+The inherited structural renderer commits detached legacy markup around an
+anchor and preserves the exact `ep-control-surface` node. It never assigns
+`shadowRoot.innerHTML`. A real structural update may replace legacy cards, but
+it must retain the ShadowRoot, `main`, control surface and every operational
+control node. Settings hides the connected surface instead of disconnecting it.
+
+The panel supplies frozen, narrowly scoped models and a small action gateway;
+it does not pass the full Home Assistant object into the component tree.
+Telemetry and API responses update component properties. Lit then patches only
+the dynamic parts of the existing controls.
+
+## Local Beta tests diagnostic boundary
+
+v0.41 also mounts one reusable `ep-beta-tests` diagnostic component and exposes
+it from the dashboard layout menu as **Beta tests**. It is deliberately outside
+the operational control surface and has no access to the Home Assistant action
+gateway, GoodWe or EMHASS. Beta.4 adds five numbered method comparisons ahead
+of the original eight native controls: observer-neutral native click, direct
+and delegated guarded pointerup, a 120 ms missing-click fallback and immediate
+pointerup with 700 ms late-click deduplication.
+
+Captured `pointerdown`, `pointermove`, `pointerup`, `pointercancel`, `click`,
+`input`, `change`, completed actions and their native/pointer/fallback sources
+are available through `globalThis.__epBetaTests`. Raw evidence is buffered and
+the Lit display is updated only after 650 ms of inactivity, so no diagnostic
+render occurs between pointerdown/up and native click synthesis. Pointerup test
+methods require a primary pointer within a 12 px movement radius.
+
+Opening the page locally hides the other `main` children without rendering or
+disconnecting them. Ordinary telemetry continues to patch the hidden dashboard
+and preserves both `main` and the test component. A genuine structural render
+may rebuild historical content, but it must reattach the same test component,
+retain its counters and preserve the open state. Closing restores only the
+dashboard children that were visible before opening. The diagnostic adds no
+pointer capture, synthetic click, gesture cancellation, motion or HA call.
+
+## iOS missing-click compatibility boundary
+
+Physical beta.4 evidence from Home Assistant Companion build 2026.2805 showed
+that touch `pointerdown`/`pointerup` reached every clean test target while a
+substantial share of native clicks was missing. Method 4 recovered every valid
+pointerup exactly once; immediate pointerup action with later deduplication
+over-activated and is not used.
+
+Beta.5 therefore installs one capture-phase adapter on the unchanged panel
+ShadowRoot. It considers enabled native buttons, checkbox/radio menu controls,
+their labels, native `summary` controls and semantic `role="button"` elements.
+The numbered `[data-beta-control]` controls remain explicitly outside this
+adapter as the raw diagnostic reference.
+
+For a primary touch that stays within 12 px on the same element, the adapter
+waits 120 ms for native click. A timely native click proceeds untouched and
+cancels the timer. If no click arrives, the adapter invokes that same
+element's `.click()` method; existing click/form/change listeners and, for the
+permanent surface, the existing pending/acknowledgement state machine remain
+the only action route. One late physical click for that fallback is stopped at
+the root. New touch sequences, mouse/pen activation, Enter/Space and unrelated
+programmatic clicks retain normal semantics.
+
+Pointer listeners are passive. The adapter never captures a pointer, calls
+`preventDefault()` on pointer events, writes scroll position or invokes a Home
+Assistant/GoodWe/EMHASS API directly. Movement beyond 12 px and
+`pointercancel` discard the candidate without scheduling an action.
+
+Every asynchronous control follows one state machine:
+
+```text
+idle -> pending -> acknowledged
+                -> error
+```
+
+One native `click` starts at most one backend request. While pending, the
+control group rejects another activation. A successful service or WebSocket
+return is necessary but not sufficient: selected state remains derived from a
+matching Home Assistant publication or API payload. Completion requires both,
+in either order. A service error or a 15-second missing-publication timeout is
+visible inline and leaves the confirmed selection unchanged. The original
+focused node is retained and refocused after acknowledgement or error.
+
+Battery AUTO/manual highlighting is exclusive. AUTO is selected only for
+confirmed Automatic Control `on`; manual actions are eligible only for
+confirmed `off` plus the matching canonical `control_command`. Unknown or
+unavailable ownership selects nothing and disables unsafe actions. Manual EMS
+mode buttons remain separate native actions: their existing select entity is
+the sole service route and the backend remains responsible for applying the
+already stored manual power value.
 
 ## Render ownership
 
@@ -59,13 +174,13 @@ A complete render is allowed for Home Assistant language/locale, user/admin cont
 
 When context and structure signatures are unchanged, the `hass` setter does not queue the inherited complete render. It batches a live patch and mutates existing power/SOC/energy text, configured PV-source values, status classes, controller/EMHASS metrics, sliders, meter widths, diagnostics, static flow semantics and thermal values. The existing `main`, cards and controls remain connected.
 
-Automatic Control ownership changes patch the existing manual EMS pad in place.
+Automatic Control ownership changes patch the existing Lit manual EMS pad in place.
 While automatic ownership is active, the manual mode grid and power row use the
 native `hidden` state and a compact ownership summary remains visible. When
 manual control becomes available, those same mode-button and slider nodes are
 revealed and enabled; they are not removed, replaced or reconstructed.
 
-Home Assistant also assigns `narrow`, `route` and `panel` during host updates. The stable-DOM layer ignores repeated normalized `narrow` values and semantically identical plain-JSON `panel` values, including a newly allocated clone of unchanged panel configuration. A real narrow-layout or nested panel-config change still delegates to the inherited setter and requests a complete structural render. This keeps a pressed control connected between `pointerdown` and its native `click` without intercepting or synthesizing touch events.
+Home Assistant also assigns `narrow`, `route` and `panel` during host updates. The stable-DOM layer ignores repeated normalized values and semantically identical plain-JSON `panel` values, including a newly allocated clone of unchanged panel configuration. A real narrow-layout change patches `main` layout and the immutable control model only. A real nested panel-config/context change may still request structural legacy-content rendering, while preserving `main` and the complete permanent control tree. This keeps a pressed control connected between `pointerdown` and native click; the beta.5 compatibility boundary can supply the same element's click only after the native event is proven missing for 120 ms.
 
 ### Header connectivity status
 
@@ -73,14 +188,17 @@ The one reachability control is created during structural render between Automat
 
 ### Battery quick actions
 
-The four Battery quick actions keep their existing button nodes while an action is pending and when Home Assistant publishes ownership and command state in separate events. The v0.41 live patch derives one selection with explicit precedence: Automatic Control ON selects only AUTO; otherwise an exact manual `control_command` selects Max export, Pause or Max charge; an unrelated or unavailable command selects none. `.active` and `aria-pressed` are patched together. Inactive AUTO uses the same neutral surface as the other inactive actions, so color no longer implies a second selection.
+The four Battery quick actions keep their existing Lit button nodes while an action is pending and when Home Assistant publishes ownership and command state in separate events. The component derives one selection with explicit precedence: Automatic Control ON selects only AUTO; otherwise an exact manual `control_command` selects Max export, Pause or Max charge; an unrelated or unavailable command selects none. `.active` and `aria-pressed` are rendered together. Inactive AUTO uses the same neutral surface as the other inactive actions, so color no longer implies a second selection.
 
-The persistent EMHASS cost-function selector follows the same rule: service completion and later entity publication patch its existing buttons, label and accessibility state without rebuilding `main`. Its explicit busy state remains authoritative across intervening telemetry patches, so a second strategy/optimization request cannot start while the first service call is still running. Manual EMS controls read Automatic Control ownership at event time rather than retaining the ownership value from the structural render; pending, enabled and message feedback is patched in place. This matters when Automatic Control changes through a normal stable-DOM state event after those controls were created.
+The persistent EMHASS cost-function selector follows the same rule: service completion and later entity publication update its component model without rebuilding `main`. Its explicit pending state remains authoritative across intervening telemetry patches. Manual EMS controls derive Automatic Control ownership from their newest immutable model rather than retaining a value from structural creation.
 
 The persisted latest EMS-setpoint update time is rendered as secondary text inside the existing EMS-setpoint metric. A controller dispatcher update publishes the existing `control_command` entity attributes, and the v0.41 live patch updates only that text node. It does not rebuild the Controller card or treat ordinary telemetry polling as a new setpoint update.
 ### Battery Strategy refresh
 
-Loading, pending, success/error and Custom-SOC feedback rerender only `.ep-v038-strategy`. Stable backend mode keys, not translated labels, remain the control identity.
+Loading, pending, success/error, Custom values and SOC feedback belong to
+`ep-battery-strategy`. Stable backend mode keys, not translated labels, remain
+the control identity. Draft input state is local to that connected component;
+backend confirmation updates its model without replacing the form or sliders.
 
 The separate Hybrid strategy explanation is owned by v0.48 presentation while Hybrid is selected. Historical localization/presentation layers respect that marker, so normal telemetry preserves the existing note and strong-emphasis nodes. A genuine language or strategy context change may update the contents once.
 
@@ -100,13 +218,27 @@ shell and every unrelated control.
 
 ### Optimize now
 
-The inherited v0.10 Optimize listener calls the existing Home Assistant `button.press` entity correctly, but requested `_queueRender()` when the asynchronous solve/publish service completed. v0.44 replaces only that listener and moves the one canonical action under `main` as a safe-area-aware fixed control, independent of the optional EMHASS card. Busy/idle text, `aria-busy`, orchestrator state, last-success/error details and the canonical plan revision are patched in place. A targeted plan refresh rebuilds the Battery · Plan · Price contents inside its connected interactive shell; `main`, Optimize now, layout, Automatic Control and Battery Strategy nodes also remain connected.
+Optimize now is owned by `ep-optimize-action`. Its pending transaction requires
+both the service return and a changed canonical `plan_revision`; an
+orchestrator-running state alone is not optimistic success. A targeted plan
+refresh rebuilds the Battery · Plan · Price contents inside its connected
+interactive shell; `main`, Optimize now, Automatic Control and Battery Strategy
+nodes remain connected.
 
 ## Native interaction and scroll contract
 
 The active v0.41 normal telemetry path never writes `scrollTop` or `scrollLeft`, captures a touch pointer, cancels a vertical pan, delays telemetry because of hover, restores an earlier viewport snapshot or reuses a detached control to compensate for a full telemetry render. The Home Assistant browser/WebView owns pan and momentum scrolling.
 
-Legacy v0.38 interaction and scroll-restoration functions remain available for historical entrypoints, but `__epV041StableRuntime` bypasses them before installation or use.
+Legacy v0.38 interaction and scroll-restoration functions remain available for historical entrypoints, but `__epV041StableRuntime` bypasses them before installation or use. The active architecture also bypasses the old base Automatic Control listener, v0.10/v0.16/v0.21/v0.38/v0.44 operational creators and the delegated v0.38 strategy listener. Historical localization and presentation passes must skip descendants of `ep-control-surface`.
+
+All permanent actions are native `button[type="button"]` controls with native
+`click` and keyboard semantics. Beta.5's bounded adapter may call the same
+element's `.click()` after a missing touch click; it does not dispatch a custom
+event or bypass the existing handler. EnergyPilot does not capture pointers,
+call `preventDefault()` on pointer events or add `touchstart` / `touchend`
+action routes. Targets are at least 44 by 44 CSS pixels, pseudo
+elements cannot receive pointer events, controls use `touch-action:
+manipulation`, and containers preserve vertical `pan-y` scrolling.
 
 On coarse-pointer/touch devices, native `:hover` never owns selected presentation. The v0.43 release layer restores inactive hover styles for Optimize now, EMHASS strategy, Battery Strategy, manual battery quick actions and the layout menu. Existing `.active` and `aria-pressed="true"` state remains authoritative. This rule is presentation-only: v0.43 adds no touch/pointer listeners, pointer capture or event cancellation.
 
@@ -120,16 +252,74 @@ PV remains one compact group with one combined total. A structural render create
 
 ## Required invariants
 
-A normal telemetry burst must preserve `main`, Dashboard layout-button, Automatic Control button, header connectivity button and Battery Strategy button identity; keep idle scroll drift within two pixels; produce no backward controlled-scroll samples; emit no JavaScript/page errors or unknown WebSocket calls; and have zero computed active EnergyPilot animations and transitions. An Automatic Control ON/OFF cycle must additionally preserve the manual pad, mode-grid, mode-button, power-row and slider nodes while changing their semantic visibility and disabled state. A plan refresh must preserve the graph card shell and its 12h/24h/36h, S/M/L, expand and window controls while rebuilding its data-dependent contents.
+A normal telemetry burst must preserve the ShadowRoot, `main`, permanent
+surface and every operational control node; keep idle scroll drift within two
+pixels; produce no backward controlled-scroll samples; emit no JavaScript/page
+errors or unknown WebSocket calls; and have zero
+computed active EnergyPilot animations and transitions. One thousand telemetry
+updates, a plan refresh, language/narrow/panel structural changes and Settings
+open/close must satisfy the same operational-control identity invariant. An
+Automatic Control ON/OFF cycle must change the manual pad's semantic disabled
+state without replacing it. A plan refresh must preserve the graph card shell
+and its 12h/24h/36h, S/M/L, expand and window controls while rebuilding its
+data-dependent contents.
 
 ## Regression matrix
 
-The required release gate uses desktop Chromium at 1440 × 900, iPad WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is implemented in `tests/browser/test_frontend_stability.py` and selected for v1.1.1 by `tests/browser/test_frontend_stability_v110.py`. Touch profiles repeatedly tap every affected group, verify executed actions and exactly one active selection, cycle the menu, run telemetry concurrently and exercise deliberate structural renders. All three profiles emulate Home Assistant's repeated same-value and cloned-equivalent host-property assignments, hold a native press across one such update and prove that a genuinely changed nested panel config still renders. They also hold Optimize now and EMHASS strategy presses across rapid live-copy patches and require unchanged button child nodes until the native click is delivered. They force a plan-card refresh during a physical S/M/L press and require exactly one delivered click with stable card/header/control identity. They also require the Hybrid explanation to retain node identity, height and child-list stability through sixty telemetry patches. The matrix further requires the zero-centered two-deadband scale, overlap validation and responsive settings layout; the complete managed-profile table and Custom-only SOC sliders; the header reachability control in its exact position with green/red/live-detail transitions and stable node identity; one external-PV group with four fields and correct switch/value preservation; one internal ETA/DC and one aggregated external AC/PCC flow route with a shared PV total and stable node identity; compact manual controls with stable node identity across ownership changes; split/delayed Battery quick-action and EMHASS publication; authoritative busy locking; editable Custom costs with stable main-node identity and larger typography; combined PV and bounded SOC telemetry; all static flow states; the single history card, immutable wanted-SOC history, detailed source bars, verified EV-protection underlays and full-table modal; a stationary unfocused SOC slider draft; one viewport-safe Optimize action; zero complete Optimize renders; native scroll anchoring; and working scroll after scoped card refreshes.
+`tests/browser/test_frontend_control_surface.py` is the authoritative permanent
+control gate. On desktop Chromium, iPad WebKit touch and iPhone WebKit touch it
+executes 50 successful activations of every rendered control across the
+critical groups: Battery actions,
+Automatic Control, EMHASS strategy, Battery Strategy, Optimize, manual modes,
+manual power, Custom save, minimum SOC and maximum SOC. Every group must record
+exactly one backend call per activation. That is 1,500 activations per profile
+and 4,500 in the complete three-profile gate.
+
+The gate additionally covers delayed publication, backend state before service
+return, service errors, missing acknowledgement, unknown/unavailable state,
+duplicate activation while pending, telemetry between pointer-down and
+pointer-up, scroll starting on a control, Enter/Space keyboard activation,
+focus retention, portrait/landscape geometry, target size, overlap and 1,000
+telemetry updates with complete node-identity preservation. WebKit here is an
+automated browser-engine profile; physical iPhone Safari and Home Assistant
+Companion acceptance remains the separate protocol in
+`docs/FRONTEND_IPHONE_ACCEPTANCE.md`.
+
+The complete stability matrix uses desktop Chromium at 1440 × 900, iPad
+WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is
+implemented in `tests/browser/test_frontend_stability.py` and selected for the
+active release by `tests/browser/test_frontend_stability_v110.py`. It retains
+the established PV topology, 12h/24h/36h chart, settings, connectivity,
+history, EV protection, native scrolling, static-flow and no-motion gates in
+addition to the permanent-control assertions above.
+The same matrix requires the Local Modbus/SEMS+ selector, write-only password,
+source-scoped cloud fields, always-enabled local-control fields and explicit
+local EMS safety copy on all three viewport profiles.
+It also opens **Beta tests**, performs twenty activations per new method and per
+legacy variant, proves the delayed fallback and movement rejection branches,
+verifies raw event/action/deduplication counts, runs telemetry and a structural
+render, restores the dashboard and proves that the complete diagnostic session
+emits zero Home Assistant service and WebSocket calls.
+For beta.5 the same three-profile matrix additionally removes the native click
+after pointerup and proves exact-once recovery for an operational service
+button, late-click suppression, movement/cancel rejection, layout-menu
+open/close, a menu checkbox, Beta Tests navigation and Settings navigation.
+For beta.6 it also removes native click from the real `S/M/L`,
+`12h/24h/36h` and full-history controls, proves exact-once recovery and
+late-click suppression, checks the self-removing history close action and
+requires 44 CSS-pixel targets without horizontal card overflow on touch
+profiles.
 
 ## Contributor rules
 
 - Do not call `_queueRender()` for normal v0.41 telemetry feedback when an existing scoped callback owns the update.
 - Do not add scroll-position writes as a visual correction for render movement.
 - Do not add pointer capture or global gesture cancellation to protect a control from telemetry.
+- Do not install another operational listener outside the permanent Lit
+  component tree. The single root-scoped `ep-touch-click-fallback.js` adapter
+  is the bounded iOS compatibility exception and may only re-enter existing
+  native element handlers.
+- Do not interpret a resolved service call as confirmed selected state; wait
+  for the matching Home Assistant/API model.
 - Do not re-enable motion without a separately documented ownership model and browser regressions on all three profiles.
 - Preserve entity IDs, unique IDs, settings, backend APIs and GoodWe/EMHASS semantics unless a separate change explicitly requires them.

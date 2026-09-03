@@ -47,6 +47,18 @@ CONF_EV_CHARGER_MAX_CURRENT = "ev_charger_max_current"
 CONF_EV_LOAD_BALANCE_WINDOW = "ev_load_balance_window"
 CONF_SCAN_INTERVAL = "scan_interval"
 
+# Telemetry source selection. EMS control always remains on the proven local
+# Modbus write path; SEMS is a Beta cloud telemetry alternative only.
+CONF_TELEMETRY_SOURCE = "telemetry_source"
+CONF_SEMS_USERNAME = "sems_username"
+CONF_SEMS_PASSWORD = "sems_password"
+CONF_SEMS_STATION_ID = "sems_station_id"
+CONF_SEMS_INVERTER_SERIAL = "sems_inverter_serial"
+CONF_SEMS_SCAN_INTERVAL = "sems_scan_interval"
+TELEMETRY_SOURCE_MODBUS = "modbus"
+TELEMETRY_SOURCE_SEMS = "sems_api"
+TELEMETRY_SOURCES = (TELEMETRY_SOURCE_MODBUS, TELEMETRY_SOURCE_SEMS)
+
 CONTROL_STRATEGY_BATTERY = "battery"
 CONTROL_STRATEGY_GRID = "grid"
 CONTROL_STRATEGY_HYBRID = "hybrid"
@@ -62,6 +74,8 @@ CONF_EMHASS_URL = "emhass_url"
 CONF_EMHASS_OPTIMIZATION_INTERVAL = "emhass_optimization_interval"
 CONF_EMHASS_SOC_FINAL = "emhass_soc_final"
 CONF_EMHASS_FALLBACK_LOAD = "emhass_fallback_load"
+CONF_EMHASS_CUSTOM_LOAD_FORECAST = "emhass_custom_load_forecast"
+CONF_EMHASS_CUSTOM_LOAD_POWER = "emhass_custom_load_power"
 CONF_USE_NORDPOOL_PRICES = "use_nordpool_prices"
 CONF_OPTIMIZE_ON_TOMORROW_PRICES = "optimize_on_tomorrow_prices"
 CONF_NORDPOOL_AREA = "nordpool_area"
@@ -120,6 +134,10 @@ EV_CONNECTIVITY_GRACE_SECONDS = 300
 DEFAULT_ENABLE_INTERNAL_PV = True
 DEFAULT_ENABLE_EXTERNAL_PV = False
 DEFAULT_SCAN_INTERVAL = 10
+DEFAULT_TELEMETRY_SOURCE = TELEMETRY_SOURCE_MODBUS
+DEFAULT_SEMS_SCAN_INTERVAL = 60
+MIN_SEMS_SCAN_INTERVAL = 60
+MAX_SEMS_SCAN_INTERVAL = 300
 DEFAULT_P_BATT_ENTITY = "sensor.p_batt_forecast"
 DEFAULT_P_GRID_ENTITY = "sensor.p_grid_forecast"
 DEFAULT_OPTIM_STATUS_ENTITY = "sensor.optim_status"
@@ -139,6 +157,10 @@ EMHASS_OPTIMIZATION_INTERVALS = (15, 30, 60)
 DEFAULT_EMHASS_OPTIMIZATION_INTERVAL = 15
 DEFAULT_EMHASS_SOC_FINAL = 0.10
 DEFAULT_EMHASS_FALLBACK_LOAD = 700
+# Existing installations remain on the Recorder/history based AUTO forecast.
+# CUSTOM is an explicit operator choice and defaults to the requested 700 W.
+DEFAULT_EMHASS_CUSTOM_LOAD_FORECAST = False
+DEFAULT_EMHASS_CUSTOM_LOAD_POWER = 700
 DEFAULT_USE_NORDPOOL_PRICES = True
 DEFAULT_OPTIMIZE_ON_TOMORROW_PRICES = True
 DEFAULT_NORDPOOL_AREA = ""

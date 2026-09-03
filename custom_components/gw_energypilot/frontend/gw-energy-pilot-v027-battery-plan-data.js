@@ -292,7 +292,7 @@ function normalizeFuturePlan(points, startMs, endMs) {
 
 export function normalizeSocPlanPoints(points, startMs, endMs) {
   return (points || [])
-    .map((p) => ({ t: timestampMs(p.start), pct: finiteNumber(p.value_pct) }))
+    .map((p) => ({ t: timestampMs(p.target_at), pct: finiteNumber(p.value_pct) }))
     .filter((p) => (
       p.t !== null && p.pct !== null && p.pct >= 0 && p.pct <= 100 &&
       p.t >= startMs && p.t < endMs
@@ -303,7 +303,7 @@ export function normalizeSocPlanPoints(points, startMs, endMs) {
 export function normalizeExecutionSocHistory(events, startMs, endMs) {
   const byTimestamp = new Map();
   for (const event of events || []) {
-    const t = timestampMs(event?.occurred_at);
+    const t = timestampMs(event?.plan?.soc_opt_target_at);
     const pct = finiteNumber(event?.plan?.soc_opt_pct);
     if (t === null || pct === null || pct < 0 || pct > 100) continue;
     if (t < startMs || t >= endMs) continue;

@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v025.js?v=1.1.1-stable1";
+import "./gw-energy-pilot-v025.js?v=1.2.0-stable1";
 
 const VERSION = "0.26";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -13,8 +13,8 @@ const TEXT = {
     discardChanges: "Discard changes",
     saveChanges: "Save changes",
     saving: "Saving…",
-    goodweSafetyTitle: "Connection safety:",
-    goodweSafety: "host, port and unit ID are tested against the inverter before they are saved. A successful change reloads the integration.",
+    goodweSafetyTitle: "Beta boundary:",
+    goodweSafety: "choose local Modbus or SEMS+ for telemetry. Every EMS mode/setpoint command still uses the local Modbus host, port and unit ID. SEMS credentials are validated before saving and the password is never returned to this page.",
     emhassNoteTitle: "EMHASS:",
     emhassNote: "this page owns EnergyPilot's EMHASS connection, scheduling, output mapping and price-source settings. Live SOC and cost-function controls remain available on the dashboard.",
     controlStrategy: "Automatic control strategy",
@@ -112,8 +112,8 @@ const TEXT = {
     discardChanges: "Wijzigingen verwerpen",
     saveChanges: "Wijzigingen opslaan",
     saving: "Opslaan…",
-    goodweSafetyTitle: "Veilige verbinding:",
-    goodweSafety: "host, poort en unit-ID worden eerst op de omvormer getest. Na een succesvolle wijziging wordt de integratie herladen.",
+    goodweSafetyTitle: "Betagrens:",
+    goodweSafety: "kies lokale Modbus- of SEMS+-telemetrie. Elk EMS-modus/setpointcommando blijft via de lokale Modbus-host, poort en unit-ID lopen. SEMS-inloggegevens worden vóór opslag gevalideerd en het wachtwoord wordt nooit naar deze pagina teruggestuurd.",
     emhassNoteTitle: "EMHASS:",
     emhassNote: "deze pagina beheert de EMHASS-verbinding, planning, outputkoppeling en prijsbron van EnergyPilot. Live SOC- en optimalisatiestrategiebediening blijft beschikbaar op het dashboard.",
     controlStrategy: "Automatische regelstrategie",
@@ -235,9 +235,16 @@ const FIELD_NL = {
   buy_price_adder: ["Opslag importprijs", "Variabele kosten/toeslagen boven op de marktprijs in EUR/kWh."],
   sell_price_deduction: ["Aftrek exportprijs", "Bedrag dat van de marktprijs voor teruglevering wordt afgetrokken."],
   hardware_target: ["Gevalideerd hardwaredoel", "EnergyPilot wordt primair ontwikkeld en gevalideerd voor de GoodWe ETA-G20-generatie."],
+  telemetry_source: ["Telemetriebron", "Kies lokale Modbus TCP of SEMS+ API Beta voor runtime-telemetrie; EMS-aansturing blijft lokaal."],
   host: ["Omvormerhost", "Lokaal IP-adres of oplosbare hostnaam van de omvormer."],
   port: ["Modbus TCP-poort", "Modbus TCP-poort van de omvormer."],
   slave: ["Modbus unit-ID", "Modbus unit-ID van de omvormer."],
+  sems_username: ["SEMS+-account", "SEMS/SEMS+ e-mailadres; een alleen-lezen bezoekersaccount wordt aanbevolen."],
+  sems_password: ["SEMS+-wachtwoord", "Wordt in de Home Assistant-configuratie opgeslagen en nooit naar het dashboard teruggestuurd."],
+  sems_password_status: ["SEMS+-wachtwoordstatus", "Het opgeslagen wachtwoord zelf wordt nooit getoond."],
+  sems_station_id: ["SEMS-station-ID", "Verplicht wanneer het account meer dan één energiecentrale kan zien."],
+  sems_inverter_serial: ["SEMS-omvormerserienummer", "Verplicht bij meerdere omvormers, zodat EnergyPilot nooit stilzwijgend de verkeerde kiest."],
+  sems_scan_interval: ["SEMS+-telemetrieverversing", "Cloudpolling is begrensd op 60–300 seconden en respecteert extra portal-back-off."],
 };
 
 function language(panel) {
@@ -326,6 +333,7 @@ function localizeControlStrategy(panel, root) {
   const note = root.querySelector(".ep-v022-strategy-note");
   if (
     note &&
+    !note.closest("ep-control-surface") &&
     !(note.dataset.epReleasePresentationOwner === "v048-hybrid" && strategy === "hybrid")
   ) {
     note.innerHTML = `<strong>${panel._escape(t(panel, "strategyNote"))}</strong> ${panel._escape(current.label)} · ${panel._escape(current.description)} ${panel._escape(t(panel, "evOverride"))}`;
@@ -358,7 +366,7 @@ function localizeSettings(panel, root) {
     const tab = panel.__epV016SettingsTab;
     if (sectionHead && tab === "energypilot") sectionHead.querySelector("p").textContent = "Regelaar, telemetrie en optionele EV-ontlaadbeveiliging.";
     if (sectionHead && tab === "emhass") sectionHead.querySelector("p").textContent = "Verbinding, orchestratie, outputentiteiten en runtime-prijsintegratie.";
-    if (sectionHead && tab === "goodwe") sectionHead.querySelector("p").textContent = "Lokale Modbus TCP-verbinding. Wijzigingen worden vóór opslag op de omvormer gevalideerd.";
+    if (sectionHead && tab === "goodwe") sectionHead.querySelector("p").textContent = "Kies lokale Modbus- of SEMS+ Beta-telemetrie. Lokale Modbus blijft de enige EMS-aansturing.";
   }
 
   const goodweNote = shell.querySelector(".ep-v016-goodwe-note");
@@ -376,6 +384,7 @@ function localizeSettings(panel, root) {
 
 function replaceText(root, selector, from, to) {
   root.querySelectorAll(selector).forEach((node) => {
+    if (node.closest("ep-control-surface")) return;
     if (node.textContent?.trim() === from) node.textContent = to;
   });
 }

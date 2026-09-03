@@ -457,10 +457,25 @@
             ],
           },
           goodwe: {
-            title: "GoodWe",
-            short_title: "GOODWE",
-            description: "GoodWe connection.",
-            fields: [],
+            title: "GoodWe data & control",
+            short_title: "DATA",
+            description: "Choose local Modbus or SEMS+ Beta telemetry.",
+            fields: [
+              { key: "telemetry_source", label: "Telemetry source", type: "select", value: "modbus", readonly: false, options: [
+                { value: "modbus", label: "Local Modbus TCP" },
+                { value: "sems_api", label: "SEMS+ API · Beta" },
+              ] },
+              { key: "hardware_target", label: "Validated hardware target", type: "text", value: "GoodWe GW15K-ETA-G20", readonly: true },
+              { key: "host", label: "Inverter host / IP", type: "text", value: "192.0.2.10", readonly: false },
+              { key: "port", label: "Modbus TCP port", type: "number", value: 502, min: 1, max: 65535, step: 1, readonly: false },
+              { key: "slave", label: "Modbus unit ID", type: "number", value: 247, min: 1, max: 247, step: 1, readonly: false },
+              { key: "sems_username", label: "SEMS+ account", type: "text", value: "visitor@example.com", readonly: false, source: "sems_api" },
+              { key: "sems_password", label: "SEMS+ password", type: "password", value: "", placeholder: "Leave blank to keep the configured password", readonly: false, source: "sems_api" },
+              { key: "sems_password_status", label: "SEMS+ password status", type: "text", value: "Configured", readonly: true, source: "sems_api" },
+              { key: "sems_station_id", label: "SEMS station ID", type: "text", value: "station-1", readonly: false, source: "sems_api" },
+              { key: "sems_inverter_serial", label: "SEMS inverter serial", type: "text", value: "ETA15TEST0001", readonly: false, source: "sems_api" },
+              { key: "sems_scan_interval", label: "SEMS+ telemetry refresh", type: "number", value: 60, min: 60, max: 300, step: 30, readonly: false, source: "sems_api" },
+            ],
           },
         },
       };
@@ -503,6 +518,7 @@
       }));
       const socPlan = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
+        target_at: new Date(hour.getTime() + (index + 1) * 60 * 60 * 1000).toISOString(),
         value_pct: Math.min(95, 54 + index * 1.25),
       }));
       const pBattState = window.__epHass?.states?.["sensor.p_batt_forecast"];
@@ -524,7 +540,14 @@
           occurred_at: occurred.toISOString(),
           runtime_session_id: "browser-session",
           owner: "automatic",
-          plan: { p_batt_w: -3000, p_grid_w: 3000, soc_opt_pct: soc + 1, revision: planRevision },
+          plan: {
+            p_batt_w: -3000,
+            p_grid_w: 3000,
+            soc_opt_pct: soc + 1,
+            soc_opt_target_at: new Date(occurred.getTime() + 15 * 60 * 1000).toISOString(),
+            step_seconds: 900,
+            revision: planRevision,
+          },
           configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: evActive },
           actual: {
             battery_soc_pct: soc,
@@ -551,7 +574,16 @@
         kind: "projection",
         occurred_at: new Date(hour.getTime() + index * 15 * 60 * 1000).toISOString(),
         owner: "automatic",
-        plan: { p_batt_w: index < 4 ? -3000 : 0, p_grid_w: index < 4 ? 3000 : 0, soc_opt_pct: 56 + index, revision: planRevision },
+        plan: {
+          p_batt_w: index < 4 ? -3000 : 0,
+          p_grid_w: index < 4 ? 3000 : 0,
+          soc_opt_pct: 56 + index,
+          soc_opt_target_at: new Date(
+            hour.getTime() + (index + 1) * 15 * 60 * 1000
+          ).toISOString(),
+          step_seconds: 900,
+          revision: planRevision,
+        },
         configuration: { strategy: "hybrid", deadband_w: 100, battery_hold_deadband_w: 100, goodwe_auto_deadband_w: 1000, max_power_w: 15000, ev_active: false },
         actual: {},
         outcome: {
@@ -563,7 +595,7 @@
         },
       }));
       return {
-        chart_schema_version: 6,
+        chart_schema_version: 7,
         chart_time: {
           time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
           now: now.toISOString(),
@@ -602,7 +634,13 @@
           source: "emhass_api_v1_plan",
           source_column: "SOC_opt",
           source_unit: "fraction_0_1",
-          points: [...socPlan, { start: hour.toISOString(), value_pct: 156 }],
+          timestamp_semantics: "interval_end",
+          step_seconds: 3600,
+          points: [...socPlan, {
+            start: hour.toISOString(),
+            target_at: new Date(hour.getTime() + 60 * 60 * 1000).toISOString(),
+            value_pct: 156,
+          }],
         },
         execution: {
           schema_version: 1,
@@ -629,7 +667,13 @@
     const unknownWsTypes = new Set();
     const serviceCalls = [];
     const wsCalls = [];
-    const actionDelay = () => new Promise((resolve) => setTimeout(resolve, 18));
+    window.__epControlTestMode = true;
+    const actionDelay = () => new Promise((resolve) => setTimeout(
+      resolve,
+      Number.isFinite(Number(window.__epActionDelayMs))
+        ? Math.max(0, Number(window.__epActionDelayMs))
+        : 18
+    ));
     const snapshot = (value) => JSON.parse(JSON.stringify(value || {}));
 
     function keyForEntityId(entityId) {
@@ -639,6 +683,11 @@
     async function callWS(message) {
       const type = message?.type || "";
       wsCalls.push(snapshot(message));
+      if (window.__epRejectNextWsCall) {
+        window.__epRejectNextWsCall = false;
+        await actionDelay();
+        throw new Error("Injected WebSocket failure");
+      }
       if (type === "config/entity_registry/list") return registry;
       if (type === "gw_energypilot/battery_saver/get") return batterySaverPayload();
       if (type === "gw_energypilot/battery_saver/set") {
@@ -716,6 +765,13 @@
       const entityId = data?.entity_id;
       serviceCalls.push({ domain, service, data: snapshot(data) });
       await actionDelay();
+      if (window.__epRejectNextServiceCall) {
+        window.__epRejectNextServiceCall = false;
+        throw new Error("Injected service failure");
+      }
+      const suppressPublication = Boolean(window.__epSuppressNextPublication);
+      window.__epSuppressNextPublication = false;
+      if (suppressPublication) return undefined;
       if (domain === "switch" && entityId) {
         const current = window.__epHass.states[entityId];
         if (current) {
@@ -737,16 +793,26 @@
           Cost: "cost",
           "Self-consumption": "self-consumption",
         }[data.option];
-        const publishSelect = () => window.__epSetEntity(
-          entityId,
-          data.option,
-          raw ? { emhass_costfun: raw } : null
-        );
+        const publishSelect = () => {
+          window.__epSetEntity(
+            entityId,
+            data.option,
+            raw ? { emhass_costfun: raw } : null
+          );
+          if (entityId === entityIdForKey("manual_mode")) {
+            const mode = Number(String(data.option || "").split(":", 1)[0]);
+            if (Number.isFinite(mode)) window.__epSetEntityByKey("ems_mode", mode);
+          }
+        };
         const publishDelay = entityId === costfunId
           ? Number(window.__epCostfunPublishDelayMs || 0)
           : 0;
         if (publishDelay > 0) window.setTimeout(publishSelect, publishDelay);
         else publishSelect();
+        const returnDelay = Number(window.__epServiceReturnDelayMs || 0);
+        if (returnDelay > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, returnDelay));
+        }
       } else if (domain === "button" && service === "press") {
         const key = keyForEntityId(entityId);
         if (key === "optimize_now") {

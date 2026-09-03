@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 import logging
 from struct import pack, unpack
 
@@ -41,6 +42,8 @@ class GWETAData:
     """Current GoodWe ETA telemetry snapshot."""
 
     values: dict[str, int | float]
+    source: str = "modbus"
+    source_updated_at: datetime | None = None
 
     @property
     def mode(self) -> int | None:
@@ -204,6 +207,33 @@ class GWModbusClient:
     async def async_read_status(self) -> GWETAData:
         """Read data for setup validation and backward compatibility."""
         return await self.async_read_data()
+
+    async def async_read_control_status(self) -> GWETAData:
+        """Read canonical EMS status plus optional local SOC-floor settings.
+
+        SEMS can replace the normal telemetry poll, but it must not replace the
+        local control/read-back boundary.  The two verified SOC-floor settings
+        are included so their existing transactional UI remains usable.  They
+        stay optional because unsupported Beta registers must not hide valid
+        EMS mode/setpoint read-back.
+        """
+        async with self._lock:
+            await self._async_ensure_connected()
+            registers = await self._async_read_block(REGISTER_EMS_MODE, 2)
+            values: dict[str, int | float] = {
+                "ems_mode": registers[0],
+                "ems_setpoint": registers[1],
+            }
+            for key, address in _BETA_SOC_FLOOR_REGISTERS.items():
+                try:
+                    soc_floor_register = await self._async_read_block(address, 1)
+                except GWModbusError as err:
+                    _LOGGER.debug(
+                        "Optional GoodWe %s read-back unavailable: %s", key, err
+                    )
+                else:
+                    values[key] = soc_floor_register[0]
+        return GWETAData(values=values)
 
     async def async_set_beta_soc_floor(self, key: str, minimum_soc: int) -> int:
         """Write one manually selected Beta SOC-floor register and verify read-back.

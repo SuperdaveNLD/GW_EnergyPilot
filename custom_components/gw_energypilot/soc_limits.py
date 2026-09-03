@@ -34,6 +34,13 @@ def publish_goodwe_minimum_soc(entry: Any, value: int) -> None:
         return
     values = dict(snapshot.values)
     values[GOODWE_ON_GRID_MINIMUM_SOC_KEY] = int(value)
+    readback = GWETAData(
+        values={GOODWE_ON_GRID_MINIMUM_SOC_KEY: int(value)},
+    )
+    publish_local = getattr(coordinator, "async_publish_local_readback", None)
+    if callable(publish_local):
+        publish_local(readback)
+        return
     coordinator.async_set_updated_data(GWETAData(values=values))
 
 

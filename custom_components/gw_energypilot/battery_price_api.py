@@ -18,6 +18,7 @@ from .battery_plan import (
     nonnegative_number,
     normalize_emhass_forecasts,
     normalized_timestamp,
+    soc_interval_end_points,
 )
 from .chart_time import build_chart_time_payload
 from .control_decision import resolve_control_decision
@@ -127,8 +128,16 @@ def _battery_soc_plan_payload(entry: ConfigEntry) -> dict[str, Any]:
     """Return validated planned SOC percentages from the official plan mirror."""
     runtime_data = getattr(entry, "runtime_data", None)
     plan_runtime = getattr(runtime_data, "plan_runtime", None)
-    points = plan_runtime.points("soc_opt") if plan_runtime is not None else []
+    raw_points = (
+        plan_runtime.points("soc_opt") if plan_runtime is not None else []
+    )
     diagnostics = dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
+    step_seconds = diagnostics.get("step_seconds")
+    try:
+        step = int(step_seconds)
+    except (TypeError, ValueError):
+        step = None
+    points = soc_interval_end_points(raw_points, step)
     source = diagnostics.get("source") if points else None
     return {
         "available": bool(points),
@@ -136,6 +145,8 @@ def _battery_soc_plan_payload(entry: ConfigEntry) -> dict[str, Any]:
         "source": source,
         "source_column": "SOC_opt" if source == "emhass_api_v1_plan" else None,
         "source_unit": "fraction_0_1" if source == "emhass_api_v1_plan" else None,
+        "timestamp_semantics": "interval_end" if points else None,
+        "step_seconds": step if points else None,
         "points": points,
     }
 
@@ -150,6 +161,19 @@ def _points_by_start(
         value = finite_number(point.get(value_key))
         if parsed is not None and value is not None:
             result[parsed[1]] = (parsed[0], value)
+    return result
+
+
+def _soc_targets_by_start(
+    points: list[dict[str, Any]],
+) -> dict[float, tuple[str, float, str]]:
+    result: dict[float, tuple[str, float, str]] = {}
+    for point in points:
+        parsed = normalized_timestamp(point.get("start"))
+        value = finite_number(point.get("value_pct"))
+        target = normalized_timestamp(point.get("target_at"))
+        if parsed is not None and value is not None and target is not None:
+            result[parsed[1]] = (parsed[0], value, target[0])
     return result
 
 
@@ -171,7 +195,14 @@ def _future_execution_rows(
     p_grid = _points_by_start(plan_runtime.points("p_grid"), "value_w")
     p_pv = _points_by_start(plan_runtime.points("p_pv"), "value_w")
     p_load = _points_by_start(plan_runtime.points("p_load"), "value_w")
-    soc_opt = _points_by_start(plan_runtime.points("soc_opt"), "value_pct")
+    diagnostics = dict(plan_runtime.diagnostics)
+    try:
+        step_seconds = int(diagnostics.get("step_seconds"))
+    except (TypeError, ValueError):
+        step_seconds = None
+    soc_opt = _soc_targets_by_start(
+        soc_interval_end_points(plan_runtime.points("soc_opt"), step_seconds)
+    )
     battery_deadband = float(entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND))
     grid_deadband = float(
         entry.options.get(
@@ -182,13 +213,13 @@ def _future_execution_rows(
     max_power = int(entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
     start_seconds = now.timestamp()
     end_seconds = end.timestamp()
-    diagnostics = dict(plan_runtime.diagnostics)
     rows: list[dict[str, Any]] = []
     for timestamp in sorted(p_batt):
         if timestamp < start_seconds or timestamp >= end_seconds:
             continue
         start, battery = p_batt[timestamp]
         grid = p_grid.get(timestamp, (start, None))[1]
+        soc_target = soc_opt.get(timestamp)
         decision = resolve_control_decision(
             strategy=controller.control_strategy,
             p_batt=battery,
@@ -209,7 +240,11 @@ def _future_execution_rows(
                     "p_grid_w": grid,
                     "p_pv_w": p_pv.get(timestamp, (start, None))[1],
                     "p_load_w": p_load.get(timestamp, (start, None))[1],
-                    "soc_opt_pct": soc_opt.get(timestamp, (start, None))[1],
+                    "soc_opt_pct": soc_target[1] if soc_target is not None else None,
+                    "soc_opt_target_at": (
+                        soc_target[2] if soc_target is not None else None
+                    ),
+                    "step_seconds": step_seconds,
                     "mirror_source": diagnostics.get("source"),
                     "generated_at": diagnostics.get("generated_at"),
                     "valid_until": diagnostics.get("valid_until"),
@@ -327,7 +362,7 @@ async def websocket_get_battery_price(
         msg["id"],
         {
             "entry_id": entry.entry_id,
-            "chart_schema_version": 6,
+            "chart_schema_version": 7,
             "plan_revision": int(getattr(orchestrator, "plan_revision", 0) or 0),
             "chart_time": build_chart_time_payload(
                 getattr(hass.config, "time_zone", None)

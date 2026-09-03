@@ -4,6 +4,169 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-03
+
+### Stable promotion
+
+- Promote the exact v1.2.0-beta.7 runtime behavior to the normal/latest
+  production channel with the complete `1.2.0-stable1` frontend cache boundary.
+- Retain the permanent Lit control surface, bounded iOS missing-click recovery,
+  44 CSS-pixel graph/history touch targets, SEMS+ Beta telemetry and EMHASS
+  load-forecast controls without changing GoodWe/EMS control semantics.
+
+## [1.2.0-beta.7] - 2026-09-02
+
+### Changed
+
+- Publish the fully revalidated beta.6 mobile-control behavior as a new
+  immutable prerelease and advance the complete active frontend module graph
+  to cache boundary `1.2.0-beta.7-chart-touch1`.
+- Preserve all GoodWe, EMS, EMHASS, Battery Saver and persistent-state
+  semantics unchanged.
+
+## [1.2.0-beta.6] - 2026-09-02
+
+### Fixed
+
+- Expand the coarse-pointer touch targets for Battery · Plan · Price `S/M/L`,
+  `12h/24h/36h`, expand/footer actions and execution-history open/close
+  controls to at least 44 CSS pixels, while retaining the compact desktop
+  presentation.
+- Exercise missing native clicks on the real chart-size, chart-range and full
+  history controls, including late-click deduplication and modal removal.
+
+## [1.2.0-beta.5] - 2026-09-02
+
+### Fixed
+
+- Recover an iOS Home Assistant Companion touch when `pointerdown` and
+  `pointerup` reach an enabled EnergyPilot control but the native `click` is
+  still absent after 120 ms.
+- Apply the same recovery to operational buttons, Settings and navigation,
+  layout/window controls, diagnostics, graph/history/modal buttons and
+  dashboard-menu checkbox/radio controls.
+
+### Safety and compatibility
+
+- Route recovery only through the target element's existing `.click()` path;
+  the adapter has no Home Assistant, GoodWe or EMHASS action route and retains
+  all existing pending, acknowledgement, form and error guards.
+- Reject movement beyond 12 px, secondary touches, changed/disconnected or
+  disabled targets and `pointercancel`; keep pointer listeners passive and do
+  not capture pointers, cancel vertical gestures or write scroll position.
+- Suppress one late physical click after each fallback while preserving a new
+  pointer sequence, mouse/pen and keyboard activation. Keep numbered Beta Tests
+  methods outside the adapter and export production recovery metrics.
+- Advance the complete frontend cache boundary to
+  `1.2.0-beta.5-touch-fallback1`.
+
+## [1.2.0-beta.4] - 2026-09-02
+
+### Added
+
+- Add five isolated **Beta tests** activation comparisons for clean native
+  click, direct pointerup, delegated pointerup, native click with a 120 ms
+  fallback and immediate pointerup with late-click deduplication.
+- Export per-method native, pointer, fallback and deduplicated action counts,
+  plus the exact display delay, movement threshold and timing windows.
+
+### Changed
+
+- Buffer diagnostic events and values without reactive rendering during the
+  pointer-to-click synthesis window; refresh visible evidence only after 650 ms
+  of inactivity so the test observer cannot suppress the click being measured.
+- Require a primary pointer and no more than 12 px movement for pointerup test
+  activation, without pointer capture, gesture cancellation or synthetic click.
+- Keep the original eight native controls available as a collapsed comparison
+  and advance the complete frontend cache boundary to
+  `1.2.0-beta.4-touch-methods1`.
+
+## [1.2.0-beta.3] - 2026-09-02
+
+### Added
+
+- Add **Load forecast · AUTO / CUSTOM** to Settings → EMHASS. AUTO preserves
+  the existing GoodWe/Recorder forecast and remains the compatibility default;
+  CUSTOM reveals a fixed-watt field with an initial value of 700 W.
+- Build the CUSTOM `load_power_forecast` list from an existing runtime
+  `prediction_horizon`, or from EMHASS `delta_forecast_daily` and
+  `optimization_time_step` when no explicit horizon is present.
+
+### Changed
+
+- Override only `load_power_forecast` in the final day-ahead runtime body while
+  CUSTOM is selected. Existing SOC, price, battery-limit and other runtime
+  parameters remain unchanged, and switching back to AUTO is an immediate
+  rollback without losing the saved custom wattage.
+- Advance the complete active frontend module cache boundary to
+  `1.2.0-beta.3-load-forecast1`.
+
+## [1.2.0-beta.2] - 2026-09-01
+
+### Fixed
+
+- Plot EMHASS `SOC_opt` at the end of its source power interval instead of at
+  the plan-row start (#122). The read-only chart payload now carries explicit
+  `target_at` evidence derived from the validated 15/30/60-minute plan step,
+  and new execution snapshots retain that same immutable target instant.
+- Reject the observed SEMS `soc: 0` placeholder, fall back to a positive
+  selected-inverter SOC and otherwise publish SOC as unavailable so an
+  EnergyPilot-owned EMHASS solve cannot be initialized at a false 0%.
+
+### Added
+
+- Add credential-free SEMS raw/mapped telemetry and SOC source decisions to the
+  opt-in LOG debug report and the Home Assistant debug logger.
+- Add a **Beta tests** page to the dashboard layout menu with eight local-only
+  native button, switch, select and slider variants. It exposes raw
+  pointer/click/change/input and completed-action counts without sending a Home
+  Assistant service, WebSocket, GoodWe or EMHASS command.
+
+### Changed
+
+- Advance the complete active frontend module cache boundary to
+  `1.2.0-beta.2-soc-end-sems2-beta-tests1` so upgraded/open browser sessions cannot
+  retain the pre-fix nested SOC chart module or omit the diagnostic page.
+
+## [1.2.0-beta.1] - 2026-09-01
+
+### Added
+
+- Add one permanent declarative Lit control surface with fixed child components
+  for Battery actions, Automatic Control, EMHASS strategy, Battery Strategy,
+  Optimize, Custom SOC and manual EMS, backed by one confirmed-state
+  interaction contract and a bounded passive diagnostic trace.
+- Add a Local Modbus TCP / SEMS+ API Beta telemetry selector to GoodWe data &
+  control, including a write-only password, explicit ambiguous station/inverter
+  selection and a 60–300 second cloud cadence.
+- Add asynchronous SEMS+/legacy authentication, regional gateway rewriting,
+  one expired-token renewal, five-minute `GY0429` back-off and strict runtime
+  sample-age, shape, sentinel, unit and sign validation.
+- Add dedicated desktop Chromium, iPad WebKit and iPhone WebKit control-surface
+  and settings gates, including delayed/reordered publication, failures,
+  native scrolling, keyboard/focus and one thousand telemetry updates.
+
+### Changed
+
+- Preserve the exact ShadowRoot, `main`, permanent surface and operational
+  controls through telemetry, plan, language, layout and Settings updates.
+- Bypass historical operational listeners while retaining their card,
+  Settings, diagnostics, flow and history presentation responsibilities.
+- Keep all EMS and minimum-SOC writes on the canonical local Modbus client;
+  cloud telemetry and local-control health are tracked independently.
+
+### Safety and compatibility
+
+- Preserve existing entity unique IDs, device identity, config entries and
+  Stores. Existing installations remain on Local Modbus until explicitly
+  changed.
+- Do not map SEMS cloud lifetime totals, meter phase currents or settings as
+  local-register equivalents. Accounting and phase-aware EV load balancing
+  fail safely while canonical inputs are unavailable.
+- Preserve GoodWe register/write semantics, EMHASS plan/config ownership and
+  Battery Saver profile behavior. Physical iPhone/Companion and live
+  SEMS+/GoodWe acceptance remain required before stable promotion.
+
 ## [1.1.1] - 2026-08-31
 
 ### Fixed
@@ -75,7 +238,6 @@ All notable changes to GW EnergyPilot are documented here.
   Automatic Control, GoodWe writes, EMHASS, plans, accounting, entity identity
   and Store schemas are unchanged. Desktop Chromium, iPad WebKit touch and
   iPhone WebKit cover route geometry, values, totals and stable node identity.
-
 ## [1.0.1-beta.4] - 2026-08-31
 
 ### Added

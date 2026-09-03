@@ -24,6 +24,8 @@ Starting debug logging always begins a fresh session. Stopping capture retains t
 A session starts with a complete baseline and then records existing runtime signals:
 
 - all decoded GoodWe telemetry values from the canonical `registers.py` definitions;
+- for SEMS+ telemetry, an explicit credential-free allowlist of raw
+  power-flow/inverter fields, the mapped values and field-selection decisions;
 - canonical register address/type/scale metadata so support can map each decoded value back to its register definition;
 - coordinator poll success/failure, latest exception and Modbus connection state;
 - controller enabled state, configured strategy, command, requested target, expected mode, latest successful EMS-setpoint update timestamp/context and actual GoodWe mode/setpoint read-back;
@@ -51,7 +53,8 @@ The existing optimization history remains independently persistent and keeps its
 
 The debug report intentionally excludes the configured GoodWe host/IP address and the EMHASS base URL. It includes configured entity IDs and their diagnostic state values because those are required to identify incorrect mappings and stale/unavailable inputs.
 
-No Home Assistant access tokens, passwords or arbitrary entity attributes are collected.
+No Home Assistant access tokens, SEMS account/password/API token, arbitrary
+portal fields or arbitrary entity attributes are collected.
 
 ## Safety
 

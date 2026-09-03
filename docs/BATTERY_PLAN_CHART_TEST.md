@@ -1,6 +1,6 @@
 # Battery plan chart field validation
 
-For the current **v1.1.1** line, validate on a live installation:
+For the current **v1.2.0** line, validate on a live installation:
 
 1. Select S, M and L and confirm the selected size survives a browser refresh.
 2. Confirm the red Battery · Plan · Price window control hides the card immediately and that the card can be restored from Dashboard layout / visibility.
@@ -20,6 +20,10 @@ For the current **v1.1.1** line, validate on a live installation:
 16. Remove Recorder SOC statistics and confirm only the actual SOC line/message becomes unavailable; battery power, plan and price remain visible. Remove `SOC_opt` and confirm only forecast SOC becomes unavailable.
 17. With an EMHASS multi-battery plan containing only `SOC_opt_0`/`SOC_opt_1`, confirm no aggregate forecast SOC is drawn.
 18. Run the chart regressions on desktop Chromium, iPad WebKit touch and iPhone WebKit touch. Confirm telemetry preserves `main`, controls and scroll position, while a plan refresh replaces only the one canonical graph card and both SOC series remain present.
+19. For 15-, 30- and 60-minute plans, compare an official `SOC_opt` row with
+    the chart tooltip. Confirm the Wanted SOC timestamp is exactly one inferred
+    plan step after the source row, while `P_batt` and price remain at the
+    source interval start. Repeat across a local DST boundary.
 19. Run a fresh optimization that changes the plan but leaves the Battery · Plan · Price card already visible. Confirm the existing canonical card refreshes immediately rather than waiting for the normal five-minute cache.
 20. Select **12h** and confirm the axis spans six hours before through six hours after NOW; select **24h** and confirm the fixed local day; select **36h** and confirm the fixed endpoint tomorrow 12:00.
 21. Repeat the range choices on desktop, iPad and iPhone. Confirm the chosen range is restored after a dashboard structural rerender/browser reload and that no duplicate Battery · Plan · Price card appears.

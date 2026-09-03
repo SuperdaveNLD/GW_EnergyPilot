@@ -1,20 +1,17 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.1.1**, the stable production release. All v1.0.1-beta.4 behavior and the
-validated v1.1.0-beta.1 candidate are included.
+v1.2.0**. It promotes the validated beta.7 candidate and retains v1.1.1 as the
+previous production base.
 
 ## High-level flow
 
 ```text
-GoodWe ETA-G20
-    |
-    | Modbus TCP
-    v
-GWModbusClient
-    |
-    v
-GWEnergyPilotCoordinator
+Local Modbus full telemetry --+
+                              | selected source
+SEMS+ Beta telemetry ---------+
+                              v
+                     GWEnergyPilotCoordinator
     |----------------------> Home Assistant telemetry/entities
     |----------------------> GWEnergyPilotAccounting
     |----------------------> GWEnergyPilotConnectivity
@@ -37,9 +34,20 @@ GWEnergyPilotCoordinator
                                   |
                                   v
                            Automatic Control
+
+Local GWModbusClient (always present)
+    |----> EMS mode/setpoint and optional SOC-floor read-back
+    `----> every EMS/minimum-SOC write
 ```
 
 EMHASS remains an external prerequisite and remains the canonical owner of the optimization plan. The EnergyPilot plan Store is only a resilience mirror.
+
+SEMS+ is an optional telemetry source only. `sems_api.py` owns asynchronous
+portal authentication, token renewal, station discovery and rate limiting;
+`sems_model.py` owns pure identity/freshness/value normalization. The
+coordinator can merge the small local control read-back into a cloud snapshot,
+but local success never changes failed SEMS telemetry health and local failure
+never discards a valid cloud snapshot. See `docs/SEMS_API.md`.
 
 Read-only PV insight is a separate presentation path:
 
@@ -94,7 +102,8 @@ No Home Assistant Store is a second configuration database or optimizer.
 
 `__init__.py` creates per config entry:
 
-- `GWModbusClient`;
+- `GWModbusClient` (always the control/write client);
+- selected telemetry client: the same `GWModbusClient` or `GWSemsClient`;
 - `GWEnergyPilotCoordinator`;
 - `GWEnergyPilotControlHistory`;
 - `GWEnergyPilotController` from `controller_v033.py`;
@@ -112,7 +121,12 @@ During setup, the last valid plan mirror is restored before the normal control/o
 
 ### Connectivity runtime
 
-`connectivity.py` derives one canonical status from the existing coordinator poll result and an optional Home Assistant charger-online entity. It never opens a second Modbus connection or starts another polling loop: GoodWe reachability therefore updates on the configured coordinator interval. A configured charger source also updates on its normal Home Assistant state-change signal.
+`connectivity.py` derives separate telemetry and local-control status from the
+existing coordinator cycle plus an optional Home Assistant charger-online
+entity. It does not start a separate health-check loop. In local mode telemetry
+and Modbus status share the full coordinator result; in SEMS mode cloud and
+bounded local control read-back remain individually visible. A configured
+charger source also updates on its normal Home Assistant state-change signal.
 
 Missing, `unknown` and `unavailable` sources are unreachable. A binary sensor is explicit (`on` online, `off` unreachable); any usable state from another domain means that integration is reporting, so an idle `switch.* = off` remains reachable.
 
@@ -472,25 +486,27 @@ market + buy adder      = effective load_cost
 market - sell deduction = effective prod_price
 ```
 
-`battery_price_api.py` exposes read-only chart data. The payload uses schema `6`, includes `plan_revision` plus authoritative Home Assistant-timezone chart windows, and uses future-plan source order:
+`battery_price_api.py` exposes read-only chart data. The payload uses schema `7`, includes `plan_revision` plus authoritative Home Assistant-timezone chart windows, and uses future-plan source order:
 
 ```text
 1. persistent validated official EMHASS plan mirror
 2. existing Home Assistant battery_scheduled_power / forecasts compatibility path
 ```
 
-Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. The dashed wanted-SOC line uses immutable execution snapshots for elapsed time and exact validated `SOC_opt` from the current official plan for current/future time; no output-entity fallback or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
+Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. The dashed wanted-SOC line uses immutable execution snapshots for elapsed time and exact validated `SOC_opt` from the current official plan for current/future time. EMHASS computes `SOC_opt` after each row's power interval, so schema 7 retains the row `start` but plots/persists explicit `target_at = start + inferred step`; no output-entity fallback, hardcoded 15-minute shift or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
 
 The same bounded Recorder request includes combined display-only PV, load and
 fast grid power. Large/expanded views apply a load-first balance and draw
 grid/solar charge plus battery/solar export with an explicit unknown residual.
 This attribution is approximate presentation, never accounting or control.
 
-The schema-6 `execution` section contains the last 48 elapsed hours of exact
+The schema-7 `execution` section contains the last 48 elapsed hours of exact
 ledger evidence and a 24-hour conditional projection. Future rows reuse the
 pure controller decision resolver against exact current-plan timestamps. They
 state that strategy/ownership remain unchanged and never predict EV/manual
-overrides, write success or read-back.
+overrides, write success or read-back. New ledger rows store
+`soc_opt_target_at`; retained legacy rows without that evidence remain valid
+for command history but are excluded from the Wanted-SOC graph.
 
 The frontend retains one shared cached dataset and selects a rolling `NOW - 6h .. NOW + 6h`, fixed local today, or fixed today-through-tomorrow-12:00 view. Range changes are local and add no Recorder request. The initial history request reaches at most six hours before local midnight; fixed windows and ticks come from `hass.config.time_zone`, so 23/25-hour DST days retain their local-day meaning.
 
@@ -529,22 +545,33 @@ The v0.38 base deliberately bypasses the historical v0.35/v0.36.x/v0.37
 stability wrappers in a fresh browser session. Their files remain for release
 history, but the v0.35 pointer/render lock and v0.36.3 old-button-node reuse are
 no longer active owners. v0.41 replaces normal telemetry renders with
-stable-DOM patches and owns the internal-ETA/external-PCC PV-flow presentation;
-v0.42-v0.44 add bounded settings, touch-presentation and
-Optimize behavior; v0.45-v0.50 add bounded release presentation/cache
+stable-DOM patches, owns the internal-ETA/external-PCC PV-flow presentation and
+mounts one permanent declarative Lit control surface. v0.42-v0.44 retain
+bounded settings, touch-presentation and compatibility presentation; their
+historical operational listeners are disabled while the permanent architecture
+is active. v0.45-v0.50 add bounded release presentation/cache
 ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped
 history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
-chain as its bounded presentation layer. v1.1.1 owns final stable
-presentation and the complete `1.1.1-stable1` active-graph cache
-boundary.
+chain as its bounded presentation layer. v1.1.1 remains the previous stable
+base; v1.2.0 owns final stable presentation and the complete
+`1.2.0-stable1` active-graph cache boundary. Its EMHASS settings
+select AUTO or a fixed CUSTOM household load at the final runtime request-body
+boundary; unrelated optimization parameters remain untouched. Its isolated
+Beta tests compare five iOS activation methods with deferred, observer-neutral
+metrics. The measured winning native-click plus 120 ms fallback is installed
+once on the panel ShadowRoot for buttons and menu switches; it routes only
+through existing element handlers and does not own any backend action.
+The same final presentation gives the compact chart size/range and
+execution-history open/close controls real 44 CSS-pixel touch targets on
+coarse-pointer/narrow displays.
 
-The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `gw-energy-pilot-v038-strategy.js` still owns key-based delegated Battery Strategy actions and active state; historical particle CSS remains present for compatibility but is hidden by the active no-motion policy.
+The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 
-Visible/translated text is never a control identity. Canonical profile keys plus `aria-pressed` define action and selected state. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; current presentation is static and patched in place. See `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
+Visible/translated text is never a control identity. Canonical action/profile keys plus confirmed Home Assistant/API models and `aria-pressed` define selected state. Each asynchronous action is `idle -> pending -> acknowledged | error`; a resolved service call cannot select a control before matching backend publication. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; current presentation is static and patched in place. See `docs/FRONTEND_CONTROL_ARCHITECTURE.md`, `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
-Historical frontend layering remains technical debt below the v0.34 base. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
+Historical frontend layering remains technical debt below the v0.34 base. The permanent control surface is the first consolidated functional boundary; dashboard cards, Settings, modals, diagnostics, layout/window controls, flow and graph/history presentation still use the historical chain. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
 
 ## Synchronized minimum SOC
 

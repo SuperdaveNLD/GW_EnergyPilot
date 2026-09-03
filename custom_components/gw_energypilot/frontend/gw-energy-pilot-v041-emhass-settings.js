@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v041.js?v=1.1.1-stable1";
+import "./gw-energy-pilot-v041.js?v=1.2.0-stable1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const STYLE_ID = "ep-v041-emhass-settings-style";
@@ -12,6 +12,8 @@ const GROUPS = Object.freeze([
       "emhass_optimization_interval",
       "emhass_soc_final_pct",
       "emhass_fallback_load",
+      "emhass_custom_load_forecast",
+      "emhass_custom_load_power",
     ],
   }),
   Object.freeze({
@@ -213,6 +215,16 @@ function ensureStyles(root) {
       margin-top:6px; color:#587b91; font-size:7px; line-height:1.4; word-break:break-word;
     }
     .ep-v041-emhass-field-meta strong { color:#6fcfe3; font-weight:720; }
+    .ep-v041-emhass-group .ep-v016-field[hidden] { display:none !important; }
+    .ep-v041-load-mode {
+      display:inline-flex; align-items:center; justify-content:center; min-width:48px;
+      margin-left:7px; padding:2px 7px; border:1px solid rgba(90,179,220,.24);
+      border-radius:999px; color:#8cbbd0; background:rgba(11,49,73,.38);
+      font-size:6px; font-weight:880; letter-spacing:.05em;
+    }
+    .ep-v041-load-mode.custom {
+      color:#a6f4ce; border-color:rgba(49,214,153,.31); background:rgba(16,104,75,.30);
+    }
     .ep-v041-emhass-control {
       margin-top:12px; padding:14px; border:1px solid rgba(70,172,230,.16); border-radius:13px;
       background:linear-gradient(150deg,rgba(7,35,58,.58),rgba(5,24,43,.68));
@@ -257,6 +269,31 @@ function ensureStyles(root) {
 
 function fieldNode(form, key) {
   return form.querySelector(`[data-setting-key="${key}"]`)?.closest(".ep-v016-field") || null;
+}
+
+function syncCustomLoadForecastField(form) {
+  const toggle = form?.querySelector('[data-setting-key="emhass_custom_load_forecast"]');
+  const power = form?.querySelector('[data-setting-key="emhass_custom_load_power"]');
+  const field = power?.closest(".ep-v016-field");
+  if (!toggle || !power || !field) return;
+
+  const custom = Boolean(toggle.checked);
+  field.hidden = !custom;
+  power.disabled = !custom;
+  field.setAttribute("aria-hidden", custom ? "false" : "true");
+
+  const toggleField = toggle.closest(".ep-v016-field");
+  const label = toggleField?.querySelector(".ep-v016-field-label");
+  let badge = label?.querySelector(".ep-v041-load-mode");
+  if (label && !badge) {
+    badge = document.createElement("span");
+    badge.className = "ep-v041-load-mode";
+    label.appendChild(badge);
+  }
+  if (badge) {
+    badge.textContent = custom ? "CUSTOM" : "AUTO";
+    badge.classList.toggle("custom", custom);
+  }
 }
 
 function decorateField(panel, field, key, saved) {
@@ -491,6 +528,15 @@ function enhanceEmhassSettings(panel, root) {
     layout.appendChild(other);
   }
   originalFields.replaceWith(layout);
+
+  const customLoadToggle = form.querySelector(
+    '[data-setting-key="emhass_custom_load_forecast"]'
+  );
+  if (customLoadToggle && !customLoadToggle.dataset.epCustomLoadListener) {
+    customLoadToggle.dataset.epCustomLoadListener = "true";
+    customLoadToggle.addEventListener("change", () => syncCustomLoadForecastField(form));
+  }
+  syncCustomLoadForecastField(form);
 
   actions.classList.add("ep-v041-emhass-actions");
   if (controls.defaults) {

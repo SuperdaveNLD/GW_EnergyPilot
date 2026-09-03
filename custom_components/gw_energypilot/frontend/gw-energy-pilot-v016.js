@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v015.js?v=1.1.1-stable1";
+import "./gw-energy-pilot-v015.js?v=1.2.0-stable1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -181,6 +181,7 @@ async function chooseStrategy(panel, definition) {
 }
 
 function installStrategySelector(panel, root) {
+  if (panel.__epControlSurfaceArchitecture) return;
   const old = root.querySelector(".ep-v015-costfun");
   if (!old) return;
 

@@ -232,6 +232,8 @@ Optimization status                   sensor.optim_status
 Optimization interval                 15 min recommended; 30/60 min available
 Runtime final SOC target              installation dependent
 Fallback house load                   installation dependent
+Load forecast                         AUTO (existing history forecast)
+Custom load forecast                  700 W initial value; visible in CUSTOM
 Use runtime Nord Pool prices          ON when a supported source exists
 Optimize when tomorrow prices arrive  ON
 Nord Pool currency                    EUR
