@@ -26,9 +26,8 @@ GoodWe GW15K-ETA-G20
 Current release lines:
 
 ```text
-v1.1.1 Stable
-v1.2.0-beta.6 Previous beta
-v1.2.0-beta.7 Current beta
+v1.2.0 Stable
+v1.2.0-beta.7 Previous beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -62,11 +61,11 @@ EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must 
   reports must exclude all credentials.
 - See `docs/SEMS_API.md` for the current mapped subset and limits.
 
-## Frontend stability contract (v0.41+, active v1.2.0 beta)
+## Frontend stability contract (v0.41+, active v1.2.0 Stable)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.2.0 beta telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.2.0 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - The beta.5 iOS adapter may recover a missing touch click after 120 ms only
   through the same native element's existing click path, with a 12 px movement
   guard and late-click deduplication.
@@ -417,12 +416,12 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0-beta.7 owns final beta presentation and the complete
-`1.2.0-beta.7-chart-touch1` cache boundary. It retains the earlier safety,
+v1.2.0 owns final stable presentation and the complete `1.2.0-stable1` cache
+boundary. It promotes beta.7 unchanged and retains the earlier safety,
 diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
 missing-click recovery, and expands the remaining graph/history touch targets
 to at least 44 CSS pixels on coarse-pointer/narrow displays. v1.1.1
-remains the stable base and v1.0.1-beta.4 remains in the chain as its bounded
+remains the previous stable base and v1.0.1-beta.4 remains in the chain as its bounded
 historical beta presentation layer. v0.51 remains the bounded feature layer
 that owns the scoped EMHASS-to-GoodWe history card. The settings module owns
 the two-deadband configuration panel and explanatory scale; backend

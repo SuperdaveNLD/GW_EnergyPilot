@@ -17,6 +17,19 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.0 — Stable mobile controls and resilient EnergyPilot operation
+
+This normal/latest production release promotes the exact v1.2.0-beta.7 runtime
+behavior. It includes the permanent Lit control surface, bounded 120 ms iOS
+missing-click recovery, 44 CSS-pixel graph/history touch targets, optional
+SEMS+ Beta telemetry, persistent EMHASS plan resilience and selectable
+AUTO/CUSTOM fixed-load forecasting.
+
+GoodWe register definitions, EMS mode/setpoint signs, local-only control
+ownership, Battery Saver profiles, entity unique IDs and persistent stores are
+unchanged by the promotion itself. The stable release uses the complete
+`1.2.0-stable1` frontend cache boundary. See `docs/releases/v1.2.0.md`.
+
 # v1.2.0-beta.7 — Validated mobile-control roll-forward
 
 This prerelease republishes beta.6's complete mobile-control behavior on a new
@@ -316,6 +329,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |
 | **1.2.0-beta.7** | 2026-09-02 | **Beta** | Republishes the fully validated beta.6 mobile-control behavior behind a new complete frontend cache boundary. |
 | **1.2.0-beta.6** | 2026-09-02 | **Beta** | Enlarges the remaining chart/history touch targets and adds real missing-click coverage for S/M/L, 12h/24h/36h and full history. |
 | **1.2.0-beta.5** | 2026-09-02 | **Beta** | Applies the measured 120 ms missing-click recovery to all EnergyPilot buttons and dashboard-menu switches with scroll rejection and late-click deduplication. |

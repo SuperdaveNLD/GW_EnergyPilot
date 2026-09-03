@@ -12,7 +12,7 @@ optimization.
 
 ## Status
 
-**v1.2.0-beta.7 · Beta**
+**v1.2.0 · Stable**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -29,19 +29,19 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.1.1` remains the stable production release. `v1.2.0-beta.7` is the opt-in
-validated roll-forward of beta.6's mobile-control improvements. It retains the
-measured missing-click recovery and the enlarged Battery · Plan · Price and
-execution-history controls behind a new complete frontend cache boundary.
-Every recovered touch still enters the existing native click, form-submit or
-change route exactly once. Local Modbus remains mandatory for every EMS and
-minimum-SOC write/read-back. Normal users keep the HACS prerelease switch off;
-testers explicitly enable it for GW EnergyPilot before selecting the beta.
+`v1.2.0` is the stable production release promoted from the fully validated
+beta.7 candidate. It retains the measured missing-click recovery and enlarged
+Battery · Plan · Price and execution-history controls behind a new complete
+frontend cache boundary. Every recovered touch still enters the existing
+native click, form-submit or change route exactly once. Local Modbus remains
+mandatory for every EMS and minimum-SOC write/read-back. Normal HACS users
+receive this release without enabling prereleases.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
+- `docs/releases/v1.2.0.md` — current stable mobile-control and telemetry release notes;
 - `docs/releases/v1.2.0-beta.7.md` — validated beta.6 touch-control roll-forward notes;
 - `docs/releases/v1.2.0-beta.6.md` — chart/history mobile touch-target notes;
 - `docs/releases/v1.2.0-beta.5.md` — Companion touch-click recovery notes;
@@ -49,7 +49,7 @@ Release documentation:
 - `docs/releases/v1.2.0-beta.3.md` — EMHASS AUTO/CUSTOM fixed load-forecast notes;
 - `docs/releases/v1.2.0-beta.2.md` — SEMS SOC, Wanted-SOC timing and local Beta tests notes;
 - `docs/releases/v1.2.0-beta.1.md` — mobile-control and SEMS+ combined beta notes;
-- `docs/releases/v1.1.1.md` — current stable managed-profile settings-save hotfix notes;
+- `docs/releases/v1.1.1.md` — previous stable managed-profile settings-save hotfix notes;
 - `docs/releases/v1.1.0-beta.2.md` — validated prerelease hotfix notes;
 - `docs/releases/v1.1.0.md` — previous stable Chargegasm, plan-range and PV-flow release notes;
 - `docs/releases/v1.1.0-beta.1.md` — promoted beta-candidate notes;
@@ -93,6 +93,17 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.2.0 highlights
+
+- Promotes the exact v1.2.0-beta.7 runtime behavior to the normal HACS
+  production channel without changing GoodWe, EMS, EMHASS or Battery Saver
+  semantics.
+- Includes the permanent mobile control surface, bounded 120 ms missing-click
+  recovery and at least 44 × 44 CSS-pixel graph/history touch targets.
+- Includes optional SEMS+ Beta telemetry, persistent plan resilience and the
+  EMHASS AUTO/CUSTOM fixed-load forecast introduced across the beta line.
+- Advances the complete frontend cache boundary to `1.2.0-stable1`.
 
 ## v1.2.0-beta.7 highlights
 

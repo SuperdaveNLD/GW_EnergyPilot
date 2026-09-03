@@ -1,7 +1,8 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.2.0-beta.7**. Stable v1.1.1 remains the production base.
+v1.2.0**. It promotes the validated beta.7 candidate and retains v1.1.1 as the
+previous production base.
 
 ## High-level flow
 
@@ -553,9 +554,9 @@ ownership, with v0.48 also owning current Hybrid copy. v0.51 owns the scoped
 history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
-chain as its bounded presentation layer. v1.1.1 remains the stable base;
-v1.2.0-beta.7 owns final beta presentation and the complete
-`1.2.0-beta.7-chart-touch1` active-graph cache boundary. Its EMHASS settings
+chain as its bounded presentation layer. v1.1.1 remains the previous stable
+base; v1.2.0 owns final stable presentation and the complete
+`1.2.0-stable1` active-graph cache boundary. Its EMHASS settings
 select AUTO or a fixed CUSTOM household load at the final runtime request-body
 boundary; unrelated optimization parameters remain untouched. Its isolated
 Beta tests compare five iOS activation methods with deferred, observer-neutral

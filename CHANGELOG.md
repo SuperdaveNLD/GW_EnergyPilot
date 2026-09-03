@@ -4,6 +4,16 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-03
+
+### Stable promotion
+
+- Promote the exact v1.2.0-beta.7 runtime behavior to the normal/latest
+  production channel with the complete `1.2.0-stable1` frontend cache boundary.
+- Retain the permanent Lit control surface, bounded iOS missing-click recovery,
+  44 CSS-pixel graph/history touch targets, SEMS+ Beta telemetry and EMHASS
+  load-forecast controls without changing GoodWe/EMS control semantics.
+
 ## [1.2.0-beta.7] - 2026-09-02
 
 ### Changed
