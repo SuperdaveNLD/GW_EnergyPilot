@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v007.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v007.js?v=1.3.0-beta.1";
 
 const VERSION = "0.08";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -9,6 +9,10 @@ const CARD_DEFS = [
   { id: "solar", label: "Solar", selector: ".energy-card.solar", span: 1 },
   { id: "home", label: "Home", selector: ".energy-card.home", span: 1 },
   { id: "grid", label: "Grid", selector: ".energy-card.grid", span: 1 },
+  {
+    id: "controls", label: "EnergyPilot controls",
+    selector: "ep-control-surface", span: 1, fixed: true, toggleable: false,
+  },
   { id: "battery", label: "Battery", selector: ".energy-card.battery", span: 1 },
   { id: "controller", label: "Controller", selector: ".panel-card.controller", span: 2 },
   { id: "emhass", label: "EMHASS", selector: ".panel-card.emhass", span: 2 },
@@ -26,6 +30,24 @@ function defaultPrefs() {
   };
 }
 
+function mergeStoredOrder(storedOrder) {
+  const order = storedOrder.filter((id) => DEFAULT_ORDER.includes(id));
+  for (const id of DEFAULT_ORDER) {
+    if (order.includes(id)) continue;
+    const defaultIndex = DEFAULT_ORDER.indexOf(id);
+    let insertAt = order.length;
+    for (let index = defaultIndex - 1; index >= 0; index -= 1) {
+      const previous = order.indexOf(DEFAULT_ORDER[index]);
+      if (previous >= 0) {
+        insertAt = previous + 1;
+        break;
+      }
+    }
+    order.splice(insertAt, 0, id);
+  }
+  return order;
+}
+
 function loadPrefs() {
   const fallback = defaultPrefs();
   try {
@@ -33,10 +55,7 @@ function loadPrefs() {
     if (!raw) return fallback;
     const stored = JSON.parse(raw);
     const storedOrder = Array.isArray(stored.order) ? stored.order : [];
-    const order = [
-      ...storedOrder.filter((id) => DEFAULT_ORDER.includes(id)),
-      ...DEFAULT_ORDER.filter((id) => !storedOrder.includes(id)),
-    ];
+    const order = mergeStoredOrder(storedOrder);
     return {
       order,
       hidden: stored.hidden && typeof stored.hidden === "object" ? stored.hidden : {},
@@ -67,7 +86,7 @@ function layoutIcon() {
 }
 
 function menuHtml(prefs) {
-  const toggles = CARD_DEFS.map(
+  const toggles = CARD_DEFS.filter((card) => card.toggleable !== false).map(
     (card) => `
       <label class="ep-menu-row">
         <span>${card.label}</span>
@@ -260,13 +279,13 @@ function dashboardStyles() {
     .ep-dashboard-layout [data-ep-span="2"] { grid-column: span 2; }
     .ep-dashboard-layout [hidden] { display: none !important; }
 
-    .ep-dashboard-layout.ep-editing > [data-ep-card] {
+    .ep-dashboard-layout.ep-editing > [data-ep-card]:not([data-ep-fixed-card="true"]) {
       cursor: grab;
       outline: 1px dashed rgba(90, 217, 255, .42);
       outline-offset: -5px;
       transition: opacity .14s ease, transform .14s ease, box-shadow .14s ease;
     }
-    .ep-dashboard-layout.ep-editing > [data-ep-card]::before {
+    .ep-dashboard-layout.ep-editing > [data-ep-card]:not([data-ep-fixed-card="true"])::before {
       content: "DRAG";
       position: absolute;
       z-index: 40;
@@ -282,7 +301,7 @@ function dashboardStyles() {
       letter-spacing: .12em;
       pointer-events: none;
     }
-    .ep-dashboard-layout.ep-editing > [data-ep-card]:active { cursor: grabbing; }
+    .ep-dashboard-layout.ep-editing > [data-ep-card]:not([data-ep-fixed-card="true"]):active { cursor: grabbing; }
     .ep-dashboard-layout .ep-dragging { opacity: .35; transform: scale(.985); }
     .ep-dashboard-layout .ep-drop-target {
       box-shadow: 0 0 0 2px rgba(31, 239, 167, .50), 0 18px 55px rgba(0,0,0,.22) !important;
@@ -354,7 +373,7 @@ function dashboardStyles() {
       .ep-layout-menu { right: 14px; top: 74px; }
       .ep-dashboard-layout { grid-template-columns: 1fr; }
       .ep-dashboard-layout [data-ep-span="2"] { grid-column: span 1; }
-      .ep-dashboard-layout.ep-editing > [data-ep-card]::before { content: "DRAG"; }
+      .ep-dashboard-layout.ep-editing > [data-ep-card]:not([data-ep-fixed-card="true"])::before { content: "DRAG"; }
     }
   `;
 }
@@ -430,6 +449,10 @@ function collectCards(root) {
 function installDragAndDrop(panel, layout, prefs) {
   const cards = [...layout.querySelectorAll("[data-ep-card]")];
   for (const card of cards) {
+    if (card.dataset.epFixedCard === "true") {
+      card.draggable = false;
+      continue;
+    }
     card.draggable = prefs.edit;
 
     card.addEventListener("dragstart", (event) => {
@@ -501,11 +524,29 @@ function applyLayout(panel, root, prefs) {
     const { def, node } = item;
     node.dataset.epCard = id;
     node.dataset.epSpan = String(def.span);
-    node.hidden = Boolean(prefs.hidden[id]);
+    if (def.fixed) node.dataset.epFixedCard = "true";
+    else delete node.dataset.epFixedCard;
+    node.hidden = def.toggleable === false ? false : Boolean(prefs.hidden[id]);
     layout.appendChild(node);
   }
 
   installDragAndDrop(panel, layout, prefs);
+}
+
+function placeNewCard(root, prefs, id, node) {
+  const def = CARD_DEFS.find((item) => item.id === id);
+  const layout = root.querySelector(".ep-dashboard-layout");
+  if (!def || !layout || !node) return;
+  node.dataset.epCard = id;
+  node.dataset.epSpan = String(def.span);
+  if (def.fixed) node.dataset.epFixedCard = "true";
+  node.hidden = def.toggleable === false ? false : Boolean(prefs.hidden[id]);
+  const position = prefs.order.indexOf(id);
+  const following = prefs.order.slice(position + 1)
+    .map((nextId) => layout.querySelector(`[data-ep-card="${nextId}"]`))
+    .find(Boolean);
+  if (following) layout.insertBefore(node, following);
+  else layout.appendChild(node);
 }
 
 await customElements.whenDefined(PANEL_NAME);
@@ -526,6 +567,9 @@ PanelClass.prototype._render = function energyPilotV008Render() {
 
   const prefs = loadPrefs();
   applyLayout(this, root, prefs);
+  this.__epV008PlaceControlSurface = (surface) => {
+    placeNewCard(this.shadowRoot, loadPrefs(), "controls", surface);
+  };
   installMenu(this, root, prefs);
 
   const versionBadge = root.querySelector(".version");

@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v039.js?v=1.3.0-beta.1";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-stable1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-stable1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.1";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.2.0-stable1";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.2.0-stable1";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.2.0-stable1";
+} from "./ep-control-surface.js?v=1.3.0-beta.1";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.1";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -67,7 +67,7 @@ const COPY = Object.freeze({
     hoverHint: "Hover a mode for its meaning.",
     today: "Today",
     yesterday: "Yesterday",
-    motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
+    motionAvailable: "Moving energy particles · respects reduced-motion settings",
     flowUnknown: "power unavailable",
     flowIdle: "idle below 50 W",
     flowLow: "low relative flow",
@@ -146,7 +146,7 @@ const COPY = Object.freeze({
     hoverHint: "Beweeg over een modus voor uitleg.",
     today: "Vandaag",
     yesterday: "Gisteren",
-    motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
+    motionAvailable: "Bewegende energiedeeltjes · respecteert de instelling voor minder beweging",
     flowUnknown: "vermogen niet beschikbaar",
     flowIdle: "inactief onder 50 W",
     flowLow: "lage relatieve stroom",
@@ -228,12 +228,6 @@ const NO_MOTION_CSS = `
     -webkit-overflow-scrolling: touch;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-  }
-  :host .ep-v041-motion-disabled {
-    opacity: .58;
-  }
-  :host .ep-v041-motion-disabled input {
-    cursor: not-allowed !important;
   }
   :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:not(.active),
   :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:hover:not(:disabled):not(.active) {
@@ -701,6 +695,43 @@ const NO_MOTION_CSS = `
     color: #a8cbd5;
     font-size: 11px;
     line-height: 1.4;
+  }
+  /* Stable v0.41 keeps every general animation and transition frozen. The
+     existing dashboard preference may opt only active live-flow particles
+     back into their compositor-friendly v0.38 direction keyframes. */
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v011-particles,
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v011-particles span {
+    display: block !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v011-particles span {
+    animation-duration: 4.6s !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: infinite !important;
+    animation-play-state: running !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="right"] .ep-v011-particles span {
+    animation-name: epV038HRight !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="left"] .ep-v011-particles span {
+    animation-name: epV038HLeft !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="down"] .ep-v011-particles span {
+    animation-name: epV038VDown !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="up"] .ep-v011-particles span {
+    animation-name: epV038VUp !important;
+  }
+  :host .ep-dashboard-layout.ep-animations-off .ep-flow-link .ep-v011-particles,
+  :host .ep-dashboard-layout.ep-animations-off .ep-flow-link .ep-v011-particles span {
+    display: none !important;
+    animation: none !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :host .ep-dashboard-layout.ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link.ep-flow-link[data-ep-v041-flow-status] .ep-v011-particles.ep-v011-particles,
+    :host .ep-dashboard-layout.ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link.ep-flow-link[data-ep-v041-flow-status] .ep-v011-particles.ep-v011-particles span {
+      display: none !important;
+      animation: none !important;
+    }
   }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
@@ -1543,7 +1574,11 @@ function activeCostFunctionRaw(panel) {
 }
 
 function patchCostFunctionSelector(panel, root) {
-  const wrap = root.querySelector(".ep-v016-costfun");
+  // Scope the compatibility patch to the historical EMHASS overview. The
+  // permanent Lit selector owns and reconciles its own confirmed state.
+  const wrap = root.querySelector(
+    ".panel-card.emhass .ep-v016-costfun, .panel-card.emhass .ep-v015-costfun"
+  );
   if (!wrap) return;
   const activeRaw = activeCostFunctionRaw(panel);
   const activeDefinition = activeRaw ? EMHASS_COST_FUNCTIONS[activeRaw] : null;
@@ -1561,8 +1596,11 @@ function patchCostFunctionSelector(panel, root) {
   }
 
   const selectEntityId = panel._entityId?.("emhass_cost_function");
-  for (const button of wrap.querySelectorAll(".ep-v016-costfun-button[data-costfun]")) {
-    const raw = button.dataset.costfun;
+  for (const button of wrap.querySelectorAll(
+    ".ep-v016-costfun-button[data-costfun], " +
+    ".ep-v015-costfun-button[data-emhass-overview-costfun]"
+  )) {
+    const raw = button.dataset.costfun || button.dataset.emhassOverviewCostfun;
     const definition = EMHASS_COST_FUNCTIONS[raw];
     if (!definition) continue;
     const active = raw === activeRaw;
@@ -1603,7 +1641,7 @@ function socLimitValue(panel, kind) {
 function patchEmhass(panel, root) {
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
-  if (!panel.__epControlSurfaceArchitecture) patchCostFunctionSelector(panel, root);
+  patchCostFunctionSelector(panel, root);
   const t = copy(panel);
   const pBattState = externalState(
     panel,
@@ -1908,13 +1946,12 @@ function installFreshDiagnosticsCopy(panel, root) {
 function patchMotionMenu(panel, root) {
   const input = root.querySelector('[data-ep-setting="animations"]');
   if (!input) return;
-  input.checked = false;
-  input.disabled = true;
-  input.setAttribute("aria-disabled", "true");
+  input.disabled = false;
+  input.removeAttribute("aria-disabled");
   const row = input.closest(".ep-menu-row");
-  row?.classList.add("ep-v041-motion-disabled");
+  row?.classList.remove("ep-v041-motion-disabled");
   const detail = row?.querySelector("small");
-  if (detail) detail.textContent = copy(panel).motionDisabled;
+  if (detail) detail.textContent = copy(panel).motionAvailable;
 }
 
 function patchLiveDom(panel) {

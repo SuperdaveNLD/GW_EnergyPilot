@@ -4,6 +4,44 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.1] - 2026-09-04
+
+### Added
+
+- Add a localized **?** help link to the permanent dashboard header. Dutch
+  Home Assistant sessions open the Dutch manual; other sessions open the
+  English user guide in a new tab.
+- Add task-oriented English and Dutch user guides covering safe first setup,
+  dashboard use, automatic strategies, battery profiles, planning, EV features
+  and troubleshooting.
+
+### Fixed
+
+- Remove the duplicate minimum/maximum SOC sliders from the EMHASS overview;
+  Battery Strategy → Custom remains their single dashboard editor.
+- Make the overview Profit/Cost/Self-consumption buttons reflect the confirmed
+  stateful EMHASS `costfun`, including changes made outside the dashboard.
+- Advance the complete active frontend module graph to cache boundary
+  `1.3.0-beta.1` so browsers cannot retain the earlier overview behavior.
+
+### Changed
+
+- Replace the oversized full-width EnergyPilot control area with one fixed,
+  single-column dashboard card directly after the four live power cards. Quick
+  actions use a 2 × 2 grid; EMHASS and Battery Strategy use compact native
+  disclosures; Optimize remains immediately available; and manual EMS stays
+  collapsed while Automatic Control is active (#125).
+- Preserve every permanent Lit control node through telemetry and genuine
+  structural renders while moving its containing dashboard card. Existing
+  browser-local card orders gain the new fixed card after Grid without
+  resetting the user's remaining order or visibility preferences.
+- Re-enable the dashboard's **Flow animations** preference for active energy
+  connectors. The scoped compositor animation leaves the permanent control
+  surface, stable telemetry DOM and native touch path untouched.
+- Keep general animations, CSS transitions and modal backdrop filters frozen;
+  switching Flow animations off or requesting reduced motion produces zero
+  active dashboard animations.
+
 ## [1.2.0] - 2026-09-03
 
 ### Stable promotion

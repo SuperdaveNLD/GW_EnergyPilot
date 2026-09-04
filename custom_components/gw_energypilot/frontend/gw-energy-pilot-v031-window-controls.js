@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v031.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v031.js?v=1.3.0-beta.1";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const DASHBOARD_STORAGE_KEY = "gw_energypilot_dashboard_v008";
@@ -202,6 +202,14 @@ function installWindowControls(panel, root) {
   for (const card of layout.querySelectorAll(":scope > [data-ep-card]")) {
     const id = card.dataset.epCard;
     if (!id) continue;
+
+    if (card.dataset.epFixedCard === "true") {
+      card.querySelectorAll(":scope > .ep-v031-card-windowbar").forEach(
+        (node) => node.remove()
+      );
+      card.classList.remove("ep-v031-card-collapsed", "ep-v031-card-maximized");
+      continue;
+    }
 
     // Remove the earlier Battery-only implementation so v0.31 has one
     // consistent control surface for every dashboard card.

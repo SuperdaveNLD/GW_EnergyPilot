@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v010.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v010.js?v=1.3.0-beta.1";
 
 const VERSION = "0.11";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -201,6 +201,10 @@ function numberValue(panel, key) {
 }
 
 function installSocSliders(panel, root) {
+  // The permanent control surface owns the synchronized SOC controls. Keep
+  // this historical creator only for older entrypoints that do not mount that
+  // surface, otherwise the EMHASS overview exposes a second write path.
+  if (panel.__epControlSurfaceArchitecture) return;
   const card = root.querySelector(".panel-card.emhass");
   if (!card || card.querySelector(".ep-v011-soc-controls")) return;
 

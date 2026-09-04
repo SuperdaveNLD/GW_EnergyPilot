@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v014.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v014.js?v=1.3.0-beta.1";
 
 const VERSION = "0.15";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -49,10 +49,17 @@ function ensureStyles(root) {
       letter-spacing: .035em;
       cursor: pointer;
     }
-    .ep-v015-costfun-button:hover:not(:disabled) {
+    .ep-v015-costfun-button:hover:not(:disabled):not(.active) {
       border-color: rgba(47, 236, 190, .46);
       color: #efffff;
       background: rgba(10, 68, 81, .62);
+    }
+    .ep-v015-costfun-button.active,
+    .ep-v015-costfun-button[aria-pressed="true"] {
+      border-color: rgba(35, 242, 179, .68);
+      background: linear-gradient(145deg, rgba(15, 105, 107, .58), rgba(9, 64, 80, .70));
+      color: #e9fff7;
+      box-shadow: inset 0 0 16px rgba(30, 241, 176, .08), 0 0 12px rgba(30, 241, 176, .08);
     }
     .ep-v015-costfun-button:disabled {
       opacity: .42;
@@ -114,6 +121,9 @@ function installCostFunctionActions(panel, root) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ep-v015-costfun-button";
+    button.dataset.emhassOverviewCostfun = value;
+    button.dataset.costfunLabel = label;
+    button.setAttribute("aria-pressed", "false");
     button.textContent = label;
     button.title = `Set EMHASS costfun to ${value} and run a fresh optimization`;
     button.disabled = !entityId;

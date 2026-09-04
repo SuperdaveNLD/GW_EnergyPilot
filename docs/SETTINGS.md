@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.2.0-beta.4 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.3.0-beta.1 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -27,6 +27,19 @@ gw_energypilot/battery_price/get
 ```
 
 The active frontend chain is documented in `docs/FRONTEND_STABLE_DOM.md`. The settings shell remains owned by `gw-energy-pilot-settings-v016.js`; later release layers extend presentation without creating a second configuration database.
+
+## Dashboard layout preferences
+
+**Dashboard → Layout & visibility** stores its presentation preferences only in
+the browser's existing `gw_energypilot_dashboard_v008` local-storage record; it
+does not call Home Assistant or change integration configuration.
+
+**Flow animations** is enabled by default for a fresh browser profile and may
+be switched off independently. It controls only particles on finite, active
+energy-flow connectors. Idle and unavailable flows remain static, and the
+device/browser `prefers-reduced-motion: reduce` setting always suppresses the
+particles even when the dashboard switch is on. General interface animations,
+transitions and modal backdrop filters remain disabled.
 
 ## EP page
 
@@ -242,6 +255,15 @@ legacy use_goodwe_smart_meter true          -> Grid
 ```
 
 Manual EMS selections are never remapped by the automatic strategy.
+
+## Dashboard ownership of EMHASS controls
+
+The EMHASS overview card is not a second editor for battery SOC limits.
+Minimum and maximum SOC are edited only under **Battery Strategy → Custom** in
+the permanent control surface, alongside the other Custom profile values. The
+overview card retains the compact Profit/Cost/Self-consumption selector and
+highlights only the `costfun` value confirmed by the stateful Home Assistant
+select; direct EMHASS changes therefore update the same active indication.
 
 ## Low-level Beta SOC API
 

@@ -1,8 +1,17 @@
-import "./gw-energy-pilot-v015.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v015.js?v=1.3.0-beta.1";
 
 const VERSION = "0.16";
 const PANEL_NAME = "gw-energypilot-panel";
 const SECTION_ORDER = ["energypilot", "ev", "emhass", "pv", "goodwe"];
+const HELP_URLS = Object.freeze({
+  en: "https://github.com/SuperdaveNLD/GW_EnergyPilot/blob/main/docs/USER_GUIDE.md",
+  nl: "https://github.com/SuperdaveNLD/GW_EnergyPilot/blob/main/docs/HANDLEIDING_NL.md",
+});
+
+const HELP_COPY = Object.freeze({
+  en: Object.freeze({ title: "GW EnergyPilot user guide", label: "Open GW EnergyPilot user guide" }),
+  nl: Object.freeze({ title: "GW EnergyPilot-handleiding", label: "Open de GW EnergyPilot-handleiding" }),
+});
 
 const PV_COPY = Object.freeze({
   en: Object.freeze({
@@ -91,12 +100,22 @@ function gearIcon() {
     </svg>`;
 }
 
+function helpIcon() {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M9.8 9a2.35 2.35 0 0 1 4.55.8c0 1.75-2.35 2.05-2.35 3.7"/>
+      <path d="M12 17.25h.01"/>
+    </svg>`;
+}
+
 function ensureStyles(root) {
   if (root.querySelector("#ep-v016-style")) return;
   const style = document.createElement("style");
   style.id = "ep-v016-style";
   style.textContent = `
-    .ep-v016-settings-button {
+    .ep-v016-settings-button,
+    .ep-v016-help-button {
       width: 38px;
       height: 38px;
       display: grid;
@@ -107,14 +126,17 @@ function ensureStyles(root) {
       background: rgba(12,38,66,.72);
       cursor: pointer;
       transition: border-color .14s linear, background-color .14s linear;
+      text-decoration: none;
     }
     .ep-v016-settings-button:hover,
-    .ep-v016-settings-button.active {
+    .ep-v016-settings-button.active,
+    .ep-v016-help-button:hover {
       border-color: rgba(36,226,255,.45);
       color: #dffcff;
       background: rgba(13,50,86,.94);
     }
-    .ep-v016-settings-button svg {
+    .ep-v016-settings-button svg,
+    .ep-v016-help-button svg {
       width: 20px;
       height: 20px;
       fill: none;
@@ -122,6 +144,16 @@ function ensureStyles(root) {
       stroke-width: 1.7;
       stroke-linecap: round;
       stroke-linejoin: round;
+    }
+
+    @media (pointer: coarse), (max-width: 720px) {
+      .ep-v016-settings-button,
+      .ep-v016-help-button {
+        width: 44px;
+        min-width: 44px;
+        height: 44px;
+        min-height: 44px;
+      }
     }
 
     .ep-v016-settings {
@@ -679,6 +711,26 @@ function installSettingsButton(panel, root) {
   });
 }
 
+function installHelpButton(panel, root) {
+  const actions = root.querySelector(".header-actions");
+  if (!actions || actions.querySelector(".ep-v016-help-button")) return;
+
+  const language = settingsLanguage(panel);
+  const copy = HELP_COPY[language];
+  const link = document.createElement("a");
+  link.className = "ep-v016-help-button";
+  link.href = HELP_URLS[language];
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.title = copy.title;
+  link.setAttribute("aria-label", copy.label);
+  link.innerHTML = helpIcon();
+
+  const settings = actions.querySelector(".ep-v016-settings-button");
+  if (settings) settings.insertAdjacentElement("afterend", link);
+  else actions.prepend(link);
+}
+
 function fieldValue(panel, sectionId, field) {
   const draft = panel.__epV016Draft?.[sectionId] || {};
   return Object.prototype.hasOwnProperty.call(draft, field.key)
@@ -1145,6 +1197,7 @@ PanelClass.prototype._render = function energyPilotV016Render() {
 
   ensureStyles(root);
   installSettingsButton(this, root);
+  installHelpButton(this, root);
   renderSettingsPage(this, root);
 
   const versionBadge = root.querySelector(".version");

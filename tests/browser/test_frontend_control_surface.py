@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_frontend_stability as stability  # noqa: E402
 
 
-HARNESS = "/tests/browser/frontend_harness.html?entry=v110"
+HARNESS = "/tests/browser/frontend_harness.html?entry=v130"
 REPETITIONS = 50
 
 
@@ -51,6 +51,18 @@ def activate(
 ) -> None:
     before = action_count(page, counter)
     control = stability.shadow(page, selector)
+    control.evaluate(
+        """
+        node => {
+          const disclosure = node.closest('details');
+          if (!disclosure) return;
+          node.closest('ep-control-surface')?.querySelectorAll('details[open]').forEach(
+            candidate => { if (candidate !== disclosure) candidate.open = false; }
+          );
+          disclosure.open = true;
+        }
+        """
+    )
     control.scroll_into_view_if_needed(timeout=5_000)
     if profile.touch:
         control.tap(timeout=5_000)
@@ -148,7 +160,7 @@ def repeat_range(
     selector: str,
     component: str,
     counter: str,
-    values: tuple[int, int],
+    _values: tuple[int, int],
 ) -> dict[str, object]:
     before = action_count(page, counter)
     page.evaluate(
@@ -156,33 +168,26 @@ def repeat_range(
         [name, selector],
     )
     for index in range(REPETITIONS):
-        expected = values[index % 2]
         control = stability.shadow(page, selector)
-        control.scroll_into_view_if_needed(timeout=5_000)
-        geometry = control.evaluate(
+        control.evaluate(
             """
-            (input, value) => {
-              const rect = input.getBoundingClientRect();
-              const minimum = Number(input.min || 0);
-              const maximum = Number(input.max || 100);
-              const ratio = Math.max(0, Math.min(1, (Number(value) - minimum) / (maximum - minimum)));
-              return {
-                x: Math.max(2, Math.min(rect.width - 2, rect.width * ratio)),
-                y: Math.max(2, rect.height / 2),
-              };
+            node => {
+              const disclosure = node.closest('details');
+              if (!disclosure) return;
+              node.closest('ep-control-surface')?.querySelectorAll('details[open]').forEach(
+                candidate => { if (candidate !== disclosure) candidate.open = false; }
+              );
+              disclosure.open = true;
             }
-            """,
-            expected,
+            """
         )
-        if profile.touch:
-            # Playwright WebKit does not finalize a range `change` for tap() or
-            # mouse click in a has_touch context. One trusted native keypress is
-            # still one range activation/call; physical slider touch remains an
-            # explicit iPhone acceptance item. Buttons retain real tap() runs.
-            control.press("ArrowRight" if index % 2 == 0 else "ArrowLeft")
-            control.press("Tab")
-        else:
-            control.click(position=geometry, timeout=5_000)
+        control.scroll_into_view_if_needed(timeout=5_000)
+        # Native slider track geometry differs between Chromium and WebKit and
+        # is materially inset on the compact card. PageUp/PageDown gives every
+        # profile one trusted range activation and one final `change` on blur;
+        # physical slider touch remains an explicit iPhone acceptance item.
+        control.press("PageUp" if index % 2 == 0 else "PageDown")
+        control.press("Tab")
         try:
             page.wait_for_function(
                 """
@@ -233,7 +238,7 @@ def repeat_range(
         "calls": after - before,
         "expected": REPETITIONS,
         "stable": stable,
-        "activation": "native-keyboard" if profile.touch else "native-track-click",
+        "activation": "native-keyboard",
     }
 
 
@@ -665,12 +670,17 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
         """
         () => {
           const root = window.__epPanel.shadowRoot;
+          root.querySelectorAll('ep-control-surface details').forEach(
+            disclosure => { disclosure.open = false; }
+          );
           window.__epPermanentIdentity = {
             root,
             main: root.querySelector('main'),
             surface: root.querySelector('ep-control-surface'),
             card: root.querySelector('.panel-card.controller'),
-            controls: [...root.querySelectorAll('ep-control-surface button, ep-control-surface input')],
+            controls: [...root.querySelectorAll(
+              'ep-control-surface button, ep-control-surface input, ep-control-surface summary'
+            )],
           };
         }
         """
@@ -683,7 +693,7 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
           const root = window.__epPanel.shadowRoot;
           const saved = window.__epPermanentIdentity;
           const controls = [...root.querySelectorAll(
-            'ep-control-surface button, ep-control-surface input'
+            'ep-control-surface button, ep-control-surface input, ep-control-surface summary'
           )];
           return {
             root: saved.root === root,
@@ -714,7 +724,7 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
           const root = window.__epPanel.shadowRoot;
           const saved = window.__epPermanentIdentity;
           const controls = [...root.querySelectorAll(
-            'ep-control-surface button, ep-control-surface input'
+            'ep-control-surface button, ep-control-surface input, ep-control-surface summary'
           )];
           return {
             main: saved.main === root.querySelector('main'),
@@ -739,7 +749,7 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
         () => {
           const root = window.__epPanel.shadowRoot;
           const controls = [...root.querySelectorAll(
-            'ep-control-surface button, ep-control-surface input'
+            'ep-control-surface button, ep-control-surface input, ep-control-surface summary'
           )].filter(
             control => control.getClientRects().length
           );
@@ -754,6 +764,16 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
             }
           }
           const surface = root.querySelector('.ep-control-surface');
+          const host = root.querySelector('ep-control-surface');
+          const dashboard = root.querySelector('.ep-dashboard-layout');
+          const orderedCards = [...(dashboard?.children || [])];
+          const controlIndex = orderedCards.indexOf(host);
+          const primaryIndices = ['flow', 'solar', 'home', 'grid'].map(
+            id => orderedCards.findIndex(card => card.dataset.epCard === id)
+          );
+          const flow = root.querySelector('[data-ep-card="flow"]');
+          const hostRect = host?.getBoundingClientRect();
+          const flowRect = flow?.getBoundingClientRect();
           return {
             targets: controls.every(control => {
               const rect = control.getBoundingClientRect();
@@ -769,6 +789,20 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
             focusVisibleRule: [...root.querySelectorAll('style')].some(
               style => style.textContent.includes('button:focus-visible')
             ),
+            dashboardCard:
+              host?.parentElement === dashboard &&
+              host?.dataset.epCard === 'controls' &&
+              host?.dataset.epSpan === '1',
+            afterPrimary:
+              controlIndex >= 0 &&
+              primaryIndices.every(index => index >= 0 && index < controlIndex),
+            compact:
+              Boolean(hostRect && flowRect) &&
+              hostRect.width <= flowRect.width + 1 &&
+              hostRect.height <= Math.max(460, flowRect.height * 1.5),
+            collapsed: [...root.querySelectorAll(
+              'ep-control-surface details'
+            )].every(disclosure => !disclosure.open),
           };
         }
         """
@@ -814,7 +848,17 @@ def validate(result: dict[str, object]) -> list[str]:
         not layout["targets"]
         or not layout["accessibleNames"]
         or layout["overlaps"]
-        or not all(layout[key] for key in ("horizontalFit", "focusVisibleRule"))
+        or not all(
+            layout[key]
+            for key in (
+                "horizontalFit",
+                "focusVisibleRule",
+                "dashboardCard",
+                "afterPrimary",
+                "compact",
+                "collapsed",
+            )
+        )
         or not landscape.get("fit")
         or not landscape.get("targets")
         or landscape.get("overlaps")
@@ -921,7 +965,7 @@ def main() -> int:
                       const root = window.__epPanel.shadowRoot;
                       const surface = root.querySelector('.ep-control-surface');
                       const controls = [...root.querySelectorAll(
-                        'ep-control-surface button, ep-control-surface input'
+                        'ep-control-surface button, ep-control-surface input, ep-control-surface summary'
                       )].filter(control => control.getClientRects().length);
                       const rects = controls.map(control => control.getBoundingClientRect());
                       let overlaps = 0;

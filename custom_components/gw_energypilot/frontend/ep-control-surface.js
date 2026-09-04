@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.2.0-stable1";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.1";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-stable1";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.1";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.1";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -93,13 +93,15 @@ const COPY = Object.freeze({
     battery: "Battery actions",
     batteryPending: "Request sent · waiting for confirmed ownership…",
     automatic: "Automatic Control",
-    automaticOn: "Automatic ON",
-    automaticOff: "Automatic OFF",
+    automaticOn: "AUTO ACTIVE",
+    automaticOff: "AUTO INACTIVE",
     unavailable: "Unavailable",
     confirmAutomatic:
       "Enable GW EnergyPilot automatic control?\n\nOnly continue when EMHASS is fully configured, optimization is successful, publish-data is working and the selected plan sensors are valid.",
     emhass: "EMHASS optimization strategy",
+    emhassCompact: "EMHASS",
     batteryStrategy: "Battery strategy",
+    batteryCompact: "BATTERY",
     profilesLoading: "Loading battery profiles…",
     custom: "Custom battery values",
     saveCustom: "Save and optimize",
@@ -138,13 +140,15 @@ const COPY = Object.freeze({
     battery: "Batterijacties",
     batteryPending: "Opdracht verzonden · wachten op bevestigd eigenaarschap…",
     automatic: "Automatische bediening",
-    automaticOn: "Automatisch AAN",
-    automaticOff: "Automatisch UIT",
+    automaticOn: "AUTO ACTIEF",
+    automaticOff: "AUTO INACTIEF",
     unavailable: "Niet beschikbaar",
     confirmAutomatic:
       "GW EnergyPilot automatisch inschakelen?\n\nGa alleen verder als EMHASS volledig is geconfigureerd, de optimalisatie slaagt, publish-data werkt en de gekozen plansensoren geldig zijn.",
     emhass: "EMHASS-optimalisatiestrategie",
+    emhassCompact: "EMHASS",
     batteryStrategy: "Batterijstrategie",
+    batteryCompact: "BATTERIJ",
     profilesLoading: "Batterijprofielen laden…",
     custom: "Aangepaste batterijwaarden",
     saveCustom: "Opslaan en optimaliseren",
@@ -202,31 +206,42 @@ const CONTROL_SURFACE_CSS = `
   ep-battery-strategy,
   ep-optimize-action,
   ep-manual-ems-controls { display:block; min-width:0; }
+  ep-control-surface { align-self:start; }
   .ep-control-surface {
-    margin:14px 0 18px; padding:14px; border-radius:18px;
+    margin:0; padding:14px; border-radius:20px;
     border:1px solid rgba(74,190,229,.22);
     background:linear-gradient(145deg,rgba(5,30,54,.96),rgba(4,18,35,.98));
-    color:#e6f7ff; touch-action:pan-y; overflow:clip;
+    color:#e6f7ff; touch-action:pan-y; overflow:visible;
   }
   .ep-control-surface *, .ep-control-surface *::before, .ep-control-surface *::after {
     box-sizing:border-box;
   }
   .ep-control-surface [hidden] { display:none!important; }
   .ep-control-surface *::before, .ep-control-surface *::after { pointer-events: none; }
-  .ep-control-surface-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .ep-control-surface-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
   .ep-control-surface-kicker { color:#64e5f5; font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
-  .ep-control-surface-detail { margin-top:3px; color:#7894a8; font-size:10px; }
-  .ep-control-surface-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; touch-action:pan-y; }
-  .ep-control-group { height:100%; padding:12px; border-radius:14px; border:1px solid rgba(79,174,217,.14); background:rgba(4,24,44,.56); }
-  .ep-control-group.wide { grid-column:1/-1; }
-  .ep-control-title { margin:0 0 9px; color:#dff6ff; font-size:12px; font-weight:850; }
-  .ep-control-status { min-height:18px; margin-top:8px; color:#829db0; font-size:10px; line-height:1.4; }
+  .ep-control-surface-detail {
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+  .ep-control-surface-grid { display:grid; grid-template-columns:1fr; gap:9px; touch-action:pan-y; }
+  .ep-control-selectors { display:grid; grid-template-columns:1fr; gap:8px; }
+  .ep-control-group { height:auto; min-width:0; padding:0; border:0; border-radius:0; background:transparent; }
+  .ep-control-group.wide { grid-column:auto; }
+  .ep-control-surface .ep-v016-costfun,
+  .ep-control-surface .ep-v038-strategy {
+    margin:0; padding:0; border:0; background:transparent;
+  }
+  .ep-control-title { margin:0 0 8px; color:#dff6ff; font-size:12px; font-weight:850; }
+  .ep-control-status { margin-top:7px; color:#829db0; font-size:10px; line-height:1.4; }
+  .ep-control-status:empty { display:none; }
   .ep-control-status.error { color:#ff9e96; }
   .ep-control-status.ok { color:#79e4b8; }
   .ep-control-actions { display:grid; gap:8px; }
-  .ep-battery-actions { grid-template-columns:repeat(4,minmax(0,1fr)); }
-  .ep-v016-costfun-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
-  .ep-v038-profile-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .ep-control-surface .ep-battery-actions {
+    grid-template-columns:repeat(2,minmax(0,1fr)); margin:0;
+  }
+  .ep-v016-costfun-actions, .ep-v038-profile-grid { grid-template-columns:1fr; }
   .ep-v021-mode-grid { grid-template-columns:repeat(6,minmax(44px,1fr)); }
   .ep-control-surface button {
     appearance:none; min-width:44px; min-height:44px; padding:9px 10px;
@@ -249,6 +264,40 @@ const CONTROL_SURFACE_CSS = `
   .ep-automatic-control-button { width:100%; display:flex; align-items:center; justify-content:center; gap:9px; }
   .ep-automatic-indicator { width:10px; height:10px; border-radius:50%; background:#637c8f; pointer-events:none; }
   button[aria-pressed="true"] .ep-automatic-indicator { background:#34e4b0; }
+  .ep-automatic-compact { position:relative; }
+  .ep-automatic-compact .ep-control-title,
+  .ep-battery-quick .ep-control-title,
+  .ep-optimize-compact .ep-control-title {
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+  .ep-automatic-compact .ep-control-status { max-width:150px; text-align:right; }
+  .ep-automatic-compact .ep-automatic-control-button {
+    width:auto; min-width:128px; border-radius:999px; padding-inline:13px;
+  }
+  .ep-compact-selector { position:relative; min-width:0; }
+  .ep-compact-selector > summary,
+  .ep-manual-disclosure > summary {
+    min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:9px;
+    padding:9px 11px; border:1px solid rgba(74,187,226,.24); border-radius:11px;
+    background:rgba(8,43,69,.78); color:#c7e4ef; cursor:pointer;
+    font:800 11px/1.2 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+    list-style:none; touch-action:manipulation; -webkit-tap-highlight-color:rgba(59,226,205,.18);
+  }
+  .ep-compact-selector > summary::-webkit-details-marker,
+  .ep-manual-disclosure > summary::-webkit-details-marker { display:none; }
+  .ep-compact-selector > summary:focus-visible,
+  .ep-manual-disclosure > summary:focus-visible { outline:3px solid #71e8ff; outline-offset:3px; }
+  .ep-compact-selector-label { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ep-compact-selector-label strong { color:#eafaff; letter-spacing:.06em; }
+  .ep-compact-chevron { flex:0 0 auto; color:#7894a8; font-size:14px; }
+  .ep-compact-selector-menu {
+    position:absolute; z-index:30; top:calc(100% + 5px); left:0; right:0;
+    padding:8px; border:1px solid rgba(74,190,229,.28); border-radius:12px;
+    background:#061c31; box-shadow:0 16px 38px rgba(0,0,0,.42);
+  }
+  .ep-compact-selector:not([open]) > .ep-compact-selector-menu,
+  .ep-manual-disclosure:not([open]) > .ep-manual-body { display:none; }
   .ep-v038-profile { position:relative; text-align:left; }
   .ep-v038-profile strong, .ep-v038-profile small { display:block; pointer-events:none; }
   .ep-v038-profile small { margin-top:4px; color:#7894a8; font-size:9px; font-weight:600; }
@@ -269,16 +318,27 @@ const CONTROL_SURFACE_CSS = `
   .ep-v021-mode-button small { margin-top:3px; color:#7894a8; font-size:8px; }
   .ep-manual-readback { color:#7894a8; font-size:10px; white-space:normal; overflow-wrap:anywhere; text-align:right; }
   .ep-optimize-now { width:100%; border-color:rgba(52,228,176,.42)!important; }
+  .ep-manual-disclosure { min-width:0; }
+  .ep-manual-summary-copy { min-width:0; }
+  .ep-manual-summary-copy strong,
+  .ep-manual-summary-copy small { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ep-manual-summary-copy small { margin-top:3px; color:#7894a8; font-size:9px; font-weight:600; }
+  .ep-manual-disclosure[data-locked="true"] > summary { cursor:default; opacity:.82; }
+  .ep-manual-disclosure[data-locked="true"] > .ep-manual-body { display:none; }
+  .ep-manual-body { padding-top:9px; }
+  .ep-control-surface .ep-v022-strategy-note {
+    position:absolute!important; width:1px!important; height:1px!important; padding:0!important;
+    margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important;
+    white-space:nowrap!important; border:0!important;
+  }
   @media(max-width:820px) {
-    .ep-control-surface-grid { grid-template-columns:1fr; }
-    .ep-control-group.wide { grid-column:auto; }
-    .ep-v038-profile-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .ep-v021-mode-grid { grid-template-columns:repeat(4,minmax(44px,1fr)); }
   }
   @media(max-width:520px) {
-    .ep-control-surface { margin:10px 0 14px; padding:10px; }
-    .ep-battery-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .ep-v016-costfun-actions { grid-template-columns:1fr; }
+    .ep-control-surface { padding:12px; }
+    .ep-control-surface-head { align-items:flex-start; }
+    .ep-automatic-compact .ep-automatic-control-button { min-width:112px; padding-inline:10px; }
+    .ep-compact-selector-menu { position:static; margin-top:6px; }
     .ep-v038-custom-grid, .ep-v038-custom-values { grid-template-columns:1fr; }
   }
 `;
@@ -585,7 +645,7 @@ class EpBatteryActions extends EpAcknowledgedControl {
     const selected = this._selected();
     const busy = this.phase === "pending";
     return html`
-      <section class="ep-control-group" aria-busy=${busy ? "true" : "false"}>
+      <section class="ep-control-group ep-battery-quick" aria-busy=${busy ? "true" : "false"}>
         <h2 class="ep-control-title">${copy.battery}</h2>
         <div class="ep-control-actions ep-battery-actions" role="group" aria-label=${copy.battery}>
           ${QUICK_ACTIONS.map((definition) => html`
@@ -625,7 +685,7 @@ class EpAutomaticControl extends EpAcknowledgedControl {
     const known = ["on", "off"].includes(this.model.state);
     const busy = this.phase === "pending";
     return html`
-      <section class="ep-control-group" aria-busy=${busy ? "true" : "false"}>
+      <section class="ep-control-group ep-automatic-compact" aria-busy=${busy ? "true" : "false"}>
         <h2 class="ep-control-title">${copy.automatic}</h2>
         <button type="button" id="auto-toggle"
           class="ep-automatic-control-button"
@@ -657,24 +717,36 @@ class EpEmhassStrategy extends EpAcknowledgedControl {
   render() {
     const copy = textFor(this.model);
     const busy = this.phase === "pending";
+    const active = COST_FUNCTIONS.find(
+      (definition) => definition.raw === this.model.currentRaw
+    );
     return html`
       <section class="ep-control-group ep-v016-costfun" aria-busy=${busy ? "true" : "false"}>
-        <h2 class="ep-control-title">${copy.emhass}</h2>
-        <div class="ep-control-actions ep-v016-costfun-actions" role="group" aria-label=${copy.emhass}>
-          ${COST_FUNCTIONS.map((definition) => html`
-            <button type="button"
-              class=${`ep-v016-costfun-button${this.model.currentRaw === definition.raw ? " active" : ""}`}
-              data-costfun=${definition.raw}
-              data-control-id=${`emhass:${definition.raw}`}
-              data-pending=${this.pendingKey === definition.raw ? "true" : "false"}
-              aria-pressed=${this.model.currentRaw === definition.raw ? "true" : "false"}
-              ?disabled=${busy || !this.model.available?.[definition.raw]}
-              @click=${() => this._select(definition)}>
-              ${this.pendingKey === definition.raw ? copy.pending : definition.label}
-            </button>
-          `)}
-        </div>
-        ${this._status(this.model.currentRaw ? `${copy.active} · ${this.model.currentRaw}` : copy.unavailable)}
+        <details class="ep-compact-selector">
+          <summary data-control-id="emhass-selector"
+            aria-label=${`${copy.emhass}: ${active?.label || copy.unavailable}`}>
+            <span class="ep-compact-selector-label"><strong>${copy.emhassCompact}</strong> · ${active?.label || copy.unavailable}</span>
+            <span class="ep-compact-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="ep-compact-selector-menu">
+            <h2 class="ep-control-title">${copy.emhass}</h2>
+            <div class="ep-control-actions ep-v016-costfun-actions" role="group" aria-label=${copy.emhass}>
+              ${COST_FUNCTIONS.map((definition) => html`
+                <button type="button"
+                  class=${`ep-v016-costfun-button${this.model.currentRaw === definition.raw ? " active" : ""}`}
+                  data-costfun=${definition.raw}
+                  data-control-id=${`emhass:${definition.raw}`}
+                  data-pending=${this.pendingKey === definition.raw ? "true" : "false"}
+                  aria-pressed=${this.model.currentRaw === definition.raw ? "true" : "false"}
+                  ?disabled=${busy || !this.model.available?.[definition.raw]}
+                  @click=${() => this._select(definition)}>
+                  ${this.pendingKey === definition.raw ? copy.pending : definition.label}
+                </button>
+              `)}
+            </div>
+            ${this._status(this.model.currentRaw ? `${copy.active} · ${this.model.currentRaw}` : copy.unavailable)}
+          </div>
+        </details>
       </section>`;
   }
 }
@@ -770,81 +842,90 @@ class EpBatteryStrategy extends EpAcknowledgedControl {
     ];
     return html`
       <section class="ep-control-group wide ep-v038-strategy" aria-busy=${busy ? "true" : "false"}>
-        <h2 class="ep-control-title">${copy.batteryStrategy}</h2>
-        <div class="ep-control-actions ep-v038-profile-grid" role="group" aria-label=${copy.batteryStrategy}>
-          ${(this.model.modes || []).map((mode) => html`
-            <button type="button" class="ep-v038-profile"
-              data-ep-v038-profile=${mode.key}
-              data-control-id=${`profile:${mode.key}`}
-              data-pending=${this.pendingKey === `profile:${mode.key}` ? "true" : "false"}
-              aria-pressed=${this.model.activeMode === mode.key &&
-                (mode.key === CUSTOM_MODE ? !this.model.managed : this.model.managed)
-                ? "true"
-                : "false"}
-              ?disabled=${busy || this.model.loading || !this.model.data}
-              @click=${() => this._select(mode.key)}>
-              <strong>${mode.label}</strong><small>${mode.description}</small>
-            </button>
-          `)}
-        </div>
-        <div class="ep-v038-custom" ?hidden=${this.model.activeMode !== CUSTOM_MODE}>
-          <div class="ep-control-title">${copy.custom}</div>
-          <div class="ep-v038-custom-grid">
-            <label>${copy.minimumSoc}
-              <input type="range" min="0" max="100" step="1"
-                data-control-id="profile:minimum-soc"
-                .value=${String(this.minimumDraft ?? this.model.minimumSoc ?? 0)}
-                ?disabled=${busy || !this.model.minimumSocAvailable}
-                @input=${(event) => { this.minimumDraft = Number(event.currentTarget.value); }}
-                @change=${(event) => this._setSoc("minimum", event.currentTarget.value)}>
-            </label>
-            <label>${copy.maximumSoc}
-              <input type="range" min="0" max="100" step="1"
-                data-control-id="profile:maximum-soc"
-                .value=${String(this.maximumDraft ?? this.model.maximumSoc ?? 100)}
-                ?disabled=${busy || !this.model.maximumSocAvailable}
-                @input=${(event) => { this.maximumDraft = Number(event.currentTarget.value); }}
-                @change=${(event) => this._setSoc("maximum", event.currentTarget.value)}>
-            </label>
-          </div>
-          <div>
-            <div class="ep-v038-custom-values">
-              ${fields.map(([key, label]) => html`
-                <label>${label}
-                  <input type="number" inputmode="decimal" min="0" step="0.000001" required
-                    data-control-id=${`profile:custom:${key}`}
-                    .value=${String(values[key] ?? "")}
-                    ?disabled=${busy || !this.model.editable}
-                    @input=${(event) => this._customInput(key, event)}>
-                </label>
+        <details class="ep-compact-selector">
+          <summary data-control-id="battery-selector"
+            aria-label=${`${copy.batteryStrategy}: ${activeProfile?.label || copy.unavailable}`}>
+            <span class="ep-compact-selector-label"><strong>${copy.batteryCompact}</strong> · ${activeProfile?.label || copy.unavailable}</span>
+            <span class="ep-compact-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="ep-compact-selector-menu">
+            <h2 class="ep-control-title">${copy.batteryStrategy}</h2>
+            <div class="ep-control-actions ep-v038-profile-grid" role="group" aria-label=${copy.batteryStrategy}>
+              ${(this.model.modes || []).map((mode) => html`
+                <button type="button" class="ep-v038-profile"
+                  data-ep-v038-profile=${mode.key}
+                  data-control-id=${`profile:${mode.key}`}
+                  data-pending=${this.pendingKey === `profile:${mode.key}` ? "true" : "false"}
+                  aria-pressed=${this.model.activeMode === mode.key &&
+                    (mode.key === CUSTOM_MODE ? !this.model.managed : this.model.managed)
+                    ? "true"
+                    : "false"}
+                  ?disabled=${busy || this.model.loading || !this.model.data}
+                  @click=${() => this._select(mode.key)}>
+                  <strong>${mode.label}</strong><small>${mode.description}</small>
+                </button>
               `)}
             </div>
-            <div class="ep-v038-custom-actions">
-              <button type="button" class="ep-v038-custom-save"
-                data-control-id="profile:custom-save"
-                data-pending=${this.pendingKey === "custom" ? "true" : "false"}
-                ?disabled=${busy || !this.model.editable}
-                @click=${this._saveCustom}>${copy.saveCustom}</button>
+            <div class="ep-v038-custom" ?hidden=${this.model.activeMode !== CUSTOM_MODE}>
+              <div class="ep-control-title">${copy.custom}</div>
+              <div class="ep-v038-custom-grid">
+                <label>${copy.minimumSoc}
+                  <input type="range" min="0" max="100" step="1"
+                    data-control-id="profile:minimum-soc"
+                    .value=${String(this.minimumDraft ?? this.model.minimumSoc ?? 0)}
+                    ?disabled=${busy || !this.model.minimumSocAvailable}
+                    @input=${(event) => { this.minimumDraft = Number(event.currentTarget.value); }}
+                    @change=${(event) => this._setSoc("minimum", event.currentTarget.value)}>
+                </label>
+                <label>${copy.maximumSoc}
+                  <input type="range" min="0" max="100" step="1"
+                    data-control-id="profile:maximum-soc"
+                    .value=${String(this.maximumDraft ?? this.model.maximumSoc ?? 100)}
+                    ?disabled=${busy || !this.model.maximumSocAvailable}
+                    @input=${(event) => { this.maximumDraft = Number(event.currentTarget.value); }}
+                    @change=${(event) => this._setSoc("maximum", event.currentTarget.value)}>
+                </label>
+              </div>
+              <div>
+                <div class="ep-v038-custom-values">
+                  ${fields.map(([key, label]) => html`
+                    <label>${label}
+                      <input type="number" inputmode="decimal" min="0" step="0.000001" required
+                        data-control-id=${`profile:custom:${key}`}
+                        .value=${String(values[key] ?? "")}
+                        ?disabled=${busy || !this.model.editable}
+                        @input=${(event) => this._customInput(key, event)}>
+                    </label>
+                  `)}
+                </div>
+                <div class="ep-v038-custom-actions">
+                  <button type="button" class="ep-v038-custom-save"
+                    data-control-id="profile:custom-save"
+                    data-pending=${this.pendingKey === "custom" ? "true" : "false"}
+                    ?disabled=${busy || !this.model.editable}
+                    @click=${this._saveCustom}>${copy.saveCustom}</button>
+                </div>
+              </div>
             </div>
+            ${this.model.managed && activeProfile ? html`
+              <div class="ep-v038-managed">
+                <div class="ep-control-title">${copy.managedTitle}</div>
+                <div class="ep-v038-managed-grid">
+                  <span>${copy.hardRange} <strong>${profilePercent(activeProfile.minimum_soc_pct)} – ${profilePercent(activeProfile.maximum_soc_pct)}</strong></span>
+                  <span>${copy.comfortRange} <strong>${profilePercent(activeProfile.deficit_threshold_pct)} – ${profilePercent(activeProfile.surplus_threshold_pct)}</strong></span>
+                  <span>${copy.lowCost} <strong>${profilePercent(activeProfile.deficit_cost_factor_pct)}</strong></span>
+                  <span>${copy.highCost} <strong>${profilePercent(activeProfile.surplus_cost_factor_pct)}</strong></span>
+                  <span>${copy.stressCost} <strong>${profilePercent(activeProfile.stress_cost_factor_pct)}</strong></span>
+                  <span>${copy.antiChurn} <strong>${profilePercent(activeProfile.anti_churn_cost_factor_pct)}</strong></span>
+                </div>
+              </div>
+            ` : nothing}
+            ${this._status(
+              this.model.loading ? copy.profilesLoading : this.model.error || "",
+              this.model.error ? "error" : ""
+            )}
           </div>
-        </div>
-        ${this.model.managed && activeProfile ? html`
-          <div class="ep-v038-managed">
-            <div class="ep-control-title">${copy.managedTitle}</div>
-            <div class="ep-v038-managed-grid">
-              <span>${copy.hardRange} <strong>${profilePercent(activeProfile.minimum_soc_pct)} – ${profilePercent(activeProfile.maximum_soc_pct)}</strong></span>
-              <span>${copy.comfortRange} <strong>${profilePercent(activeProfile.deficit_threshold_pct)} – ${profilePercent(activeProfile.surplus_threshold_pct)}</strong></span>
-              <span>${copy.lowCost} <strong>${profilePercent(activeProfile.deficit_cost_factor_pct)}</strong></span>
-              <span>${copy.highCost} <strong>${profilePercent(activeProfile.surplus_cost_factor_pct)}</strong></span>
-              <span>${copy.stressCost} <strong>${profilePercent(activeProfile.stress_cost_factor_pct)}</strong></span>
-              <span>${copy.antiChurn} <strong>${profilePercent(activeProfile.anti_churn_cost_factor_pct)}</strong></span>
-            </div>
-          </div>
-        ` : nothing}
-        ${this._status(
-          this.model.loading ? copy.profilesLoading : this.model.error || "",
-          this.model.error ? "error" : ""
-        )}
+        </details>
       </section>`;
   }
 }
@@ -864,8 +945,10 @@ class EpOptimizeAction extends EpAcknowledgedControl {
   render() {
     const copy = textFor(this.model);
     const busy = this.phase === "pending" || this.model.running;
+    const status = String(this.model.status || "").trim();
+    const idleStatus = ["idle", "ready"].includes(status.toLowerCase());
     return html`
-      <section class="ep-control-group" aria-busy=${busy ? "true" : "false"}>
+      <section class="ep-control-group ep-optimize-compact" aria-busy=${busy ? "true" : "false"}>
         <h2 class="ep-control-title">${copy.optimize}</h2>
         <button type="button" class="ep-optimize-now"
           data-control-id="optimize-now"
@@ -873,7 +956,7 @@ class EpOptimizeAction extends EpAcknowledgedControl {
           aria-busy=${busy ? "true" : "false"}
           ?disabled=${busy || !this.model.available}
           @click=${this._optimize}>${busy ? copy.optimizing : copy.optimize}</button>
-        ${this._status(this.model.status || "")}
+        ${this._status(idleStatus ? "" : status)}
       </section>`;
   }
 }
@@ -935,41 +1018,50 @@ class EpManualEmsControls extends EpAcknowledgedControl {
     const locked = busy || automaticOn || !this.model.available;
     return html`
       <section class=${`ep-control-group wide ep-v021-manual-pad${automaticOn ? " compact" : ""}`} aria-busy=${busy ? "true" : "false"}>
-        <div class="ep-control-surface-head">
-          <h2 class="ep-control-title">${copy.manual}</h2>
-          <span class="ep-manual-readback" data-manual-note>${automaticOn ? copy.manualLocked : copy.manualReady}</span>
-        </div>
-        <div class="ep-control-actions ep-v021-mode-grid" role="group" aria-label=${copy.manual}
-          ?hidden=${automaticOn} aria-hidden=${automaticOn ? "true" : "false"}>
-          ${MANUAL_MODES.map((definition) => {
-            const localized = localizedEmsMode(this.model.language, definition.mode);
-            const label = `${definition.mode} · ${localized.name}${localized.tip ? ` — ${localized.tip}` : ""}`;
-            return html`
-            <button type="button" class="ep-v021-mode-button"
-              data-mode=${definition.mode}
-              data-control-id=${`manual-mode:${definition.mode}`}
-              data-pending=${this.pendingKey === `mode:${definition.mode}` ? "true" : "false"}
-              aria-label=${label} title=${label}
-              aria-pressed=${!automaticOn && this.model.mode === definition.mode ? "true" : "false"}
-              ?disabled=${locked}
-              @click=${() => this._selectMode(definition)}>
-              <strong>${definition.mode}</strong><small>${definition.tag}</small>
-            </button>`;
-          })}
-        </div>
-        <div class="ep-v021-power-row" ?hidden=${automaticOn} aria-hidden=${automaticOn ? "true" : "false"}>
-          <label class="ep-v021-power-label">${copy.manualPower}
-            <input type="range" class="ep-v021-power-slider"
-              min="0" .max=${String(this.model.max || 0)} .step=${String(this.model.step || 1)}
-              .value=${String(this.powerDraft)}
-              data-control-id="manual-power"
-              ?disabled=${locked}
-              @input=${this._powerInput}
-              @change=${this._savePower}>
-          </label>
-          <span class="ep-manual-readback">${Math.round(this.powerDraft)} W · ${copy.live} ${Number.isFinite(this.model.actualSetpoint) ? `${Math.round(this.model.actualSetpoint)} W` : "—"}</span>
-        </div>
-        ${this._status()}
+        <details class="ep-manual-disclosure" data-locked=${automaticOn ? "true" : "false"}>
+          <summary data-control-id="manual-selector"
+            aria-disabled=${automaticOn ? "true" : "false"}
+            @click=${(event) => { if (automaticOn) event.preventDefault(); }}>
+            <span class="ep-manual-summary-copy">
+              <strong>${copy.manual}</strong>
+              <small data-manual-note>${automaticOn ? copy.manualLocked : copy.manualReady}</small>
+            </span>
+            <span class="ep-compact-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="ep-manual-body">
+            <div class="ep-control-actions ep-v021-mode-grid" role="group" aria-label=${copy.manual}
+              ?hidden=${automaticOn} aria-hidden=${automaticOn ? "true" : "false"}>
+              ${MANUAL_MODES.map((definition) => {
+                const localized = localizedEmsMode(this.model.language, definition.mode);
+                const label = `${definition.mode} · ${localized.name}${localized.tip ? ` — ${localized.tip}` : ""}`;
+                return html`
+                <button type="button" class="ep-v021-mode-button"
+                  data-mode=${definition.mode}
+                  data-control-id=${`manual-mode:${definition.mode}`}
+                  data-pending=${this.pendingKey === `mode:${definition.mode}` ? "true" : "false"}
+                  aria-label=${label} title=${label}
+                  aria-pressed=${!automaticOn && this.model.mode === definition.mode ? "true" : "false"}
+                  ?disabled=${locked}
+                  @click=${() => this._selectMode(definition)}>
+                  <strong>${definition.mode}</strong><small>${definition.tag}</small>
+                </button>`;
+              })}
+            </div>
+            <div class="ep-v021-power-row" ?hidden=${automaticOn} aria-hidden=${automaticOn ? "true" : "false"}>
+              <label class="ep-v021-power-label">${copy.manualPower}
+                <input type="range" class="ep-v021-power-slider"
+                  min="0" .max=${String(this.model.max || 0)} .step=${String(this.model.step || 1)}
+                  .value=${String(this.powerDraft)}
+                  data-control-id="manual-power"
+                  ?disabled=${locked}
+                  @input=${this._powerInput}
+                  @change=${this._savePower}>
+              </label>
+              <span class="ep-manual-readback">${Math.round(this.powerDraft)} W · ${copy.live} ${Number.isFinite(this.model.actualSetpoint) ? `${Math.round(this.model.actualSetpoint)} W` : "—"}</span>
+            </div>
+            ${this._status()}
+          </div>
+        </details>
       </section>`;
   }
 }
@@ -990,20 +1082,42 @@ class EpControlSurface extends LitElement {
     return this;
   }
 
+  _collapseOtherDisclosures(event) {
+    const path = event.composedPath();
+    const summary = path.find(
+      (node) => node instanceof HTMLElement && node.tagName === "SUMMARY"
+    );
+    const selected = summary?.parentElement;
+    if (selected instanceof HTMLDetailsElement) {
+      for (const disclosure of this.querySelectorAll("details[open]")) {
+        if (disclosure !== selected) disclosure.open = false;
+      }
+      return;
+    }
+    const option = path.find(
+      (node) => node instanceof HTMLButtonElement &&
+        node.closest(".ep-compact-selector-menu")
+    );
+    option?.closest("details")?.removeAttribute("open");
+  }
+
   render() {
     const copy = textFor(this.model);
     return html`
       <style>${CONTROL_SURFACE_CSS}</style>
-      <section class="ep-control-surface" data-ep-permanent-control-surface="1" aria-label=${copy.surface}>
+      <section class="ep-control-surface" data-ep-permanent-control-surface="1"
+        aria-label=${copy.surface} @click=${this._collapseOtherDisclosures}>
         <div class="ep-control-surface-head">
           <div><div class="ep-control-surface-kicker">${copy.surface}</div><div class="ep-control-surface-detail">${copy.surfaceDetail}</div></div>
+          <ep-automatic-control .model=${this.model.automatic} .actions=${this.actions}></ep-automatic-control>
         </div>
         <div class="ep-control-surface-grid">
           <ep-battery-actions .model=${this.model.battery} .actions=${this.actions}></ep-battery-actions>
-          <ep-automatic-control .model=${this.model.automatic} .actions=${this.actions}></ep-automatic-control>
-          <ep-emhass-strategy .model=${this.model.emhass} .actions=${this.actions}></ep-emhass-strategy>
+          <div class="ep-control-selectors">
+            <ep-emhass-strategy .model=${this.model.emhass} .actions=${this.actions}></ep-emhass-strategy>
+            <ep-battery-strategy .model=${this.model.profiles} .actions=${this.actions}></ep-battery-strategy>
+          </div>
           <ep-optimize-action .model=${this.model.optimize} .actions=${this.actions}></ep-optimize-action>
-          <ep-battery-strategy .model=${this.model.profiles} .actions=${this.actions}></ep-battery-strategy>
           <ep-manual-ems-controls .model=${this.model.manual} .actions=${this.actions}></ep-manual-ems-controls>
         </div>
         <p class="section-note ep-v022-strategy-note"
@@ -1269,12 +1383,14 @@ export function mountEnergyPilotControlSurface(panel, root = panel?.shadowRoot) 
     surface = document.createElement("ep-control-surface");
     panel.__epPermanentControlSurface = surface;
   }
-  if (!surface.isConnected) {
+  const newlyMounted = !surface.isConnected;
+  if (newlyMounted) {
     const anchor = root.querySelector("[data-ep-control-anchor]");
     const main = root.querySelector("main");
     if (anchor) anchor.replaceWith(surface);
     else if (main) main.insertBefore(surface, main.children[1] || null);
   }
+  if (newlyMounted) panel.__epV008PlaceControlSurface?.(surface);
   surface.hidden = false;
   const gateway = controlGateway(panel);
   surface.actions = gateway.actions;

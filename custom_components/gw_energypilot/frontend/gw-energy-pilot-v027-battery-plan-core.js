@@ -1,12 +1,12 @@
-import "./gw-energy-pilot-v026-complete.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v026-complete.js?v=1.3.0-beta.1";
 import {
   CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartRange,
   chartSize, chartSubtitle, chartWindowData, formatTime, loadChartData,
   saveChartRange, saveChartSize, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.1";
 import {
   cardBody, ensureStyles, rangeControlHtml, sizeControlHtml,
-} from "./gw-energy-pilot-v027-battery-plan-view.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v027-battery-plan-view.js?v=1.3.0-beta.1";
 
 const V041_PANEL_STYLE_ID = "ep-v041-scoped-no-motion";
 const V041_GLOBAL_STYLE_ID = "ep-v041-scoped-global-no-motion";
@@ -24,6 +24,23 @@ function freezeV041Element(element) {
   element.style.setProperty("transition-property", "none", "important");
   element.style.setProperty("transition-duration", "0s", "important");
   element.style.setProperty("scroll-behavior", "auto", "important");
+}
+
+function isV041FlowParticle(element) {
+  return element instanceof Element && element.matches(
+    ".ep-v011-particles, .ep-v011-particles span"
+  );
+}
+
+function releaseV041FlowParticle(element) {
+  if (!isV041FlowParticle(element)) return;
+  element.removeAttribute(V041_STATIC_ATTRIBUTE);
+  for (const property of [
+    "animation", "animation-name", "animation-duration", "transition",
+    "transition-property", "transition-duration", "scroll-behavior", "display",
+  ]) {
+    element.style.removeProperty(property);
+  }
 }
 
 function freezeV041GlobalMotion() {
@@ -89,9 +106,12 @@ export function freezeV041Motion(panel) {
     `;
     root.appendChild(style);
   }
-  for (const element of root.querySelectorAll("*")) freezeV041Element(element);
+  for (const element of root.querySelectorAll("*")) {
+    if (isV041FlowParticle(element)) releaseV041FlowParticle(element);
+    else freezeV041Element(element);
+  }
   for (const element of root.querySelectorAll(
-    ".ep-flow-arrows, .ep-flow-live span, .ep-v011-particles, .ep-v011-particles span"
+    ".ep-flow-arrows, .ep-flow-live span"
   )) {
     element.style.setProperty("display", "none", "important");
   }
