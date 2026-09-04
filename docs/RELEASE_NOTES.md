@@ -17,6 +17,42 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.1 — Compact controls, scoped live-flow motion and built-in help
+
+This beta adds a localized **?** control to the dashboard header. Dutch Home
+Assistant sessions open the new Dutch manual and other sessions open the new
+English guide in a separate tab. Both guides cover installation, safe first
+validation, strategies, battery profiles, planning, EV features, normal daily
+operation, troubleshooting and support diagnostics. The GitHub introduction
+now presents EnergyPilot's user value and intelligent safety/control layers
+before the detailed release history.
+
+EnergyPilot controls now occupy one normal-width dashboard card immediately
+after the four live power cards instead of a large full-width area above them.
+The four quick actions remain visible, while EMHASS strategy, Battery Strategy
+and manual EMS use compact native disclosures. Optimize remains directly
+available and all interactive targets retain the 44 CSS-pixel touch minimum.
+Existing saved dashboard orders receive this fixed card after Grid without
+resetting the user's other ordering or visibility choices.
+
+This is a presentation-only consolidation: the permanent Lit nodes, confirmed
+state feedback, Automatic/manual ownership, service calls and GoodWe/EMHASS
+semantics remain unchanged.
+
+The dashboard's **Layout & visibility → Flow animations** switch is available
+again. It enables only the existing particles on finite active energy-flow
+connectors and preserves the stable connector DOM, fixed directional arrows,
+native touch handling and permanent control surface. The saved off state and
+the browser/device reduced-motion preference both suppress the particles
+completely. Non-flow animations, CSS transitions and modal backdrop filters
+remain disabled.
+
+The complete desktop Chromium, iPad WebKit and iPhone WebKit stability matrix
+verifies the on/off/reduced-motion states, zero non-flow motion and unchanged
+dashboard-control behavior, including the localized help link and its 44 CSS-
+pixel touch target. No Home Assistant API, GoodWe, EMS or EMHASS semantics
+change. See `docs/releases/v1.3.0-beta.1.md`.
+
 # v1.2.0 — Stable mobile controls and resilient EnergyPilot operation
 
 This normal/latest production release promotes the exact v1.2.0-beta.7 runtime
@@ -329,6 +365,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.1** | 2026-09-04 | **Beta** | Adds compact permanent controls, scoped live-flow animation, a localized built-in manual and a clearer product introduction without changing control semantics. |
 | **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |
 | **1.2.0-beta.7** | 2026-09-02 | **Beta** | Republishes the fully validated beta.6 mobile-control behavior behind a new complete frontend cache boundary. |
 | **1.2.0-beta.6** | 2026-09-02 | **Beta** | Enlarges the remaining chart/history touch targets and adds real missing-click coverage for S/M/L, 12h/24h/36h and full history. |
