@@ -4978,8 +4978,18 @@ def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, obj
         )
         result["menu_switch"] = switch_after is not None and switch_after != switch_before
 
+        # The switch queues a structural menu refresh on requestAnimationFrame.
+        # Let that refresh finish before selecting the reset button so slower
+        # WebKit runners never target the just-disconnected menu instance.
+        page.evaluate(
+            "() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+        )
+
         page.evaluate("window.__epDispatchMissingTouch('.ep-menu-reset')")
-        page.wait_for_timeout(100)
+        page.wait_for_function(
+            "() => window.__epPanel.shadowRoot.querySelector('[data-ep-visible=\"solar\"]')?.checked === true",
+            timeout=2_000,
+        )
         result["menu_reset"] = page.evaluate(
             "() => window.__epPanel.shadowRoot.querySelector('[data-ep-visible=\"solar\"]')?.checked === true"
         )
