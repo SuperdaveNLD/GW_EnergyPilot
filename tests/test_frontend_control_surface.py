@@ -18,6 +18,9 @@ class FrontendControlSurfaceTests(unittest.TestCase):
             encoding="utf-8"
         )
         cls.base = (FRONTEND / "gw-energy-pilot.js").read_text(encoding="utf-8")
+        cls.layout = (FRONTEND / "gw-energy-pilot-v008.js").read_text(
+            encoding="utf-8"
+        )
         cls.stable = (FRONTEND / "gw-energy-pilot-v041.js").read_text(
             encoding="utf-8"
         )
@@ -87,12 +90,43 @@ class FrontendControlSurfaceTests(unittest.TestCase):
         self.assertIn("_commitStructuralRender", self.base)
         self.assertIn("data-ep-control-anchor", self.base)
         self.assertIn("ep-control-surface", self.base)
+        self.assertIn("existingSurfaceContainer", self.base)
+        self.assertIn('classList.contains("ep-dashboard-layout")', self.base)
         self.assertNotIn("this.shadowRoot.innerHTML =", self.base)
         self.assertIn("existingSurface.isConnected", self.base)
 
+    def test_surface_is_one_compact_fixed_dashboard_card(self) -> None:
+        self.assertLess(
+            self.layout.index('{ id: "grid"'),
+            self.layout.index('id: "controls"'),
+        )
+        self.assertLess(
+            self.layout.index('id: "controls"'),
+            self.layout.index('{ id: "battery"'),
+        )
+        self.assertIn('selector: "ep-control-surface"', self.layout)
+        self.assertIn("fixed: true, toggleable: false", self.layout)
+        self.assertIn("mergeStoredOrder", self.layout)
+        self.assertIn("__epV008PlaceControlSurface", self.layout)
+        self.assertIn('dataset.epFixedCard === "true"', self.layout)
+        window_controls = (
+            FRONTEND / "gw-energy-pilot-v031-window-controls.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('card.dataset.epFixedCard === "true"', window_controls)
+        self.assertIn('grid-template-columns:repeat(2,minmax(0,1fr))', self.component)
+        self.assertIn('class="ep-control-selectors"', self.component)
+        self.assertIn('class="ep-compact-selector"', self.component)
+        self.assertIn(
+            '.ep-compact-selector:not([open]) > .ep-compact-selector-menu',
+            self.component,
+        )
+        self.assertIn('data-control-id="emhass-selector"', self.component)
+        self.assertIn('data-control-id="battery-selector"', self.component)
+        self.assertIn('class="ep-manual-disclosure"', self.component)
+
     def test_stable_layer_mounts_and_updates_one_surface(self) -> None:
         self.assertIn('import {', self.stable)
-        self.assertIn('from "./ep-control-surface.js?v=1.2.0-stable1"', self.stable)
+        self.assertIn('from "./ep-control-surface.js?v=1.3.0-beta.1"', self.stable)
         self.assertIn("mountEnergyPilotControlSurface", self.stable)
         self.assertIn("refreshEnergyPilotControlSurface", self.stable)
         self.assertIn("__epControlSurfaceArchitecture", self.stable)
@@ -122,6 +156,28 @@ class FrontendControlSurfaceTests(unittest.TestCase):
         for name in ("gw-energy-pilot-v024.js", "gw-energy-pilot-v028.js"):
             historical_note = (FRONTEND / name).read_text(encoding="utf-8")
             self.assertIn('closest("ep-control-surface")', historical_note, name)
+
+        legacy_soc = (FRONTEND / "gw-energy-pilot-v011.js").read_text(
+            encoding="utf-8"
+        )
+        start = legacy_soc.index("function installSocSliders")
+        guard = legacy_soc.index(
+            "if (panel.__epControlSurfaceArchitecture) return;", start
+        )
+        self.assertLess(guard - start, 420)
+
+    def test_emhass_overview_cost_function_reflects_confirmed_state(self) -> None:
+        legacy = (FRONTEND / "gw-energy-pilot-v015.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("button.dataset.emhassOverviewCostfun = value", legacy)
+        self.assertIn('button.setAttribute("aria-pressed", "false")', legacy)
+        self.assertIn('.ep-v015-costfun-button[aria-pressed="true"]', legacy)
+        self.assertIn(
+            '".panel-card.emhass .ep-v016-costfun, .panel-card.emhass .ep-v015-costfun"',
+            self.stable,
+        )
+        self.assertIn("patchCostFunctionSelector(panel, root);", self.stable)
 
     def test_lit_profile_presentation_has_single_dom_owner(self) -> None:
         self.assertIn('class="ep-v038-managed"', self.component)

@@ -288,9 +288,18 @@ class GWEnergyPilotPanel extends HTMLElement {
     const existingMain = existingSurface?.isConnected
       ? existingSurface.closest("main")
       : null;
+    const existingSurfaceContainer = existingSurface?.parentElement !== existingMain &&
+      existingSurface?.parentElement?.classList.contains("ep-dashboard-layout")
+      ? existingSurface.parentElement
+      : existingSurface;
     const nextMain = template.content.querySelector("main");
 
-    if (!existingSurface?.isConnected || !existingMain || !nextMain) {
+    if (
+      !existingSurface?.isConnected ||
+      !existingMain ||
+      !existingSurfaceContainer ||
+      !nextMain
+    ) {
       this.shadowRoot.replaceChildren(template.content);
       globalThis.__epRecordEnergyPilotControlTrace?.(this, "structural-render", {
         preserved: false,
@@ -322,7 +331,12 @@ class GWEnergyPilotPanel extends HTMLElement {
       existingMain.setAttribute(attribute.name, attribute.value);
     }
     for (const child of [...existingMain.childNodes]) {
-      if (child !== existingSurface) child.remove();
+      if (child !== existingSurfaceContainer) child.remove();
+    }
+    if (existingSurfaceContainer !== existingSurface) {
+      for (const child of [...existingSurfaceContainer.childNodes]) {
+        if (child !== existingSurface) child.remove();
+      }
     }
 
     let afterAnchor = false;
@@ -332,7 +346,7 @@ class GWEnergyPilotPanel extends HTMLElement {
         continue;
       }
       if (afterAnchor) existingMain.appendChild(child);
-      else existingMain.insertBefore(child, existingSurface);
+      else existingMain.insertBefore(child, existingSurfaceContainer);
     }
 
     globalThis.__epRecordEnergyPilotControlTrace?.(this, "structural-render", {

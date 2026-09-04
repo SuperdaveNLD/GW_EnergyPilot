@@ -27,7 +27,7 @@ Current release lines:
 
 ```text
 v1.2.0 Stable
-v1.2.0-beta.7 Previous beta
+v1.3.0-beta.1 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -61,18 +61,23 @@ EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must 
   reports must exclude all credentials.
 - See `docs/SEMS_API.md` for the current mapped subset and limits.
 
-## Frontend stability contract (v0.41+, active v1.2.0 Stable)
+## Frontend stability contract (v0.41+, active v1.3.0-beta.1)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.2.0 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.3.0-beta.1 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - The beta.5 iOS adapter may recover a missing touch click after 120 ms only
   through the same native element's existing click path, with a 12 px movement
   guard and late-click deduplication.
 - Operational controls must remain in the permanent Lit surface and must not be
   recreated or mutated by historical presentation layers.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
-- EnergyPilot animations, transitions, moving particle layers and modal backdrop filters remain disabled unless a later release introduces a separately proven, browser-tested motion contract.
+- General EnergyPilot animations, transitions, animated pseudo-elements and
+  modal backdrop filters remain disabled. The only motion exception is the
+  existing user-controlled live-flow particle layer: it may animate active
+  connectors when **Flow animations** is enabled, must stop completely when
+  disabled or when `prefers-reduced-motion: reduce` applies, and must retain
+  zero non-flow animations/transitions in the three-profile browser matrix.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
 - `docs/FRONTEND_STABLE_DOM.md` is the canonical architecture decision for this contract.
 
@@ -396,8 +401,9 @@ v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v110.js
-  -> gw-energy-pilot-v101.js
+gw-energy-pilot-v130.js
+  -> gw-energy-pilot-v110.js
+       -> gw-energy-pilot-v101.js
        -> gw-energy-pilot-v051.js
        -> gw-energy-pilot-v051-history.js
        -> gw-energy-pilot-v050.js
@@ -416,8 +422,8 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0 owns final stable presentation and the complete `1.2.0-stable1` cache
-boundary. It promotes beta.7 unchanged and retains the earlier safety,
+v1.3.0-beta.1 owns the beta presentation and complete `1.3.0-beta.1` cache
+boundary. It retains v1.2.0's stable safety,
 diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
 missing-click recovery, and expands the remaining graph/history touch targets
 to at least 44 CSS pixels on coarse-pointer/narrow displays. v1.1.1

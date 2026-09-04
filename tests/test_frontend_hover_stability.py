@@ -54,6 +54,7 @@ class FrontendHoverStabilityTests(unittest.TestCase):
                 any(
                     name in init_source
                     for name in (
+                        "gw-energy-pilot-v130.js?v=",
                         "gw-energy-pilot-v110.js?v=",
                         "gw-energy-pilot-v100.js?v=",
                         "gw-energy-pilot-v051.js?v=",

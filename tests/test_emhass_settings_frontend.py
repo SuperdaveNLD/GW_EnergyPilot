@@ -22,19 +22,19 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         release = (FRONTEND / "gw-energy-pilot-v044.js").read_text(encoding="utf-8")
         v043 = (FRONTEND / "gw-energy-pilot-v043.js").read_text(encoding="utf-8")
         v042 = (FRONTEND / "gw-energy-pilot-v042.js").read_text(encoding="utf-8")
-        self.assertIn("gw-energy-pilot-v110.js?v=1.2.0-stable1", init_source)
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.2.0-stable1"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.2.0-stable1"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.2.0-stable1"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.2.0-stable1"', v045)
+        self.assertIn("gw-energy-pilot-v130.js?v=1.3.0-beta.1", init_source)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.3.0-beta.1"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.3.0-beta.1"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.3.0-beta.1"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.3.0-beta.1"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=1.2.0-stable1"',
+            'import "./gw-energy-pilot-v043.js?v=1.3.0-beta.1"',
             release,
         )
         self.assertIn('const VERSION = "0.44"', release)
-        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.2.0-stable1"', v043)
-        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-stable1"', v042)
-        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.2.0-stable1"', self.source)
+        self.assertIn('import "./gw-energy-pilot-v042.js?v=1.3.0-beta.1"', v043)
+        self.assertIn('import "./gw-energy-pilot-v041-emhass-settings.js?v=1.3.0-beta.1"', v042)
+        self.assertIn('import "./gw-energy-pilot-v041.js?v=1.3.0-beta.1"', self.source)
         self.assertIn("__epV041EmhassSettingsInstalled", self.source)
 
     def test_emhass_fields_are_grouped_without_changing_setting_keys(self) -> None:
@@ -99,6 +99,28 @@ class EmhassSettingsFrontendTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('field.type === "select"', settings_source)
         self.assertIn('<select class="ep-v016-input"', settings_source)
+
+    def test_header_has_localized_native_user_guide_link(self) -> None:
+        settings_source = (
+            FRONTEND / "gw-energy-pilot-settings-v016.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn("function installHelpButton(panel, root)", settings_source)
+        self.assertIn('link.className = "ep-v016-help-button"', settings_source)
+        self.assertIn('link.target = "_blank"', settings_source)
+        self.assertIn('link.rel = "noopener noreferrer"', settings_source)
+        self.assertIn("docs/USER_GUIDE.md", settings_source)
+        self.assertIn("docs/HANDLEIDING_NL.md", settings_source)
+        self.assertIn("HELP_COPY[language]", settings_source)
+        self.assertIn("installHelpButton(this, root)", settings_source)
+
+        # Help is navigation only: no Home Assistant or hardware action path.
+        helper = settings_source[
+            settings_source.index("function installHelpButton") :
+            settings_source.index("function fieldValue")
+        ]
+        self.assertNotIn("callService", helper)
+        self.assertNotIn("callWS", helper)
+        self.assertNotIn("_queueRender", helper)
 
     def test_emhass_only_values_are_not_falsely_attached_to_energypilot_fields(self) -> None:
         self.assertIn("The editable fields are EnergyPilot settings", self.source)

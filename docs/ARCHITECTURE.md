@@ -1,8 +1,8 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.2.0**. It promotes the validated beta.7 candidate and retains v1.1.1 as the
-previous production base.
+v1.3.0-beta.1**. It retains v1.2.0 as the production base and adds a bounded
+beta presentation layer.
 
 ## High-level flow
 
@@ -519,8 +519,9 @@ The header reachability pill is also canonical stable DOM. It is created only du
 Active top-level module:
 
 ```text
-gw-energy-pilot-v110.js
-  -> gw-energy-pilot-v101.js
+gw-energy-pilot-v130.js
+  -> gw-energy-pilot-v110.js
+       -> gw-energy-pilot-v101.js
        -> gw-energy-pilot-v051.js
        -> gw-energy-pilot-v051-history.js
        -> gw-energy-pilot-v050.js
@@ -555,8 +556,8 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the previous stable
-base; v1.2.0 owns final stable presentation and the complete
-`1.2.0-stable1` active-graph cache boundary. Its EMHASS settings
+base; v1.3.0-beta.1 owns the beta presentation over v1.2.0 and the complete
+`1.3.0-beta.1` active-graph cache boundary. Its EMHASS settings
 select AUTO or a fixed CUSTOM household load at the final runtime request-body
 boundary; unrelated optimization parameters remain untouched. Its isolated
 Beta tests compare five iOS activation methods with deferred, observer-neutral
@@ -567,9 +568,9 @@ The same final presentation gives the compact chart size/range and
 execution-history open/close controls real 44 CSS-pixel touch targets on
 coarse-pointer/narrow displays.
 
-The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
+The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. It also owns the only motion exception: browser-local, user-switchable particles on active connectors, suppressed by the off state and reduced-motion media preference. Every non-flow animation and every CSS transition remains frozen. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 
-Visible/translated text is never a control identity. Canonical action/profile keys plus confirmed Home Assistant/API models and `aria-pressed` define selected state. Each asynchronous action is `idle -> pending -> acknowledged | error`; a resolved service call cannot select a control before matching backend publication. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; current presentation is static and patched in place. See `docs/FRONTEND_CONTROL_ARCHITECTURE.md`, `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
+Visible/translated text is never a control identity. Canonical action/profile keys plus confirmed Home Assistant/API models and `aria-pressed` define selected state. Each asynchronous action is `idle -> pending -> acknowledged | error`; a resolved service call cannot select a control before matching backend publication. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; the stable fixed presentation and optional particle state are patched in place. See `docs/FRONTEND_CONTROL_ARCHITECTURE.md`, `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
 Historical frontend layering remains technical debt below the v0.34 base. The permanent control surface is the first consolidated functional boundary; dashboard cards, Settings, modals, diagnostics, layout/window controls, flow and graph/history presentation still use the historical chain. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
 
