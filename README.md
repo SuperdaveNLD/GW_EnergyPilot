@@ -4,15 +4,71 @@
 
 # GW EnergyPilot
 
-GW EnergyPilot is an unofficial Home Assistant integration for selectable local
-or SEMS+ GoodWe ETA-G20 telemetry, local GoodWe EMS control and EMHASS
-optimization.
+**Turn a GoodWe ETA-G20 into a transparent, price-aware home energy system.**
+
+GW EnergyPilot brings live inverter telemetry, safe local battery control,
+EMHASS planning, dynamic prices and EV protection together in one built-in
+Home Assistant dashboard. See what your home is doing now, understand what the
+battery is going to do next and let one clearly owned control path execute the
+plan.
+
+[Get started](#installation--first-validation) ·
+[English user guide](docs/USER_GUIDE.md) ·
+[Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
+[Latest beta](docs/releases/v1.3.0-beta.1.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
+## One cockpit for your home energy
+
+EnergyPilot is built for people who want more than a collection of inverter
+sensors. It connects measurement, planning and execution while keeping each
+system's responsibility explicit:
+
+- **See the whole energy flow** — live PV, home, grid and battery power, SOC,
+  phase currents, temperatures, daily import/export and optional external PV;
+- **Plan around energy prices** — run and publish EMHASS plans on reliable
+  wall-clock boundaries with optional Nord Pool/runtime pricing;
+- **Control the inverter locally** — translate the active battery/grid plan to
+  verified GoodWe EMS modes and setpoints over local Modbus TCP;
+- **Choose how the plan is followed** — Battery, Grid or Hybrid control, from
+  direct battery power to GoodWe smart-meter/PCC targets;
+- **Protect the system when reality changes** — block home-battery discharge
+  into a charging EV, wait for fresh plans and suspend EV coordination when
+  charger state becomes stale;
+- **Keep plans resilient** — bridge a temporary missing EMHASS publication
+  with the last validated, still-current official plan, never an expired guess;
+- **Tune battery behaviour without black boxes** — five transparent profiles,
+  price-relative SOC preferences, power-stress and anti-churn costs, plus a
+  fully editable Custom mode;
+- **Understand every decision** — compare plan, actual battery power and price,
+  inspect execution history and create a credential-free diagnostic report.
+
+All EMS and minimum-SOC writes remain local and are read back for verification.
+SEMS+ is an optional Beta telemetry source only; it never becomes a control
+transport.
+
+## How the intelligence fits together
+
+```text
+GoodWe + Home Assistant telemetry
+                ↓
+       EMHASS price-aware plan
+                ↓
+   EnergyPilot safety + strategy layer
+                ↓
+   verified local GoodWe EMS command
+```
+
+The dashboard's **?** button opens the user guide in English or Dutch, based on
+the Home Assistant language. The guide covers first setup, daily operation,
+strategies, Battery Saver, EV features, troubleshooting and safe validation.
+
 ## Status
 
-**v1.2.0 · Stable**
+**v1.3.0-beta.1 · Beta prerelease**
+
+Latest production release: **v1.2.0 · Stable**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -40,6 +96,9 @@ See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps
 
 Release documentation:
 
+- `docs/USER_GUIDE.md` — English installation and daily-use guide;
+- `docs/HANDLEIDING_NL.md` — Nederlandse installatie- en gebruikershandleiding;
+- `docs/releases/v1.3.0-beta.1.md` — current compact-controls, flow-motion and built-in-help beta notes;
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
 - `docs/releases/v1.2.0.md` — current stable mobile-control and telemetry release notes;
 - `docs/releases/v1.2.0-beta.7.md` — validated beta.6 touch-control roll-forward notes;
@@ -93,6 +152,21 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.1 highlights
+
+- Consolidates operational controls into one normal-width, fixed dashboard
+  card with always-visible quick actions and compact native disclosures.
+- Restores optional live-flow particle motion while retaining zero non-flow
+  animations/transitions and respecting both the saved off state and reduced
+  motion.
+- Removes duplicate EMHASS overview SOC editors and keeps Battery Strategy →
+  Custom as the single owner.
+- Adds a localized **?** header link plus complete English and Dutch guides for
+  setup, safe validation, daily operation and troubleshooting.
+- Uses the complete `1.3.0-beta.1` frontend cache boundary. GoodWe registers,
+  EMS semantics, EMHASS ownership, entity identities and persistent stores are
+  unchanged.
 
 ## v1.2.0 highlights
 
@@ -233,8 +307,13 @@ Release documentation:
 - GoodWe registers, EMS writes, normal strategy decisions, entity identities
   and persistent Store schemas remain unchanged.
 
-## Unreleased frontend reliability work
+## v1.3.0-beta.1 frontend reliability work
 
+- The former full-width control area is consolidated into one normal-width,
+  fixed **EnergyPilot controls** card immediately after the four live power
+  cards. Its four quick actions stay visible in a 2 × 2 grid; EMHASS, Battery
+  Strategy and manual EMS use compact disclosures; and Optimize remains one
+  tap away. Battery Strategy → Custom remains the single SOC editor.
 - Operational dashboard controls now live in one permanent declarative Lit
   surface with native buttons/clicks and frozen control-only models.
 - Service completion never selects a control optimistically: each action waits
@@ -398,7 +477,7 @@ Release documentation:
 - Normal GoodWe and EMHASS telemetry updates mutate the existing dashboard DOM instead of rebuilding the complete ShadowRoot, preserving button identity, focus, hover and the Home Assistant scroll container.
 - Battery Strategy and Battery · Plan · Price refreshes are scoped to their own sections/cards; a fresh optimization no longer rebuilds unrelated controls.
 - The active v0.41 path removes inherited pointer/render guarding and delayed mobile scroll restoration, leaving vertical pan and momentum scrolling under native browser/WebView ownership.
-- All EnergyPilot animations, transitions, flow particles and modal backdrop filters are intentionally disabled for deterministic desktop, iPad and iPhone behavior.
+- v0.41 originally disabled all EnergyPilot animations, transitions, flow particles and modal backdrop filters for deterministic desktop, iPad and iPhone behavior; the current development head restores only the separately tested Flow animations preference.
 - Real-browser CI covers desktop Chromium, iPad WebKit touch and iPhone WebKit touch, including telemetry during scrolling, menu/buttons, plan refresh, Dutch localization and deliberate structural rerender recovery.
 - No GoodWe register, Modbus, EMS, Automatic Control or EMHASS backend semantics change.
 
