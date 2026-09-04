@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.3.0-beta.1";
+import "./gw-energy-pilot-v039.js?v=1.3.0-beta.2";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.1";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.2";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.2";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.2";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.2";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.3.0-beta.1";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.1";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.1";
+} from "./ep-control-surface.js?v=1.3.0-beta.2";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.2";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.2";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -79,6 +79,7 @@ const COPY = Object.freeze({
     gridToSystem: "Grid to system",
     systemToGrid: "System to grid",
     systemToHouse: "System to house",
+    houseToEv: "House to EV charger",
     batteryToSystem: "Battery to system",
     systemToBattery: "System to battery",
     pvSources: "PV sources",
@@ -97,6 +98,7 @@ const COPY = Object.freeze({
     connectivityChecking: "CHECKING",
     modbus: "Modbus",
     evCharger: "EV charger",
+    evPartOfLoad: "Part of total load",
     evCoordination: "EV coordination",
     online: "Online",
     unreachable: "Unknown / unreachable",
@@ -158,6 +160,7 @@ const COPY = Object.freeze({
     gridToSystem: "Net naar systeem",
     systemToGrid: "Systeem naar net",
     systemToHouse: "Systeem naar woning",
+    houseToEv: "Woning naar laadpaal",
     batteryToSystem: "Batterij naar systeem",
     systemToBattery: "Systeem naar batterij",
     pvSources: "PV-bronnen",
@@ -176,6 +179,7 @@ const COPY = Object.freeze({
     connectivityChecking: "CONTROLEREN",
     modbus: "Modbus",
     evCharger: "Laadpaal",
+    evPartOfLoad: "Onderdeel totale belasting",
     evCoordination: "EV-regeling",
     online: "Online",
     unreachable: "Onbekend / niet bereikbaar",
@@ -397,6 +401,8 @@ const NO_MOTION_CSS = `
   :host .ep-flow-stage {
     --ep-v041-pv-group-width: 112px;
     --ep-v041-pv-hub-half: 31px;
+    --ep-v041-node-width: 92px;
+    --ep-v041-node-height: 68px;
   }
   :host .ep-flow-pv-group {
     position: absolute;
@@ -520,6 +526,26 @@ const NO_MOTION_CSS = `
   :host .ep-v034-flow-compact .ep-flow-stage {
     --ep-v041-pv-group-width: calc(var(--ep-v034-node-width) + 16px);
     --ep-v041-pv-hub-half: var(--ep-v034-hub-half);
+    --ep-v041-node-width: var(--ep-v034-node-width);
+    --ep-v041-node-height: var(--ep-v034-node-height);
+  }
+  :host .ep-flow-ev {
+    top: 0;
+    right: 0;
+    border-color: rgba(151, 115, 255, .30);
+  }
+  :host .ep-flow-ev .ep-flow-icon svg {
+    stroke: #a98cff;
+    filter: drop-shadow(0 0 6px rgba(169,140,255,.42));
+  }
+  :host .ep-link-ev {
+    top: calc(var(--ep-v041-node-height) / 2);
+    left: calc(50% + var(--ep-v041-node-width) / 2 - 2px);
+    right: calc(var(--ep-v041-node-width) - 2px);
+    width: auto;
+    height: 18px;
+    transform: translateY(-50%);
+    color: #a98cff;
   }
   :host .ep-v034-flow-tight .ep-flow-pv-total-label,
   :host .ep-v034-flow-tight .ep-flow-pv-source .ep-flow-node-sub {
@@ -912,6 +938,59 @@ function patchPvFlowGroup(panel, root, snapshot) {
   setText(externalNode, ".ep-flow-node-sub", t.externalPvRoute);
 }
 
+function evFlowSnapshot(panel) {
+  const attrs = panel._stateByKey?.("control_command")?.attributes || {};
+  return {
+    configured: attrs.ev_charger_configured === true,
+    active: attrs.ev_active === true,
+    power: finiteValue(attrs.ev_power_w),
+  };
+}
+
+function installEvFlowNode(root) {
+  const stage = root?.querySelector(".ep-flow-stage");
+  if (!stage || stage.querySelector(".ep-flow-ev")) return;
+
+  const node = document.createElement("div");
+  node.className = "ep-flow-node ep-flow-ev";
+  node.hidden = true;
+  node.innerHTML = `
+    <div class="ep-flow-node-title">EV CHARGER</div>
+    <div class="ep-flow-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M7 3h8v18H7zM9 6h4M9 10h4M15 7h2l2 2v6a2 2 0 0 0 2 2M10 17h2"/></svg>
+    </div>
+    <div class="ep-flow-node-value">—</div>
+    <div class="ep-flow-node-sub">Part of total load</div>`;
+
+  const link = document.createElement("div");
+  link.className = "ep-flow-link ep-link-ev idle";
+  link.hidden = true;
+  link.innerHTML = `
+    <div class="ep-flow-track"></div>
+    <div class="ep-flow-arrows"><span>›</span><span>›</span><span>›</span></div>`;
+  stage.append(link, node);
+}
+
+function patchEvFlowNode(panel, root, snapshot) {
+  const node = root?.querySelector(".ep-flow-ev");
+  const link = root?.querySelector(".ep-link-ev");
+  if (!node || !link) return;
+  node.hidden = !snapshot.configured;
+  link.hidden = !snapshot.configured;
+  if (!snapshot.configured) return;
+
+  const t = copy(panel);
+  setText(node, ".ep-flow-node-title", t.evCharger);
+  setText(
+    node,
+    ".ep-flow-node-value",
+    Number.isFinite(snapshot.power)
+      ? panel._formatPower(snapshot.power)
+      : snapshot.active ? t.charging : "—"
+  );
+  setText(node, ".ep-flow-node-sub", t.evPartOfLoad);
+}
+
 function patchPvSourceMetrics(panel, solar, snapshot) {
   if (!solar) return;
   const t = copy(panel);
@@ -1216,6 +1295,7 @@ function flowDirectionText(panel, key, direction) {
   if (key === "pvInternal") return t.internalPvToEta;
   if (key === "pvExternal") return t.externalPvToPcc;
   if (key === "house") return t.systemToHouse;
+  if (key === "ev") return t.houseToEv;
   if (key === "grid") return direction === "left" ? t.gridToSystem : t.systemToGrid;
   return direction === "up" ? t.batteryToSystem : t.systemToBattery;
 }
@@ -1227,6 +1307,7 @@ function flowSourceText(panel, key) {
     pvExternal: language(panel) === "nl" ? "Externe PV" : "External PV",
     grid: language(panel) === "nl" ? "Net" : "Grid",
     house: language(panel) === "nl" ? "Woning" : "House",
+    ev: copy(panel).evCharger,
     battery: language(panel) === "nl" ? "Batterij" : "Battery",
   }[key];
 }
@@ -1260,7 +1341,7 @@ function patchStaticFlowLink(panel, link, key, presentation) {
   link.title = label;
 }
 
-function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery }) {
+function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery, ev }) {
   const directions = {
     pvInternal: Number.isFinite(pvInternal) && pvInternal > FLOW_THRESHOLD_W
       ? "right"
@@ -1274,11 +1355,12 @@ function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery }) 
     house: !Number.isFinite(house) || Math.abs(house) < FLOW_THRESHOLD_W
       ? "idle"
       : "up",
+    ev: !Number.isFinite(ev) || ev < FLOW_THRESHOLD_W ? "idle" : "right",
     battery: !Number.isFinite(battery) || Math.abs(battery) < FLOW_THRESHOLD_W
       ? "idle"
       : battery > 0 ? "up" : "down",
   };
-  const powers = { pvInternal, pvExternal, house, grid, battery };
+  const powers = { pvInternal, pvExternal, house, grid, battery, ev };
   const activeMaximum = Math.max(
     0,
     ...Object.entries(powers)
@@ -1316,6 +1398,7 @@ function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery }) 
 function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
   const pv = pvSnapshot.power;
   const house = resolveHousePower(load, pv, grid, battery);
+  const evSnapshot = evFlowSnapshot(panel);
   const visual = splitPvFlowVisualMap({
     pvInternal: pvSnapshot.internalEnabled ? pvSnapshot.internalPower : null,
     pvExternal: pvSnapshot.externalEnabled && pvSnapshot.configuredExternal > 0
@@ -1324,12 +1407,14 @@ function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
     house,
     grid,
     battery,
+    ev: evSnapshot.configured ? evSnapshot.power : null,
   });
   const t = copy(panel);
   const gridMode = gridPresentation(panel, grid);
   const batteryMode = batteryPresentation(panel, battery);
 
   patchPvFlowGroup(panel, root, pvSnapshot);
+  patchEvFlowNode(panel, root, evSnapshot);
   setText(root, ".ep-flow-house .ep-flow-node-value", panel._formatPower(house));
   setText(root, ".ep-flow-grid .ep-flow-node-value", panel._formatPower(grid));
   setText(root, ".ep-flow-battery .ep-flow-node-value", panel._formatPower(battery));
@@ -1353,6 +1438,9 @@ function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
     battery: !Number.isFinite(battery) || Math.abs(battery) < FLOW_THRESHOLD_W
       ? "idle"
       : battery > 0 ? "inbound" : "outbound",
+    ev: !Number.isFinite(evSnapshot.power) || evSnapshot.power < FLOW_THRESHOLD_W
+      ? "idle"
+      : "outbound",
   };
   for (const [key, selector] of Object.entries({
     pvInternal: ".ep-link-pv-internal",
@@ -1360,6 +1448,7 @@ function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
     grid: ".ep-link-grid",
     house: ".ep-link-house",
     battery: ".ep-link-battery",
+    ev: ".ep-link-ev",
   })) {
     const link = root.querySelector(selector);
     if (!link) continue;
@@ -2242,6 +2331,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
     installPvFlowGroup(this.shadowRoot);
+    installEvFlowNode(this.shadowRoot);
     installEvProtectionBanner(this.shadowRoot);
     this.__epV041RefreshLiveDom = () => {
       ensureNoMotionStyle(this.shadowRoot);

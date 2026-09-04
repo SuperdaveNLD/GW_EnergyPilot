@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.1.md)
+[Latest beta](docs/releases/v1.3.0-beta.2.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,7 +66,7 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.1 · Beta prerelease**
+**v1.3.0-beta.2 · Beta prerelease**
 
 Latest production release: **v1.2.0 · Stable**
 
@@ -98,7 +98,8 @@ Release documentation:
 
 - `docs/USER_GUIDE.md` — English installation and daily-use guide;
 - `docs/HANDLEIDING_NL.md` — Nederlandse installatie- en gebruikershandleiding;
-- `docs/releases/v1.3.0-beta.1.md` — current compact-controls, flow-motion and built-in-help beta notes;
+- `docs/releases/v1.3.0-beta.2.md` — current responsive Power overview and optional EV charger beta notes;
+- `docs/releases/v1.3.0-beta.1.md` — compact-controls, flow-motion and built-in-help beta notes;
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
 - `docs/releases/v1.2.0.md` — current stable mobile-control and telemetry release notes;
 - `docs/releases/v1.2.0-beta.7.md` — validated beta.6 touch-control roll-forward notes;
@@ -152,6 +153,20 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.2 highlights
+
+- Adds `S`, `M` and `L` Power overview sizes for one column, two columns or a
+  complete dashboard row, with a safe single-column mobile fallback.
+- Corrects node alignment by selecting compact flow geometry from the actual
+  card width instead of the browser viewport.
+- Shows an EV charger branch only when a charger source is configured and
+  keeps it explicitly display-only and part of total household load.
+- Keeps expanded EnergyPilot disclosures above neighboring card-window
+  controls and makes the non-interactive `AUTO ACTIVE` badge substantially
+  smaller without changing operational touch targets.
+- Advances the complete frontend cache boundary to `1.3.0-beta.2` without
+  changing GoodWe, EMS, EMHASS, Battery Saver or accounting semantics.
 
 ## v1.3.0-beta.1 highlights
 

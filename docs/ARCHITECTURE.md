@@ -1,7 +1,7 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.3.0-beta.1**. It retains v1.2.0 as the production base and adds a bounded
+v1.3.0-beta.2**. It retains v1.2.0 as the production base and adds a bounded
 beta presentation layer.
 
 ## High-level flow
@@ -519,8 +519,9 @@ The header reachability pill is also canonical stable DOM. It is created only du
 Active top-level module:
 
 ```text
-gw-energy-pilot-v130.js
-  -> gw-energy-pilot-v110.js
+gw-energy-pilot-v131.js
+  -> gw-energy-pilot-v130.js
+       -> gw-energy-pilot-v110.js
        -> gw-energy-pilot-v101.js
        -> gw-energy-pilot-v051.js
        -> gw-energy-pilot-v051-history.js
@@ -556,8 +557,8 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the previous stable
-base; v1.3.0-beta.1 owns the beta presentation over v1.2.0 and the complete
-`1.3.0-beta.1` active-graph cache boundary. Its EMHASS settings
+base; v1.3.0-beta.2 owns the beta presentation over v1.2.0 and the complete
+`1.3.0-beta.2` active-graph cache boundary. Its EMHASS settings
 select AUTO or a fixed CUSTOM household load at the final runtime request-body
 boundary; unrelated optimization parameters remain untouched. Its isolated
 Beta tests compare five iOS activation methods with deferred, observer-neutral

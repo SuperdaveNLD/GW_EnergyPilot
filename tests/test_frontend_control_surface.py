@@ -69,6 +69,36 @@ class FrontendControlSurfaceTests(unittest.TestCase):
         self.assertNotIn("animation:", self.component)
         self.assertNotIn("backdrop-filter", self.component)
 
+    def test_header_automatic_status_is_compact_and_not_a_touch_target(self) -> None:
+        self.assertIn('class="status ep-automatic-status ${statusClass}"', self.base)
+        self.assertRegex(
+            self.base,
+            re.compile(
+                r"\.status\.ep-automatic-status\s*\{[^}]*"
+                r"padding:\s*4px 7px;[^}]*font-size:\s*9px;"
+            ),
+        )
+        self.assertRegex(
+            self.base,
+            re.compile(
+                r"\.status\.ep-automatic-status \.dot\s*\{[^}]*"
+                r"width:\s*5px;[^}]*height:\s*5px;"
+            ),
+        )
+
+    def test_surface_overlays_card_window_controls_when_expanded(self) -> None:
+        window_controls = (
+            FRONTEND / "gw-energy-pilot-v031-window-controls.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn("position:relative; z-index:70", window_controls)
+        self.assertRegex(
+            self.component,
+            re.compile(
+                r"ep-control-surface\s*\{[^}]*position:\s*relative;[^}]*"
+                r"z-index:\s*80;"
+            ),
+        )
+
     def test_every_operational_group_uses_the_same_state_machine(self) -> None:
         for state in ("idle", "pending", "acknowledged", "error"):
             self.assertIn(f'"{state}"', self.component)
@@ -126,7 +156,7 @@ class FrontendControlSurfaceTests(unittest.TestCase):
 
     def test_stable_layer_mounts_and_updates_one_surface(self) -> None:
         self.assertIn('import {', self.stable)
-        self.assertIn('from "./ep-control-surface.js?v=1.3.0-beta.1"', self.stable)
+        self.assertIn('from "./ep-control-surface.js?v=1.3.0-beta.2"', self.stable)
         self.assertIn("mountEnergyPilotControlSurface", self.stable)
         self.assertIn("refreshEnergyPilotControlSurface", self.stable)
         self.assertIn("__epControlSurfaceArchitecture", self.stable)

@@ -502,7 +502,7 @@ class GWEnergyPilotPanel extends HTMLElement {
             </div>
           </div>
           <div class="header-actions">
-            <span class="status ${statusClass}"><span class="dot"></span>${statusText}</span>
+            <span class="status ep-automatic-status ${statusClass}"><span class="dot"></span>${statusText}</span>
             <span class="version">v${VERSION}</span>
           </div>
         </header>
@@ -684,6 +684,8 @@ class GWEnergyPilotPanel extends HTMLElement {
       .header-actions { display: flex; align-items: center; gap: 10px; }
       .version { color: var(--ep-muted); font-size: 12px; border: 1px solid var(--ep-border); border-radius: 999px; padding: 7px 9px; }
       .status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; font-size: 11px; letter-spacing: .08em; font-weight: 800; white-space: nowrap; }
+      .status.ep-automatic-status { gap: 5px; padding: 4px 7px; font-size: 9px; letter-spacing: .06em; }
+      .status.ep-automatic-status .dot { width: 5px; height: 5px; }
       .status.active { color: #dffff4; background: rgba(24, 239, 163, .11); border: 1px solid rgba(24, 239, 163, .25); }
       .status.inactive { color: #c4d2df; background: rgba(145, 167, 189, .09); border: 1px solid rgba(145, 167, 189, .17); }
       .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 12px currentColor; }

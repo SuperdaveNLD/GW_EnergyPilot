@@ -4,6 +4,35 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.2] - 2026-09-04
+
+### Added
+
+- Add `S`, `M` and `L` sizing to the Power overview card. Small uses one
+  dashboard column, Medium two columns and Large the complete row; narrow
+  mobile layouts safely collapse all three to one column.
+- Show a display-only EV charger branch in Power overview when an EV charger
+  source is configured. The branch reports configured charger power when
+  available and remains separate from household-load accounting and control.
+
+### Fixed
+
+- Base compact Power overview geometry on the measured card width, keeping the
+  house, grid, battery, PV and optional charger nodes aligned when the card is
+  placed in a narrow dashboard column.
+- Preserve direct EV-power display updates while Automatic Control is off,
+  without adding a charger-control loop.
+- Combine the compact control-card overflow geometry with its established
+  stacking context so disclosures remain visible above neighboring cards.
+- Reduce the non-interactive `AUTO ACTIVE` status badge without shrinking any
+  operational control or touch target.
+
+### Changed
+
+- Advance the complete active frontend module graph to cache boundary
+  `1.3.0-beta.2` so Home Assistant cannot mix beta.1 presentation modules with
+  the updated flow layout.
+
 ## [1.3.0-beta.1] - 2026-09-04
 
 ### Added
