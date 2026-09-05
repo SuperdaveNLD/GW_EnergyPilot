@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.3.0-beta.3** and retained from v1.0.0 Stable.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.3.0-beta.4** and retained from v1.0.0 Stable.
 
 ## Purpose
 
@@ -11,7 +11,7 @@ The dashboard shows, on one selectable Home Assistant-local timeline:
 - the latest validated EMHASS future battery schedule;
 - actual GoodWe battery SOC and the historical/current wanted EMHASS SOC;
 - actual combined PV production and the validated expected solar-production
-  series in Large and expanded views;
+  series in every chart size and expanded views;
 - estimated solar/grid origin for battery charge and solar/battery origin for
   grid export in the detailed view;
 - the direction-neutral market-price series;
@@ -80,7 +80,7 @@ only attribution.
 
 ## Actual and expected solar production
 
-Large and expanded views additionally show the combined display-only
+All chart sizes (S, M and L) and expanded views show the combined display-only
 `pv_generation_power` series as a solid yellow **Actual solar production**
 line. It is the same bounded Recorder 5-minute mean data already used for
 actual-flow attribution. The yellow dashed **Forecast solar production** step
@@ -91,7 +91,7 @@ official EMHASS plan mirror:
 EMHASS GET /api/v1/plan P_PV
 -> validated current plan mirror
 -> pv_plan in battery_price/get
--> large/expanded chart
+-> every chart size and expanded view
 ```
 
 The forecast is not derived from a similarly named Home Assistant entity, is
@@ -293,9 +293,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v1.3.0-beta.3 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v1.3.0-beta.4 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.3.0-beta.3 loads its presentation wrapper and every inner feature import through `1.3.0-beta.3`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.3.0-beta.4 loads its presentation wrapper and every inner feature import through `1.3.0-beta.4`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
 
 ## EV protection underlays
 

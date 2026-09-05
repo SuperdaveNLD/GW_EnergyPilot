@@ -4,6 +4,22 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.4] - 2026-09-05
+
+### Fixed
+
+- Display actual and expected solar production and their legend in all
+  Battery · Plan · Price sizes, including the default Medium and Compact.
+  Beta.3 incorrectly restricted them to Large and expanded views.
+- Include the solar data-source and unavailable-data notes in the normal
+  graph, using the existing Recorder actuals and official EMHASS forecast.
+
+### Changed
+
+- Advance the complete active frontend cache boundary to `1.3.0-beta.4`.
+- Extend desktop Chromium, iPad WebKit and iPhone WebKit regressions to verify
+  both solar curves and legend entries through S/M/L switches and expansion.
+
 ## [1.3.0-beta.3] - 2026-09-05
 
 ### Added
