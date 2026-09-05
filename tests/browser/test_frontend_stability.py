@@ -4540,6 +4540,8 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         "source_bars": False,
         "actual_solar_visible": False,
         "forecast_solar_visible": False,
+        "solar_all_sizes": False,
+        "solar_expanded": False,
         "ev_charge_underlay": False,
         "ev_hold_underlay": False,
         "modal_open": False,
@@ -4630,6 +4632,51 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
             }
         """))
         activate(page, profile, '.ep-v027-battery-plan-card [data-chart-size="normal"]')
+
+        for size in ("normal", "compact", "large", "normal"):
+            activate(page, profile, f'.ep-v027-battery-plan-card [data-chart-size="{size}"]')
+            page.wait_for_function(
+                """
+                size => {
+                  const card = window.__epPanel.shadowRoot.querySelector(
+                    `.ep-v027-battery-plan-card.size-${size}`
+                  );
+                  return card && ['actual', 'forecast'].every(kind => {
+                    const path = card.querySelector(`[data-series="${kind}-pv"]`);
+                    const legend = card.querySelector(`.ep-v027-legend .${kind}-pv`);
+                    return path?.getTotalLength() > 0 && legend &&
+                      legend.parentElement.getBoundingClientRect().width > 0;
+                  });
+                }
+                """,
+                arg=size,
+                timeout=10_000,
+            )
+        result["solar_all_sizes"] = True
+
+        activate(page, profile, '.ep-v027-battery-plan-card .ep-v027-expand')
+        page.wait_for_function(
+            """
+            () => {
+              const modal = document.querySelector('.ep-v027-modal');
+              return modal && ['actual', 'forecast'].every(kind =>
+                modal.querySelector(`[data-series="${kind}-pv"]`)?.getTotalLength() > 0 &&
+                modal.querySelector(`.ep-v027-legend .${kind}-pv`)?.getBoundingClientRect().width > 0
+              );
+            }
+            """,
+            timeout=10_000,
+        )
+        result["solar_expanded"] = True
+        close_graph = page.locator('.ep-v027-modal [data-window-action="close"]')
+        if profile.touch:
+            close_graph.tap(timeout=5_000)
+        else:
+            close_graph.click(timeout=5_000)
+        page.wait_for_function(
+            "() => !document.querySelector('.ep-v027-modal')",
+            timeout=10_000,
+        )
 
         activate(page, profile, '.ep-v051-history-card [data-action="full-history"]')
         page.wait_for_function(
@@ -5623,7 +5670,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.3 BETA",
+        "v131": "v1.3.0-beta.4 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -6044,7 +6091,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         for key in (
             "ran", "single_card", "compact_rows", "future_rows",
             "wanted_soc_history", "source_bars", "actual_solar_visible",
-            "forecast_solar_visible", "ev_charge_underlay",
+            "forecast_solar_visible", "solar_all_sizes", "solar_expanded", "ev_charge_underlay",
             "ev_hold_underlay", "modal_open", "modal_rows",
             "modal_no_filter", "card_stable", "main_stable", "modal_closed",
         )

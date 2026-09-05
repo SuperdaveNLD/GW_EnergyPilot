@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.3.md)
+[Latest beta](docs/releases/v1.3.0-beta.4.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,7 +66,7 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.3 · Beta prerelease**
+**v1.3.0-beta.4 · Beta prerelease**
 
 Latest production release: **v1.2.0 · Stable**
 
@@ -98,7 +98,8 @@ Release documentation:
 
 - `docs/USER_GUIDE.md` — English installation and daily-use guide;
 - `docs/HANDLEIDING_NL.md` — Nederlandse installatie- en gebruikershandleiding;
-- `docs/releases/v1.3.0-beta.3.md` — current actual-versus-expected solar-production graph beta notes;
+- `docs/releases/v1.3.0-beta.4.md` — current solar-production visibility fix for every chart size;
+- `docs/releases/v1.3.0-beta.3.md` — actual-versus-expected solar-production graph beta notes;
 - `docs/releases/v1.3.0-beta.2.md` — responsive Power overview and optional EV charger beta notes;
 - `docs/releases/v1.3.0-beta.1.md` — compact-controls, flow-motion and built-in-help beta notes;
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
@@ -154,6 +155,15 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.4 highlights
+
+- Shows actual and expected solar production in every Battery · Plan · Price
+  size: **S**, the default **M**, **L** and the expanded graph. In beta.3 the
+  lines and legend were only visible in Large and expanded views.
+- Includes both yellow line styles in the legend and explains missing solar
+  data in the normal graph. The complete frontend cache boundary advances to
+  `1.3.0-beta.4`.
 
 ## v1.3.0-beta.3 highlights
 

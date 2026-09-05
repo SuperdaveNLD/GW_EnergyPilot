@@ -1,7 +1,7 @@
 import {
   chartSubtitle, currentPrice, energyComparison, formatChartTime, formatEnergy,
   formatPower, formatPrice, inferredPlanInterval, nicePowerPeak, planEnergy, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.3";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.4";
 
 const ACTUAL_IDLE_W = 50;
 
@@ -217,23 +217,22 @@ function chartSvg(panel, data, size, modal) {
     return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="3" fill="${color}" fill-opacity=".085" stroke="${color}" stroke-opacity=".90" stroke-width="1.2" stroke-dasharray="6 4"><title>${panel._escape(`${formatChartTime(panel, startT, data.chartTime?.timeZone)}–${formatChartTime(panel, endT, data.chartTime?.timeZone)} · ${t(panel, "future")} · ${formatPower(point.w)}`)}</title></rect>`;
   }).join("");
 
-  const showSolarSeries = modal || size === "large";
   const actualPvPath = linePath(data.pvRows || [], x, powerY, "w");
-  const actualPv = showSolarSeries && actualPvPath
+  const actualPv = actualPvPath
     ? `<path data-series="actual-pv" d="${actualPvPath}" fill="none" stroke="#ffe36e" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`
     : "";
   const forecastPvPath = steppedPowerPath(
     data.pvForecastPoints || [], x, powerY, data.endMs
   );
-  const forecastPv = showSolarSeries && forecastPvPath
+  const forecastPv = forecastPvPath
     ? `<path data-series="forecast-pv" d="${forecastPvPath}" fill="none" stroke="#ffe36e" stroke-opacity=".92" stroke-width="2.2" stroke-dasharray="7 5" stroke-linejoin="round" stroke-linecap="round"/>`
     : "";
-  const actualPvDots = showSolarSeries ? (data.pvRows || []).map((point) => (
+  const actualPvDots = (data.pvRows || []).map((point) => (
     `<circle cx="${x(point.t).toFixed(1)}" cy="${powerY(point.w).toFixed(1)}" r="5" fill="transparent"><title>${panel._escape(`${formatChartTime(panel, point.t, data.chartTime?.timeZone)} · ${t(panel, "actualPv")} · ${formatPower(point.w)}`)}</title></circle>`
-  )).join("") : "";
-  const forecastPvDots = showSolarSeries ? (data.pvForecastPoints || []).map((point) => (
+  )).join("");
+  const forecastPvDots = (data.pvForecastPoints || []).map((point) => (
     `<circle cx="${x(point.t).toFixed(1)}" cy="${powerY(point.w).toFixed(1)}" r="5" fill="transparent"><title>${panel._escape(`${formatChartTime(panel, point.t, data.chartTime?.timeZone)} · ${t(panel, "forecastPv")} · ${formatPower(point.w)}`)}</title></circle>`
-  )).join("") : "";
+  )).join("");
 
   const actualSocPath = linePath(data.actualSocRows || [], x, socY, "pct");
   const actualSoc = actualSocPath
@@ -303,30 +302,28 @@ function notesHtml(panel, data, size, modal) {
   if (!data?.actualSocRows?.length) notes.push(t(panel, "noActualSoc"));
   if (!data?.historicalPlanRows?.length && !data?.futurePlanPoints?.length) notes.push(t(panel, "noPlan"));
   if (!data?.socPlanPoints?.length) notes.push(t(panel, "noForecastSoc"));
-  if ((modal || size === "large") && !data?.pvRows?.length) notes.push(t(panel, "noActualPv"));
-  if ((modal || size === "large") && !data?.pvForecastPoints?.length) notes.push(t(panel, "noForecastPv"));
+  if (!data?.pvRows?.length) notes.push(t(panel, "noActualPv"));
+  if (!data?.pvForecastPoints?.length) notes.push(t(panel, "noForecastPv"));
   if (!data?.pricePoints?.length) notes.push(data?.payload?.error || t(panel, "noPrice"));
   if (data?.actualRows?.length) notes.push(t(panel, "energySource"));
   if (data?.attributionRows?.length) notes.push(t(panel, "sourceEstimate"));
   if (data?.historicalPlanRows?.length || data?.futurePlanPoints?.length) notes.push(t(panel, "planHistory"));
   if (data?.evProtectionIntervals?.length) notes.push(t(panel, "evHistory"));
   if (data?.actualSocRows?.length || data?.socPlanPoints?.length) notes.push(t(panel, "socSource"));
-  if ((modal || size === "large") && (data?.pvRows?.length || data?.pvForecastPoints?.length)) notes.push(t(panel, "pvSource"));
+  if (data?.pvRows?.length || data?.pvForecastPoints?.length) notes.push(t(panel, "pvSource"));
   const comparison = energyComparison(data);
   if (comparison.chargeDifference > 0.25 || comparison.dischargeDifference > 0.25) notes.push(t(panel, "discrepancy"));
   return notes.map((note) => `<span>${panel._escape(note)}</span>`).join(" · ");
 }
 
 function legendHtml(panel, data, size, modal) {
+  const solarLegend = `<span><i class="actual-pv"></i>${panel._escape(t(panel, "actualPv"))}</span><span><i class="forecast-pv"></i>${panel._escape(t(panel, "forecastPv"))}</span>`;
   if (size === "compact") {
-    return `<div class="ep-v027-legend compact"><span><i class="actual-combined"></i>${panel._escape(t(panel, "actual"))}</span><span><i class="plan"></i>${panel._escape(t(panel, "plan"))}</span><span><i class="ev-charge-allowed"></i>${panel._escape(t(panel, "evChargeAllowed"))}</span><span><i class="ev-discharge-blocked"></i>${panel._escape(t(panel, "evDischargeBlocked"))}</span><span><i class="actual-soc"></i>${panel._escape(t(panel, "actualSoc"))}</span><span><i class="forecast-soc"></i>${panel._escape(t(panel, "wantedSoc"))}</span><span><i class="price"></i>${panel._escape(t(panel, "marketPrice"))}</span></div>`;
+    return `<div class="ep-v027-legend compact"><span><i class="actual-combined"></i>${panel._escape(t(panel, "actual"))}</span>${solarLegend}<span><i class="plan"></i>${panel._escape(t(panel, "plan"))}</span><span><i class="ev-charge-allowed"></i>${panel._escape(t(panel, "evChargeAllowed"))}</span><span><i class="ev-discharge-blocked"></i>${panel._escape(t(panel, "evDischargeBlocked"))}</span><span><i class="actual-soc"></i>${panel._escape(t(panel, "actualSoc"))}</span><span><i class="forecast-soc"></i>${panel._escape(t(panel, "wantedSoc"))}</span><span><i class="price"></i>${panel._escape(t(panel, "marketPrice"))}</span></div>`;
   }
   const sourceLegend = (modal || size === "large") && data?.attributionRows?.length
     ? `<span><i class="grid-battery"></i>${panel._escape(t(panel, "gridToBattery"))}</span><span><i class="solar-battery"></i>${panel._escape(t(panel, "solarToBattery"))}</span><span><i class="unknown-source"></i>${panel._escape(t(panel, "unknownSource"))}</span><span><i class="battery-grid"></i>${panel._escape(t(panel, "batteryToGrid"))}</span><span><i class="solar-grid"></i>${panel._escape(t(panel, "solarToGrid"))}</span>`
     : `<span><i class="actual-charge"></i>${panel._escape(t(panel, "actualCharge"))}</span><span><i class="actual-discharge"></i>${panel._escape(t(panel, "actualDischarge"))}</span>`;
-  const solarLegend = modal || size === "large"
-    ? `<span><i class="actual-pv"></i>${panel._escape(t(panel, "actualPv"))}</span><span><i class="forecast-pv"></i>${panel._escape(t(panel, "forecastPv"))}</span>`
-    : "";
   return `<div class="ep-v027-legend">${sourceLegend}${solarLegend}<span><i class="plan"></i>${panel._escape(t(panel, "plan"))}</span><span><i class="ev-charge-allowed"></i>${panel._escape(t(panel, "evChargeAllowed"))}</span><span><i class="ev-discharge-blocked"></i>${panel._escape(t(panel, "evDischargeBlocked"))}</span><span><i class="actual-soc"></i>${panel._escape(t(panel, "actualSoc"))}</span><span><i class="forecast-soc"></i>${panel._escape(t(panel, "wantedSoc"))}</span><span><i class="price"></i>${panel._escape(t(panel, "marketPrice"))}</span></div>`;
 }
 
