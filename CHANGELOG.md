@@ -13,6 +13,8 @@ All notable changes to GW EnergyPilot are documented here.
   Beta.3 incorrectly restricted them to Large and expanded views.
 - Include the solar data-source and unavailable-data notes in the normal
   graph, using the existing Recorder actuals and official EMHASS forecast.
+- Give the expanded graph its own solid/dashed solar legend swatches because
+  it renders outside the dashboard ShadowRoot.
 
 ### Changed
 

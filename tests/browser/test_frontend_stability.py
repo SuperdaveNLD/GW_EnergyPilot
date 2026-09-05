@@ -4658,19 +4658,23 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         page.wait_for_function(
             """
             () => {
-              const modal = window.__epPanel.shadowRoot.querySelector('.ep-v027-modal');
+              const modal = document.querySelector('.ep-v027-modal');
               return modal && ['actual', 'forecast'].every(kind =>
                 modal.querySelector(`[data-series="${kind}-pv"]`)?.getTotalLength() > 0 &&
-                modal.querySelector(`.ep-v027-legend .${kind}-pv`)
+                modal.querySelector(`.ep-v027-legend .${kind}-pv`)?.getBoundingClientRect().width > 0
               );
             }
             """,
             timeout=10_000,
         )
         result["solar_expanded"] = True
-        activate(page, profile, '.ep-v027-modal .ep-v027-close')
+        close_graph = page.locator('.ep-v027-modal [data-window-action="close"]')
+        if profile.touch:
+            close_graph.tap(timeout=5_000)
+        else:
+            close_graph.click(timeout=5_000)
         page.wait_for_function(
-            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v027-modal')",
+            "() => !document.querySelector('.ep-v027-modal')",
             timeout=10_000,
         )
 
