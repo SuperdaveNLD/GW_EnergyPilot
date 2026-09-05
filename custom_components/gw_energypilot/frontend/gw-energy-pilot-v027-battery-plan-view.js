@@ -1,7 +1,7 @@
 import {
   chartSubtitle, currentPrice, energyComparison, formatChartTime, formatEnergy,
   formatPower, formatPrice, inferredPlanInterval, nicePowerPeak, planEnergy, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.2";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.3";
 
 const ACTUAL_IDLE_W = 50;
 
@@ -69,6 +69,20 @@ function steppedPricePath(points, x, priceY, endMs) {
   }
   const last = sorted[sorted.length - 1];
   const lastEnd = Math.min(endMs, last.t + inferredPriceInterval(sorted));
+  if (lastEnd > last.t) path += ` H${x(lastEnd).toFixed(1)}`;
+  return path;
+}
+
+function steppedPowerPath(points, x, powerY, endMs) {
+  if (!points?.length) return "";
+  const sorted = [...points].sort((a, b) => a.t - b.t);
+  let path = `M${x(sorted[0].t).toFixed(1)},${powerY(sorted[0].w).toFixed(1)}`;
+  for (let index = 1; index < sorted.length; index += 1) {
+    const point = sorted[index];
+    path += ` H${x(point.t).toFixed(1)} V${powerY(point.w).toFixed(1)}`;
+  }
+  const last = sorted[sorted.length - 1];
+  const lastEnd = Math.min(endMs, last.t + inferredPlanInterval(sorted));
   if (lastEnd > last.t) path += ` H${x(lastEnd).toFixed(1)}`;
   return path;
 }
@@ -203,6 +217,24 @@ function chartSvg(panel, data, size, modal) {
     return `<rect x="${xx.toFixed(1)}" y="${rectY.toFixed(1)}" width="${blockWidth.toFixed(1)}" height="${rectH.toFixed(1)}" rx="3" fill="${color}" fill-opacity=".085" stroke="${color}" stroke-opacity=".90" stroke-width="1.2" stroke-dasharray="6 4"><title>${panel._escape(`${formatChartTime(panel, startT, data.chartTime?.timeZone)}–${formatChartTime(panel, endT, data.chartTime?.timeZone)} · ${t(panel, "future")} · ${formatPower(point.w)}`)}</title></rect>`;
   }).join("");
 
+  const showSolarSeries = modal || size === "large";
+  const actualPvPath = linePath(data.pvRows || [], x, powerY, "w");
+  const actualPv = showSolarSeries && actualPvPath
+    ? `<path data-series="actual-pv" d="${actualPvPath}" fill="none" stroke="#ffe36e" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`
+    : "";
+  const forecastPvPath = steppedPowerPath(
+    data.pvForecastPoints || [], x, powerY, data.endMs
+  );
+  const forecastPv = showSolarSeries && forecastPvPath
+    ? `<path data-series="forecast-pv" d="${forecastPvPath}" fill="none" stroke="#ffe36e" stroke-opacity=".92" stroke-width="2.2" stroke-dasharray="7 5" stroke-linejoin="round" stroke-linecap="round"/>`
+    : "";
+  const actualPvDots = showSolarSeries ? (data.pvRows || []).map((point) => (
+    `<circle cx="${x(point.t).toFixed(1)}" cy="${powerY(point.w).toFixed(1)}" r="5" fill="transparent"><title>${panel._escape(`${formatChartTime(panel, point.t, data.chartTime?.timeZone)} · ${t(panel, "actualPv")} · ${formatPower(point.w)}`)}</title></circle>`
+  )).join("") : "";
+  const forecastPvDots = showSolarSeries ? (data.pvForecastPoints || []).map((point) => (
+    `<circle cx="${x(point.t).toFixed(1)}" cy="${powerY(point.w).toFixed(1)}" r="5" fill="transparent"><title>${panel._escape(`${formatChartTime(panel, point.t, data.chartTime?.timeZone)} · ${t(panel, "forecastPv")} · ${formatPower(point.w)}`)}</title></circle>`
+  )).join("") : "";
+
   const actualSocPath = linePath(data.actualSocRows || [], x, socY, "pct");
   const actualSoc = actualSocPath
     ? `<path data-series="actual-soc" d="${actualSocPath}" fill="none" stroke="#f472b6" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`
@@ -242,7 +274,7 @@ function chartSvg(panel, data, size, modal) {
   const currency = panel._escape(data.payload?.currency || "EUR");
   const titles = size === "compact" && !modal ? "" : `<text x="${left}" y="17" fill="#d9eaf2" font-size="11">${panel._escape(t(panel, "powerAxis"))}</text><text x="${width - right + 9}" y="17" fill="#e69ac6" font-size="10">${panel._escape(t(panel, "socAxis"))}</text><text x="${width - 4}" y="17" text-anchor="end" fill="#62e2f5" font-size="10">${panel._escape(t(panel, "priceAxisShort", { currency }))}</text>`;
 
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="${panel._escape(chartSubtitle(panel, data.viewRange))}"><defs><filter id="epV027PriceGlow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter><pattern id="epV051UnknownHatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#697b8c" fill-opacity=".28"/><line x1="0" y1="0" x2="0" y2="5" stroke="#b7c3ce" stroke-width="1.2"/></pattern><pattern id="${stripePatternId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#79e68c" fill-opacity=".045"/><rect width="2.2" height="8" fill="#a2f2ad" fill-opacity=".24"/></pattern></defs>${titles}${evUnderlays}${grid}${powerTicks}${actualBars}${historicalPlan}${futurePlan}${actualSoc}${forecastSoc}${actualSocDots}${forecastSocDots}${socTicks}${priceLine}${priceDots}${priceTicks}${nowLine}</svg>`;
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="${panel._escape(chartSubtitle(panel, data.viewRange))}"><defs><filter id="epV027PriceGlow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter><pattern id="epV051UnknownHatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#697b8c" fill-opacity=".28"/><line x1="0" y1="0" x2="0" y2="5" stroke="#b7c3ce" stroke-width="1.2"/></pattern><pattern id="${stripePatternId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#79e68c" fill-opacity=".045"/><rect width="2.2" height="8" fill="#a2f2ad" fill-opacity=".24"/></pattern></defs>${titles}${evUnderlays}${grid}${powerTicks}${actualBars}${historicalPlan}${futurePlan}${actualPv}${forecastPv}${actualSoc}${forecastSoc}${actualPvDots}${forecastPvDots}${actualSocDots}${forecastSocDots}${socTicks}${priceLine}${priceDots}${priceTicks}${nowLine}</svg>`;
 }
 
 function sourceLine(panel, native, graphValue) {
@@ -265,18 +297,21 @@ function summaryHtml(panel, data, size, modal) {
   </div>`;
 }
 
-function notesHtml(panel, data) {
+function notesHtml(panel, data, size, modal) {
   const notes = [];
   if (!data?.actualRows?.length) notes.push(t(panel, "noActual"));
   if (!data?.actualSocRows?.length) notes.push(t(panel, "noActualSoc"));
   if (!data?.historicalPlanRows?.length && !data?.futurePlanPoints?.length) notes.push(t(panel, "noPlan"));
   if (!data?.socPlanPoints?.length) notes.push(t(panel, "noForecastSoc"));
+  if ((modal || size === "large") && !data?.pvRows?.length) notes.push(t(panel, "noActualPv"));
+  if ((modal || size === "large") && !data?.pvForecastPoints?.length) notes.push(t(panel, "noForecastPv"));
   if (!data?.pricePoints?.length) notes.push(data?.payload?.error || t(panel, "noPrice"));
   if (data?.actualRows?.length) notes.push(t(panel, "energySource"));
   if (data?.attributionRows?.length) notes.push(t(panel, "sourceEstimate"));
   if (data?.historicalPlanRows?.length || data?.futurePlanPoints?.length) notes.push(t(panel, "planHistory"));
   if (data?.evProtectionIntervals?.length) notes.push(t(panel, "evHistory"));
   if (data?.actualSocRows?.length || data?.socPlanPoints?.length) notes.push(t(panel, "socSource"));
+  if ((modal || size === "large") && (data?.pvRows?.length || data?.pvForecastPoints?.length)) notes.push(t(panel, "pvSource"));
   const comparison = energyComparison(data);
   if (comparison.chargeDifference > 0.25 || comparison.dischargeDifference > 0.25) notes.push(t(panel, "discrepancy"));
   return notes.map((note) => `<span>${panel._escape(note)}</span>`).join(" · ");
@@ -289,7 +324,10 @@ function legendHtml(panel, data, size, modal) {
   const sourceLegend = (modal || size === "large") && data?.attributionRows?.length
     ? `<span><i class="grid-battery"></i>${panel._escape(t(panel, "gridToBattery"))}</span><span><i class="solar-battery"></i>${panel._escape(t(panel, "solarToBattery"))}</span><span><i class="unknown-source"></i>${panel._escape(t(panel, "unknownSource"))}</span><span><i class="battery-grid"></i>${panel._escape(t(panel, "batteryToGrid"))}</span><span><i class="solar-grid"></i>${panel._escape(t(panel, "solarToGrid"))}</span>`
     : `<span><i class="actual-charge"></i>${panel._escape(t(panel, "actualCharge"))}</span><span><i class="actual-discharge"></i>${panel._escape(t(panel, "actualDischarge"))}</span>`;
-  return `<div class="ep-v027-legend">${sourceLegend}<span><i class="plan"></i>${panel._escape(t(panel, "plan"))}</span><span><i class="ev-charge-allowed"></i>${panel._escape(t(panel, "evChargeAllowed"))}</span><span><i class="ev-discharge-blocked"></i>${panel._escape(t(panel, "evDischargeBlocked"))}</span><span><i class="actual-soc"></i>${panel._escape(t(panel, "actualSoc"))}</span><span><i class="forecast-soc"></i>${panel._escape(t(panel, "wantedSoc"))}</span><span><i class="price"></i>${panel._escape(t(panel, "marketPrice"))}</span></div>`;
+  const solarLegend = modal || size === "large"
+    ? `<span><i class="actual-pv"></i>${panel._escape(t(panel, "actualPv"))}</span><span><i class="forecast-pv"></i>${panel._escape(t(panel, "forecastPv"))}</span>`
+    : "";
+  return `<div class="ep-v027-legend">${sourceLegend}${solarLegend}<span><i class="plan"></i>${panel._escape(t(panel, "plan"))}</span><span><i class="ev-charge-allowed"></i>${panel._escape(t(panel, "evChargeAllowed"))}</span><span><i class="ev-discharge-blocked"></i>${panel._escape(t(panel, "evDischargeBlocked"))}</span><span><i class="actual-soc"></i>${panel._escape(t(panel, "actualSoc"))}</span><span><i class="forecast-soc"></i>${panel._escape(t(panel, "wantedSoc"))}</span><span><i class="price"></i>${panel._escape(t(panel, "marketPrice"))}</span></div>`;
 }
 
 export function sizeControlHtml(panel, size) {
@@ -307,7 +345,7 @@ export function rangeControlHtml(panel, range) {
 }
 
 export function cardBody(panel, data, size, modal = false) {
-  return `<div class="ep-v027-chart size-${size} ${modal ? "modal" : ""}">${chartSvg(panel, data, size, modal)}</div>${legendHtml(panel, data, size, modal)}${summaryHtml(panel, data, size, modal)}<div class="ep-v027-notes">${notesHtml(panel, data)}</div>`;
+  return `<div class="ep-v027-chart size-${size} ${modal ? "modal" : ""}">${chartSvg(panel, data, size, modal)}</div>${legendHtml(panel, data, size, modal)}${summaryHtml(panel, data, size, modal)}<div class="ep-v027-notes">${notesHtml(panel, data, size, modal)}</div>`;
 }
 
 export function ensureStyles(root) {
@@ -322,7 +360,7 @@ export function ensureStyles(root) {
     .ep-v027-range-control{display:flex;align-items:center;padding:3px;border:1px solid rgba(85,232,255,.14);border-radius:999px;background:rgba(1,12,28,.42);box-shadow:inset 0 1px 8px rgba(0,0,0,.20)}.ep-v027-range-control button{min-width:39px;height:27px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:#7793a7;font:700 9px -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease}.ep-v027-range-control button.active{background:rgba(85,232,255,.13);color:#dffaff;box-shadow:0 1px 8px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.10)}
     .ep-v027-expand{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;border:1px solid rgba(72,198,235,.22);background:rgba(9,47,74,.50);color:#c3eff8;cursor:pointer;font-size:17px;transition:background .16s ease,border-color .16s ease,transform .16s ease}.ep-v027-expand:hover{background:rgba(12,66,94,.68);border-color:rgba(73,225,248,.42);transform:translateY(-1px)}
     .ep-v027-chart{margin-top:8px;border-radius:15px;background:rgba(1,12,28,.25);overflow:hidden}.ep-v027-chart.size-compact{min-height:160px}.ep-v027-chart.size-normal{min-height:260px}.ep-v027-chart.size-large{min-height:360px}.ep-v027-chart svg{display:block}.ep-v027-empty{min-height:190px;display:grid;place-items:center;color:#7895aa;font-size:10px}
-    .ep-v027-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px 19px;margin:5px 0 12px;color:#91a9ba;font-size:9px}.ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-legend i{display:inline-block}.ep-v027-legend i.actual-charge,.ep-v027-legend i.actual-discharge,.ep-v027-legend i.grid-battery,.ep-v027-legend i.solar-battery,.ep-v027-legend i.battery-grid,.ep-v027-legend i.solar-grid,.ep-v027-legend i.unknown-source{width:9px;height:9px;border-radius:3px;background:#27dfc2}.ep-v027-legend i.actual-discharge{background:#ffa52f}.ep-v027-legend i.grid-battery{background:#41b96f}.ep-v027-legend i.solar-battery{background:#d9a928}.ep-v027-legend i.battery-grid{background:#eb6a24}.ep-v027-legend i.solar-grid{background:#f0b52f}.ep-v027-legend i.unknown-source{background:repeating-linear-gradient(45deg,#697b8c 0 2px,#b7c3ce 2px 3px,#697b8c 3px 5px)}.ep-v027-legend i.actual-combined{width:15px;height:9px;border-radius:3px;background:linear-gradient(90deg,#27dfc2 0 50%,#ffa52f 50% 100%)}.ep-v027-legend i.plan{width:18px;height:0;border-top:1px dashed #a8c5d1}.ep-v027-legend i.ev-charge-allowed,.ep-v027-legend i.ev-discharge-blocked{width:16px;height:9px;border:1px solid rgba(140,242,155,.46);border-radius:2px}.ep-v027-legend i.ev-charge-allowed{background:repeating-linear-gradient(135deg,rgba(162,242,173,.42) 0 2px,rgba(121,230,140,.06) 2px 6px)}.ep-v027-legend i.ev-discharge-blocked{background:rgba(121,230,140,.32)}.ep-v027-legend i.actual-soc{width:18px;height:2px;border-radius:999px;background:#f472b6}.ep-v027-legend i.forecast-soc{width:18px;height:0;border-top:2px dashed #c4b5fd}.ep-v027-legend i.price{width:18px;height:2px;border-radius:999px;background:#55e8ff;box-shadow:0 0 8px rgba(85,232,255,.42)}
+    .ep-v027-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px 19px;margin:5px 0 12px;color:#91a9ba;font-size:9px}.ep-v027-legend span{display:flex;align-items:center;gap:7px}.ep-v027-legend i{display:inline-block}.ep-v027-legend i.actual-charge,.ep-v027-legend i.actual-discharge,.ep-v027-legend i.grid-battery,.ep-v027-legend i.solar-battery,.ep-v027-legend i.battery-grid,.ep-v027-legend i.solar-grid,.ep-v027-legend i.unknown-source{width:9px;height:9px;border-radius:3px;background:#27dfc2}.ep-v027-legend i.actual-discharge{background:#ffa52f}.ep-v027-legend i.grid-battery{background:#41b96f}.ep-v027-legend i.solar-battery{background:#d9a928}.ep-v027-legend i.battery-grid{background:#eb6a24}.ep-v027-legend i.solar-grid{background:#f0b52f}.ep-v027-legend i.unknown-source{background:repeating-linear-gradient(45deg,#697b8c 0 2px,#b7c3ce 2px 3px,#697b8c 3px 5px)}.ep-v027-legend i.actual-combined{width:15px;height:9px;border-radius:3px;background:linear-gradient(90deg,#27dfc2 0 50%,#ffa52f 50% 100%)}.ep-v027-legend i.actual-pv{width:18px;height:2px;border-radius:999px;background:#ffe36e}.ep-v027-legend i.forecast-pv{width:18px;height:0;border-top:2px dashed #ffe36e}.ep-v027-legend i.plan{width:18px;height:0;border-top:1px dashed #a8c5d1}.ep-v027-legend i.ev-charge-allowed,.ep-v027-legend i.ev-discharge-blocked{width:16px;height:9px;border:1px solid rgba(140,242,155,.46);border-radius:2px}.ep-v027-legend i.ev-charge-allowed{background:repeating-linear-gradient(135deg,rgba(162,242,173,.42) 0 2px,rgba(121,230,140,.06) 2px 6px)}.ep-v027-legend i.ev-discharge-blocked{background:rgba(121,230,140,.32)}.ep-v027-legend i.actual-soc{width:18px;height:2px;border-radius:999px;background:#f472b6}.ep-v027-legend i.forecast-soc{width:18px;height:0;border-top:2px dashed #c4b5fd}.ep-v027-legend i.price{width:18px;height:2px;border-radius:999px;background:#55e8ff;box-shadow:0 0 8px rgba(85,232,255,.42)}
     .ep-v027-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ep-v027-summary.with-plan{grid-template-columns:repeat(5,minmax(0,1fr))}.ep-v027-chip{min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid rgba(255,255,255,.055);border-radius:13px;background:rgba(255,255,255,.022);box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}.ep-v027-icon{width:29px;height:29px;flex:0 0 29px;display:grid;place-items:center;border-radius:50%;border:1px solid rgba(39,224,193,.62);color:#42ebce;font-size:14px}.ep-v027-chip.discharge .ep-v027-icon{border-color:rgba(255,165,47,.66);color:#ffb34a}.ep-v027-chip.price .ep-v027-icon{border-color:rgba(85,232,255,.62);color:#64e9fb}.ep-v027-chip.plan-charge .ep-v027-icon,.ep-v027-chip.plan-discharge .ep-v027-icon{border-color:rgba(171,205,220,.38);color:#a8c5d1}.ep-v027-chip small{display:block;color:#849dae;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ep-v027-chip strong{display:block;margin-top:2px;color:#eff9fd;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ep-v027-chip em{display:block;margin-top:2px;color:#607c90;font-size:7px;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ep-v027-notes{margin-top:9px;color:#617f94;font-size:8px;line-height:1.5}.ep-v027-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px}.ep-v027-footer-actions{display:flex;align-items:center;gap:12px}.ep-v027-footer button{border:0;padding:0;background:transparent;color:#70d5eb;cursor:pointer;font:inherit;font-size:8px}.ep-v027-footer span{color:#607d92;font-size:8px}
     .ep-v027-battery-plan-card.size-compact .ep-v027-subtitle{max-width:340px}.ep-v027-battery-plan-card.size-compact .ep-v027-notes{display:none}.ep-v027-battery-plan-card.size-compact .ep-v027-legend{gap:7px 12px;margin:3px 0 9px}.ep-v027-battery-plan-card.size-compact .ep-v027-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip{padding:8px;gap:7px}.ep-v027-battery-plan-card.size-compact .ep-v027-icon{width:25px;height:25px;flex-basis:25px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip strong{font-size:12px}.ep-v027-battery-plan-card.size-compact .ep-v027-chip em{display:none}

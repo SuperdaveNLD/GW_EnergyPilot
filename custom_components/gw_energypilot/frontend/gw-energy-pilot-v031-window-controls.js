@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v031.js?v=1.3.0-beta.2";
+import "./gw-energy-pilot-v031.js?v=1.3.0-beta.3";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const DASHBOARD_STORAGE_KEY = "gw_energypilot_dashboard_v008";

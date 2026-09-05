@@ -11,7 +11,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const TEXT = {
   en: {
     title: "BATTERY · PLAN · PRICE",
-    subtitle: "Battery power, actual/forecast SOC and market price",
+    subtitle: "Battery and solar power, actual/forecast SOC and market price",
     subtitle12: "Rolling 12 hours · 6 hours before and after now",
     subtitle24: "Today · 00:00–24:00",
     subtitle36: "Today 00:00 · through tomorrow 12:00",
@@ -20,6 +20,7 @@ const TEXT = {
     actualCharge: "Actual charging", actualDischarge: "Actual discharging",
     actual: "Actual", plan: "EMHASS plan", marketPrice: "Market price",
     actualSoc: "Actual SOC", forecastSoc: "Forecast SOC", wantedSoc: "Wanted SOC",
+    actualPv: "Actual solar production", forecastPv: "Forecast solar production",
     gridToBattery: "Grid → Battery", solarToBattery: "Solar → Battery",
     unknownSource: "Unknown", batteryToGrid: "Battery → Grid", solarToGrid: "Solar → Grid",
     sourceEstimate: "Source split is estimated from Recorder PV, load, battery and grid actuals.",
@@ -33,7 +34,10 @@ const TEXT = {
     noPlan: "No usable EMHASS P_batt history or battery schedule is available yet.",
     noActualSoc: "Recorder has not collected enough actual GoodWe SOC statistics yet.",
     noForecastSoc: "No safe EMHASS SOC_opt forecast is available from the official plan mirror.",
+    noActualPv: "Recorder has not collected enough actual solar-production statistics yet.",
+    noForecastPv: "No validated EMHASS P_PV solar-production forecast is available from the official plan mirror.",
     socSource: "Actual SOC is the Recorder 5-minute mean of the existing GoodWe battery_soc percentage sensor. Forecast SOC is validated EMHASS SOC_opt (0..1) normalized to percent.",
+    pvSource: "Actual solar production is the Recorder 5-minute mean of combined PV. The dashed forecast is the non-negative P_PV column from the validated official EMHASS plan and is display-only.",
     noPrice: "The market-price line is unavailable until timestamped runtime prices can be loaded.",
     discrepancy: "The native GoodWe day counter and Recorder power integral use different measurement paths and can differ. The GoodWe counter remains the headline total.",
     now: "NOW", updated: "updated {time}", waiting: "waiting for data",
@@ -49,7 +53,7 @@ const TEXT = {
   },
   nl: {
     title: "ACCU · PLAN · PRIJS",
-    subtitle: "Accuvermogen, werkelijke/verwachte SOC en marktprijs",
+    subtitle: "Accu- en zonnevermogen, werkelijke/verwachte SOC en marktprijs",
     subtitle12: "Rollende 12 uur · 6 uur vóór en na nu",
     subtitle24: "Vandaag · 00:00–24:00",
     subtitle36: "Vandaag 00:00 · tot morgen 12:00",
@@ -58,6 +62,7 @@ const TEXT = {
     actualCharge: "Werkelijk laden", actualDischarge: "Werkelijk ontladen",
     actual: "Werkelijk", plan: "EMHASS-plan", marketPrice: "Marktprijs",
     actualSoc: "Werkelijke SOC", forecastSoc: "Verwachte SOC", wantedSoc: "Gewenste SOC",
+    actualPv: "Werkelijke zonne-opbrengst", forecastPv: "Verwachte zonne-opbrengst",
     gridToBattery: "Net → accu", solarToBattery: "Zon → accu",
     unknownSource: "Onbekend", batteryToGrid: "Accu → net", solarToGrid: "Zon → net",
     sourceEstimate: "De bronverdeling is geschat uit Recorder-actuals voor PV, belasting, accu en net.",
@@ -71,7 +76,10 @@ const TEXT = {
     noPlan: "Er is nog geen bruikbare EMHASS P_batt-historie of accuschema beschikbaar.",
     noActualSoc: "Recorder heeft nog onvoldoende statistieken van de werkelijke GoodWe-SOC.",
     noForecastSoc: "De officiële planmirror bevat nog geen veilig bruikbare EMHASS SOC_opt-prognose.",
+    noActualPv: "Recorder heeft nog onvoldoende statistieken van de werkelijke zonne-opbrengst.",
+    noForecastPv: "De officiële planmirror bevat nog geen gevalideerde EMHASS P_PV-zonneprognose.",
     socSource: "Werkelijke SOC is het Recorder-gemiddelde per 5 minuten van de bestaande GoodWe battery_soc-percentagesensor. Verwachte SOC is gevalideerde EMHASS SOC_opt (0..1), omgerekend naar procent.",
+    pvSource: "Werkelijke zonne-opbrengst is het Recorder-gemiddelde per 5 minuten van gecombineerde PV. De gestreepte prognose is de niet-negatieve P_PV-kolom uit het gevalideerde officiële EMHASS-plan en dient alleen ter weergave.",
     noPrice: "De marktprijslijn verschijnt zodra tijdgebonden runtimeprijzen beschikbaar zijn.",
     discrepancy: "De GoodWe-dagteller en Recorder-vermogensintegratie gebruiken verschillende meetpaden en kunnen afwijken. Voor het hoofdtotaal blijft de GoodWe-teller leidend.",
     now: "NU", updated: "bijgewerkt {time}", waiting: "wachten op gegevens",
@@ -577,6 +585,7 @@ export function chartWindowData(data, range = chartRange()) {
     actualRows: rowsInside(data.actualRows, startMs, pastEndMs),
     actualSocRows: rowsInside(data.actualSocRows, startMs, pastEndMs),
     pvRows: rowsInside(data.pvRows, startMs, pastEndMs),
+    pvForecastPoints: stepRowsInside(data.pvForecastPoints, startMs, endMs),
     loadRows: rowsInside(data.loadRows, startMs, pastEndMs),
     gridRows: rowsInside(data.gridRows, startMs, pastEndMs),
     attributionRows: rowsInside(data.attributionRows, startMs, pastEndMs),
@@ -665,6 +674,7 @@ export async function loadChartData(panel, force = false, backendForce = force) 
         actualRows,
         actualSocRows: normalizeSocStatisticRows(actualStats?.[batterySocId] || [], startMs, endMs),
         pvRows, loadRows, gridRows,
+        pvForecastPoints: normalizeFuturePlan(payload?.pv_plan?.points || [], startMs, endMs),
         attributionRows: attributeActualRows(actualRows, pvRows, loadRows, gridRows),
         historicalPlanRows: normalizeHistoryRows(planHistory, planEntityId, startMs, chartTime.nowMs),
         futurePlanPoints: normalizeFuturePlan(payload?.battery_plan?.points || [], startMs, endMs),
@@ -686,7 +696,7 @@ export async function loadChartData(panel, force = false, backendForce = force) 
       const data = {
         at: Date.now(), chartTime: fallbackTime, nowMs: fallbackTime.nowMs,
         actualRows: inherited?.batteryRows || [],
-        actualSocRows: [], pvRows: [], loadRows: [], gridRows: [], attributionRows: [],
+        actualSocRows: [], pvRows: [], pvForecastPoints: [], loadRows: [], gridRows: [], attributionRows: [],
         historicalPlanRows: [], futurePlanPoints: [], socPlanPoints: [],
         historicalSocWantedRows: [], evProtectionIntervals: [],
         pricePoints: inherited?.pricePoints || [],
@@ -707,7 +717,8 @@ export async function loadChartData(panel, force = false, backendForce = force) 
 export function nicePowerPeak(data) {
   const values = [
     ...(data?.actualRows || []), ...(data?.historicalPlanRows || []),
-    ...(data?.futurePlanPoints || []),
+    ...(data?.futurePlanPoints || []), ...(data?.pvRows || []),
+    ...(data?.pvForecastPoints || []),
   ].map((p) => Math.abs(p.w) / 1000);
   for (const row of data?.attributionRows || []) {
     values.push(

@@ -4,6 +4,21 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.3] - 2026-09-05
+
+### Added
+
+- Show solid actual and dashed expected solar production in the Large and
+  expanded Battery · Plan · Price graph. Actuals use the existing combined-PV
+  Recorder statistics; the expected series uses only non-negative `P_PV` rows
+  from the validated official EMHASS plan and remains display-only.
+
+### Changed
+
+- Advance the complete active frontend module graph to cache boundary
+  `1.3.0-beta.3` so Home Assistant reloads the solar-chart presentation as one
+  coherent module graph.
+
 ## [1.3.0-beta.2] - 2026-09-04
 
 ### Added

@@ -1,6 +1,6 @@
 # Battery plan chart field validation
 
-For the current **v1.3.0-beta.2** line, validate on a live installation:
+For the current **v1.3.0-beta.3** line, validate on a live installation:
 
 1. Select S, M and L and confirm the selected size survives a browser refresh.
 2. Confirm the red Battery · Plan · Price window control hides the card immediately and that the card can be restored from Dashboard layout / visibility.

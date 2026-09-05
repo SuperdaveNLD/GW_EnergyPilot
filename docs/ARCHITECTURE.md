@@ -1,7 +1,7 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.3.0-beta.2**. It retains v1.2.0 as the production base and adds a bounded
+v1.3.0-beta.3**. It retains v1.2.0 as the production base and adds a bounded
 beta presentation layer.
 
 ## High-level flow
@@ -495,6 +495,13 @@ market - sell deduction = effective prod_price
 
 Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. The dashed wanted-SOC line uses immutable execution snapshots for elapsed time and exact validated `SOC_opt` from the current official plan for current/future time. EMHASS computes `SOC_opt` after each row's power interval, so schema 7 retains the row `start` but plots/persists explicit `target_at = start + inferred step`; no output-entity fallback, hardcoded 15-minute shift or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
 
+Large and expanded views also plot the existing combined `pv_generation_power`
+Recorder means as solid actual solar production and the non-negative official
+plan `P_PV` points as a dashed expected-production step line. `P_PV` is only
+returned through the optional read-only `pv_plan` payload when the current
+validated official mirror provides it; it has no entity fallback and never
+enters control or accounting.
+
 The same bounded Recorder request includes combined display-only PV, load and
 fast grid power. Large/expanded views apply a load-first balance and draw
 grid/solar charge plus battery/solar export with an explicit unknown residual.
@@ -557,8 +564,8 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the previous stable
-base; v1.3.0-beta.2 owns the beta presentation over v1.2.0 and the complete
-`1.3.0-beta.2` active-graph cache boundary. Its EMHASS settings
+base; v1.3.0-beta.3 owns the beta presentation over v1.2.0 and the complete
+`1.3.0-beta.3` active-graph cache boundary. Its EMHASS settings
 select AUTO or a fixed CUSTOM household load at the final runtime request-body
 boundary; unrelated optimization parameters remain untouched. Its isolated
 Beta tests compare five iOS activation methods with deferred, observer-neutral

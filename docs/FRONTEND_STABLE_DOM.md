@@ -4,7 +4,7 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.3.0-beta.2**. The beta retains v1.2.0 and all earlier v1 behavior
+EnergyPilot v1.3.0-beta.3**. The beta retains v1.2.0 and all earlier v1 behavior
 through presentation-only wrappers; its nested v0.51 feature layer supplies
 the scoped execution-history card.
 
@@ -28,29 +28,29 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v131.js?v=1.3.0-beta.2
-       -> gw-energy-pilot-v130.js?v=1.3.0-beta.2
-            -> gw-energy-pilot-v110.js?v=1.3.0-beta.2
-            -> gw-energy-pilot-v101.js?v=1.3.0-beta.2
-            -> gw-energy-pilot-v051.js?v=1.3.0-beta.2
-                 -> gw-energy-pilot-v051-history.js?v=1.3.0-beta.2
-                 -> gw-energy-pilot-v050.js?v=1.3.0-beta.2
-                 -> gw-energy-pilot-v049.js?v=1.3.0-beta.2
-                      -> gw-energy-pilot-v048.js?v=1.3.0-beta.2
-                           -> gw-energy-pilot-v047.js?v=1.3.0-beta.2
-                                -> gw-energy-pilot-v046.js?v=1.3.0-beta.2
-                                     -> gw-energy-pilot-v045.js?v=1.3.0-beta.2
-                                          -> gw-energy-pilot-v044.js?v=1.3.0-beta.2
-                                               -> gw-energy-pilot-v043.js?v=1.3.0-beta.2
-                                                    -> gw-energy-pilot-v042.js?v=1.3.0-beta.2
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.3.0-beta.2
-                                                              -> gw-energy-pilot-v041.js?v=1.3.0-beta.2
-                                                                   -> gw-energy-pilot-v039.js?v=1.3.0-beta.2
-                                                                        -> gw-energy-pilot-v038.js?v=1.3.0-beta.2
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.3.0-beta.2
+  -> gw-energy-pilot-v131.js?v=1.3.0-beta.3
+       -> gw-energy-pilot-v130.js?v=1.3.0-beta.3
+            -> gw-energy-pilot-v110.js?v=1.3.0-beta.3
+            -> gw-energy-pilot-v101.js?v=1.3.0-beta.3
+            -> gw-energy-pilot-v051.js?v=1.3.0-beta.3
+                 -> gw-energy-pilot-v051-history.js?v=1.3.0-beta.3
+                 -> gw-energy-pilot-v050.js?v=1.3.0-beta.3
+                 -> gw-energy-pilot-v049.js?v=1.3.0-beta.3
+                      -> gw-energy-pilot-v048.js?v=1.3.0-beta.3
+                           -> gw-energy-pilot-v047.js?v=1.3.0-beta.3
+                                -> gw-energy-pilot-v046.js?v=1.3.0-beta.3
+                                     -> gw-energy-pilot-v045.js?v=1.3.0-beta.3
+                                          -> gw-energy-pilot-v044.js?v=1.3.0-beta.3
+                                               -> gw-energy-pilot-v043.js?v=1.3.0-beta.3
+                                                    -> gw-energy-pilot-v042.js?v=1.3.0-beta.3
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.3.0-beta.3
+                                                              -> gw-energy-pilot-v041.js?v=1.3.0-beta.3
+                                                                   -> gw-energy-pilot-v039.js?v=1.3.0-beta.3
+                                                                        -> gw-energy-pilot-v038.js?v=1.3.0-beta.3
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.3.0-beta.3
 ```
 
-Every import in the active graph uses `1.3.0-beta.2`. This ensures an
+Every import in the active graph uses `1.3.0-beta.3`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 

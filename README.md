@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.2.md)
+[Latest beta](docs/releases/v1.3.0-beta.3.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,7 +66,7 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.2 · Beta prerelease**
+**v1.3.0-beta.3 · Beta prerelease**
 
 Latest production release: **v1.2.0 · Stable**
 
@@ -98,7 +98,8 @@ Release documentation:
 
 - `docs/USER_GUIDE.md` — English installation and daily-use guide;
 - `docs/HANDLEIDING_NL.md` — Nederlandse installatie- en gebruikershandleiding;
-- `docs/releases/v1.3.0-beta.2.md` — current responsive Power overview and optional EV charger beta notes;
+- `docs/releases/v1.3.0-beta.3.md` — current actual-versus-expected solar-production graph beta notes;
+- `docs/releases/v1.3.0-beta.2.md` — responsive Power overview and optional EV charger beta notes;
 - `docs/releases/v1.3.0-beta.1.md` — compact-controls, flow-motion and built-in-help beta notes;
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
 - `docs/releases/v1.2.0.md` — current stable mobile-control and telemetry release notes;
@@ -153,6 +154,16 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.3 highlights
+
+- Adds solid actual and dashed expected solar-production lines to the Large
+  and expanded Battery · Plan · Price graph.
+- Uses existing combined-PV Recorder statistics for actuals and only
+  non-negative `P_PV` points from the validated official EMHASS plan for the
+  forecast; both remain display-only.
+- Advances the complete frontend cache boundary to `1.3.0-beta.3` without
+  changing GoodWe, EMS, EMHASS, Battery Saver or accounting semantics.
 
 ## v1.3.0-beta.2 highlights
 

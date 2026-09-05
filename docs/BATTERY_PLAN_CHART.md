@@ -1,6 +1,6 @@
 # Battery plan versus actual chart
 
-This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.3.0-beta.2** and retained from v1.0.0 Stable.
+This document defines the Battery · Plan · Price chart contract used by GW EnergyPilot **v1.3.0-beta.3** and retained from v1.0.0 Stable.
 
 ## Purpose
 
@@ -10,6 +10,8 @@ The dashboard shows, on one selectable Home Assistant-local timeline:
 - the EMHASS battery-power target that was active historically;
 - the latest validated EMHASS future battery schedule;
 - actual GoodWe battery SOC and the historical/current wanted EMHASS SOC;
+- actual combined PV production and the validated expected solar-production
+  series in Large and expanded views;
 - estimated solar/grid origin for battery charge and solar/battery origin for
   grid export in the detailed view;
 - the direction-neutral market-price series;
@@ -75,6 +77,28 @@ This is an instantaneous visualization estimate. It is not settlement-grade
 energy allocation and does not feed grid accounting, EMHASS, Automatic Control
 or financial totals. Recorder remains optional; missing statistics suppress
 only attribution.
+
+## Actual and expected solar production
+
+Large and expanded views additionally show the combined display-only
+`pv_generation_power` series as a solid yellow **Actual solar production**
+line. It is the same bounded Recorder 5-minute mean data already used for
+actual-flow attribution. The yellow dashed **Forecast solar production** step
+line comes only from non-negative `P_PV` values in the current validated
+official EMHASS plan mirror:
+
+```text
+EMHASS GET /api/v1/plan P_PV
+-> validated current plan mirror
+-> pv_plan in battery_price/get
+-> large/expanded chart
+```
+
+The forecast is not derived from a similarly named Home Assistant entity, is
+not extrapolated past available plan rows, and is absent when the active plan
+uses the Home Assistant schedule fallback or does not expose `P_PV`. Both
+series share the chart's power axis with charge/discharge, but do not enter
+Automatic Control, accounting or any EMS decision.
 
 ## Actual and forecast SOC
 
@@ -238,6 +262,9 @@ The current command uses chart schema version **`7`** and includes:
   interval `start`, explicit interval-end `target_at`, inferred `step_seconds`,
   `interval_end` timestamp semantics, `%` unit and exact official
   source-column/unit evidence;
+- `pv_plan` — optional, non-negative official-plan `P_PV` points in W with
+  explicit source-column evidence; it is display-only and has no Home
+  Assistant-entity fallback;
 - timestamped market/effective-price data from the existing EnergyPilot price runtime.
 - `execution` — UTC boundaries, Home Assistant timezone, retention metadata,
   exact 48-hour decision evidence, a conditional 24-hour projection and its
@@ -266,9 +293,9 @@ The duplicate-card guard must therefore **not** return permanently just because 
 
 ## Frontend cache contract
 
-The active v1.3.0-beta.2 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
+The active v1.3.0-beta.3 top-level panel URL is versioned and the static integration path disables cache headers. Nested historical modules remain part of the active import chain; do not delete or rename them without tracing that chain.
 
-A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.3.0-beta.2 loads its presentation wrapper and every inner feature import through `1.3.0-beta.2`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
+A live browser session also keeps already-evaluated ES modules in its module map. Changing only the top-level panel URL is therefore not sufficient when a historical nested module itself changes. v1.3.0-beta.3 loads its presentation wrapper and every inner feature import through `1.3.0-beta.3`, including the strategy, permanent controls, settings, scoped plan-refresh and execution-history owners. The older v1.0.0 and v0.33 cache/plan-refresh mechanisms remain historical compatibility context.
 
 ## EV protection underlays
 

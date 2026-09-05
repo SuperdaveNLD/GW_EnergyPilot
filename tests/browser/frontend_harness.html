@@ -518,6 +518,12 @@
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         value_w: index % 4 === 0 ? -1600 : index % 5 === 0 ? 1100 : 0,
       }));
+      const pvPlan = Array.from({ length: 48 }, (_, index) => ({
+        start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
+        value_w: index % 24 >= 7 && index % 24 <= 18
+          ? Math.max(0, 6200 - Math.abs(12 - index % 24) * 900)
+          : 0,
+      }));
       const socPlan = Array.from({ length: 48 }, (_, index) => ({
         start: new Date(hour.getTime() + index * 60 * 60 * 1000).toISOString(),
         target_at: new Date(hour.getTime() + (index + 1) * 60 * 60 * 1000).toISOString(),
@@ -629,6 +635,13 @@
           entity_id: "sensor.p_batt_forecast",
           last_updated: pBattState?.last_updated || new Date().toISOString(),
           points: plan,
+        },
+        pv_plan: {
+          available: true,
+          unit: "W",
+          source: "emhass_api_v1_plan",
+          source_column: "P_PV",
+          points: pvPlan,
         },
         battery_soc_plan: {
           available: true,

@@ -4538,6 +4538,8 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         "future_rows": False,
         "wanted_soc_history": False,
         "source_bars": False,
+        "actual_solar_visible": False,
+        "forecast_solar_visible": False,
         "ev_charge_underlay": False,
         "ev_hold_underlay": False,
         "modal_open": False,
@@ -4602,15 +4604,31 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         activate(page, profile, '.ep-v027-battery-plan-card [data-chart-size="large"]')
         page.wait_for_function(
             """
-            () => Boolean(
-              window.__epPanel.shadowRoot.querySelector(
-                '.ep-v027-battery-plan-card [data-source-series]'
-              )
-            )
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              return Boolean(
+                root.querySelector('.ep-v027-battery-plan-card [data-source-series]') &&
+                root.querySelector('.ep-v027-battery-plan-card [data-series="actual-pv"]') &&
+                root.querySelector('.ep-v027-battery-plan-card [data-series="forecast-pv"]')
+              );
+            }
             """,
             timeout=10_000,
         )
         result["source_bars"] = True
+        result.update(page.evaluate("""
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              return {
+                actual_solar_visible: Boolean(root.querySelector(
+                  '.ep-v027-battery-plan-card [data-series="actual-pv"]'
+                )),
+                forecast_solar_visible: Boolean(root.querySelector(
+                  '.ep-v027-battery-plan-card [data-series="forecast-pv"]'
+                )),
+              };
+            }
+        """))
         activate(page, profile, '.ep-v027-battery-plan-card [data-chart-size="normal"]')
 
         activate(page, profile, '.ep-v051-history-card [data-action="full-history"]')
@@ -5605,7 +5623,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.2 BETA",
+        "v131": "v1.3.0-beta.3 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -6025,7 +6043,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         execution_history.get(key) is True
         for key in (
             "ran", "single_card", "compact_rows", "future_rows",
-            "wanted_soc_history", "source_bars", "ev_charge_underlay",
+            "wanted_soc_history", "source_bars", "actual_solar_visible",
+            "forecast_solar_visible", "ev_charge_underlay",
             "ev_hold_underlay", "modal_open", "modal_rows",
             "modal_no_filter", "card_stable", "main_stable", "modal_closed",
         )

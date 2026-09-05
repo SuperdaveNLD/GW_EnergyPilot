@@ -6,7 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "1.3.0-beta.2"
+CACHE_KEY = "1.3.0-beta.3"
 
 
 class FrontendV051ReleaseTests(unittest.TestCase):
@@ -103,6 +103,8 @@ class FrontendV051ReleaseTests(unittest.TestCase):
             'panel._entityId?.("meter_total_power_fast")',
             "attributeActualRows",
             "historicalSocWantedRows",
+            "payload?.pv_plan?.points",
+            "pvForecastPoints",
         ):
             self.assertIn(key, data)
         for key in (
@@ -111,6 +113,8 @@ class FrontendV051ReleaseTests(unittest.TestCase):
             "desiredSocPoints(data)",
             'data-history-points="${data.historicalSocWantedRows?.length || 0}"',
             'stroke-dasharray="7 5"',
+            'data-series="actual-pv"',
+            'data-series="forecast-pv"',
         ):
             self.assertIn(key, view)
 

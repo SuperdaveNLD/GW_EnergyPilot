@@ -17,6 +17,16 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.3 — Actual and expected solar production
+
+Large and expanded Battery · Plan · Price charts now compare a solid actual
+combined-PV series from Recorder with a dashed expected solar-production line
+from non-negative `P_PV` values in the current validated official EMHASS plan.
+The forecast is dashboard-only and is unavailable rather than guessed when
+the plan has no evidenced `P_PV` series. It does not alter GoodWe control,
+EMHASS ownership, accounting or persistent state. See
+`docs/releases/v1.3.0-beta.3.md`.
+
 # v1.3.0-beta.2 — Responsive Power overview and optional EV charger
 
 Power overview now has its own `S`, `M` and `L` card sizes: one dashboard
@@ -389,6 +399,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.3** | 2026-09-05 | **Beta** | Adds actual-versus-expected solar production to the detailed Battery · Plan · Price graph. |
 | **1.3.0-beta.2** | 2026-09-04 | **Beta** | Adds responsive S/M/L Power overview sizing and an optional EV branch, and fixes control-overlay stacking plus the oversized AUTO badge. |
 | **1.3.0-beta.1** | 2026-09-04 | **Beta** | Adds compact permanent controls, scoped live-flow animation, a localized built-in manual and a clearer product introduction without changing control semantics. |
 | **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |
