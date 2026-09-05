@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the v1.3.0-beta.1 frontend regression matrix."""
+"""Run the historical v1.3.0-beta.1 frontend regression matrix."""
 
 from __future__ import annotations
 

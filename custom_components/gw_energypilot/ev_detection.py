@@ -68,16 +68,22 @@ def legacy_status_is_active(states: Any, entity_id: str | None) -> bool:
 
 def power_is_active(states: Any, entity_id: str | None, threshold_w: float) -> bool:
     """Interpret a selected charger power sensor in W, kW, MW or mW."""
+    power = power_value_w(states, entity_id)
+    return power is not None and power > threshold_w
+
+
+def power_value_w(states: Any, entity_id: str | None) -> float | None:
+    """Return finite measured charger power in watts, if available."""
     state = states.get(entity_id) if entity_id else None
     raw = str(getattr(state, "state", "")).strip().lower()
     if raw in {"", "none", "unknown", "unavailable"}:
-        return False
+        return None
     try:
         power = float(raw)
     except (TypeError, ValueError):
-        return False
+        return None
     if not isfinite(power):
-        return False
+        return None
     unit = (getattr(state, "attributes", {}) or {}).get("unit_of_measurement")
     if unit == "kW":
         power *= 1000
@@ -85,4 +91,4 @@ def power_is_active(states: Any, entity_id: str | None, threshold_w: float) -> b
         power *= 1_000_000
     elif unit == "mW":
         power /= 1000
-    return power > threshold_w
+    return power

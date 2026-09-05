@@ -117,8 +117,20 @@ class EVDetectionTests(unittest.TestCase):
         states = {
             entity_id: FakeState("0.8", unit_of_measurement="kW"),
         }
+        self.assertEqual(ev_detection.power_value_w(states, entity_id), 800)
         self.assertTrue(ev_detection.power_is_active(states, entity_id, 500))
         self.assertFalse(ev_detection.power_is_active(states, entity_id, 1000))
+
+    def test_power_value_rejects_unavailable_or_non_finite_readings(self):
+        entity_id = "sensor.charger_power"
+        for raw in ("unknown", "unavailable", "nan", "inf", "not-a-number"):
+            with self.subTest(raw=raw):
+                self.assertIsNone(
+                    ev_detection.power_value_w(
+                        {entity_id: FakeState(raw, unit_of_measurement="W")},
+                        entity_id,
+                    )
+                )
 
     def test_legacy_entry_keeps_exact_previous_behavior(self):
         options = {

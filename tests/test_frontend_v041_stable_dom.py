@@ -41,7 +41,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=1.3.0-beta.1"', self.source
+            'import "./gw-energy-pilot-v039.js?v=1.3.0-beta.2"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -111,6 +111,19 @@ class FrontendV041StableDomTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("exercise_ev_protection_banner", browser_test)
+
+    def test_configured_ev_charger_is_a_display_only_house_flow_branch(self) -> None:
+        self.assertIn("function installEvFlowNode(root)", self.source)
+        self.assertIn("function patchEvFlowNode(panel, root, snapshot)", self.source)
+        self.assertIn("attrs.ev_charger_configured === true", self.source)
+        self.assertIn("finiteValue(attrs.ev_power_w)", self.source)
+        self.assertIn('className = "ep-flow-node ep-flow-ev"', self.source)
+        self.assertIn('className = "ep-flow-link ep-link-ev idle"', self.source)
+        self.assertIn("houseToEv", self.source)
+        self.assertIn("evPartOfLoad", self.source)
+        self.assertIn("installEvFlowNode(this.shadowRoot)", self.source)
+        self.assertIn("_async_ev_power_updated", self.sensor)
+        self.assertIn("power_value_w", self.sensor)
 
     def test_other_persistent_selectors_use_stable_live_state(self) -> None:
         self.assertIn("function patchCostFunctionSelector", self.source)
@@ -214,7 +227,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         browser_test = (BROWSER / "test_frontend_stability.py").read_text(
             encoding="utf-8"
         )
-        wrapper = (BROWSER / "test_frontend_stability_v130.py").read_text(
+        wrapper = (BROWSER / "test_frontend_stability_v131.py").read_text(
             encoding="utf-8"
         )
         harness = (BROWSER / "frontend_harness.html").read_text(
@@ -231,10 +244,10 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn('animation["flowParticleAnimations"] <= 0', browser_test)
         self.assertIn('animation["otherAnimations"] != 0', browser_test)
         self.assertIn('page.emulate_media(reduced_motion="reduce")', browser_test)
-        self.assertIn("frontend_harness.html?entry=v130", wrapper)
-        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v130"', wrapper)
+        self.assertIn("frontend_harness.html?entry=v131", wrapper)
+        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v131"', wrapper)
         self.assertIn(
-            '"v050", "v051", "v100", "v101", "v110", "v130"].includes(requestedEntry)',
+            '"v050", "v051", "v100", "v101", "v110", "v130", "v131"].includes(requestedEntry)',
             harness,
         )
         self.assertIn("exercise_touch_controls", browser_test)
@@ -252,7 +265,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
             "window.__epPanel.shadowRoot.querySelector('main') !==",
             browser_test,
         )
-        self.assertIn("test_frontend_stability_v130.py", workflow)
+        self.assertIn("test_frontend_stability_v131.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)
         self.assertFalse((BROWSER / "frontend_harness_v041.html").exists())

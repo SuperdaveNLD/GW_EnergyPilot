@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.1";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.2";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.1";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.1";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.2";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.2";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -206,7 +206,7 @@ const CONTROL_SURFACE_CSS = `
   ep-battery-strategy,
   ep-optimize-action,
   ep-manual-ems-controls { display:block; min-width:0; }
-  ep-control-surface { align-self:start; }
+  ep-control-surface { align-self:start; position:relative; z-index:80; }
   .ep-control-surface {
     margin:0; padding:14px; border-radius:20px;
     border:1px solid rgba(74,190,229,.22);

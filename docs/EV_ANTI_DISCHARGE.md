@@ -124,6 +124,14 @@ new controller ownership mode or additional Modbus write path. A future
 override would change safety and control ownership semantics and therefore
 requires a separate explicit design decision and review.
 
+The Power overview flow also shows a charger branch only when an existing EV
+status, power, online or load-balancing charger source is configured. When the
+selected charging-power sensor is available, its value is normalized to watts
+and displayed live; otherwise the node remains a status-only configured branch.
+It is drawn beneath House ownership because charger demand is already included
+in total house load. This visualization does not add the value again or change
+control, accounting or optimization inputs.
+
 ### Historical chart evidence
 
 v1.0.0 draws EV protection underlays from the existing execution-history

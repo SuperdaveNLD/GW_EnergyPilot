@@ -28,7 +28,7 @@
   <script type="module">
     const ENTRY_ID = "test_entry";
     const requestedEntry = new URLSearchParams(location.search).get("entry") || "v040";
-    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"].includes(requestedEntry)
+    const ENTRYPOINT = ["v040", "v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"].includes(requestedEntry)
       ? requestedEntry
       : "v040";
     const ENTITY_KEYS = [
@@ -102,7 +102,7 @@
       connectivity_status: "all_ok",
       manual_mode: "1",
       manual_power: 0,
-      control_strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"].includes(ENTRYPOINT) ? "hybrid" : "battery",
+      control_strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"].includes(ENTRYPOINT) ? "hybrid" : "battery",
       grid_energy_imported_today: 3.2,
       grid_energy_exported_today: 7.8,
       grid_energy_import_total: 1234.5,
@@ -174,6 +174,8 @@
           last_ems_mode: 11,
           last_ems_setpoint_command: "battery_charge",
           ev_active: false,
+          ev_charger_configured: false,
+          ev_power_w: null,
           ev_protection_state: "inactive",
           execution_history_revision: 20,
         });
@@ -716,7 +718,7 @@
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {
@@ -885,6 +887,7 @@
       v101: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v101.js?browser-harness=1",
       v110: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v110.js?browser-harness=1",
       v130: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v130.js?browser-harness=1",
+      v131: "/custom_components/gw_energypilot/frontend/gw-energy-pilot-v131.js?browser-harness=1",
     }[ENTRYPOINT];
     await import(modulePath);
     await customElements.whenDefined("gw-energypilot-panel");
@@ -1018,7 +1021,7 @@
           root?.querySelector("#auto-toggle") &&
           root?.querySelector("[data-ep-v038-profile]") &&
           cards >= 8 &&
-          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
+          (!["v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"].includes(ENTRYPOINT) || root.querySelector("main")?.dataset.epV041StableDom === "1")
         );
         if (ready) {
           resolve(true);

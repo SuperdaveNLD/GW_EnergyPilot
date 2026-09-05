@@ -18,7 +18,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
 
 
 @dataclass(frozen=True)
@@ -965,7 +965,7 @@ def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
         "context_refresh": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}:
+    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         return result
     try:
         state = page.evaluate(
@@ -1500,7 +1500,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, object]:
     """Emulate Home Assistant host assignments during one physical press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "no_full_render": False,
@@ -1732,7 +1732,7 @@ def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, obje
 
 def exercise_live_copy_press(page: Page, profile: Profile) -> dict[str, object]:
     """Keep WebKit's native click alive while live patches refresh button copy."""
-    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "optimize_click": False,
@@ -1895,7 +1895,7 @@ def exercise_live_copy_press(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, object]:
     """Prove split HA state events patch one unambiguous stable selection."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "event_ordering": False,
@@ -2108,7 +2108,7 @@ def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Keep EMHASS and manual selectors live without rebuilding the dashboard."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "costfun_delayed": False,
@@ -2365,7 +2365,7 @@ def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -2925,7 +2925,7 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -3176,7 +3176,7 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]:
     """Refresh the plan card during one physical S/M/L press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "refresh_during_press": False,
@@ -3322,7 +3322,7 @@ def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]
 
 def exercise_chart_range_press(page: Page, profile: Profile) -> dict[str, object]:
     """Switch 12/24/36-hour views without reloading Recorder or replacing controls."""
-    enabled = EXPECTED_ENTRYPOINT in {"v050", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v050", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "refresh_during_press": False,
@@ -3957,6 +3957,144 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
     return result
 
 
+def exercise_flow_sizes_and_ev_charger(page: Page, profile: Profile) -> dict[str, object]:
+    result: dict[str, object] = {
+        "ran": False,
+        "sizes_present": False,
+        "small_selected": False,
+        "medium_selected": False,
+        "large_selected": False,
+        "preference_saved": False,
+        "desktop_widths": False,
+        "ev_initially_hidden": False,
+        "ev_shown": False,
+        "ev_value": False,
+        "ev_linked": False,
+        "ev_hidden_again": False,
+        "main_stable": False,
+        "error": None,
+    }
+    try:
+        initial = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const card = root.querySelector('[data-ep-card="flow"]');
+              window.__epFlowSizeMain = root.querySelector('main');
+              return {
+                controls: root.querySelectorAll('[data-flow-size]').length,
+                hidden: Boolean(
+                  root.querySelector('.ep-flow-ev')?.hidden &&
+                  root.querySelector('.ep-link-ev')?.hidden
+                ),
+                width: card?.getBoundingClientRect().width || 0,
+              };
+            }
+            """
+        )
+        result["sizes_present"] = initial["controls"] == 3
+        result["ev_initially_hidden"] = initial["hidden"]
+
+        widths: dict[str, float] = {"small": initial["width"]}
+        for size in ("medium", "large", "small"):
+            activate(page, profile, f'[data-ep-card="flow"] [data-flow-size="{size}"]')
+            page.wait_for_function(
+                f"""
+                () => window.__epPanel.shadowRoot.querySelector(
+                  '[data-ep-card="flow"]'
+                )?.classList.contains('ep-v031-flow-size-{size}')
+                """,
+                timeout=5_000,
+            )
+            widths[size] = page.evaluate(
+                """
+                () => window.__epPanel.shadowRoot.querySelector(
+                  '[data-ep-card="flow"]'
+                )?.getBoundingClientRect().width || 0
+                """
+            )
+            result[f"{size}_selected"] = True
+
+        result["preference_saved"] = page.evaluate(
+            """
+            () => JSON.parse(
+              localStorage.getItem('gw_energypilot_dashboard_v008') || '{}'
+            )?.sizes?.flow === 'small'
+            """
+        )
+        result["desktop_widths"] = (
+            profile.width <= 720
+            or widths["medium"] > widths["small"]
+            and (profile.width <= 1180 or widths["large"] > widths["medium"])
+        )
+
+        page.evaluate(
+            "window.__epFlowSizeMain = window.__epPanel.shadowRoot.querySelector('main')"
+        )
+        page.evaluate(
+            """
+            () => window.__epSetEntityByKey('control_command', 'battery_charge', {
+              ev_charger_configured: true,
+              ev_active: true,
+              ev_power_w: 7400,
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector('.ep-flow-ev')?.hidden === false
+            """,
+            timeout=5_000,
+        )
+        shown = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const node = root.querySelector('.ep-flow-ev');
+              const link = root.querySelector('.ep-link-ev');
+              return {
+                shown: Boolean(node && !node.hidden),
+                value: node?.querySelector('.ep-flow-node-value')?.textContent || '',
+                linked: Boolean(
+                  link && !link.hidden && link.dataset.epV041FlowStatus === 'active' &&
+                  link.getAttribute('aria-label')?.includes('EV charger')
+                ),
+              };
+            }
+            """
+        )
+        result["ev_shown"] = shown["shown"]
+        result["ev_value"] = "7.40 kW" in shown["value"]
+        result["ev_linked"] = shown["linked"]
+
+        page.evaluate(
+            """
+            () => window.__epSetEntityByKey('control_command', 'battery_charge', {
+              ev_charger_configured: false,
+              ev_active: false,
+              ev_power_w: null,
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.shadowRoot.querySelector('.ep-flow-ev')?.hidden &&
+              window.__epPanel.shadowRoot.querySelector('.ep-link-ev')?.hidden
+            )
+            """,
+            timeout=5_000,
+        )
+        result["ev_hidden_again"] = True
+        result["main_stable"] = page.evaluate(
+            "window.__epFlowSizeMain === window.__epPanel.shadowRoot.querySelector('main')"
+        )
+        result["ran"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
     result: dict[str, object] = {
         "ran": False,
@@ -4044,7 +4182,7 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the beta.2 EP deadband panel, validation and responsive fit."""
-    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "inputs_present": False,
@@ -4165,7 +4303,7 @@ def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object
 
 def exercise_sems_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the SEMS Beta selector, secret field and local-control boundary."""
-    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "tab_present": False,
@@ -4410,7 +4548,7 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         "modal_closed": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v051", "v100", "v101", "v110", "v130"}:
+    if EXPECTED_ENTRYPOINT not in {"v051", "v100", "v101", "v110", "v130", "v131"}:
         return result
     try:
         page.wait_for_function(
@@ -4533,7 +4671,7 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
 
 def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise the local-only control laboratory without touching HA services."""
-    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "initially_hidden": False,
@@ -4838,7 +4976,7 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, object]:
     """Prove missing iOS clicks recover once across controls and menus."""
-    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130"}
+    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "installed": False,
@@ -5297,6 +5435,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     static_flow = exercise_static_flow(page)
     connectivity = exercise_connectivity_status(page, profile)
     ev_protection = exercise_ev_protection_banner(page)
+    flow_sizes_ev = exercise_flow_sizes_and_ev_charger(page, profile)
 
     motion = page.evaluate(
         """
@@ -5368,6 +5507,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "static_flow": static_flow,
         "connectivity": connectivity,
         "ev_protection": ev_protection,
+        "flow_sizes_ev": flow_sizes_ev,
         "motion": motion,
         "pv_insight": pv_insight,
         "deadband_settings": deadband_settings,
@@ -5411,6 +5551,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     static_flow = result["static_flow"]
     connectivity = result["connectivity"]
     ev_protection = result["ev_protection"]
+    flow_sizes_ev = result["flow_sizes_ev"]
     motion = result["motion"]
     pv_insight = result["pv_insight"]
     deadband_settings = result["deadband_settings"]
@@ -5438,6 +5579,18 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     structural = result["structural"]
     animation = result["animation"]
 
+    if EXPECTED_ENTRYPOINT == "v110":
+        required_flow_sizes_ev = (
+            "ran", "sizes_present", "small_selected", "medium_selected",
+            "large_selected", "preference_saved", "desktop_widths",
+            "ev_initially_hidden", "ev_shown", "ev_value", "ev_linked",
+            "ev_hidden_again", "main_stable",
+        )
+        if not all(flow_sizes_ev[key] is True for key in required_flow_sizes_ev):
+            failures.append(f"{name}: flow S/M/L or conditional EV charger regression failed")
+        if flow_sizes_ev["error"]:
+            failures.append(f"{name}: flow S/M/L or EV charger interaction error")
+
     if EXPECTED_ENTRYPOINT and initial["entrypoint"] != EXPECTED_ENTRYPOINT:
         failures.append(f"{name}: loaded {initial['entrypoint']} instead of {EXPECTED_ENTRYPOINT}")
     expected_badge = {
@@ -5452,12 +5605,13 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
+        "v131": "v1.3.0-beta.2 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
             f"{name}: release badge is {initial['releaseVersion']!r} instead of {expected_badge}"
         )
-    if EXPECTED_ENTRYPOINT in {"v110", "v130"}:
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}:
         if not (
             initial["helpHref"].endswith("/docs/USER_GUIDE.md")
             and initial["helpTarget"] == "_blank"
@@ -5481,7 +5635,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "modes 9/10 outside it",
             "full grid target as setpoint",
         )
-        if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130"}
+        if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
         else (
             "neutral P_batt plan in mode 8",
             "mode 1 inside the configured deadband",
@@ -5489,7 +5643,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "full grid target as setpoint",
         )
     )
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"} and not all(
         phrase in initial["hybridNote"] for phrase in hybrid_phrases
     ):
         failures.append(f"{name}: active Hybrid operator copy is stale")
@@ -5501,7 +5655,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}:
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_strategy_note = (
             "ran", "present", "note_stable", "strong_stable", "height_stable",
             "no_child_rebuilds", "dutch_copy", "context_refresh",
@@ -5643,7 +5797,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"} and not all(
         deadband_settings.get(key) is True
         for key in (
             "ran", "inputs_present", "defaults_correct", "zero_centered",
@@ -5657,7 +5811,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if deadband_settings["error"]:
         failures.append(f"{name}: EP deadband settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v110", "v130"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"} and not all(
         sems_settings.get(key) is True
         for key in (
             "ran", "tab_present", "choices_present",
@@ -5672,7 +5826,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if sems_settings["error"]:
         failures.append(f"{name}: SEMS settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}:
+    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         if not all(
             ev_settings[key] is True
             for key in (
@@ -5687,7 +5841,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: EV load-balancing settings safety regression failed")
         if ev_settings["error"]:
             failures.append(f"{name}: EV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}:
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_host_press = (
             "ran", "no_full_render", "main_stable", "controls_stable",
             "native_click", "touch_click", "real_panel_change",
@@ -5696,7 +5850,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: Home Assistant host update interrupted a control press")
         if host_property_press["error"]:
             failures.append(f"{name}: host-property press interaction error")
-        if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130"}:
+        if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}:
             required_live_copy_press = (
                 "ran", "optimize_click", "costfun_click",
                 "optimize_copy_stable", "costfun_copy_stable",
@@ -5734,7 +5888,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: stable selector feedback regression failed")
         if selector_stability["error"]:
             failures.append(f"{name}: stable selector feedback interaction error")
-    if profile.touch and not control_architecture and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}:
+    if profile.touch and not control_architecture and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -5744,7 +5898,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130"}:
+    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -5815,7 +5969,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: SOC slider interaction error")
     if strategy["present"] is not True or strategy["changed"] is not True:
         failures.append(f"{name}: Battery Strategy button did not apply")
-    if EXPECTED_ENTRYPOINT in {"v110", "v130"} and not (
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"} and not (
         strategy["profile_choices"] == 6
         and strategy["chargegasm_present"] is True
         and strategy["managed_summary"] is True
@@ -5826,7 +5980,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if strategy["error"]:
         failures.append(f"{name}: Battery Strategy interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110", "v130"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110", "v130", "v131"} and not all(
         chart_size_press[key] is True
         for key in (
             "ran", "refresh_during_press", "click_delivered", "size_selected",
@@ -5838,7 +5992,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh interrupted an S/M/L chart-size press")
     if chart_size_press["error"]:
         failures.append(f"{name}: chart-size press interaction error")
-    if EXPECTED_ENTRYPOINT in {"v050", "v110", "v130"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v050", "v110", "v130", "v131"} and not all(
         chart_range_press[key] is True
         for key in (
             "ran", "refresh_during_press", "click_delivered",
@@ -5867,7 +6021,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
     if plan["error"]:
         failures.append(f"{name}: battery-plan refresh interaction error")
-    if EXPECTED_ENTRYPOINT in {"v051", "v100", "v101", "v110", "v130"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v051", "v100", "v101", "v110", "v130", "v131"} and not all(
         execution_history.get(key) is True
         for key in (
             "ran", "single_card", "compact_rows", "future_rows",
@@ -5882,7 +6036,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if execution_history["error"]:
         failures.append(f"{name}: execution-history interaction error")
-    if EXPECTED_ENTRYPOINT in {"v110", "v130"}:
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}:
         required_beta_tests = (
             "ran", "initially_hidden", "menu_entry", "opened", "dashboard_hidden", "touch_targets",
             "responsive", "telemetry_main_stable", "telemetry_tests_stable",
@@ -5969,7 +6123,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: Dutch structural render did not localize")
     if language_result["flow_localized"] is not True:
         failures.append(f"{name}: Dutch flow accessibility label did not localize")
-    if EXPECTED_ENTRYPOINT in {"v110", "v130"} and language_result["help_localized"] is not True:
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"} and language_result["help_localized"] is not True:
         failures.append(f"{name}: Dutch help link did not localize")
     if language_result["main_stable_during_telemetry"] is not True:
         failures.append(f"{name}: Dutch telemetry replaced the main DOM")

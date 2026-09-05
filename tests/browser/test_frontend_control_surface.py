@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_frontend_stability as stability  # noqa: E402
 
 
-HARNESS = "/tests/browser/frontend_harness.html?entry=v130"
+HARNESS = "/tests/browser/frontend_harness.html?entry=v131"
 REPETITIONS = 50
 
 
@@ -772,6 +772,9 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
             id => orderedCards.findIndex(card => card.dataset.epCard === id)
           );
           const flow = root.querySelector('[data-ep-card="flow"]');
+          const windowBar = root.querySelector(
+            '[data-ep-card]:not([data-ep-card="controls"]) > .ep-v031-card-windowbar'
+          );
           const hostRect = host?.getBoundingClientRect();
           const flowRect = flow?.getBoundingClientRect();
           return {
@@ -800,6 +803,9 @@ def exercise_identity_layout(page: Page, profile: stability.Profile) -> dict[str
               Boolean(hostRect && flowRect) &&
               hostRect.width <= flowRect.width + 1 &&
               hostRect.height <= Math.max(460, flowRect.height * 1.5),
+            aboveWindowControls:
+              Number(getComputedStyle(host).zIndex) >
+              Number(getComputedStyle(windowBar).zIndex),
             collapsed: [...root.querySelectorAll(
               'ep-control-surface details'
             )].every(disclosure => !disclosure.open),
@@ -856,6 +862,7 @@ def validate(result: dict[str, object]) -> list[str]:
                 "dashboardCard",
                 "afterPrimary",
                 "compact",
+                "aboveWindowControls",
                 "collapsed",
             )
         )

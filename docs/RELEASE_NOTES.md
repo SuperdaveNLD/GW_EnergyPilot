@@ -17,6 +17,30 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.2 — Responsive Power overview and optional EV charger
+
+Power overview now has its own `S`, `M` and `L` card sizes: one dashboard
+column, two columns or the complete row. Its internal geometry follows the
+actual card width, which keeps the energy nodes aligned in narrow columns as
+well as at full width. On narrow mobile layouts every size safely resolves to
+one column.
+
+When an EV charger source is configured, Power overview adds a display-only
+charger branch with the configured power reading when available. The charger
+remains part of total household load; it is not added to canonical energy
+accounting and this release does not introduce charger control.
+
+Expanded EnergyPilot disclosures now stay above the red, amber and green
+card-window controls instead of allowing them to bleed through the overlay.
+The non-interactive `AUTO ACTIVE` badge is also substantially smaller; all
+operational controls retain their established touch targets.
+
+The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix covers the
+three sizes, geometry, saved preference, conditional charger visibility and
+stable telemetry updates. GoodWe, EMS, EMHASS, Battery Saver, entity identity
+and persistent-store semantics remain unchanged. See
+`docs/releases/v1.3.0-beta.2.md`.
+
 # v1.3.0-beta.1 — Compact controls, scoped live-flow motion and built-in help
 
 This beta adds a localized **?** control to the dashboard header. Dutch Home
@@ -365,6 +389,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.2** | 2026-09-04 | **Beta** | Adds responsive S/M/L Power overview sizing and an optional EV branch, and fixes control-overlay stacking plus the oversized AUTO badge. |
 | **1.3.0-beta.1** | 2026-09-04 | **Beta** | Adds compact permanent controls, scoped live-flow animation, a localized built-in manual and a clearer product introduction without changing control semantics. |
 | **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |
 | **1.2.0-beta.7** | 2026-09-02 | **Beta** | Republishes the fully validated beta.6 mobile-control behavior behind a new complete frontend cache boundary. |

@@ -141,11 +141,31 @@ class FrontendDashboardCardTests(unittest.TestCase):
         self.assertIn("const FLOW_TIGHT_BREAKPOINT_PX = 340", source)
         self.assertIn("function updateResponsiveFlowLayout", source)
         self.assertIn("typeof globalThis.ResizeObserver", source)
+        self.assertIn(
+            "const compact = width > 0 && width <= FLOW_COMPACT_BREAKPOINT_PX",
+            source,
+        )
+        self.assertNotIn("const narrowPanel =", source)
         self.assertIn('flow.classList.toggle("ep-v034-flow-compact", compact)', source)
         self.assertIn("--ep-v034-node-width", source)
         self.assertIn("--ep-v034-stage-height", source)
         self.assertIn("height: auto !important", source)
         self.assertIn("updateParticleGeometry(flow)", source)
+
+    def test_flow_card_has_persistent_small_medium_large_widths(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v031-window-controls.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('new Set(["small", "medium", "large"])', source)
+        self.assertIn('prefs.sizes[FLOW_CARD_ID] = size', source)
+        self.assertIn('data-flow-size="small"', source)
+        self.assertIn('data-flow-size="medium"', source)
+        self.assertIn('data-flow-size="large"', source)
+        self.assertIn('.ep-v031-flow-size-medium', source)
+        self.assertIn('grid-column:span 2!important', source)
+        self.assertIn('.ep-v031-flow-size-large', source)
+        self.assertIn('grid-column:1/-1!important', source)
 
     def test_v035_filters_unrelated_hass_updates_before_rendering(self) -> None:
         source = (FRONTEND / "gw-energy-pilot-v035.js").read_text(encoding="utf-8")
@@ -241,11 +261,11 @@ class FrontendDashboardCardTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            'gw-energy-pilot-v031-battery-saver.js?v=1.3.0-beta.1',
+            'gw-energy-pilot-v031-battery-saver.js?v=1.3.0-beta.2',
             release_v034,
         )
         self.assertIn(
-            'gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.1',
+            'gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.2',
             release_v034,
         )
         self.assertIn('gw-energy-pilot-v034.js?v=0.36-flowmobile1', release_v035)

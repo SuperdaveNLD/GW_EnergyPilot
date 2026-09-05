@@ -4,7 +4,7 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.3.0-beta.1**. The beta retains v1.2.0 and all earlier v1 behavior
+EnergyPilot v1.3.0-beta.2**. The beta retains v1.2.0 and all earlier v1 behavior
 through presentation-only wrappers; its nested v0.51 feature layer supplies
 the scoped execution-history card.
 
@@ -28,28 +28,29 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v130.js?v=1.3.0-beta.1
-       -> gw-energy-pilot-v110.js?v=1.3.0-beta.1
-            -> gw-energy-pilot-v101.js?v=1.3.0-beta.1
-            -> gw-energy-pilot-v051.js?v=1.3.0-beta.1
-                 -> gw-energy-pilot-v051-history.js?v=1.3.0-beta.1
-                 -> gw-energy-pilot-v050.js?v=1.3.0-beta.1
-                 -> gw-energy-pilot-v049.js?v=1.3.0-beta.1
-                      -> gw-energy-pilot-v048.js?v=1.3.0-beta.1
-                           -> gw-energy-pilot-v047.js?v=1.3.0-beta.1
-                                -> gw-energy-pilot-v046.js?v=1.3.0-beta.1
-                                     -> gw-energy-pilot-v045.js?v=1.3.0-beta.1
-                                          -> gw-energy-pilot-v044.js?v=1.3.0-beta.1
-                                               -> gw-energy-pilot-v043.js?v=1.3.0-beta.1
-                                                    -> gw-energy-pilot-v042.js?v=1.3.0-beta.1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.3.0-beta.1
-                                                              -> gw-energy-pilot-v041.js?v=1.3.0-beta.1
-                                                                   -> gw-energy-pilot-v039.js?v=1.3.0-beta.1
-                                                                        -> gw-energy-pilot-v038.js?v=1.3.0-beta.1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.3.0-beta.1
+  -> gw-energy-pilot-v131.js?v=1.3.0-beta.2
+       -> gw-energy-pilot-v130.js?v=1.3.0-beta.2
+            -> gw-energy-pilot-v110.js?v=1.3.0-beta.2
+            -> gw-energy-pilot-v101.js?v=1.3.0-beta.2
+            -> gw-energy-pilot-v051.js?v=1.3.0-beta.2
+                 -> gw-energy-pilot-v051-history.js?v=1.3.0-beta.2
+                 -> gw-energy-pilot-v050.js?v=1.3.0-beta.2
+                 -> gw-energy-pilot-v049.js?v=1.3.0-beta.2
+                      -> gw-energy-pilot-v048.js?v=1.3.0-beta.2
+                           -> gw-energy-pilot-v047.js?v=1.3.0-beta.2
+                                -> gw-energy-pilot-v046.js?v=1.3.0-beta.2
+                                     -> gw-energy-pilot-v045.js?v=1.3.0-beta.2
+                                          -> gw-energy-pilot-v044.js?v=1.3.0-beta.2
+                                               -> gw-energy-pilot-v043.js?v=1.3.0-beta.2
+                                                    -> gw-energy-pilot-v042.js?v=1.3.0-beta.2
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.3.0-beta.2
+                                                              -> gw-energy-pilot-v041.js?v=1.3.0-beta.2
+                                                                   -> gw-energy-pilot-v039.js?v=1.3.0-beta.2
+                                                                        -> gw-energy-pilot-v038.js?v=1.3.0-beta.2
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.3.0-beta.2
 ```
 
-Every import in the active graph uses `1.3.0-beta.1`. This ensures an
+Every import in the active graph uses `1.3.0-beta.2`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 
@@ -290,6 +291,20 @@ name.
 
 PV remains one compact group with one combined total. A structural render creates at most one internal ETA/DC source node and one aggregated external AC/PCC source node. Ordinary telemetry patches their values, link state and accessibility text without replacing either node or connector. Internal PV ends at the battery-side branch; external AC-coupled PV ends at the shared PCC side. The split is display-only and does not infer source-to-load attribution or alter EMHASS/control inputs.
 
+The Power overview card has a persistent local S/M/L width selector. S spans one
+dashboard column, M spans two and L spans every available column; on a one-column
+phone layout all three safely resolve to that one column. Responsive flow
+geometry follows the measured card width rather than the overall viewport, so a
+narrow desktop dashboard column receives the same non-overlapping layout as a
+narrow mobile card.
+
+When any existing EV charger source is configured, the flow stage shows one
+display-only charger node as a child branch of House. A selected charger-power
+entity supplies its normalized live W/kW value. The node and connector stay
+hidden when no charger source is configured, and normal EV telemetry patches
+them without rebuilding `main`. Charger power remains part of total house load
+and is never added to canonical accounting, EMHASS input or EMS control.
+
 ## Required invariants
 
 A normal telemetry burst must preserve the ShadowRoot, `main`, permanent
@@ -331,7 +346,7 @@ Companion acceptance remains the separate protocol in
 The complete stability matrix uses desktop Chromium at 1440 × 900, iPad
 WebKit touch at 834 × 1112 and iPhone WebKit touch at 390 × 844. It is
 implemented in `tests/browser/test_frontend_stability.py` and selected for the
-active release by `tests/browser/test_frontend_stability_v130.py`. It retains
+active release by `tests/browser/test_frontend_stability_v131.py`. It retains
 the established PV topology, 12h/24h/36h chart, settings, connectivity,
 history, EV protection, native scrolling, static-flow and scoped-motion gates in
 addition to the permanent-control assertions above.

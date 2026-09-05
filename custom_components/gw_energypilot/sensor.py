@@ -33,12 +33,18 @@ from .const import (
     CONF_ENABLE_EV_LOAD_BALANCING,
     CONF_ENABLE_EXTERNAL_PV,
     CONF_ENABLE_INTERNAL_PV,
+    CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
+    CONF_EV_CHARGER_CURRENT_ENTITY,
+    CONF_EV_MODE_ENTITY,
+    CONF_EV_ONLINE_ENTITY,
+    CONF_EV_POWER_ENTITY,
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
     EXTERNAL_PV_ENTITY_KEYS,
     MODE_NAMES,
 )
 from .entity import GWEnergyPilotEntity
+from .ev_detection import power_value_w
 from .pv_insight import (
     external_sources_enabled,
     normalize_generation_power_w,
@@ -484,10 +490,26 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
                 self._async_controller_updated,
             )
         )
+        ev_power_entity = str(
+            self.entry.options.get(CONF_EV_POWER_ENTITY, "")
+        ).strip()
+        if ev_power_entity:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass,
+                    [ev_power_entity],
+                    self._async_ev_power_updated,
+                )
+            )
 
     @callback
     def _async_controller_updated(self) -> None:
         """Refresh command evidence and EV-protection presentation state."""
+        self.async_write_ha_state()
+
+    @callback
+    def _async_ev_power_updated(self, _event: Event) -> None:
+        """Refresh the display-only charger branch without controller polling."""
         self.async_write_ha_state()
 
     @property
@@ -499,6 +521,19 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
         """Expose persistent evidence for the latest actual EMS setpoint write."""
         controller = self.entry.runtime_data.controller
         timestamp = controller.last_ems_setpoint_updated_at
+        charger_keys = (
+            CONF_EV_MODE_ENTITY,
+            CONF_EV_POWER_ENTITY,
+            CONF_EV_ONLINE_ENTITY,
+            CONF_EV_CHARGER_CURRENT_ENTITY,
+            CONF_EV_CHARGER_ALLOCATED_CURRENT_ENTITY,
+        )
+        charger_configured = any(
+            str(self.entry.options.get(key, "")).strip() for key in charger_keys
+        )
+        ev_power_entity = str(
+            self.entry.options.get(CONF_EV_POWER_ENTITY, "")
+        ).strip()
         return {
             "last_ems_setpoint_updated_at": (
                 timestamp.isoformat() if timestamp is not None else None
@@ -507,6 +542,11 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
             "last_ems_mode": controller.last_ems_mode,
             "last_ems_setpoint_command": controller.last_ems_setpoint_command,
             "ev_active": controller.ev_is_active(),
+            "ev_charger_configured": charger_configured,
+            "ev_power_w": power_value_w(
+                self.hass.states,
+                ev_power_entity or None,
+            ),
             "ev_protection_state": controller.ev_protection_state,
             "execution_history_revision": (
                 controller.execution_history.revision

@@ -1,8 +1,10 @@
-import "./gw-energy-pilot-v031.js?v=1.3.0-beta.1";
+import "./gw-energy-pilot-v031.js?v=1.3.0-beta.2";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const DASHBOARD_STORAGE_KEY = "gw_energypilot_dashboard_v008";
 const WINDOW_STORAGE_KEY = "gw_energypilot_window_state_v031";
+const FLOW_CARD_ID = "flow";
+const FLOW_CARD_SIZES = new Set(["small", "medium", "large"]);
 
 const CARD_LABELS = {
   flow: "Power overview",
@@ -29,12 +31,20 @@ function copy(panel) {
         close: "Kaart verbergen · herstellen via Dashboard layout",
         minimize: "Kaart inklappen / herstellen",
         maximize: "Kaart volle breedte / herstellen",
+        flowSize: "Kaartbreedte",
+        flowSmall: "Eén kaartkolom",
+        flowMedium: "Twee kaartkolommen",
+        flowLarge: "Volledige dashboardbreedte",
       }
     : {
         controls: "Window controls",
         close: "Hide card · restore via Dashboard layout",
         minimize: "Collapse / restore card",
         maximize: "Full width / restore card",
+        flowSize: "Card width",
+        flowSmall: "One card column",
+        flowMedium: "Two card columns",
+        flowLarge: "Full dashboard width",
       };
 }
 
@@ -73,6 +83,28 @@ function windowState() {
   return state;
 }
 
+function flowCardSize(state = windowState()) {
+  const prefs = readJson(DASHBOARD_STORAGE_KEY);
+  const stored = prefs.sizes?.[FLOW_CARD_ID];
+  if (FLOW_CARD_SIZES.has(stored)) return stored;
+  return state.maximized[FLOW_CARD_ID] ? "large" : "small";
+}
+
+function setFlowCardSize(panel, size) {
+  if (!FLOW_CARD_SIZES.has(size)) return;
+  const prefs = readJson(DASHBOARD_STORAGE_KEY);
+  prefs.sizes = prefs.sizes && typeof prefs.sizes === "object" ? prefs.sizes : {};
+  prefs.sizes[FLOW_CARD_ID] = size;
+  writeJson(DASHBOARD_STORAGE_KEY, prefs);
+
+  // The former green-dot state represented only normal/full width. Once an
+  // explicit S/M/L choice exists it must not compete with that saved width.
+  const state = windowState();
+  state.maximized[FLOW_CARD_ID] = false;
+  writeJson(WINDOW_STORAGE_KEY, state);
+  panel._queueRender();
+}
+
 function toggleCollapsed(panel, id) {
   const state = windowState();
   state.collapsed[id] = !state.collapsed[id];
@@ -82,6 +114,10 @@ function toggleCollapsed(panel, id) {
 }
 
 function toggleMaximized(panel, id) {
+  if (id === FLOW_CARD_ID) {
+    setFlowCardSize(panel, flowCardSize() === "large" ? "small" : "large");
+    return;
+  }
   const state = windowState();
   state.maximized[id] = !state.maximized[id];
   if (state.maximized[id]) state.collapsed[id] = false;
@@ -156,10 +192,41 @@ function ensureStyles(root) {
     .ep-dashboard-layout > .ep-v031-card-collapsed > :not(.ep-v031-card-windowbar) { display:none!important; }
     .ep-dashboard-layout > .ep-v031-card-collapsed .ep-v031-card-windowbar { margin-bottom:0; }
     .ep-dashboard-layout > .ep-v031-card-maximized { grid-column:1/-1!important; }
+    .ep-dashboard-layout > [data-ep-card="flow"].ep-v031-flow-size-small {
+      grid-column:span 1!important;
+    }
+    .ep-dashboard-layout > [data-ep-card="flow"].ep-v031-flow-size-medium {
+      grid-column:span 2!important;
+    }
+    .ep-dashboard-layout > [data-ep-card="flow"].ep-v031-flow-size-large {
+      grid-column:1/-1!important;
+    }
+    .ep-v031-flow-size-control {
+      display:flex; align-items:center; flex:0 0 auto; margin-left:auto; padding:2px;
+      border:1px solid rgba(255,255,255,.075); border-radius:999px;
+      background:rgba(1,12,28,.42); box-shadow:inset 0 1px 8px rgba(0,0,0,.20);
+    }
+    .ep-v031-flow-size-control button {
+      appearance:none; width:27px; height:24px; padding:0; border:0; border-radius:999px;
+      background:transparent; color:#7793a7; cursor:pointer;
+      font:700 9px -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+    }
+    .ep-v031-flow-size-control button.active {
+      color:#f0fbff; background:rgba(255,255,255,.13);
+      box-shadow:0 1px 8px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.12);
+    }
     .ep-dashboard-layout.ep-editing .ep-v031-card-windowbar { cursor:default; }
     @media(max-width:720px) {
       .ep-v031-card-windowbar { margin-top:-2px; }
       .ep-v031-card-maximized { grid-column:1!important; }
+      .ep-dashboard-layout > [data-ep-card="flow"][class*="ep-v031-flow-size-"] {
+        grid-column:1!important;
+      }
+    }
+    @media(pointer:coarse) {
+      .ep-v031-flow-size-control button {
+        width:44px; min-width:44px; height:44px; min-height:44px;
+      }
     }
   `;
   root.appendChild(style);
@@ -167,6 +234,7 @@ function ensureStyles(root) {
 
 function createWindowBar(panel, card, id) {
   const labels = copy(panel);
+  const size = id === FLOW_CARD_ID ? flowCardSize() : null;
   const bar = document.createElement("div");
   bar.className = "ep-v031-card-windowbar";
   bar.innerHTML = `
@@ -175,7 +243,12 @@ function createWindowBar(panel, card, id) {
       <button type="button" draggable="false" class="ep-v031-window-dot minimize" data-window-action="minimize" title="${panel._escape(labels.minimize)}" aria-label="${panel._escape(labels.minimize)}"><span>−</span></button>
       <button type="button" draggable="false" class="ep-v031-window-dot maximize" data-window-action="maximize" title="${panel._escape(labels.maximize)}" aria-label="${panel._escape(labels.maximize)}"><span>+</span></button>
     </div>
-    <span class="ep-v031-card-windowlabel">${panel._escape(cardLabel(card))}</span>`;
+    <span class="ep-v031-card-windowlabel">${panel._escape(cardLabel(card))}</span>
+    ${size ? `<div class="ep-v031-flow-size-control" role="group" aria-label="${panel._escape(labels.flowSize)}">
+      <button type="button" data-flow-size="small" class="${size === "small" ? "active" : ""}" title="${panel._escape(labels.flowSmall)}" aria-pressed="${size === "small"}">S</button>
+      <button type="button" data-flow-size="medium" class="${size === "medium" ? "active" : ""}" title="${panel._escape(labels.flowMedium)}" aria-pressed="${size === "medium"}">M</button>
+      <button type="button" data-flow-size="large" class="${size === "large" ? "active" : ""}" title="${panel._escape(labels.flowLarge)}" aria-pressed="${size === "large"}">L</button>
+    </div>` : ""}`;
 
   bar.addEventListener("pointerdown", (event) => event.stopPropagation());
   bar.addEventListener("dragstart", (event) => event.preventDefault());
@@ -190,6 +263,12 @@ function createWindowBar(panel, card, id) {
   bar.querySelector('[data-window-action="maximize"]')?.addEventListener("click", (event) => {
     event.stopPropagation();
     toggleMaximized(panel, id);
+  });
+  bar.querySelectorAll("[data-flow-size]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setFlowCardSize(panel, button.dataset.flowSize);
+    });
   });
   return bar;
 }
@@ -217,6 +296,12 @@ function installWindowControls(panel, root) {
 
     card.classList.toggle("ep-v031-card-collapsed", Boolean(state.collapsed[id]));
     card.classList.toggle("ep-v031-card-maximized", Boolean(state.maximized[id]));
+    if (id === FLOW_CARD_ID) {
+      const size = flowCardSize(state);
+      for (const candidate of FLOW_CARD_SIZES) {
+        card.classList.toggle(`ep-v031-flow-size-${candidate}`, candidate === size);
+      }
+    }
 
     if (!card.querySelector(":scope > .ep-v031-card-windowbar")) {
       card.prepend(createWindowBar(panel, card, id));

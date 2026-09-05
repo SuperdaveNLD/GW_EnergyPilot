@@ -1,5 +1,5 @@
-import "./gw-energy-pilot-v031-battery-saver.js?v=1.3.0-beta.1";
-import "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.1";
+import "./gw-energy-pilot-v031-battery-saver.js?v=1.3.0-beta.2";
+import "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.2";
 
 const VERSION = "0.34";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -148,12 +148,12 @@ function updateParticleGeometry(flow) {
 
 function updateResponsiveFlowLayout(panel, flow) {
   const width = flow.getBoundingClientRect().width;
-  const narrowPanel =
-    panel.narrow === true ||
-    panel._narrow === true ||
-    globalThis.matchMedia?.("(max-width: 720px)")?.matches === true;
-  const compact =
-    narrowPanel && width > 0 && width <= FLOW_COMPACT_BREAKPOINT_PX;
+  // Dashboard columns can be narrow while the HA viewport itself is wide.
+  // The flow geometry belongs to this card, so its measured width is the only
+  // reliable compact-layout signal. Gating this on the host/viewport left the
+  // full-width PV group active in narrow desktop columns, where it collided
+  // with the centered battery node and made the connector spacing uneven.
+  const compact = width > 0 && width <= FLOW_COMPACT_BREAKPOINT_PX;
   const tight = compact && width <= FLOW_TIGHT_BREAKPOINT_PX;
 
   flow.classList.toggle("ep-v034-flow-compact", compact);
