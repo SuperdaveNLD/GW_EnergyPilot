@@ -1,29 +1,33 @@
 # Hybrid 2.0 Beta
 
-Hybrid 2.0 Beta is an opt-in automatic strategy added in v1.3.0-beta.6. Select **Settings → GoodWe → Automatic control strategy → Hybrid
+Hybrid 2.0 Beta is an opt-in automatic strategy added in v1.3.0-beta.6 and
+corrected in v1.3.0-beta.7. Select **Settings → GoodWe → Automatic control strategy → Hybrid
 2.0 Beta**. Existing Battery, Grid and Hybrid selections keep their behavior.
 The stored strategy key is `hybrid_2`; no existing config value is migrated.
 
 ## Charging rule
 
-EMHASS selects the net-charging window. Both a battery charge plan below the
-Battery Hold deadband and a grid-import plan above the GoodWe Auto deadband
-are required. Inside that window EnergyPilot requests **mode 2, Charge PV**, at
-the configured **Maximum control power**, capped at 15,000 W. It does not use
-the smaller planned `P_grid` as the total house-import target.
+EMHASS selects the charging window through `P_batt`. A battery charge plan
+below the Battery Hold deadband requests **mode 2, Charge PV**, at the
+configured **Maximum control power**, capped at 15,000 W. `P_grid` is not a
+second charging gate and is not used as the total house-import target. This is
+required when EV consumption is absent from the EMHASS load forecast: the
+planned grid value can remain around zero while the actual house imports for
+the EV.
 
 | Valid plan | GoodWe request |
 |---|---|
-| `P_batt < -battery_deadband` and `P_grid > grid_deadband` | **2**, configured maximum control power |
+| `P_batt < -battery_deadband`, any/missing `P_grid` | **2**, configured maximum control power |
 | Battery inside its deadband | **8**, 0 W |
 | Other non-neutral battery plan, grid inside its deadband | **1**, 0 W |
 | Other non-neutral battery plan, positive grid target | **9**, bounded `abs(P_grid)` |
 | Other non-neutral battery plan, negative grid target | **10**, bounded `abs(P_grid)` |
 
-Exact deadband boundaries remain neutral. Required plan inputs must be finite
-and the optimizer ready. Missing inputs wait without a new EMS write; an
-unexpired persistent plan can bridge missing publication through the existing
-live-first source order. Explicit non-ready optimizer status remains authoritative.
+Exact deadband boundaries remain neutral. `P_batt` must be finite and the
+optimizer ready. Outside a Hybrid 2.0 charge window, missing required `P_grid`
+still waits without a new EMS write; an unexpired persistent plan can bridge
+missing publication through the existing live-first source order. Explicit
+non-ready optimizer status remains authoritative.
 
 Mode 2 interprets register `47512` as an **upper grid-assistance allowance**
 with PV priority, rather than a direct battery-power target or a PCC import

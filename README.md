@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.6.md)
+[Latest beta candidate](docs/releases/v1.3.0-beta.7.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,7 +66,7 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.6 · Beta prerelease**
+**v1.3.0-beta.7 · Beta candidate**
 
 Latest production release: **v1.2.0 · Stable**
 
@@ -158,10 +158,18 @@ Release documentation:
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
 
+## v1.3.0-beta.7 highlights
+
+- Fixes the reported EV-active case where `P_batt = -1.33 kW` but
+  `P_grid = -29 W` kept Hybrid 2.0 in mode 1.
+- Every explicit battery-charge plan now selects mode 2 at configured maximum
+  power, independent of `P_grid`; neutral/discharge plans retain their guards.
+- See [beta.7 release notes](docs/releases/v1.3.0-beta.7.md).
+
 ## v1.3.0-beta.6 highlights
 
 - Adds **Hybrid 2.0 Beta** in GoodWe settings: mode 2 at configured maximum
-  power during planned net-charge windows, with PV priority.
+  power during planned battery-charge windows, with PV priority.
 - EV start preserves charging; neutral/discharge plans remain held.
 - Existing strategies are retained. Actual charging and SOC can exceed the
   EMHASS forecast. See [release notes](docs/releases/v1.3.0-beta.6.md).
@@ -701,7 +709,7 @@ For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around z
 ### Hybrid 2.0 Beta
 
 The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
+power** whenever `P_batt < -battery_deadband`, independent of `P_grid`.
 Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
 windows and holds neutral/discharge plans. Actual charging and SOC can exceed
 the EMHASS forecast. No existing selection is migrated; manual modes remain

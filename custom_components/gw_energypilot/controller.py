@@ -776,6 +776,11 @@ class GWEnergyPilotController:
             grid_deadband=DEFAULT_GOODWE_AUTO_DEADBAND,
             max_power=max_power,
         )
+        if not decision.ready:
+            self.last_command = decision.command
+            self._notify_state()
+            await self._async_record_waiting(self.last_command)
+            return
         await self._async_apply_command(
             int(decision.mode),
             int(decision.power),
@@ -832,7 +837,7 @@ class GWEnergyPilotController:
     async def _async_apply_hybrid_plan(
         self,
         p_batt: float,
-        p_grid: float,
+        p_grid: float | None,
         battery_deadband: float,
         grid_deadband: float,
         max_power: int,
@@ -892,12 +897,21 @@ class GWEnergyPilotController:
             )
             return
         p_grid = self._state_float(self._p_grid_entity_id())
+        if strategy == CONTROL_STRATEGY_HYBRID_2:
+            await self._async_apply_hybrid_plan(
+                p_batt,
+                p_grid,
+                battery_deadband,
+                grid_deadband,
+                max_power,
+            )
+            return
         if p_grid is None:
             self.last_command = "waiting_for_p_grid"
             self._notify_state()
             await self._async_record_waiting(self.last_command)
             return
-        if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
+        if strategy == CONTROL_STRATEGY_HYBRID:
             await self._async_apply_hybrid_plan(
                 p_batt,
                 p_grid,

@@ -17,6 +17,13 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.7 — Hybrid 2.0 follows the battery charge plan
+
+Hybrid 2.0 now enters mode 2 whenever EMHASS explicitly plans battery
+charging. `P_grid` is no longer a second gate, fixing mode 1 while an active EV
+was omitted from the load forecast. See
+[release notes](releases/v1.3.0-beta.7.md).
+
 # v1.3.0-beta.6 — Hybrid 2.0 Beta
 
 An extra opt-in strategy uses mode 2 with maximum grid assistance and PV
@@ -420,6 +427,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.7** | 2026-09-06 | **Beta** | Hybrid 2.0 follows explicit battery charging independent of a neutral/exporting/missing grid plan. |
 | **1.3.0-beta.6** | 2026-09-06 | **Beta** | Opt-in Hybrid 2.0 maximum mode-2 charging with PV priority; field validation pending. |
 | **1.3.0-beta.5** | 2026-09-06 | **Beta** | EV charge plans preserve strategy mode/setpoint; discharge/neutral Hold and unavailable-plan waits remain. |
 | **1.3.0-beta.4** | 2026-09-05 | **Beta** | Shows actual and expected solar production in every chart size, including the default M. |

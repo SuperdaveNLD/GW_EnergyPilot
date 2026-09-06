@@ -4,6 +4,20 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.7] - 2026-09-06
+
+### Fixed
+
+- Make the Hybrid 2.0 mode-2 charging branch depend on the explicit `P_batt`
+  charge plan alone. A neutral, exporting or unavailable `P_grid` no longer
+  incorrectly selects mode 1 or waits while the battery plan requests charge.
+- Cover the supplied EV-active field case (`P_batt = -1.33 kW`,
+  `P_grid = -29 W`) and retain mode 2 at configured maximum power with or
+  without EV activity.
+- Keep optimizer readiness, Battery Hold for neutral/discharge plans, normal
+  Hybrid mapping outside charge windows, manual ownership and EV-stop
+  freshness unchanged.
+
 ## [1.3.0-beta.6] - 2026-09-06
 
 ### Added
