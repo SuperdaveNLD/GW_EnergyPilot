@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v025.js?v=1.3.0-beta.7";
+import "./gw-energy-pilot-v025.js?v=1.3.0-beta.8";
 
 const VERSION = "0.26";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -23,7 +23,7 @@ const TEXT = {
     gridControl: "Grid control",
     hybridControl: "Hybrid control",
     hybrid2Control: "Hybrid 2.0 Beta",
-    hybrid2Description: "Planned battery charging uses mode 2 at the configured maximum power with PV priority, independent of P_grid. Other steps follow Hybrid. Charging and SOC can exceed the EMHASS forecast and its planned SOC maximum; EV protection remains active.",
+    hybrid2Description: "Planned grid charging follows the EMHASS battery power in mode 11, capped by Maximum control power. During EV charging, self-use and PV charging use mode 9 with measured EV power as the import target, updated every 15 seconds. Pause and planned discharge use mode 8 Hold. Self-use requires a fresh EV power sensor; its report must be no older than 30 seconds.",
     batteryDescription: "Controls charging and discharging using the requested battery power (GoodWe 11/12).",
     gridDescription: "Controls import and export using the requested grid power (GoodWe 9/10).",
     hybridDescription: "Uses battery power for buying/charging (11) and grid power for selling/export (10).",
@@ -124,7 +124,7 @@ const TEXT = {
     gridControl: "Netregeling",
     hybridControl: "Hybride regeling",
     hybrid2Control: "Hybrid 2.0 Beta",
-    hybrid2Description: "Geplande batterijlading gebruikt modus 2 op het ingestelde maximale regelvermogen met PV-voorrang, onafhankelijk van P_grid. Overige stappen volgen Hybrid. Lading en SOC kunnen de EMHASS-prognose en het geplande SOC-maximum overschrijden; EV-beveiliging blijft actief.",
+    hybrid2Description: "Gepland netladen volgt het EMHASS-accuvermogen in modus 11, begrensd door Maximaal regelvermogen. Tijdens EV-laden gebruiken zelfconsumptie en PV-laden modus 9 met het gemeten EV-vermogen als importdoel, elke 15 seconden bijgewerkt. Pauze en geplande ontlading gebruiken modus 8 Hold. Zelfconsumptie vereist een verse EV-vermogensmeting van maximaal 30 seconden oud.",
     batteryDescription: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
     gridDescription: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
     hybridDescription: "Regelt inkoop/laden op accuvermogen (11) en verkoop/export op netvermogen (10).",

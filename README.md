@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta candidate](docs/releases/v1.3.0-beta.7.md)
+[Latest beta release](docs/releases/v1.3.0-beta.8.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,9 +66,10 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.7 · Beta candidate**
+**v1.3.0-beta.8 · Beta**
 
-Latest production release: **v1.2.0 · Stable**
+Latest production release: **v1.2.1 · Stable**
+Latest beta release: **v1.3.0-beta.8**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -158,7 +159,18 @@ Release documentation:
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
 
-## v1.3.0-beta.7 highlights
+## v1.3.0-beta.8 highlights
+
+- Hybrid 2.0 follows planned battery watts in mode 11 during net-charge windows.
+- During EV charging, house self-consumption and PV charging use mode 9 with
+  the measured EV power as import target, updated every 15 seconds. The battery
+  may supply the house; pause and explicit planned discharge use mode 8 Hold.
+- Self-use requires a fresh measured EV power sensor. Invalid references or
+  unavailable plans during EV charging select Hold instead of retaining an old
+  import target. Missing plan inputs without EV retain the existing wait.
+- See [beta.8 release notes](docs/releases/v1.3.0-beta.8.md).
+
+## v1.3.0-beta.7 highlights (superseded by beta.8)
 
 - Fixes the reported EV-active case where `P_batt = -1.33 kW` but
   `P_grid = -29 W` kept Hybrid 2.0 in mode 1.
@@ -708,16 +720,22 @@ For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around z
 
 ### Hybrid 2.0 Beta
 
-The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** whenever `P_batt < -battery_deadband`, independent of `P_grid`.
-Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
-windows and holds neutral/discharge plans. Actual charging and SOC can exceed
-the EMHASS forecast. No existing selection is migrated; manual modes remain
+The opt-in `hybrid_2` strategy uses **mode 11 at bounded `abs(P_batt)`**
+when battery charging and grid import are both outside their deadbands.
+During EV charging, self-use (including positive `P_batt` with neutral grid)
+and PV charging use **mode 9 at measured EV power**, refreshed every 15 seconds.
+Pause and explicit planned discharge use mode 8. A fresh measured EV power
+sensor is required for self-use; missing/stale/out-of-range references select
+Hold. Missing/non-ready plan inputs during EV charging also select Hold.
+Other steps retain Hybrid behavior without EV. No existing selection is
+migrated; manual modes remain
 exact. See [Hybrid 2.0 behavior and hardware evidence](docs/HYBRID_2.md).
 
 ### EV anti-discharge override
 
-EV coordination is a directional anti-discharge guard, not an EV charging controller. While the configured EV source indicates active charging:
+EV coordination is an inverter policy, not an EV charging controller. Battery,
+Grid and original Hybrid use this directional guard while the configured EV
+source indicates active charging; Hybrid 2.0 has the self-consumption exception above:
 
 ```text
 P_batt > +deadband or inside deadband -> mode 8 Battery Hold
@@ -730,6 +748,7 @@ For an explicit home-battery charge plan:
 Battery strategy -> mode 11 using abs(P_batt)
 Grid strategy    -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
 Hybrid strategy  -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+Hybrid 2.0 Beta  -> see the self-consumption exception above; positive P_batt with neutral grid may supply the house
 ```
 
 This blocks planned battery discharge while allowing explicit charging plans. It does not guarantee instantaneous battery direction in PCC/Auto modes when actual load differs from the forecast. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.

@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.7";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.8";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.7";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.7";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.8";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.8";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -202,12 +202,14 @@ const HYBRID2_NOTE = Object.freeze({
   en: Object.freeze({
     ...HYBRID_NOTE.en,
     label: "Hybrid 2.0 Beta",
-    description: "Battery-charge windows use mode 2 at the configured maximum power with PV priority, independent of P_grid. Other steps follow Hybrid. Charging and SOC can exceed the EMHASS forecast.",
+    description: "Planned grid charging follows the EMHASS battery power in mode 11. During EV charging, self-use and PV charging use mode 9 with measured EV power as the import target, updated every 15 seconds. Pause and planned discharge use mode 8 Hold. Self-use requires a fresh EV power sensor.",
+    safety: "During EV charging, the battery may supply the house; explicit battery export is held.",
   }),
   nl: Object.freeze({
     ...HYBRID_NOTE.nl,
     label: "Hybrid 2.0 Beta",
-    description: "Acculaadvensters gebruiken modus 2 op het maximale regelvermogen met PV-voorrang, onafhankelijk van P_grid. Overige stappen volgen Hybrid. Lading en SOC kunnen de EMHASS-prognose overschrijden.",
+    description: "Gepland netladen volgt het EMHASS-accuvermogen in modus 11. Tijdens EV-laden gebruiken zelfconsumptie en PV-laden modus 9 met het gemeten EV-vermogen als importdoel, elke 15 seconden bijgewerkt. Pauze en geplande ontlading gebruiken modus 8 Hold. Zelfconsumptie vereist een verse EV-vermogensmeting.",
+    safety: "Tijdens EV-laden mag de accu het huis voeden; expliciete batterij-export wordt gepauzeerd.",
   }),
 });
 

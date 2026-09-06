@@ -1,12 +1,17 @@
 # EV anti-discharge protection
 
-This document defines the EV protection behavior for GW EnergyPilot v1.3.0-beta.6.
+This document defines the EV protection behavior for GW EnergyPilot v1.3.0-beta.8.
 
 ## Purpose
 
 The EV feature is an **anti-discharge protection**, not an EV charging controller.
 
-While the EV is charging, the home battery must not discharge into the EV. If EMHASS explicitly requests home-battery charging at the same time, GW EnergyPilot must continue that charge request instead of holding the battery.
+While the EV is charging, the home battery should not supply the EV. Hybrid
+2.0 explicitly allows ordinary house self-consumption: its mode-9 import target
+equals measured EV power, leaving GoodWe to balance the house and PV. Planned
+net charging uses mode 11 at the EMHASS battery watts. Pause and explicit
+planned discharge use Hold. Battery, Grid and Hybrid retain their existing
+plan-direction guards described below.
 
 The anti-discharge feature only observes the configured EV state/power entities.
 The separately opt-in EV load balancer may modulate one charger current entity,
@@ -32,39 +37,46 @@ GoodWe ETA / BMS / smart meter
 
 ## Control rule
 
-During an active EV charging session, `P_batt` is the directional safety guard:
+For the original Battery, Grid and Hybrid strategies, `P_batt` is the directional safety guard:
 
 | EV state | EMHASS `P_batt` plan | EnergyPilot behavior |
 |---|---|---|
 | Not charging | Any valid plan | Normal configured automatic strategy |
 | Charging | `P_batt > +deadband` — discharge | **Mode 8 Battery Hold** |
 | Charging | `P_batt` inside deadband — neutral | **Mode 8 Battery Hold** |
-| Charging | `P_batt < -deadband` — charge | **Continue charging** |
+| Charging | `P_batt < -deadband` — charge | **Continue according to strategy below** |
 
-This means EV coordination is strictly anti-discharge: discharge and neutral are paused, charging is allowed to proceed.
+Hybrid 2.0 classifies self-consumption first: a non-neutral battery plan with
+grid inside its deadband is self-use, even when `P_batt` is positive. PV charging
+with planned export also retains house self-use. These steps use mode 9 at the
+fresh measured EV watts; only explicit discharge outside the grid deadband and
+battery-neutral plans are held. Negative `P_batt` alone is not permission for
+maximum grid charging. EMHASS remains the owner of price-based timing.
 
 ## GoodWe execution while EV charging
 
-When EMHASS requests battery charging while the EV is active, the canonical
-normal strategy selects exactly the same mode and setpoint as without EV:
+When EMHASS requests battery charging while the EV is active:
 
 - **Battery control**: mode `11` using the requested `P_batt` magnitude.
 - **Grid/Hybrid control**: mode `9` for import, mode `1` inside the grid
   deadband, or mode `10` for export. Export alongside a charging battery plan
   can represent PV export and is not itself a battery-discharge request.
-- **Hybrid 2.0 Beta**: mode `2` at configured maximum power whenever `P_batt`
-  explicitly requests charging, independent of `P_grid`; otherwise normal
-  Hybrid. See [Hybrid 2.0](HYBRID_2.md).
-- Missing/non-finite required `P_grid`: wait without an EMS write, just as
-  normal Grid/Hybrid control does. A valid persistent plan may supply it.
+- **Hybrid 2.0 Beta**: mode `11` at bounded `abs(P_batt)` for explicit battery
+  charging with planned grid import. Self-use and PV charging use mode `9` at
+  measured EV power, updated every 15 seconds; missing/stale or out-of-range
+  references select Hold. Missing/non-ready/suspended plans during EV charging
+  also select Hold. See [Hybrid 2.0](HYBRID_2.md) for exact boundaries and cadence.
+- Original Grid/Hybrid with missing/non-finite required `P_grid`: wait without
+  an EMS write. A valid persistent plan may supply it. Hybrid 2.0 with active
+  EV charging uses Hold for missing plan inputs as described above.
 
 EV activity must not convert a Grid/Hybrid command to mode `11`. Only the
-explicit planned battery direction gates this override. This is a plan-based
-guard, not a guarantee of instantaneous battery direction in PCC/Auto modes
+planned battery direction gates the original Battery/Grid/Hybrid override.
+Their plan-based guard is not a guarantee of instantaneous battery direction in PCC/Auto modes
 when actual load differs from the forecast. ETA retains local power control;
 no new hardware limit or register semantics are inferred from this fix.
 
-For discharge or neutral plans, EnergyPilot always uses mode `8` (**Battery Hold**) at `0 W` while EV charging is active.
+For neutral or explicit discharge plans, EnergyPilot uses mode `8` (**Battery Hold**) at `0 W` while EV charging is active. In Hybrid 2.0, positive battery power with neutral grid remains the self-consumption exception above.
 
 No new Modbus registers are introduced. The existing EMS registers remain:
 
@@ -127,7 +139,11 @@ existing controller command:
 - **Anti-discharge active**: EV charging is active and home-battery discharge is
   blocked with mode `8` (**Battery Hold**).
 - **Battery charge allowed**: EV charging is active and the explicit
-  home-battery charging plan continues.
+  home-battery charging plan continues (Hybrid 2.0 requires planned net charging).
+- **House self-consumption**: Hybrid 2.0 imports measured EV power while PV and
+  battery balance the ordinary house. Battery discharge for that house is allowed.
+- **House control on Hold**: required plan/reference data is missing or cannot
+  be used within the configured power range. Do not reuse a stale import target.
 - **Fresh plan required**: EV charging has stopped, but Battery Hold remains
   active until the native orchestrator publishes a fresh EMHASS plan.
 
@@ -135,6 +151,9 @@ The status is presentation-only. It does not add an override, charger control,
 new controller ownership mode or additional Modbus write path. A future
 override would change safety and control ownership semantics and therefore
 requires a separate explicit design decision and review.
+
+Hybrid 2.0's house-self-consumption exception is the explicit user-requested
+beta.8 policy. Its periodic reference update remains inside the same controller.
 
 The Power overview flow also shows a charger branch only when an existing EV
 status, power, online or load-balancing charger source is configured. When the

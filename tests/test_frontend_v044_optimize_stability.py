@@ -24,17 +24,17 @@ class FrontendV044OptimizeStabilityTests(unittest.TestCase):
         v047 = (FRONTEND / "gw-energy-pilot-v047.js").read_text(encoding="utf-8")
         v046 = (FRONTEND / "gw-energy-pilot-v046.js").read_text(encoding="utf-8")
         v045 = (FRONTEND / "gw-energy-pilot-v045.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "1.3.0-beta.7")
+        self.assertEqual(manifest["version"], "1.3.0-beta.8")
         self.assertIn(
-            "gw-energy-pilot-v131.js?v=1.3.0-beta.7",
+            "gw-energy-pilot-v131.js?v=1.3.0-beta.8",
             init_source,
         )
-        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.3.0-beta.7"', v048)
-        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.3.0-beta.7"', v047)
-        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.3.0-beta.7"', v046)
-        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.3.0-beta.7"', v045)
+        self.assertIn('import "./gw-energy-pilot-v047.js?v=1.3.0-beta.8"', v048)
+        self.assertIn('import "./gw-energy-pilot-v046.js?v=1.3.0-beta.8"', v047)
+        self.assertIn('import "./gw-energy-pilot-v045.js?v=1.3.0-beta.8"', v046)
+        self.assertIn('import "./gw-energy-pilot-v044.js?v=1.3.0-beta.8"', v045)
         self.assertIn(
-            'import "./gw-energy-pilot-v043.js?v=1.3.0-beta.7"',
+            'import "./gw-energy-pilot-v043.js?v=1.3.0-beta.8"',
             self.source,
         )
         self.assertIn('const VERSION = "0.44"', self.source)

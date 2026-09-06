@@ -1052,6 +1052,8 @@ def exercise_ev_protection_banner(page: Page) -> dict[str, object]:
         "initial_hidden": False,
         "blocking": False,
         "allowing": False,
+        "house_self_consumption": False,
+        "self_consumption_hold": False,
         "waiting": False,
         "inactive_hidden": False,
         "main_stable": False,
@@ -1133,6 +1135,25 @@ def exercise_ev_protection_banner(page: Page) -> dict[str, object]:
             )?.textContent?.trim() === 'EV CHARGING · BATTERY CHARGE ALLOWED'
             """
         )
+
+        for command, state, title in (
+            ("ev_house_self_consumption", "house_self_consumption", "EV CHARGING · HOUSE SELF-CONSUMPTION"),
+            ("ev_self_consumption_hold", "self_consumption_hold", "EV CHARGING · HOUSE CONTROL ON HOLD"),
+        ):
+            page.evaluate("""({command, state}) => window.__epSetEntityByKey(
+                'control_command', command, {ev_active: true, ev_protection_state: state}
+            )""", {"command": command, "state": state})
+            page.wait_for_function("""state => {
+                const banner = window.__epPanel.shadowRoot.querySelector('.ep-v041-ev-protection');
+                return banner && !banner.hidden && banner.dataset.state === state;
+            }""", arg=state)
+            result[state] = page.evaluate("""title => window.__epPanel.shadowRoot.querySelector(
+                '.ep-v041-ev-title')?.textContent?.trim() === title
+            """, title)
+            if state == "house_self_consumption":
+                result[state] = result[state] and page.evaluate("""() => Array.from(
+                    window.__epPanel.shadowRoot.querySelectorAll('.panel-card.controller .metric-label')
+                ).some(label => label.textContent.trim() === 'PCC target')""")
 
         page.evaluate(
             """
@@ -4197,9 +4218,12 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
             timeout=10_000,
         )
         result["selected"] = shadow(page, select).input_value() == "hybrid_2"
-        result["explanation"] = "planned SOC maximum" in shadow(
+        explanation = shadow(
             page, ".ep-v024-control-strategy-field .ep-v016-field-description"
         ).inner_text()
+        result["explanation"] = all(text in explanation for text in (
+            "mode 11", "mode 9", "mode 8 Hold", "15 seconds", "30 seconds",
+        ))
         activate(page, profile, ".ep-v016-back")
         page.wait_for_function(
             "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
@@ -4216,8 +4240,10 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
               return {
                 note: Boolean(note && !note.hidden &&
                   note.textContent.includes('Hybrid 2.0 Beta') &&
-                  note.textContent.includes('mode 2') &&
-                  note.textContent.includes('forecast')),
+                  note.textContent.includes('mode 11') &&
+                  note.textContent.includes('mode 9') &&
+                  note.textContent.includes('mode 8 Hold') &&
+                  note.textContent.includes('15 seconds')),
                 stable: root.querySelector('main') === main &&
                   root.querySelector('ep-control-surface') === surface &&
                   root.querySelector('.ep-v022-strategy-note') === note,
@@ -5751,7 +5777,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.7 BETA",
+        "v131": "v1.3.0-beta.8 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -5911,6 +5937,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         required_ev_protection = (
             "present", "initial_hidden", "blocking", "allowing", "waiting",
             "inactive_hidden", "main_stable", "banner_stable", "non_interactive",
+            "house_self_consumption", "self_consumption_hold",
         )
         if not all(ev_protection[key] is True for key in required_ev_protection):
             failures.append(f"{name}: EV protection banner state/stability regression failed")

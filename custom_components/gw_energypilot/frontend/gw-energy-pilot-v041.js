@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.3.0-beta.7";
+import "./gw-energy-pilot-v039.js?v=1.3.0-beta.8";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.7";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.8";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.7";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.7";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.7";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.8";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.8";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.8";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.3.0-beta.7";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.7";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.7";
+} from "./ep-control-surface.js?v=1.3.0-beta.8";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.8";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.8";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -115,6 +115,12 @@ const COPY = Object.freeze({
     evBlockingDetail: "Home battery discharge is blocked · Mode 8 Battery Hold",
     evChargeAllowedTitle: "EV CHARGING · BATTERY CHARGE ALLOWED",
     evChargeAllowedDetail: "The home battery is following the active charging plan",
+    evHouseTitle: "EV CHARGING · HOUSE SELF-CONSUMPTION",
+    evPccTarget: "PCC target",
+    evBatteryTarget: "Battery target",
+    evHouseDetail: "PV and battery balance the house · Grid import target follows measured EV power",
+    evReferenceHoldTitle: "EV CHARGING · HOUSE CONTROL ON HOLD",
+    evReferenceHoldDetail: "Mode 8 · Requires a ready plan and fresh EV power within the control range",
     evWaitingTitle: "EV CHARGING STOPPED · FRESH PLAN REQUIRED",
     evWaitingDetail: "Battery Hold remains active while EnergyPilot waits for a fresh EMHASS plan",
     evPendingTitle: "EV CHARGING · PROTECTION EVALUATING",
@@ -196,6 +202,12 @@ const COPY = Object.freeze({
     evBlockingDetail: "Ontladen van de thuisaccu is geblokkeerd · Modus 8 Battery Hold",
     evChargeAllowedTitle: "EV LAADT · THUISACCU LADEN TOEGESTAAN",
     evChargeAllowedDetail: "De thuisaccu volgt het actieve laadplan",
+    evHouseTitle: "EV LAADT · ZELFCONSUMPTIE VOOR HET HUIS",
+    evPccTarget: "PCC-doel",
+    evBatteryTarget: "Accudoel",
+    evHouseDetail: "PV en accu balanceren het huis · Netimportdoel volgt het gemeten EV-vermogen",
+    evReferenceHoldTitle: "EV LAADT · HUISREGELING OP HOLD",
+    evReferenceHoldDetail: "Modus 8 · Geldig plan en verse EV-vermogensmeting binnen het regelbereik vereist",
     evWaitingTitle: "EV-LADEN GESTOPT · NIEUW PLAN NODIG",
     evWaitingDetail: "Battery Hold blijft actief terwijl EnergyPilot op een nieuw EMHASS-plan wacht",
     evPendingTitle: "EV LAADT · BEVEILIGING WORDT BEOORDEELD",
@@ -1496,6 +1508,8 @@ function evProtectionState(panel) {
   if (explicit) return explicit;
   const command = String(commandState?.state || "");
   if (command === "ev_anti_discharge_hold") return "blocking_discharge";
+  if (command === "ev_house_self_consumption") return "house_self_consumption";
+  if (command === "ev_self_consumption_hold") return "self_consumption_hold";
   if (command === "waiting_for_ev_stop_optimization") return "waiting_for_fresh_plan";
   if ([
     "ev_battery_charge",
@@ -1514,6 +1528,8 @@ function patchEvProtectionBanner(panel, root) {
   const presentation = {
     blocking_discharge: [t.evBlockingTitle, t.evBlockingDetail],
     allowing_charge: [t.evChargeAllowedTitle, t.evChargeAllowedDetail],
+    house_self_consumption: [t.evHouseTitle, t.evHouseDetail],
+    self_consumption_hold: [t.evReferenceHoldTitle, t.evReferenceHoldDetail],
     waiting_for_fresh_plan: [t.evWaitingTitle, t.evWaitingDetail],
     active_pending: [t.evPendingTitle, t.evPendingDetail],
   }[state];
@@ -1565,6 +1581,12 @@ function patchController(panel, root, automaticOn) {
     panel._formatPower(finite(panel, "target_power"))
   );
   patchMetric(card, ["Command", "Commando"], panel._textByKey?.("control_command") || "—");
+  const command = String(panel._stateByKey?.("control_command")?.state || "");
+  if (["ev_house_self_consumption", "hybrid2_planned_battery_charge", "ev_battery_charge"].includes(command)) {
+    const target = metricByLabels(card, ["EnergyPilot target", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel"]);
+    const label = target?.querySelector(".metric-label");
+    if (label) label.textContent = command === "ev_house_self_consumption" ? t.evPccTarget : t.evBatteryTarget;
+  }
 
   const manual = legacyControls ? card.querySelector(".ep-v021-manual-pad") : null;
   if (manual) {

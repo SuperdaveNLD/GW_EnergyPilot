@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from math import isfinite
 from typing import Any, Mapping
 
@@ -21,6 +22,29 @@ EV_ACTIVE_STATE_VALUES = frozenset(
         "connected_charging",
     }
 )
+
+EV_SELF_CONSUMPTION_INTERVAL_SECONDS = 15
+EV_POWER_MAX_AGE_SECONDS = 30
+
+
+def fresh_power_value_w(states: Any, entity_id: str | None) -> float | None:
+    """Read a measured EV reference with explicit units and report freshness.
+
+    This stricter input is for the Hybrid 2.0 PCC reference only. Existing EV
+    activity detection keeps its compatibility behavior.
+    """
+    state = states.get(entity_id) if entity_id else None
+    unit = (getattr(state, "attributes", {}) or {}).get("unit_of_measurement")
+    if unit not in {"W", "kW", "MW", "mW"}:
+        return None
+    reported = getattr(state, "last_reported", None) or getattr(state, "last_updated", None)
+    if not isinstance(reported, datetime) or reported.tzinfo is None:
+        return None
+    age = (datetime.now(timezone.utc) - reported).total_seconds()
+    if not 0 <= age <= EV_POWER_MAX_AGE_SECONDS:
+        return None
+    power = power_value_w(states, entity_id)
+    return power if power is not None and isfinite(power) and power >= 0 else None
 
 
 def detection_method(options: Mapping[str, Any]) -> str | None:

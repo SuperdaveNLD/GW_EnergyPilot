@@ -196,11 +196,15 @@ Hybrid first preserves an explicit neutral battery plan through mode 8. Every no
 
 ### Hybrid 2.0 Beta
 
-The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** whenever `P_batt < -battery_deadband`, independent of `P_grid`.
-Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
-windows and holds neutral/discharge plans. Actual charging and SOC can exceed
-the EMHASS forecast. No existing selection is migrated; manual modes remain
+The opt-in `hybrid_2` strategy uses **mode 11 at bounded `abs(P_batt)`**
+when battery charging and grid import are both outside their deadbands.
+During EV charging, self-use (including positive `P_batt` with neutral grid)
+and PV charging use **mode 9 at measured EV power**, refreshed every 15 seconds.
+Pause and explicit planned discharge use mode 8. A fresh measured EV power
+sensor is required for self-use; missing/stale/out-of-range references select
+Hold. Missing/non-ready plan inputs during EV charging also select Hold.
+Other steps retain Hybrid behavior without EV. No existing selection is
+migrated; manual modes remain
 exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
@@ -209,7 +213,8 @@ Legacy compatibility remains: without explicit `control_strategy`, old `use_good
 
 The EV feature is a higher-priority directional safety guard, not an EV charger controller.
 
-During an active EV charging session:
+For Battery, Grid and original Hybrid during an active EV charging session
+(Hybrid 2.0 uses the house-self-consumption exception above):
 
 ```text
 P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
