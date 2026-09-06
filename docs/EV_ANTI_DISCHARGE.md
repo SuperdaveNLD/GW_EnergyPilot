@@ -1,6 +1,6 @@
 # EV anti-discharge protection
 
-This document defines the EV protection behavior for the GW EnergyPilot v1.3.0-beta.8 candidate.
+This document defines the EV protection behavior for GW EnergyPilot v1.3.0-beta.8.
 
 ## Purpose
 

@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta candidate](docs/releases/v1.3.0-beta.8.md)
+[Latest beta release](docs/releases/v1.3.0-beta.8.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,10 +66,10 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.8 · Beta candidate**
+**v1.3.0-beta.8 · Beta**
 
 Latest production release: **v1.2.1 · Stable**
-Latest published beta: **v1.3.0-beta.7**
+Latest beta release: **v1.3.0-beta.8**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -168,9 +168,9 @@ Release documentation:
 - Self-use requires a fresh measured EV power sensor. Invalid references or
   unavailable plans during EV charging select Hold instead of retaining an old
   import target. Missing plan inputs without EV retain the existing wait.
-- See [beta.8 candidate notes](docs/releases/v1.3.0-beta.8.md).
+- See [beta.8 release notes](docs/releases/v1.3.0-beta.8.md).
 
-## v1.3.0-beta.7 highlights (superseded by beta.8 candidate)
+## v1.3.0-beta.7 highlights (superseded by beta.8)
 
 - Fixes the reported EV-active case where `P_batt = -1.33 kW` but
   `P_grid = -29 W` kept Hybrid 2.0 in mode 1.

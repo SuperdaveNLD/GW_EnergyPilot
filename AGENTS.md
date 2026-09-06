@@ -27,8 +27,7 @@ Current release lines:
 
 ```text
 v1.2.1 Stable
-v1.3.0-beta.7 Published beta
-v1.3.0-beta.8 Prepared beta candidate
+v1.3.0-beta.8 Current beta
 ```
 
 Release-channel migration is prepared for v1:

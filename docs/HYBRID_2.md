@@ -1,7 +1,7 @@
 # Hybrid 2.0 Beta
 
 Hybrid 2.0 Beta is an opt-in automatic strategy added in v1.3.0-beta.6 and
-corrected in the v1.3.0-beta.8 candidate. Select **Settings → GoodWe → Automatic control strategy → Hybrid
+corrected in v1.3.0-beta.8. Select **Settings → GoodWe → Automatic control strategy → Hybrid
 2.0 Beta**. Existing Battery, Grid and Hybrid selections keep their behavior.
 The stored strategy key is `hybrid_2`; no existing config value is migrated.
 
