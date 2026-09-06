@@ -26,9 +26,8 @@ GoodWe GW15K-ETA-G20
 Current release lines:
 
 ```text
-v1.2.0 Stable
-v1.3.0-beta.5 Published beta
-v1.3.0-beta.6 Prepared beta candidate
+v1.2.1 Stable
+v1.3.0-beta.6 Current beta
 ```
 
 Release-channel migration is prepared for v1:

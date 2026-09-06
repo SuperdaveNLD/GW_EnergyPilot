@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.5.md)
+[Latest beta](docs/releases/v1.3.0-beta.6.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,7 +66,7 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.5 · Beta prerelease**
+**v1.3.0-beta.6 · Beta prerelease**
 
 Latest production release: **v1.2.0 · Stable**
 
@@ -158,13 +158,13 @@ Release documentation:
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
 
-## Prepared v1.3.0-beta.6 candidate
+## v1.3.0-beta.6 highlights
 
 - Adds **Hybrid 2.0 Beta** in GoodWe settings: mode 2 at configured maximum
   power during planned net-charge windows, with PV priority.
 - EV start preserves charging; neutral/discharge plans remain held.
 - Existing strategies are retained. Actual charging and SOC can exceed the
-  EMHASS forecast. See [candidate notes](docs/releases/v1.3.0-beta.6.md).
+  EMHASS forecast. See [release notes](docs/releases/v1.3.0-beta.6.md).
 
 ## v1.3.0-beta.5 highlights
 
