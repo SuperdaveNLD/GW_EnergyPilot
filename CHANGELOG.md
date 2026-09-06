@@ -119,6 +119,24 @@ All notable changes to GW EnergyPilot are documented here.
   switching Flow animations off or requesting reduced motion produces zero
   active dashboard animations.
 
+## [1.2.1] - 2026-09-06
+
+### Fixed
+
+- Animate the external AC/PCC PV connector whenever it carries finite active
+  power, using the same single energy-ball contract as the other routes.
+- Remove redundant directional arrows from all live-flow connectors; direction
+  is conveyed by the moving ball and the existing physical-flow model.
+- Keep idle, unavailable and reduced-motion particles stationary while
+  preserving stable connector-node identity during telemetry updates.
+
+### Changed
+
+- Advance the complete active frontend module graph to cache boundary
+  `1.2.1-stable1` without changing GoodWe, EMS, EMHASS, entity or persistent
+  storage semantics.
+
+
 ## [1.2.0] - 2026-09-03
 
 ### Stable promotion

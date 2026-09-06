@@ -15,7 +15,7 @@ class FrontendV110ReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_manifest_panel_and_presentation_are_v120_stable(self) -> None:
+    def test_manifest_panel_and_presentation_are_v121_stable(self) -> None:
         manifest = json.loads(
             (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
         )
@@ -29,7 +29,7 @@ class FrontendV110ReleaseTests(unittest.TestCase):
         self.assertIn(
             f'import "./gw-energy-pilot-v101.js?v={CACHE_KEY}"', self.release
         )
-        self.assertIn('const VERSION = "1.2.0"', self.release)
+        self.assertIn('const VERSION = "1.2.1"', self.release)
         self.assertIn("v${VERSION} STABLE", self.release)
         self.assertIn("PanelClass.prototype.__epV110Installed = true", self.release)
 
@@ -47,7 +47,7 @@ class FrontendV110ReleaseTests(unittest.TestCase):
                 self.assertNotIn(forbidden, self.release)
 
     def test_stable_release_notes_exist(self) -> None:
-        notes = ROOT / "docs" / "releases" / "v1.2.0.md"
+        notes = ROOT / "docs" / "releases" / "v1.2.1.md"
         self.assertTrue(notes.is_file())
 
 
