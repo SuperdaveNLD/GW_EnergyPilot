@@ -403,3 +403,13 @@ in v1.3.0-beta.6. Its value is the effective stored strategy (`battery`, `grid`,
 `hybrid` or `hybrid_2`), including legacy fallback. The dashboard uses it for
 its strategy explanation. This does not create a new strategy entity or change
 any unique ID, Recorder identity or statistics source.
+
+
+The v1.3.0-beta.9 Hybrid 2.0 test adds `mapping_preview` to that same sensor:
+`model`, `preview_only`, `mode`, `power_w`, `reason`, `validation_required`,
+`house_reference_w`, current command comparison, ownership and numeric input
+availability. Reading it never writes or schedules anything. `preview_only`
+labels the diagnostic calculation, not the active controller: selecting
+Hybrid 2.0 still executes the test mapping. An unresolved EV net-only preview
+has no candidate; live control uses protective Hold. Input freshness requires
+successful local Modbus telemetry, not the SEMS source or EMHASS load forecast.

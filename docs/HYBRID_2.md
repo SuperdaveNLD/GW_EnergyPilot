@@ -1,95 +1,148 @@
-# Hybrid 2.0 Beta
+# Hybrid 2.0 Beta — grid-first test mapping
 
-Hybrid 2.0 Beta is an opt-in automatic strategy added in v1.3.0-beta.6 and
-corrected in v1.3.0-beta.8. Select **Settings → GoodWe → Automatic control strategy → Hybrid
-2.0 Beta**. Existing Battery, Grid and Hybrid selections keep their behavior.
-The stored strategy key is `hybrid_2`; no existing config value is migrated.
+This is the **v1.3.0-beta.9 opt-in test mapping** requested after the owner's
+2026-09-06 ETA tests. The published beta.8 used a different mode-9 EV reference;
+its release notes remain historical. Select **Settings → GoodWe → Automatic
+control strategy → Hybrid 2.0 Beta** after installing this change. The stored
+key remains `hybrid_2`. Battery, Grid and original Hybrid behavior is unchanged.
 
-## Plan and EV rules
+## Decision order
 
-EMHASS owns the grid-charging window and its battery-power target. Charging
-below the Battery Hold deadband with import above the GoodWe Auto deadband
-requests **mode 11 at `abs(P_batt)`**, capped by Maximum control power and
-15,000 W. Mode 2 remains available manually: its grid-assistance allowance
-can add to DC PV and therefore does not mean the same battery watts.
-
-During EV charging, self-use remains available for the ordinary house.
-EnergyPilot asks for **mode 9 with net import equal to measured EV power**.
-GoodWe balances the remaining house and PV locally. Positive `P_batt` with a
-neutral grid plan is self-use, not explicit scheduled battery export. PV-only
-charging, including charging alongside planned PV export, uses this same EV
-reference. This is a user-selected change from the blanket anti-discharge rule.
+Manual ownership, explicit Pause and the existing readiness/EV-stop gates keep
+priority. A numeric `P_batt = 0` is not an explicit Pause. Valid plan inputs use
+EMHASS signs: battery negative = charging; grid positive = import.
 
 | Valid plan | Without EV | EV charging |
 |---|---|---|
-| `P_batt < -battery_deadband` and `P_grid > grid_deadband` | **11**, bounded `abs(P_batt)` | **11**, same target |
-| Battery inside its deadband | **8**, 0 W | **8**, 0 W |
-| Non-neutral battery plan, grid inside its deadband (either battery sign) | **1**, 0 W | **9**, measured EV power |
-| Battery charging, negative grid target | **10**, bounded `abs(P_grid)` | **9**, measured EV power |
-| Discharge plan, positive grid target | **9**, bounded `abs(P_grid)` | **8**, 0 W |
-| Discharge plan, negative grid target | **10**, bounded `abs(P_grid)` | **8**, 0 W |
+| Grid inside its deadband, including exact boundaries and any battery sign/zero | **1**, 0 W | **5**, bounded actual load minus EV |
+| Grid outside deadband, battery below its negative deadband | **11**, bounded `abs(P_batt)` | **11**, same watts |
+| Grid outside deadband, battery above its positive deadband | **3**, bounded `P_batt` | **8**, 0 W |
+| Grid outside deadband, battery inside its deadband | **9** import / **10** export, bounded `abs(P_grid)` | **8**, unresolved net-only EV case |
+| Explicit manual Pause | **8**, 0 W | **8**, 0 W |
 
-Exact deadband boundaries remain neutral. Example, neglecting losses: total
-load 11.6 kW minus EV 11 kW leaves 0.6 kW ordinary house load. Mode 9 at 11 kW
-allows about 0.2 kW battery discharge with 0.4 kW PV, or about 1.4 kW battery
-charging with 2 kW PV. House/PV readings are not added to the EV reference;
-this avoids double counting external AC PV and the EV.
+Exact battery boundaries are neutral too. Deadbands choose the branch and are
+never subtracted from its watts. Directed commands are capped by Maximum
+control power and 15,000 W. A zero dispatch limit uses Hold for directed
+battery commands; mode 3 / 0 W is not substituted for an explicit Pause.
 
-Self-use follows actual site balance, so it can differ from planned battery
-power and SOC. Net charging follows the planned battery watts instead of
-unconditionally requesting the maximum. BMS/inverter limits remain
-authoritative. Neither exact transient isolation of EV demand nor absence of
-PV curtailment at hardware/SOC limits is guaranteed. EMHASS's maximum SOC is
-an optimizer constraint, not a new hardware cutoff. See [EMS modes](EMS_MODES.md).
+Examples: load 1,000 W minus PV 500 W minus battery 500 W gives grid 0 W → Auto.
+A plan of battery 300 W and grid 400 W gives Auto with a 1,000 W grid deadband,
+but mode 3 at **300 W**, not 400 W, with a 300 W grid deadband. Battery 0 W and
+grid 700 W also gives Auto with the default 1,000 W band.
 
-## Measurement, cadence and failure handling
+Outside the grid band, planned battery charging follows watts even alongside
+planned export. This is a test choice: mode 11 can buy grid energy when actual
+PV falls, and no extra tariff gate is inferred. A net-only mode 9/10 target can
+move the battery in either direction; it does not enforce neutral battery
+power. The unresolved EV variant therefore uses protective Hold, not a mode-9
+EV import reference. This fallback is labelled house-control Hold, not an
+explicit pause in the optimizer plan.
 
-- The existing controller rechecks the EV reference every **15 seconds**. EV
-  power events may trigger evaluation, but successive self-use commands are
-  limited to that cadence. Pause, explicit discharge, net-charge changes,
-  invalid inputs and confirmed EV stop bypass that throttle.
-- Use the configured measured EV power sensor, even with charging-status
-  detection. Allocated charger current and the EMHASS load forecast are not
-  substitutes. The measurement requires explicit W/kW/MW/mW units, finite
-  non-negative power and an aware report timestamp no older than **30 seconds**.
-  `last_reported` is primary, `last_updated` is the compatibility fallback.
-  Future timestamps are rejected.
-- A missing, stale, zero or invalid EV reference in a self-use branch selects
-  mode 8 Hold. A reference above Maximum control power or 15,000 W is held,
-  never silently clamped, since too little PCC import could feed the EV.
-- An unavailable selected activity source during an active session is not a
-  confirmed stop. Preserve the guard until valid stop evidence arrives.
-- During EV charging, missing required plan inputs, non-ready optimization or
-  a suspended native plan publication select Hold. A still-valid persistent
-  plan may supply missing live publication; explicit non-ready status wins.
-  Without EV, missing plan inputs retain the existing waiting behavior.
-- A confirmed EV stop with native orchestration immediately requests Hold and
-  retains the existing fresh-optimization/retry gate. The periodic callback
-  cannot resume a stale plan. Manual ownership and unload stop periodic work.
+## EV house reference and ownership
 
-## EV and ownership
+The new test reference is:
 
-This choice does not enable, disable or reconfigure the separately opt-in EV
-load balancer or write charger current. The 15-second callback belongs to the
-existing controller and uses its same control lock and write/readback path;
-there is no second EMS controller or error-integrating power loop. GoodWe
-performs local regulation. Manual modes remain exact; Automatic Control OFF returns mode 1
-at 0 W. Register definitions and `47512 → brief wait → 47511` writes are unchanged.
+```text
+house_reference = max(0, fresh local GoodWe load 35172 - fresh measured EV watts)
+mode 5 setpoint = min(house_reference, Maximum control power, 15000 W)
+```
 
-The controller banner distinguishes house self-consumption, explicit battery
-charging, planned-discharge Hold and invalid-input Hold. Execution history
-records the fresh EV reference. House self-consumption is not drawn as a
-guaranteed charging or discharge-blocked interval; it allows both directions.
+Mode 5 targets inverter AC output. Internal PV and battery are not added to or
+subtracted from this AC target. External AC PV is **not subtracted again**.
+This assumes 35172 includes EV and already reflects external AC PV. That exact
+meter boundary is still unverified. Mode 5 PV-surplus behavior is also open;
+this is not a guarantee of preserved PV or battery charging from surplus PV.
 
-## Evidence and limits
+For example 12.5 kW load minus 11 kW EV requests 1.5 kW inverter output. This
+is not a request for 1.5 kW battery discharge: PV can contribute to the output.
+An EV above 15 kW is allowed as an input; only the resulting inverter allowance
+is capped. A negative calculated reference is clamped to zero, whose hardware
+behavior remains part of the mode-5 test.
 
-The user's beta.6 EV-active snapshot at about 15:37 had `P_batt = -1.33 kW`,
-`P_grid = -29 W`, mode 1 and about 7.94 kW actual battery discharge. The
-corrected result for that plan is mode 1 without EV and mode 9 at measured EV
-power during EV charging.
-The later planned charging window (`P_batt = -4.3 kW`, `P_grid = +3.6 kW`)
-selects mode 11 at 4.3 kW with or without EV. This distinguishes an omitted EV load from
-EMHASS permission to buy battery energy.
+The existing controller updates the reference every **15 seconds**, using its
+same control lock and write/readback path. Meter error is never integrated and
+there is no second controller or charger write. Safety/plan branch changes
+bypass the self-use update throttle. Manual ownership stops automatic work;
+Automatic Control OFF still returns mode 1 / 0 W. Manual modes remain exact.
+
+## Freshness and failure handling
+
+- Require finite EV power with explicit W/kW/MW/mW units. Use `last_reported`,
+  with `last_updated` only as compatibility fallback. Age must be 0–30 seconds;
+  future, naive or missing timestamps are rejected. Active self-use requires
+  EV power above zero.
+- Require finite local Modbus 35172 from a successful complete telemetry read
+  no older than 30 seconds. Full Modbus reads now timestamp `source_updated_at`.
+  Failed/stale reads, cloud values and control-only readback cannot substitute
+  for fresh local load. The EMHASS load forecast is never used as actual load.
+- Missing self-use measurements select mode 8. Missing/non-ready/suspended
+  plans during EV charging select mode 8 too. Without EV, missing plan inputs
+  retain the existing wait behavior. A valid persistent plan may bridge
+  missing publication; explicit non-ready optimizer status still wins.
+- Unavailable EV activity after an active session preserves the guard.
+  Confirmed EV stop retains the native fresh-optimization/retry gate and Hold.
+- EMHASS topology, SOC profiles, power limits and schedule are not rewritten.
+  Inverter/BMS limits remain authoritative; this test does not create a
+  certified phase-current limit or eliminate inter-sample EV transients.
+
+## Measured hardware evidence
+
+Owner-provided GW15K-ETA-G20 dashboard snapshots, 2026-09-06; firmware unknown.
+Positive battery watts below mean discharge; import/export is explicit.
+EV was 0 W in all these evening snapshots. Separate inverter-AC readback was
+not included. These are point observations, not synchronized time series.
+
+| About | Mode / setpoint | DC PV | External AC PV | Battery | Meter | 35172 | SOC |
+|---|---|---:|---:|---:|---|---:|---:|
+| 19:46 | 3 / 15,000 W | 162 W | 64 W | 15,000 W | export 14,200 W | 820 W | 60% |
+| 19:48 | 3 / 1,000 W | 164 W | 64 W | 1,430 W* | export 199 W | 729 W | 59% |
+| 19:48 | 5 / 1,000 W | 172 W | 64 W | 1,080 W | export 244 W | 761 W | 59% |
+| 19:49 | 10 / 1,000 W | 165 W | 64 W | 1,630 W | export 998 W | 767 W | 59% |
+| 19:52 | 3 / 5,000 W | 157 W | 61 W | 5,030 W | export 4,190 W | 772 W | 57% |
+| 19:54 | 3 / 0 W | 149 W | 61 W | 285 W | import 644 W | 793 W | 57% |
+| 19:56 | 8 / 0 W | 140 W | 57 W | 88 W | import 831 W | 840 W | 57% |
+| 19:57 | 8 / 0 W | 131 W | 55 W | 16 W | import 853 W | 847 W | 57% |
+
+* At mode 3 / 1,000 W, 758 V × 1.30 A ≈ 985 W disagreed with the 1,430 W
+power card; a mode switch followed after 25 seconds. At 5,000 W, 758 V × 6.60 A
+≈ 5,003 W corroborated the 5,030 W card. Several earlier diagnostic sections
+stayed at 14.2 kW export / 64% SOC while live cards changed. Mode 8 settled
+from 88 W to 16 W with 0.00 A displayed, supporting practical Pause under
+these conditions; it does not establish a universal meter offset.
+
+Mode 5's 761 W + 244 W ≈ 1,005 W supports an inverter-output target, whereas
+mode 10 reached 998 W net export. At this low PV neither PV-first operation
+near the AC limit nor surplus charging is proven. The owner reports PV stops
+in mode 12; it is excluded from this Hybrid 2.0 mapping. See [Modbus evidence](MODBUS.md).
+
+Remaining tests: mode 3 near the AC limit with high PV; mode 5 with surplus PV
+and battery charge headroom; 35172 with EV and external PV independently and
+together; then EV start/stop and house-load changes with this test strategy.
+
+## Read-only inspection and offline replay
+
+The existing control-command sensor adds `mapping_preview`: proposed mode,
+watts, branch reason, input availability, current command comparison and
+`validation_required`. Its `preview_only: true` describes this diagnostic
+calculation; it does not mean a selected Hybrid 2.0 controller is disabled.
+An unresolved EV net-only case shows no candidate, while live control holds.
+No new entity IDs, statistics, Store keys or versions are introduced.
+
+The offline script uses the same pure model and never connects to HA/GoodWe:
+
+```sh
+python3 scripts/preview_ems_mapping.py --p-batt 300 --p-grid 400 --grid-deadband 300
+python3 scripts/preview_ems_mapping.py --p-batt 700 --p-grid 0 --ev-active --load-power 12500 --ev-power 11000
+python3 scripts/preview_ems_mapping.py --plan /path/to/emhass-results.txt
+```
+
+CSV, TSV and pasted EMHASS result tables retain **every row**. An EV scenario
+for an entire plan is explicitly hypothetical. Forecast `P_Load` is never
+silently used as measured load. `preview_hybrid_mapping` in `control_decision.py`
+is shared by preview and the opt-in resolver; the preview itself cannot write.
+Execution history adds the fresh local load alongside the measured EV input.
+
+## Earlier charging evidence and documentation
 
 The GoodWe **ARM 745 Modbus protocol**, V1.2 dated 2024-02-02, table 8-16
 (pp. 164–165), describes mode 2 as grid assistance with PV priority. The
@@ -130,14 +183,3 @@ while the main cards changed. The samples record accepted manual modes and
 similar battery charging at high SOC; they cannot attribute PV curtailment or
 the charging limit to a particular mode. Manual ownership also means they do
 not validate automatic Hybrid 2.0 or its EV override.
-
-## Implementation
-
-`control_decision.py` owns the single mapping used by live control and projected
-execution rows. The active `controller_v033` EV path uses the same decision.
-`smart_meter_api.py` persists the extra selection in existing config-entry data;
-the legacy smart-meter flag stays synchronized. The existing control-command
-sensor publishes `control_strategy` so the permanent Lit surface can display
-the correct explanation without rebuilding its controls. Entity unique IDs,
-device identity, history stores, EMHASS configuration and schedule ownership
-remain unchanged.

@@ -27,7 +27,7 @@ Current release lines:
 
 ```text
 v1.2.1 Stable
-v1.3.0-beta.8 Current beta
+v1.3.0-beta.9 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -61,11 +61,11 @@ EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must 
   reports must exclude all credentials.
 - See `docs/SEMS_API.md` for the current mapped subset and limits.
 
-## Frontend stability contract (v0.41+, active v1.3.0-beta.8)
+## Frontend stability contract (v0.41+, active v1.3.0-beta.9)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.3.0-beta.8 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.3.0-beta.9 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - The beta.5 iOS adapter may recover a missing touch click after 120 ms only
   through the same native element's existing click path, with a 12 px movement
   guard and late-click deduplication.
@@ -136,6 +136,11 @@ write 47511
 
 - An incorrect EMS write can move significant real power; control changes require explicit tests and hardware evidence.
 
+Reference ETA-G20 field constraint (owner report, 2026-09-06): PV production
+stops in mode 12. Do not select mode 12 for the requested PV-first Hybrid 2.0
+redesign or assume that lowering its watt setpoint preserves PV. This is an
+installation-specific observation; see the evidence note in `docs/MODBUS.md`.
+
 ## Beta register policy
 
 For unconfirmed hardware semantics:
@@ -187,22 +192,29 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 
 Hybrid first preserves an explicit neutral battery plan, then uses PCC control for every non-neutral plan. The Battery Hold deadband is applied to `P_batt`; the separate GoodWe Auto deadband is applied to `P_grid`. Exact boundaries remain neutral. Each deadband selects its branch only and must never be subtracted from a mode-9/10 setpoint.
 
-Hybrid 2.0 Beta (`hybrid_2`) is opt-in: explicit battery charging below
-its deadband AND planned grid import above the grid deadband select mode 11
-at bounded abs(P_batt), not the configured maximum. Other steps retain Hybrid
-mapping without EV. During EV charging, non-neutral battery plans with neutral
-grid (either battery sign), and PV charging with export, use mode 9 at measured
-EV power. Pause and explicit planned discharge use mode 8. Classify self-use
-before treating positive P_batt as explicit discharge. The existing controller
-refreshes this reference every 15 seconds through its same lock/write path;
-it must never introduce a separate competing controller or charger writes.
-Require finite EV power with explicit units and last_reported (fallback
-last_updated) no older than 30 seconds; reject future/naive timestamps. Missing,
-zero or out-of-range self-use references select Hold, never a clamped PCC target.
-Missing/non-ready/suspended plans during EV charging select Hold too. Without
-EV, missing plans retain waiting behavior. Preserve the guard on unavailable
-activity telemetry, and keep confirmed EV-stop fresh-plan gating intact. See
-`docs/HYBRID_2.md` for the exact rule and qualified field evidence.
+Hybrid 2.0 Beta (`hybrid_2`) is an opt-in test strategy: evaluate P_grid
+against its deadband FIRST, including P_batt = 0. Without EV, grid-neutral
+means mode 1. Outside that band, battery charging uses mode 11 at planned
+watts, discharge uses mode 3 at planned watts, and neutral battery uses mode
+9/10 at the net target. Explicit manual Pause remains mode 8. Mode 12 is not
+part of this redesign.
+
+With EV active, grid-neutral self-use uses mode 5 at bounded max(0, fresh
+local load 35172 - fresh measured EV power). Never subtract external PV again;
+this measurement boundary and mode-5 PV surplus behavior remain unverified
+hardware assumptions explicitly accepted for this test strategy. Outside the
+grid band, planned charging uses mode 11 and planned discharge is held.
+Unresolved net-only EV plans also Hold; they are not explicit optimizer Pause.
+Use the existing 15-second controller cadence and lock, never a second loop
+or charger writes. Both load and EV reports must be finite and at most 30
+seconds old; reject missing/future/naive timestamps, failed local telemetry,
+and cloud load. EV needs explicit W/kW/MW/mW units; load is canonical local
+35172 W. Preserve optimizer readiness, persistent-plan and EV-stop gates.
+
+`preview_hybrid_mapping` is the pure shared model. The command sensor's
+`mapping_preview` is read-only even when the selected Hybrid 2.0 strategy
+is executing that model. Keep unverified PV behavior visible in diagnostics
+and docs. See `docs/HYBRID_2.md` for the matrix and hardware evidence.
 
 Legacy compatibility remains: missing/false old smart-meter flag -> Battery; explicit true -> Grid.
 
@@ -443,7 +455,7 @@ gw-energy-pilot-v131.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.3.0-beta.8 owns the beta presentation and complete `1.3.0-beta.8` cache
+v1.3.0-beta.9 owns the beta presentation and complete `1.3.0-beta.9` cache
 boundary. It retains v1.2.0's stable safety,
 diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
 missing-click recovery, and expands the remaining graph/history touch targets

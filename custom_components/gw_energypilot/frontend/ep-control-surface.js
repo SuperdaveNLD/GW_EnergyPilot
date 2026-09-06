@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.8";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.9";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.8";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.8";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.9";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.9";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -202,13 +202,13 @@ const HYBRID2_NOTE = Object.freeze({
   en: Object.freeze({
     ...HYBRID_NOTE.en,
     label: "Hybrid 2.0 Beta",
-    description: "Planned grid charging follows the EMHASS battery power in mode 11. During EV charging, self-use and PV charging use mode 9 with measured EV power as the import target, updated every 15 seconds. Pause and planned discharge use mode 8 Hold. Self-use requires a fresh EV power sensor.",
+    description: "Test mapping: grid deadband first, then Auto (also at P_batt = 0). Outside it, mode 11 follows planned charging watts and mode 3 follows planned discharging watts; neutral battery plans use mode 9/10 net targets. With EV, self-use uses mode 5 at measured load minus EV every 15 seconds; planned discharge uses mode 8 Hold. Explicit pause stays Hold. PV priority and the EV load boundary still require field validation.",
     safety: "During EV charging, the battery may supply the house; explicit battery export is held.",
   }),
   nl: Object.freeze({
     ...HYBRID_NOTE.nl,
     label: "Hybrid 2.0 Beta",
-    description: "Gepland netladen volgt het EMHASS-accuvermogen in modus 11. Tijdens EV-laden gebruiken zelfconsumptie en PV-laden modus 9 met het gemeten EV-vermogen als importdoel, elke 15 seconden bijgewerkt. Pauze en geplande ontlading gebruiken modus 8 Hold. Zelfconsumptie vereist een verse EV-vermogensmeting.",
+    description: "Testmapping: eerst de net-deadband, daarbinnen Auto (ook bij P_batt = 0). Daarbuiten volgt modus 11 de geplande laadwatts en modus 3 de ontlaadwatts; een neutraal accuplan gebruikt netdoelen via modus 9/10. Met EV gebruikt zelfconsumptie modus 5 op gemeten load minus EV, elke 15 seconden; geplande ontlading gaat naar modus 8 Hold. Expliciete pauze blijft Hold. PV-voorrang en de EV-meetgrens vereisen nog praktijktests.",
     safety: "Tijdens EV-laden mag de accu het huis voeden; expliciete batterij-export wordt gepauzeerd.",
   }),
 });

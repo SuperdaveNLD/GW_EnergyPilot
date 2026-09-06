@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from struct import pack, unpack
 
@@ -202,7 +202,7 @@ class GWModbusClient:
                 except KeyError:
                     continue
 
-            return GWETAData(values=values)
+            return GWETAData(values=values, source_updated_at=datetime.now(timezone.utc))
 
     async def async_read_status(self) -> GWETAData:
         """Read data for setup validation and backward compatibility."""
