@@ -17,6 +17,20 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.9 — Hybrid 2.0 grid-first test
+
+The selected Hybrid 2.0 strategy now checks the grid deadband before the
+battery direction: Auto inside it, planned watts via mode 11/3 outside it,
+and mode 9/10 for net-only plans. EV self-use tests mode 5 at fresh local load
+minus measured EV; planned discharge, unresolved net-only EV cases and
+unusable measurements Hold. Explicit Pause remains mode 8. Other strategies
+retain their behavior. This is an opt-in Beta release; see [release notes](releases/v1.3.0-beta.9.md).
+
+Mode 3 PV priority at the AC limit, mode 5 surplus charging and the 35172/EV/
+external-PV boundary are **not hardware-validated**. See [test policy and
+measurements](HYBRID_2.md). The new preview CLI replays every plan row without
+connecting to GoodWe; the existing command sensor exposes the same model.
+
 # v1.3.0-beta.8 — House self-consumption during EV charging
 
 Hybrid 2.0 follows EMHASS battery watts in mode 11 for planned net charging.
@@ -435,6 +449,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.9** | 2026-09-06 | **Beta** | Grid-first Hybrid 2.0; planned watts via 11/3 and EV house output via 5 with fresh local load. |
 | **1.3.0-beta.8** | 2026-09-06 | **Beta** | Hybrid 2.0 house self-consumption via a measured EV import reference; planned battery charging watts and protective Hold. |
 | **1.3.0-beta.7** | 2026-09-06 | **Beta** | Hybrid 2.0 follows explicit battery charging independent of a neutral/exporting/missing grid plan. |
 | **1.3.0-beta.6** | 2026-09-06 | **Beta** | Opt-in Hybrid 2.0 maximum mode-2 charging with PV priority; field validation pending. |

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import importlib
 from types import SimpleNamespace
 import unittest
@@ -39,6 +40,10 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         )
         controller.enabled = True
         controller.hass.states.get("sensor.ev_power").attributes["unit_of_measurement"] = "W"
+        controller.coordinator.last_update_success = True
+        controller.coordinator.data.source = "modbus"
+        controller.coordinator.data.source_updated_at = datetime.now(timezone.utc)
+        controller.coordinator.data.values["total_load_power"] = 11600
         return controller, client
 
     async def test_ev_discharge_plan_is_held_even_in_grid_strategy(self):
@@ -123,12 +128,12 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 4000)])
             self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
-    async def test_hybrid2_ev_self_use_for_pv_charge_with_planned_export(self):
+    async def test_hybrid2_ev_planned_charge_with_export_follows_battery_watts(self):
         controller, client = self.make_controller(
             p_batt="-2500", p_grid="-4000", strategy="hybrid_2")
         await controller.async_evaluate()
-        self.assertEqual(client.calls, [(9, 1200)])
-        self.assertEqual(controller.ev_protection_state, "house_self_consumption")
+        self.assertEqual(client.calls, [(11, 2500)])
+        self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
     async def test_ev_start_event_preserves_existing_charge_command(self):
         for strategy in ("battery", "grid", "hybrid", "hybrid_2"):
@@ -143,8 +148,8 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
                     controller._async_source_changed(SimpleNamespace(
                         data={"entity_id": "sensor.ev_power"}))
                     await asyncio.gather(*controller.hass.tasks)
-                    if strategy == "hybrid_2" and grid in ("-4000", "0"):
-                        self.assertEqual(client.calls, [normal, (9, 11000)])
+                    if strategy == "hybrid_2" and grid == "0":
+                        self.assertEqual(client.calls, [normal, (5, 600)])
                         self.assertEqual(controller.ev_protection_state, "house_self_consumption")
                     else:
                         self.assertEqual((controller.expected_mode, controller.target_power), normal)
@@ -182,7 +187,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         controller.hass.states.set("sensor.ev_power", "11000")
         controller._async_source_changed(SimpleNamespace(data={"entity_id": "sensor.ev_power"}))
         await asyncio.gather(*controller.hass.tasks)
-        self.assertEqual(client.calls, [(1, 0), (9, 11000)])
+        self.assertEqual(client.calls, [(1, 0), (5, 600)])
         self.assertEqual(controller.last_command, "ev_house_self_consumption")
         self.assertEqual(controller.ev_protection_state, "house_self_consumption")
 
@@ -197,7 +202,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         controller.hass.states.set("sensor.p_batt", "-700")
         controller.hass.states.set("sensor.p_grid", "0")
         await controller.async_evaluate()
-        self.assertEqual(client.calls[-1], (9, 11000))
+        self.assertEqual(client.calls[-1], (5, 600))
 
     async def test_hybrid2_missing_grid_without_ev_waits_for_every_battery_direction(self):
         for battery in ("-1330", "0", "15000"):
@@ -216,7 +221,8 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
                 p_batt=battery, p_grid="9574", strategy="hybrid_2")
             await controller.async_evaluate()
             self.assertEqual(client.calls, [(8, 0)])
-            self.assertEqual(controller.ev_protection_state, "blocking_discharge")
+            self.assertEqual(controller.ev_protection_state,
+                             "blocking_discharge" if battery == "15000" else "self_consumption_hold")
 
     async def test_hybrid2_live_unready_status_overrides_persistent_plan(self):
         controller, client = self.make_controller(
@@ -252,12 +258,12 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(8, 0)])
 
     async def test_hybrid2_does_not_remap_manual_commands(self):
-        for mode in (2, 4, 9, 11):
+        for mode in range(1, 13):
             controller, client = self.make_controller(
                 p_batt="-15000", p_grid="9574", strategy="hybrid_2")
             await controller.async_manual_command(mode, 4000, "manual_test")
             await controller.async_evaluate()
-            self.assertEqual(client.calls, [(mode, 4000)])
+            self.assertEqual(client.calls, [(mode, 0 if mode in const.MODES_ZERO_POWER else 4000)])
             self.assertFalse(controller.enabled)
 
 

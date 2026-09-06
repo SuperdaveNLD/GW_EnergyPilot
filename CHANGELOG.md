@@ -4,6 +4,32 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.9] - 2026-09-06
+
+### Changed
+
+- Replace the opt-in Hybrid 2.0 mapping with the owner-requested grid-first
+  test model: Auto inside the grid deadband, including P_batt = 0; mode 11
+  for planned charging watts and mode 3 for discharging watts outside it;
+  neutral-battery net targets via 9/10. Explicit Pause remains mode 8.
+- EV house self-use now requests mode 5 at fresh local 35172 minus measured
+  EV power every 15 seconds. Do not subtract external PV twice. Explicit
+  discharge, unresolved net-only EV cases and unusable measurements Hold.
+  Preserve manual ownership, legacy strategies and EV-stop/plan safeguards.
+- Timestamp complete local Modbus telemetry for the 30-second load freshness
+  gate; control-only/cloud readback cannot make local load fresh.
+- Update English/Dutch operator copy and label the EV reference as inverter
+  AC output. Document the still-unverified PV and external-PV/EV assumptions.
+
+### Added
+
+- Read-only `mapping_preview` on the existing control-command sensor and
+  `scripts/preview_ems_mapping.py` for complete EMHASS CSV/TSV/pasted-table
+  replay, including all 96 quarter-hour rows. No additional controller,
+  charger writes, entity identities or persistent Store versions.
+- Regression coverage for grid-first boundaries, explicit Pause, planned
+  watts, EV/load freshness, local/cloud isolation and unchanged manual modes.
+
 ## [1.3.0-beta.8] - 2026-09-06
 
 ### Fixed

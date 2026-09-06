@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.3.0-beta.8 runtime structure
+## Current v1.3.0-beta.9 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.3.0-beta.8 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.3.0-beta.9 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -182,8 +182,8 @@ gw-energy-pilot-v131.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.3.0-beta.8 uses a presentation-only beta wrapper over the v1.2.0 stable
-wrapper and advances one complete `1.3.0-beta.8` active-graph cache boundary. The bounded
+v1.3.0-beta.9 uses a presentation-only beta wrapper over the v1.2.0 stable
+wrapper and advances one complete `1.3.0-beta.9` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The local-only Beta tests component additionally buffers pointer/click evidence
 until after the synthesis window and compares five guarded activation methods;
@@ -301,16 +301,19 @@ The Hybrid neutral-battery branch is evaluated first so ordinary forecast house 
 
 ### Hybrid 2.0 Beta
 
-The opt-in `hybrid_2` strategy uses **mode 11 at bounded `abs(P_batt)`**
-when battery charging and grid import are both outside their deadbands.
-During EV charging, self-use (including positive `P_batt` with neutral grid)
-and PV charging use **mode 9 at measured EV power**, refreshed every 15 seconds.
-Pause and explicit planned discharge use mode 8. A fresh measured EV power
-sensor is required for self-use; missing/stale/out-of-range references select
-Hold. Missing/non-ready plan inputs during EV charging also select Hold.
-Other steps retain Hybrid behavior without EV. No existing selection is
-migrated; manual modes remain
-exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
+mode **1**, including `P_batt = 0`. Outside it, charging uses **11** at planned
+battery watts, discharging uses **3** at planned battery watts, and neutral
+battery plans use net targets **9/10**. Explicit manual Pause remains **8**.
+With EV active, self-use uses **5** at fresh local 35172 minus measured EV
+power, updated every 15 seconds. Explicit planned discharge and unsupported
+net-only EV cases use Hold. Missing/stale load or EV measurements also hold.
+This assumes an unverified 35172/external-PV boundary; PV priority at the
+inverter limit and mode-5 surplus behavior still need field testing. Other
+strategies and manual modes retain their behavior. The existing command sensor
+exposes a read-only `mapping_preview`; it does not control the actuator.
+See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
 
 ### EV anti-discharge override
 
@@ -329,7 +332,7 @@ For an explicit home-battery charge request:
 Battery -> mode 11 using abs(P_batt)
 Grid    -> normal strategy mode/setpoint; wait if required P_grid is unavailable
 Hybrid  -> normal strategy mode/setpoint; wait if required P_grid is unavailable
-Hybrid 2.0 -> self-use/PV charge via mode 9 at measured EV power; net charge via 11 at planned watts; pause/explicit discharge via 8
+Hybrid 2.0 -> grid-first; EV self-use via mode 5 at load minus EV; directed charge via 11; explicit EV discharge via 8
 ```
 
 `ev_detection.py` is the single interpretation owner. Explicit power mode

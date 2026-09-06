@@ -27,11 +27,11 @@ class Hybrid2EVReferenceTests(unittest.IsolatedAsyncioTestCase):
         controller, client = self.make_controller()
         controller.coordinator.data.values.update(total_load_power=11600, pv_total_power=400)
         await controller.async_evaluate()
-        self.assertEqual(client.calls, [(9, 11000)])
+        self.assertEqual(client.calls, [(5, 600)])
         self.assertEqual(controller.ev_protection_state, "house_self_consumption")
         self.assertEqual(controller._actual_snapshot()["ev_reference_power_w"], 11000)
 
-    async def test_15_second_reference_updates_do_not_follow_house_or_meter_feedback(self):
+    async def test_15_second_reference_follows_load_minus_ev_without_meter_feedback(self):
         controller, client = self.make_controller()
         with patch.object(runtime, "monotonic", return_value=100):
             await controller.async_evaluate()
@@ -40,11 +40,11 @@ class Hybrid2EVReferenceTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(runtime, "monotonic", return_value=114):
             controller._async_source_changed(self.event())
             await asyncio.gather(*controller.hass.tasks)
-        self.assertEqual(client.calls, [(9, 11000)])
+        self.assertEqual(client.calls, [(5, 600)])
         with patch.object(runtime, "monotonic", return_value=115):
             controller._async_ev_reference_tick(None)
             await asyncio.gather(*controller.hass.tasks)
-        self.assertEqual(client.calls, [(9, 11000), (9, 9000)])
+        self.assertEqual(client.calls, [(5, 600), (5, 9000)])
 
     async def test_missing_ev_measurement_holds_without_claiming_ev_stopped(self):
         controller, client = self.make_controller()
@@ -59,10 +59,10 @@ class Hybrid2EVReferenceTests(unittest.IsolatedAsyncioTestCase):
         controller.hass.states.set("sensor.ev_power", "11000")
         controller._async_source_changed(self.event())
         await asyncio.gather(*controller.hass.tasks)
-        self.assertEqual(client.calls[-1], (9, 11000))
+        self.assertEqual(client.calls[-1], (5, 600))
 
     async def test_stale_future_invalid_or_unsupported_power_holds(self):
-        cases = ("unknown", "nan", "inf", "-5", "stale", "future", "naive", "no_time", "unit_A", "unit_missing", "22000")
+        cases = ("unknown", "nan", "inf", "-5", "stale", "future", "naive", "no_time", "unit_A", "unit_missing")
         for case in cases:
             with self.subTest(case=case):
                 controller, client = self.make_controller()
@@ -92,28 +92,87 @@ class Hybrid2EVReferenceTests(unittest.IsolatedAsyncioTestCase):
             state.attributes["unit_of_measurement"] = unit
             state.last_updated = datetime.now(timezone.utc) - timedelta(minutes=10)
             await controller.async_evaluate()
-            self.assertEqual(client.calls, [(9, 11000)])
+            self.assertEqual(client.calls, [(5, 600)])
         controller, client = self.make_controller()
         state = controller.hass.states.get("sensor.ev_power")
         state.last_reported = None
         await controller.async_evaluate()
-        self.assertEqual(client.calls, [(9, 11000)])
+        self.assertEqual(client.calls, [(5, 600)])
 
-    async def test_reference_above_configured_limit_is_held_not_clamped(self):
+    async def test_house_allowance_is_capped_without_capping_ev_power(self):
         controller, client = self.make_controller()
         controller.entry.options[const.CONF_MAX_POWER] = 10000
+        controller.coordinator.data.values["total_load_power"] = 27000
         await controller.async_evaluate()
-        self.assertEqual(client.calls, [(8, 0)])
+        self.assertEqual(client.calls, [(5, 10000)])
 
     async def test_plan_pause_or_sell_interrupts_reference_throttle(self):
-        for battery, grid in (("0", "0"), ("700", "-4000"), ("700", "4000")):
+        for battery, grid in (("0", "4000"), ("700", "-4000"), ("700", "4000")):
             controller, client = self.make_controller()
             with patch.object(runtime, "monotonic", return_value=100):
                 await controller.async_evaluate()
                 controller.hass.states.set("sensor.p_batt", battery)
                 controller.hass.states.set("sensor.p_grid", grid)
                 await controller.async_evaluate()
-            self.assertEqual(client.calls, [(9, 11000), (8, 0)])
+            self.assertEqual(client.calls, [(5, 600), (8, 0)])
+
+    async def test_neutral_battery_at_zero_grid_keeps_house_supply(self):
+        controller, client = self.make_controller()
+        controller.hass.states.set("sensor.p_batt", "0")
+        await controller.async_evaluate()
+        self.assertEqual(client.calls, [(5, 600)])
+        await controller.async_manual_command(8, 0, "manual_pause")
+        controller._async_ev_reference_tick(None)
+        self.assertEqual(client.calls, [(5, 600), (8, 0)])
+        self.assertEqual(controller.mapping_preview()["reason"], "explicit_pause")
+
+    async def test_stale_failed_missing_or_cloud_load_cannot_feed_house_reference(self):
+        for case in ("stale", "future", "naive", "missing_time", "cloud", "failed", "missing_load", "invalid_load"):
+            with self.subTest(case=case):
+                controller, client = self.make_controller()
+                await controller.async_evaluate()
+                data = controller.coordinator.data
+                if case == "stale":
+                    data.source_updated_at -= timedelta(seconds=31)
+                elif case == "future":
+                    data.source_updated_at += timedelta(seconds=5)
+                elif case == "naive":
+                    data.source_updated_at = datetime.now()
+                elif case == "missing_time":
+                    data.source_updated_at = None
+                elif case == "cloud":
+                    data.source = "sems"
+                elif case == "failed":
+                    controller.coordinator.last_update_success = False
+                elif case == "missing_load":
+                    data.values.pop("total_load_power")
+                else:
+                    data.values["total_load_power"] = float("nan")
+                controller._async_ev_reference_tick(None)
+                await asyncio.gather(*controller.hass.tasks)
+                self.assertEqual(client.calls[-1], (8, 0))
+                self.assertIsNone(controller.mapping_preview()["inputs"]["load_35172_w"])
+
+    async def test_preview_and_live_share_model_but_preview_has_no_side_effects(self):
+        controller, client = self.make_controller()
+        preview = controller.mapping_preview()
+        self.assertEqual((preview["mode"], preview["power_w"]), (5, 600))
+        self.assertTrue(preview["preview_only"])
+        self.assertTrue(preview["validation_required"])
+        self.assertEqual(client.calls, [])
+        self.assertEqual(controller.hass.tasks, [])
+        await controller.async_evaluate()
+        self.assertEqual(client.calls, [(preview["mode"], preview["power_w"])])
+
+    async def test_charge_and_discharge_transitions_keep_grid_first_watts(self):
+        controller, client = self.make_controller()
+        controller.hass.states.set("sensor.ev_power", "0")
+        for battery, grid, expected in (("0", "700", (1, 0)), ("5000", "-4000", (3, 5000)),
+                                       ("-8400", "2900", (11, 8400)), ("0", "-4000", (10, 4000))):
+            controller.hass.states.set("sensor.p_batt", battery)
+            controller.hass.states.set("sensor.p_grid", grid)
+            await controller.async_evaluate()
+            self.assertEqual(client.calls[-1], expected)
 
     async def test_missing_or_suspended_plan_holds_even_with_a_fresh_ev_reference(self):
         for source in ("sensor.p_batt", "sensor.p_grid", "suspended"):
@@ -154,7 +213,7 @@ class Hybrid2EVReferenceTests(unittest.IsolatedAsyncioTestCase):
         tick(None)
         self.assertEqual(len(controller.hass.tasks), 1)
         await asyncio.gather(*controller.hass.tasks)
-        self.assertEqual(client.calls, [(9, 11000)])
+        self.assertEqual(client.calls, [(5, 600)])
         await controller.async_manual_command(11, 4000, "manual_test")
         tick(None)
         self.assertEqual(len(controller.hass.tasks), 1)
@@ -188,5 +247,5 @@ class Hybrid2EVReferenceTests(unittest.IsolatedAsyncioTestCase):
         controller.entry.data[const.CONF_CONTROL_STRATEGY] = "hybrid_2"
         listeners[0][1](self.event())
         await asyncio.gather(*controller.hass.tasks)
-        self.assertEqual(client.calls, [(9, 11000)])
+        self.assertEqual(client.calls, [(5, 600)])
         await controller.async_unload()

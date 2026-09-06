@@ -26,9 +26,9 @@ Xset = target value the inverter tries to reach.
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | unused / `0 W` | normal inverter ownership; also used around a zero `P_grid` target when smart-meter control is enabled |
 | **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | Manual; earlier Hybrid 2.0 beta.6/beta.7 experiment |
-| **3** | Discharge PV | PV + battery supply | `Xmax` allowable battery discharge; PV has priority | manual only |
+| **3** | Discharge PV | PV + battery supply | `Xmax` allowable battery discharge; documented PV priority | manual + opt-in Hybrid 2.0 test |
 | **4** | Import AC | Inverter import / AC charging | `Xset` inverter-level grid purchase target | manual only |
-| **5** | Export AC | Inverter export power | `Xset` inverter-level grid sale/export target | manual only |
+| **5** | Export AC | Inverter export power | `Xset` inverter-level grid sale/export target | manual + opt-in Hybrid 2.0 EV house test |
 | **6** | Conserve | Reserve / Conserve | unused / `0 W` | manual reserve/off-grid preparation |
 | **7** | Off-Grid | Off-grid | unused / `0 W` | manual forced off-grid only |
 | **8** | Battery Standby | Battery Hold | unused / `0 W` | automatic fallback hold when direct battery strategy is selected; manual hold |
@@ -168,3 +168,15 @@ write 47511 mode
 ```
 
 Do not change that ordering without hardware validation.
+
+
+## Current Hybrid 2.0 test evidence
+
+The beta.9 opt-in strategy now uses modes 3 and 5. At mode 3 / 5,000 W,
+the owner measured 5,030 W battery discharge (758 V × 6.60 A ≈ 5,003 W)
+while 157 W internal PV remained visible. This supports adjustability, not
+PV priority at the AC limit. Mode 3 / 0 W showed 285 W battery discharge;
+mode 8 later settled to 16 W with 0.00 A. Keep explicit Pause on mode 8.
+Mode 5 / 1,000 W gave 761 W load plus 244 W export; mode 10 / 1,000 W gave
+998 W net export. The 35172 measurement boundary still requires validation.
+See [the full measurement table and open tests](HYBRID_2.md).

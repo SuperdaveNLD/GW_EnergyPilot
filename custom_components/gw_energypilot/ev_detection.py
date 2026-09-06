@@ -30,7 +30,7 @@ EV_POWER_MAX_AGE_SECONDS = 30
 def fresh_power_value_w(states: Any, entity_id: str | None) -> float | None:
     """Read a measured EV reference with explicit units and report freshness.
 
-    This stricter input is for the Hybrid 2.0 PCC reference only. Existing EV
+    This stricter input is for the Hybrid 2.0 house reference only. Existing EV
     activity detection keeps its compatibility behavior.
     """
     state = states.get(entity_id) if entity_id else None

@@ -104,9 +104,11 @@ class GWEnergyPilotController:
       otherwise P_grid < 0 = mode 10 export target at the PCC
 
     Hybrid 2.0:
-      planned battery charging with grid import = mode 11 at planned watts
-      otherwise normal Hybrid; the active controller_v033 EV path adds the
-      measured EV import reference for house self-use and PV-charge steps
+      grid inside its deadband = mode 1, including a neutral battery plan
+      outside: battery charge = mode 11; discharge = mode 3 at planned watts
+      neutral battery outside grid deadband = mode 9/10 net-only target
+      the active controller_v033 EV path uses mode 5 at fresh load minus EV
+      for house self-use, mode 11 for charging, and mode 8 to block discharge
 
     Hybrid gives an explicit neutral battery plan first priority. For every
     non-neutral battery plan it controls the PCC: GoodWe self-use owns a
@@ -860,6 +862,11 @@ class GWEnergyPilotController:
             grid_deadband=grid_deadband,
             max_power=max_power,
         )
+        if not decision.ready:
+            self.last_command = decision.command
+            self._notify_state()
+            await self._async_record_waiting(self.last_command)
+            return
         await self._async_apply_command(
             int(decision.mode),
             int(decision.power),

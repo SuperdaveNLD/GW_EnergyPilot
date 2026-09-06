@@ -3,25 +3,32 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from time import monotonic
 
 from homeassistant.core import callback
 
-from .control_decision import resolve_control_decision
+from .control_decision import preview_hybrid_mapping, resolve_control_decision
 from .const import (
+    CONF_DEADBAND,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
     CONF_EV_MODE_ENTITY,
     CONF_EV_POWER_ENTITY,
+    CONF_GOODWE_AUTO_DEADBAND,
+    CONF_MAX_POWER,
     CONF_OPTIM_STATUS_ENTITY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
     CONTROL_STRATEGY_HYBRID_2,
+    DEFAULT_DEADBAND,
+    DEFAULT_GOODWE_AUTO_DEADBAND,
+    DEFAULT_MAX_POWER,
     EV_DETECTION_METHOD_STATE,
     MODE_BATTERY_HOLD,
 )
 from .controller import GWEnergyPilotController as _BaseController
 from .ev_detection import (
+    EV_POWER_MAX_AGE_SECONDS,
     EV_SELF_CONSUMPTION_INTERVAL_SECONDS,
     detection_method,
     fresh_power_value_w,
@@ -142,7 +149,72 @@ class GWEnergyPilotController(_BaseController):
     def _actual_snapshot(self) -> dict[str, object]:
         snapshot = super()._actual_snapshot()
         snapshot["ev_reference_power_w"] = self._ev_reference_power()
+        snapshot["ev_house_load_power_w"] = self._ev_house_load_power()
         return snapshot
+
+    def _ev_house_load_power(self) -> float | None:
+        """Use fresh local 35172 only; never substitute cloud load or forecasts."""
+        data = self.coordinator.data
+        reported = getattr(data, "source_updated_at", None)
+        age = (
+            (datetime.now(timezone.utc) - reported).total_seconds()
+            if isinstance(reported, datetime) and reported.tzinfo is not None
+            else None
+        )
+        load_fresh = bool(
+            getattr(self.coordinator, "last_update_success", False)
+            and getattr(data, "source", None) == "modbus"
+            and age is not None and 0 <= age <= EV_POWER_MAX_AGE_SECONDS
+        )
+        values = getattr(data, "values", {}) or {}
+        if not isinstance(values, dict):
+            return None
+        value = values.get("total_load_power")
+        return self._finite_value(value) if load_fresh and not isinstance(value, bool) else None
+
+    def mapping_preview(self) -> dict[str, object]:
+        """Describe the new model without writing or scheduling any command."""
+        load = self._ev_house_load_power()
+        ev_power = self._ev_reference_power()
+        p_batt = self._state_float(self._p_batt_entity_id())
+        p_grid = self._state_float(self._p_grid_entity_id())
+        ev_active = self.ev_is_active()
+        plan_ready = bool(
+            self._optim_is_ready() and not self._plan_update_suspensions
+            and self.last_command != "waiting_for_ev_stop_optimization"
+        )
+        preview = preview_hybrid_mapping(
+            p_batt=p_batt,
+            p_grid=p_grid,
+            battery_deadband=self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND),
+            grid_deadband=self.entry.options.get(CONF_GOODWE_AUTO_DEADBAND, DEFAULT_GOODWE_AUTO_DEADBAND),
+            max_power=self.entry.options.get(CONF_MAX_POWER, DEFAULT_MAX_POWER),
+            explicit_pause=not self.enabled and self.expected_mode == MODE_BATTERY_HOLD,
+            plan_ready=plan_ready,
+            ev_active=ev_active,
+            load_power_w=load,
+            ev_power_w=ev_power,
+        ).as_dict()
+        preview.update({
+            "owner": "automatic" if self.enabled else "manual",
+            "active_strategy": self.control_strategy,
+            "current_command_mode": self.expected_mode,
+            "current_command_power_w": self.target_power,
+            "matches_current_command": (
+                preview["mode"] == self.expected_mode and preview["power_w"] == self.target_power
+                if preview["mode"] is not None else None
+            ),
+            "inputs": {
+                "p_batt_w": p_batt,
+                "p_grid_w": p_grid,
+                "plan_ready": plan_ready,
+                "ev_active": ev_active,
+                "ev_power_w": ev_power,
+                "load_35172_w": load,
+                "load_fresh": load is not None,
+            },
+        })
+        return preview
 
     def _plan_runtime(self):
         runtime_data = getattr(self.entry, "runtime_data", None)
@@ -197,6 +269,7 @@ class GWEnergyPilotController(_BaseController):
             max_power=max_power,
             ev_active=True,
             ev_power_w=self._ev_reference_power(),
+            load_power_w=self._ev_house_load_power(),
         )
         if not decision.ready:
             self.last_command = decision.command

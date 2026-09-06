@@ -196,16 +196,19 @@ Hybrid first preserves an explicit neutral battery plan through mode 8. Every no
 
 ### Hybrid 2.0 Beta
 
-The opt-in `hybrid_2` strategy uses **mode 11 at bounded `abs(P_batt)`**
-when battery charging and grid import are both outside their deadbands.
-During EV charging, self-use (including positive `P_batt` with neutral grid)
-and PV charging use **mode 9 at measured EV power**, refreshed every 15 seconds.
-Pause and explicit planned discharge use mode 8. A fresh measured EV power
-sensor is required for self-use; missing/stale/out-of-range references select
-Hold. Missing/non-ready plan inputs during EV charging also select Hold.
-Other steps retain Hybrid behavior without EV. No existing selection is
-migrated; manual modes remain
-exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
+mode **1**, including `P_batt = 0`. Outside it, charging uses **11** at planned
+battery watts, discharging uses **3** at planned battery watts, and neutral
+battery plans use net targets **9/10**. Explicit manual Pause remains **8**.
+With EV active, self-use uses **5** at fresh local 35172 minus measured EV
+power, updated every 15 seconds. Explicit planned discharge and unsupported
+net-only EV cases use Hold. Missing/stale load or EV measurements also hold.
+This assumes an unverified 35172/external-PV boundary; PV priority at the
+inverter limit and mode-5 surplus behavior still need field testing. Other
+strategies and manual modes retain their behavior. The existing command sensor
+exposes a read-only `mapping_preview`; it does not control the actuator.
+See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
 
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 

@@ -102,10 +102,12 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
             "outside it -> modes 9/10"
         ),
         "hybrid_2_strategy": (
-            "Planned grid charging -> mode 11 using planned P_batt, capped by maximum power. "
-            "During EV charging, self-use and PV charging -> mode 9 with measured EV "
-            "power as the import target every 15 seconds; pause or explicit discharge -> mode 8. "
-            "A fresh EV power measurement is required for self-use."
+            "Test mapping: grid deadband first -> Auto, including neutral P_batt. "
+            "Outside: planned charging watts -> mode 11; discharge watts -> mode 3; "
+            "neutral battery -> mode 9/10 net target. EV self-use -> mode 5 at fresh "
+            "local load minus measured EV power every 15 seconds. EV planned discharge, "
+            "unresolved net-only EV plans or invalid measurements -> mode 8 Hold. "
+            "Explicit pause stays Hold. PV priority and the EV load boundary require field validation."
         ),
         "storage": "home_assistant_config_entry_data",
     }

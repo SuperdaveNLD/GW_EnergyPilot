@@ -1153,7 +1153,7 @@ def exercise_ev_protection_banner(page: Page) -> dict[str, object]:
             if state == "house_self_consumption":
                 result[state] = result[state] and page.evaluate("""() => Array.from(
                     window.__epPanel.shadowRoot.querySelectorAll('.panel-card.controller .metric-label')
-                ).some(label => label.textContent.trim() === 'PCC target')""")
+                ).some(label => label.textContent.trim() === 'Inverter AC target')""")
 
         page.evaluate(
             """
@@ -4222,7 +4222,7 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
             page, ".ep-v024-control-strategy-field .ep-v016-field-description"
         ).inner_text()
         result["explanation"] = all(text in explanation for text in (
-            "mode 11", "mode 9", "mode 8 Hold", "15 seconds", "30 seconds",
+            "grid deadband first", "mode 11", "mode 3", "mode 5", "mode 8 Hold", "15 seconds", "30 seconds",
         ))
         activate(page, profile, ".ep-v016-back")
         page.wait_for_function(
@@ -4241,7 +4241,8 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
                 note: Boolean(note && !note.hidden &&
                   note.textContent.includes('Hybrid 2.0 Beta') &&
                   note.textContent.includes('mode 11') &&
-                  note.textContent.includes('mode 9') &&
+                  note.textContent.includes('mode 3') &&
+                  note.textContent.includes('mode 5') &&
                   note.textContent.includes('mode 8 Hold') &&
                   note.textContent.includes('15 seconds')),
                 stable: root.querySelector('main') === main &&
@@ -5777,7 +5778,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.8 BETA",
+        "v131": "v1.3.0-beta.9 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(

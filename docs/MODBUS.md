@@ -230,9 +230,9 @@ This distinction is important. Modes that all accept a value in watts are **not 
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | Not used; EnergyPilot writes `0 W` | Return ownership to the inverter / normal self-use |
 | **2** | Charge PV | PV-priority charging | `Xmax`: maximum grid power allowed to assist charging; `0 W` means PV-only charging | Manual; earlier Hybrid 2.0 beta.6/beta.7 experiment |
-| **3** | Discharge PV | PV + battery supply | `Xmax`: allowable battery discharge power while PV remains higher priority | Manual only |
+| **3** | Discharge PV | PV + battery supply | `Xmax`: allowable battery discharge; documented PV priority | Manual + Hybrid 2.0 test |
 | **4** | Import AC | Inverter import / AC charging | `Xset`: target grid purchase/import for inverter-level scheduling | Manual only |
-| **5** | Export AC | Inverter export power | `Xset`: target grid sale/export for inverter-level scheduling | Manual only |
+| **5** | Export AC | Inverter export power | `Xset`: target grid sale/export for inverter-level scheduling | Manual + Hybrid 2.0 EV house test |
 | **6** | Conserve | Reserve / Conserve | Not used; EnergyPilot writes `0 W` | Manual only; reserve/off-grid preparation behavior |
 | **7** | Off-Grid | Off-grid | Not used; EnergyPilot writes `0 W` | Manual only; forces off-grid operation |
 | **8** | Battery Standby | Battery Hold | Not used; EnergyPilot writes `0 W` | Automatic hold/deadband/EV/protective hold and manual pause |
@@ -385,6 +385,13 @@ Purpose: command the battery itself to discharge at a requested power.
 
 Battery discharge has high priority and is bounded by BMS/inverter discharge limits. GoodWe may limit PV under operating conditions where the requested battery discharge and PV together would exceed the applicable inverter/grid constraints.
 
+**Reference ETA-G20 field report, 2026-09-06:** the owner reports that the PV
+installation stops producing in mode 12. For this installation, treat mode 12
+as incompatible with the requested PV-first dispatch. Lowering its battery
+power setpoint has not been verified to preserve PV. The report does not
+separate internal DC PV from external AC PV or establish behavior across
+other models, firmware versions and operating conditions.
+
 Battery strategy uses mode 12 for automatic discharge.
 
 ### Similar-looking modes that must not be confused
@@ -505,3 +512,20 @@ Any register change should include:
 - whether the value is **Validated** or **Beta**.
 
 Do not generalize behaviour from an older GoodWe generation to ETA-G20 without verification.
+
+
+### Hybrid 2.0 test evidence and telemetry freshness (v1.3.0-beta.9)
+
+Mode 3 / 5,000 W measured about 5,030 W battery discharge with 157 W internal
+PV. This does not validate PV priority at the AC limit. Mode 3 / 0 W and mode
+8 are not assumed equivalent: the owner saw 285 W in the former and 16 W
+with 0.00 A after mode 8 settled. Mode 5 / 1,000 W matched load plus export
+approximately, while mode 10 / 1,000 W reached 998 W net export. Firmware and
+synchronized independent inverter AC were unavailable. Full evidence and
+limitations are in [Hybrid 2.0](HYBRID_2.md).
+
+Complete local Modbus reads timestamp `source_updated_at` in UTC. This
+supports the new 30-second load-reference check without extra polls. It is
+not a register change. Cloud telemetry retains its source timestamp and
+control-only reads never refresh the local load timestamp. Register types,
+scales, signs, blocks and the EMS write order are unchanged.
