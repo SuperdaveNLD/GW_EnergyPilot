@@ -9,9 +9,11 @@ from .const import (
     CONTROL_STRATEGY_BATTERY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
+    CONTROL_STRATEGY_HYBRID_2,
     MODE_AUTO,
     MODE_BATTERY_HOLD,
     MODE_CHARGE_BATTERY,
+    MODE_CHARGE_PV,
     MODE_DISCHARGE_BATTERY,
     MODE_GRID_EXPORT_TARGET,
     MODE_GRID_IMPORT_TARGET,
@@ -112,7 +114,19 @@ def resolve_control_decision(
     if grid is None:
         return ControlDecision(None, None, "waiting_for_p_grid")
 
-    if strategy == CONTROL_STRATEGY_HYBRID:
+    if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
+        # Opt-in maximum AC assistance with PV priority. The plan selects the
+        # grid-charge window, not the amplitude of this mode-specific limit.
+        if (
+            strategy == CONTROL_STRATEGY_HYBRID_2
+            and battery < -battery_boundary
+            and grid > grid_boundary
+        ):
+            return ControlDecision(
+                MODE_CHARGE_PV,
+                _bounded_power(max_power, max_power),
+                "hybrid2_pv_priority_charge",
+            )
         if abs(battery) <= battery_boundary:
             return ControlDecision(
                 MODE_BATTERY_HOLD,

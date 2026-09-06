@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v023.js?v=1.3.0-beta.5";
+import "./gw-energy-pilot-v023.js?v=1.3.0-beta.6";
 
 const VERSION = "0.24";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -7,9 +7,11 @@ const STRATEGY_LABELS = {
   battery: "Accuregeling",
   grid: "Netregeling",
   hybrid: "Hybride regeling",
+  hybrid_2: "Hybrid 2.0 Beta",
 };
 
 const STRATEGY_DESCRIPTIONS = {
+  hybrid_2: "Netlaadvensters: modus 2 met maximaal regelvermogen en PV-voorrang. Overige stappen volgen Hybrid.",
   battery: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
   grid: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
   hybrid: "Regelt inkoop/laden op accuvermogen (11) en verkoop/export op netvermogen (10).",
@@ -83,6 +85,7 @@ function installControlStrategy(panel, root) {
     <select class="ep-v016-input" ${busy ? "disabled" : ""} aria-label="Automatische regelstrategie">
       <option value="battery" ${strategy === "battery" ? "selected" : ""}>Accuregeling</option>
       <option value="grid" ${strategy === "grid" ? "selected" : ""}>Netregeling</option>
+      <option value="hybrid_2" ${strategy === "hybrid_2" ? "selected" : ""}>Hybrid 2.0 Beta</option>
       <option value="hybrid" ${strategy === "hybrid" ? "selected" : ""}>Hybride regeling</option>
     </select>
   `;

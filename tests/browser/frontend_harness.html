@@ -731,7 +731,18 @@
       if (type === "gw_energypilot/battery_price/get") return batteryPricePayload();
       if (type === "gw_energypilot/optimization_log/get") return { entry_id: ENTRY_ID, history: [] };
       if (type === "gw_energypilot/debug_log/get") return { entry_id: ENTRY_ID, enabled: false, events: [] };
-      if (type === "gw_energypilot/smart_meter/get") return { entry_id: ENTRY_ID, strategy: ["v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"].includes(ENTRYPOINT) ? "hybrid" : "battery", enabled: false, meter_available: true };
+      if (type === "gw_energypilot/smart_meter/set") {
+        await actionDelay();
+        window.__epSetEntityByKey("control_strategy", message.strategy);
+        const command = window.__epHass.states[entityIdForKey("control_command")];
+        window.__epSetEntityByKey("control_command", command.state, {
+          control_strategy: message.strategy,
+        });
+      }
+      if (["gw_energypilot/smart_meter/get", "gw_energypilot/smart_meter/set"].includes(type)) {
+        const strategy = window.__epHass.states[entityIdForKey("control_strategy")]?.state || "battery";
+        return { entry_id: ENTRY_ID, strategy, enabled: strategy !== "battery", meter_available: true };
+      }
       if (type === "gw_energypilot/beta_soc/get") return { entry_id: ENTRY_ID, on_grid: 5, off_grid: 5 };
       if (type === "gw_energypilot/emhass_sync/get") return { entry_id: ENTRY_ID, status: "ready" };
       if (type === "recorder/statistics_during_period") {

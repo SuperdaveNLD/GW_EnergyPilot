@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.5";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.6";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.5";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.5";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.6";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.6";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -195,6 +195,19 @@ const HYBRID_NOTE = Object.freeze({
     label: "Hybride regeling",
     description: "Gebruikt eerst de Battery Hold-deadband op P_batt voor modus 8. Daarbuiten gebruikt P_grid modus 1 binnen de aparte GoodWe Auto-deadband en modi 9/10 erbuiten, met het volledige netdoel als setpoint.",
     safety: "EV-ontlaadbeveiliging blijft actief als veiligheidsoverride.",
+  }),
+});
+
+const HYBRID2_NOTE = Object.freeze({
+  en: Object.freeze({
+    ...HYBRID_NOTE.en,
+    label: "Hybrid 2.0 Beta",
+    description: "Grid-charge windows use mode 2 at the configured maximum power with PV priority. Other steps follow Hybrid. Charging and SOC can exceed the EMHASS forecast.",
+  }),
+  nl: Object.freeze({
+    ...HYBRID_NOTE.nl,
+    label: "Hybrid 2.0 Beta",
+    description: "Netlaadvensters gebruiken modus 2 op het maximale regelvermogen met PV-voorrang. Overige stappen volgen Hybrid. Lading en SOC kunnen de EMHASS-prognose overschrijden.",
   }),
 });
 
@@ -415,6 +428,8 @@ export function buildControlSurfaceModel(panel, gateway = controlGateway(panel))
   const minimumSoc = safeState(panel, "emhass_minimum_soc");
   const maximumSoc = safeState(panel, "emhass_maximum_soc");
   const controlStrategy = safeState(panel, "control_strategy");
+  const strategyValue = command.state?.attributes?.control_strategy
+    || panel.__epV022SmartMeter?.data?.strategy || controlStrategy.value;
   const automaticState = ["on", "off"].includes(automatic.value)
     ? automatic.value
     : null;
@@ -427,8 +442,8 @@ export function buildControlSurfaceModel(panel, gateway = controlGateway(panel))
     language,
     narrow: Boolean(panel?.narrow),
     strategy: {
-      value: controlStrategy.value,
-      note: HYBRID_NOTE[language] || HYBRID_NOTE.en,
+      value: strategyValue,
+      note: strategyValue === "hybrid_2" ? HYBRID2_NOTE[language] : HYBRID_NOTE[language] || HYBRID_NOTE.en,
     },
     battery: {
       language,
@@ -1121,8 +1136,8 @@ class EpControlSurface extends LitElement {
           <ep-manual-ems-controls .model=${this.model.manual} .actions=${this.actions}></ep-manual-ems-controls>
         </div>
         <p class="section-note ep-v022-strategy-note"
-          data-ep-v048-presentation-key=${`${this.model.language}:hybrid`}
-          ?hidden=${this.model.strategy?.value !== "hybrid"}>
+          data-ep-v048-presentation-key=${`${this.model.language}:${this.model.strategy?.value}`}
+          ?hidden=${!["hybrid", "hybrid_2"].includes(this.model.strategy?.value)}>
           <strong>${this.model.strategy?.note?.title || ""}</strong>
           ${this.model.strategy?.note?.label || ""} · ${this.model.strategy?.note?.description || ""}
           ${this.model.strategy?.note?.safety || ""}

@@ -194,6 +194,15 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 
 Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance inside the separate GoodWe Auto deadband, while modes 9/10 own non-zero planned import/export outside it. Exact boundaries remain neutral and neither threshold is ever subtracted from the final mode-9/10 setpoint.
 
+### Hybrid 2.0 Beta
+
+The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
+power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
+Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
+windows and holds neutral/discharge plans. Actual charging and SOC can exceed
+the EMHASS forecast. No existing selection is migrated; manual modes remain
+exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
 ### EV anti-discharge override

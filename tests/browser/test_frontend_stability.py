@@ -4180,6 +4180,78 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Select the opt-in actuator strategy, persist it and patch its live note."""
+    result = {"ran": EXPECTED_ENTRYPOINT == "v131", "selected": False,
+              "persisted": False, "explanation": False, "note": False, "stable": False,
+              "restored": False, "error": None}
+    if not result["ran"]:
+        return result
+    select = ".ep-v024-control-strategy-field select"
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        shadow(page, select).select_option("hybrid_2", timeout=10_000)
+        page.wait_for_function(
+            "() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid_2'",
+            timeout=10_000,
+        )
+        result["selected"] = shadow(page, select).input_value() == "hybrid_2"
+        result["explanation"] = "planned SOC maximum" in shadow(
+            page, ".ep-v024-control-strategy-field .ep-v016-field-description"
+        ).inner_text()
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        state = page.evaluate(
+            """async () => {
+              const root = window.__epPanel.shadowRoot;
+              const main = root.querySelector('main');
+              const surface = root.querySelector('ep-control-surface');
+              const note = root.querySelector('.ep-v022-strategy-note');
+              window.__epSetEntityByKey('battery_power', -8200);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              return {
+                note: Boolean(note && !note.hidden &&
+                  note.textContent.includes('Hybrid 2.0 Beta') &&
+                  note.textContent.includes('mode 2') &&
+                  note.textContent.includes('forecast')),
+                stable: root.querySelector('main') === main &&
+                  root.querySelector('ep-control-surface') === surface &&
+                  root.querySelector('.ep-v022-strategy-note') === note,
+              };
+            }"""
+        )
+        result.update(state)
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        result["persisted"] = shadow(page, select).input_value() == "hybrid_2"
+        shadow(page, select).select_option("hybrid", timeout=10_000)
+        page.wait_for_function(
+            "() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid'",
+            timeout=10_000,
+        )
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        # Settings remembers its tab; leave the original tab for later tests.
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="energypilot"]')
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        result["restored"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the beta.2 EP deadband panel, validation and responsive fit."""
     enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
@@ -5535,6 +5607,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     )
 
     pv_insight = exercise_pv_insight(page)
+    hybrid2_settings = exercise_hybrid2_settings(page, profile)
     deadband_settings = exercise_deadband_settings(page, profile)
     sems_settings = exercise_sems_settings(page, profile)
     pv_settings = exercise_pv_settings(page, profile)
@@ -5575,6 +5648,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "flow_sizes_ev": flow_sizes_ev,
         "motion": motion,
         "pv_insight": pv_insight,
+        "hybrid2_settings": hybrid2_settings,
         "deadband_settings": deadband_settings,
         "sems_settings": sems_settings,
         "pv_settings": pv_settings,
@@ -5644,6 +5718,13 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     structural = result["structural"]
     animation = result["animation"]
 
+    if EXPECTED_ENTRYPOINT == "v131":
+        hybrid2 = result["hybrid2_settings"]
+        if not all(hybrid2[key] is True for key in (
+            "ran", "selected", "persisted", "explanation", "note", "stable", "restored"
+        )) or hybrid2["error"]:
+            failures.append(f"{name}: Hybrid 2.0 selection/persistence/live note failed")
+
     if EXPECTED_ENTRYPOINT == "v110":
         required_flow_sizes_ev = (
             "ran", "sizes_present", "small_selected", "medium_selected",
@@ -5670,7 +5751,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.5 BETA",
+        "v131": "v1.3.0-beta.6 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(

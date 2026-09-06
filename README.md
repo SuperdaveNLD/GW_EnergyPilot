@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.5.md)
+[Latest beta](docs/releases/v1.3.0-beta.6.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -31,7 +31,7 @@ system's responsibility explicit:
   wall-clock boundaries with optional Nord Pool/runtime pricing;
 - **Control the inverter locally** — translate the active battery/grid plan to
   verified GoodWe EMS modes and setpoints over local Modbus TCP;
-- **Choose how the plan is followed** — Battery, Grid or Hybrid control, from
+- **Choose how the plan is followed** — Battery, Grid, Hybrid or opt-in Hybrid 2.0 Beta control, from
   direct battery power to GoodWe smart-meter/PCC targets;
 - **Protect the system when reality changes** — block home-battery discharge
   into a charging EV, wait for fresh plans and suspend EV coordination when
@@ -66,7 +66,7 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.5 · Beta prerelease**
+**v1.3.0-beta.6 · Beta prerelease**
 
 Latest production release: **v1.2.0 · Stable**
 
@@ -157,6 +157,14 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.6 highlights
+
+- Adds **Hybrid 2.0 Beta** in GoodWe settings: mode 2 at configured maximum
+  power during planned net-charge windows, with PV priority.
+- EV start preserves charging; neutral/discharge plans remain held.
+- Existing strategies are retained. Actual charging and SOC can exceed the
+  EMHASS forecast. See [release notes](docs/releases/v1.3.0-beta.6.md).
 
 ## v1.3.0-beta.5 highlights
 
@@ -572,7 +580,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - direct local GoodWe Modbus TCP telemetry;
 - EMS mode/setpoint control;
 - manual access to all twelve EMS modes;
-- three Automatic Control strategies: Battery, Grid and Hybrid;
+- four Automatic Control strategies: Battery, Grid, Hybrid and Hybrid 2.0 Beta;
 - native EMHASS optimization/publishing;
 - safe EMHASS required-config synchronization that preserves installation topology;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
@@ -689,6 +697,15 @@ else P_grid < -deadband -> mode 10 Grid export target
 Hybrid first preserves an explicit neutral battery plan. This prevents ordinary site import or PV export from becoming an active target while EMHASS asks the battery to remain idle.
 
 For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around zero grid target, mode 1 lets GoodWe close the actual local balance for internal or AC-coupled PV. Outside the configured deadband, modes 9/10 receive the complete absolute `P_grid` magnitude, limited only by maximum power. Exact positive and negative deadband boundaries remain neutral.
+
+### Hybrid 2.0 Beta
+
+The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
+power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
+Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
+windows and holds neutral/discharge plans. Actual charging and SOC can exceed
+the EMHASS forecast. No existing selection is migrated; manual modes remain
+exact. See [Hybrid 2.0 behavior and hardware evidence](docs/HYBRID_2.md).
 
 ### EV anti-discharge override
 

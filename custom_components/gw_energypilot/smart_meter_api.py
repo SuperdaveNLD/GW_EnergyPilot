@@ -20,6 +20,7 @@ from .const import (
     CONTROL_STRATEGY_BATTERY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
+    CONTROL_STRATEGY_HYBRID_2,
     DEFAULT_DEADBAND,
     DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_USE_GOODWE_SMART_METER,
@@ -91,6 +92,7 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
             CONTROL_STRATEGY_BATTERY: "Battery control",
             CONTROL_STRATEGY_GRID: "Grid control",
             CONTROL_STRATEGY_HYBRID: "Hybrid control",
+            CONTROL_STRATEGY_HYBRID_2: "Hybrid 2.0 Beta",
         },
         "battery_strategy": "P_batt -> GoodWe modes 11/12; mode 8 around zero",
         "grid_strategy": "P_grid -> GoodWe modes 9/10; mode 1 around zero",
@@ -98,6 +100,11 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
             "P_batt inside the Battery Hold deadband -> mode 8; otherwise "
             "P_grid inside the GoodWe Auto deadband -> mode 1; signed P_grid "
             "outside it -> modes 9/10"
+        ),
+        "hybrid_2_strategy": (
+            "Explicit battery charging with planned grid import -> mode 2 at "
+            "configured maximum power, PV priority; otherwise normal Hybrid. "
+            "Actual charging and SOC can exceed the EMHASS forecast."
         ),
         "storage": "home_assistant_config_entry_data",
     }
