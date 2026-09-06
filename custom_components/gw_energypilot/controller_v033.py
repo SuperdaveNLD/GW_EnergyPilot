@@ -2,20 +2,147 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
+from datetime import timedelta
+from time import monotonic
+
+from homeassistant.core import callback
+
 from .control_decision import resolve_control_decision
 from .const import (
+    CONF_ENABLE_EMHASS_ORCHESTRATOR,
+    CONF_EV_MODE_ENTITY,
+    CONF_EV_POWER_ENTITY,
     CONF_OPTIM_STATUS_ENTITY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
     CONTROL_STRATEGY_HYBRID_2,
+    EV_DETECTION_METHOD_STATE,
+    MODE_BATTERY_HOLD,
 )
 from .controller import GWEnergyPilotController as _BaseController
+from .ev_detection import (
+    EV_SELF_CONSUMPTION_INTERVAL_SECONDS,
+    detection_method,
+    fresh_power_value_w,
+)
 
 _MISSING_STATES = {"unknown", "unavailable", "none", ""}
 
 
 class GWEnergyPilotController(_BaseController):
     """Keep Automatic Control usable while EMHASS HA entities are rebuilding."""
+
+    async def async_setup(self) -> None:
+        from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+
+        await super().async_setup()
+        self._ev_reference_task = None
+        self._ev_reference_unloading = False
+        # A live strategy selection need not reload the entry. Observe the
+        # optional measured source now, but act on it only in Hybrid 2.0.
+        power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
+        if power_entity and power_entity not in self.ev_source_ids:
+            self._unsubs.append(async_track_state_change_event(
+                self.hass, [power_entity], self._async_ev_power_reference_changed,
+            ))
+        self._unsubs.append(async_track_time_interval(
+            self.hass, self._async_ev_reference_tick,
+            timedelta(seconds=EV_SELF_CONSUMPTION_INTERVAL_SECONDS),
+        ))
+
+    @callback
+    def _async_ev_power_reference_changed(self, event) -> None:
+        if self.control_strategy == CONTROL_STRATEGY_HYBRID_2:
+            self._async_source_changed(event)
+
+    async def async_unload(self) -> None:
+        self._ev_reference_unloading = True
+        await super().async_unload()
+        pending = getattr(self, "_ev_reference_task", None)
+        if pending is not None:
+            # Let an in-flight mode/setpoint transaction finish atomically.
+            with suppress(Exception):
+                await pending
+
+    @property
+    def ev_source_ids(self) -> set[str]:
+        sources = super().ev_source_ids
+        if self.control_strategy == CONTROL_STRATEGY_HYBRID_2:
+            power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
+            if power_entity:
+                sources.add(power_entity)
+        return sources
+
+    def _ev_reference_power(self) -> float | None:
+        return fresh_power_value_w(self.hass.states, self.entry.options.get(CONF_EV_POWER_ENTITY))
+
+    def ev_is_active(self) -> bool:
+        active = super().ev_is_active()
+        if (active or self.control_strategy != CONTROL_STRATEGY_HYBRID_2
+                or not self._ev_coordination_effective() or not self._ev_was_active):
+            return active
+        # An unavailable reading is not a confirmed EV stop. Keep the guard
+        # until the selected activity source can actually report a stop.
+        if detection_method(self.entry.options) == EV_DETECTION_METHOD_STATE:
+            entity_id = self.entry.options.get(CONF_EV_MODE_ENTITY)
+            state = self.hass.states.get(entity_id) if entity_id else None
+            return state is None or str(state.state).lower() in _MISSING_STATES
+        return self._ev_reference_power() is None
+
+    @callback
+    def _async_ev_reference_tick(self, _now) -> None:
+        if (getattr(self, "_ev_reference_unloading", False) or not self.enabled
+                or self.control_strategy != CONTROL_STRATEGY_HYBRID_2
+                or not self.ev_is_active()):
+            return
+        pending = getattr(self, "_ev_reference_task", None)
+        if pending is not None and not pending.done():
+            return
+        self._ev_reference_task = self.hass.async_create_task(
+            self.async_evaluate(allow_suspended=True), "gw-energypilot-ev-reference",
+        )
+
+    @callback
+    def _async_source_changed(self, event) -> None:
+        native_ev_stop = (
+            self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_2
+            and event.data.get("entity_id") in self.ev_source_ids
+            and self._ev_was_active and not self.ev_is_active()
+            and self.entry.options.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, False)
+        )
+        super()._async_source_changed(event)
+        if native_ev_stop:
+            self.hass.async_create_task(self._async_hold_after_ev_stop(), "gw-energypilot-ev-stop-hold")
+
+    async def _async_hold_after_ev_stop(self) -> None:
+        async with self._control_lock:
+            if (self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_2
+                    and not self.ev_is_active()
+                    and self.last_command == "waiting_for_ev_stop_optimization"):
+                await self._async_apply_command(
+                    MODE_BATTERY_HOLD, 0, "waiting_for_ev_stop_optimization",
+                    skip_if_readback_matches=True,
+                )
+
+    async def _async_evaluate_locked(self) -> None:
+        if (self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_2
+                and self.ev_is_active()):
+            self._ev_was_active = True
+            if (self._plan_update_suspensions or not self._optim_is_ready()
+                    or self._state_float(self._p_batt_entity_id()) is None
+                    or self._state_float(self._p_grid_entity_id()) is None):
+                await self._async_apply_command(
+                    MODE_BATTERY_HOLD, 0, "ev_self_consumption_hold",
+                    skip_if_readback_matches=True,
+                )
+                return
+        await super()._async_evaluate_locked()
+
+    def _actual_snapshot(self) -> dict[str, object]:
+        snapshot = super()._actual_snapshot()
+        snapshot["ev_reference_power_w"] = self._ev_reference_power()
+        return snapshot
 
     def _plan_runtime(self):
         runtime_data = getattr(self.entry, "runtime_data", None)
@@ -69,12 +196,20 @@ class GWEnergyPilotController(_BaseController):
             grid_deadband=grid_deadband,
             max_power=max_power,
             ev_active=True,
+            ev_power_w=self._ev_reference_power(),
         )
         if not decision.ready:
             self.last_command = decision.command
             self._notify_state()
             await self._async_record_waiting(self.last_command)
             return
+        if decision.command == "ev_house_self_consumption":
+            now = monotonic()
+            previous = getattr(self, "_last_ev_reference_at", None)
+            if (self.last_command == decision.command and previous is not None
+                    and now - previous < EV_SELF_CONSUMPTION_INTERVAL_SECONDS):
+                return
+            self._last_ev_reference_at = now
         await self._async_apply_command(
             int(decision.mode),
             int(decision.power),

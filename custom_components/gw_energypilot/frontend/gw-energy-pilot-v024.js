@@ -11,7 +11,7 @@ const STRATEGY_LABELS = {
 };
 
 const STRATEGY_DESCRIPTIONS = {
-  hybrid_2: "Geplande batterijlading met netimport: modus 2 met maximaal regelvermogen en PV-voorrang. Tijdens EV-laden gaan overige planstappen naar modus 8 Hold; zonder EV volgen ze Hybrid.",
+  hybrid_2: "Gepland netladen: modus 11 op EMHASS-accuvermogen. Tijdens EV-laden: zelfconsumptie en PV-laden via modus 9 op gemeten EV-vermogen; pauze en geplande ontlading via modus 8 Hold.",
   battery: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
   grid: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
   hybrid: "Regelt inkoop/laden op accuvermogen (11) en verkoop/export op netvermogen (10).",

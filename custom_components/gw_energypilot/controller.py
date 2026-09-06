@@ -85,7 +85,7 @@ _LOGGER = logging.getLogger(__name__)
 class GWEnergyPilotController:
     """Translate the current EMHASS plan into GoodWe EMS commands.
 
-    Automatic Control supports three strategies:
+    Automatic Control supports four strategies:
 
     Battery control:
       P_batt < 0 = mode 11 direct battery charge target
@@ -102,6 +102,11 @@ class GWEnergyPilotController:
       otherwise P_grid ~= 0 = mode 1 GoodWe Auto / self-use balancing
       otherwise P_grid > 0 = mode 9 import target at the PCC
       otherwise P_grid < 0 = mode 10 export target at the PCC
+
+    Hybrid 2.0:
+      planned battery charging with grid import = mode 11 at planned watts
+      otherwise normal Hybrid; the active controller_v033 EV path adds the
+      measured EV import reference for house self-use and PV-charge steps
 
     Hybrid gives an explicit neutral battery plan first priority. For every
     non-neutral battery plan it controls the PCC: GoodWe self-use owns a
@@ -199,6 +204,10 @@ class GWEnergyPilotController:
             return "waiting_for_fresh_plan"
         if not self.enabled or not self.ev_is_active():
             return "inactive"
+        if self.last_command == "ev_house_self_consumption":
+            return "house_self_consumption"
+        if self.last_command == "ev_self_consumption_hold":
+            return "self_consumption_hold"
         if self.last_command == "ev_anti_discharge_hold":
             return "blocking_discharge"
         if self.last_command in {

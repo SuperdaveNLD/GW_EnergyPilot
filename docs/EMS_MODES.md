@@ -25,7 +25,7 @@ Xset = target value the inverter tries to reach.
 | Mode | GoodWe/OpenEMS name | EnergyPilot label | `47512` meaning | EnergyPilot policy |
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | unused / `0 W` | normal inverter ownership; also used around a zero `P_grid` target when smart-meter control is enabled |
-| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | Hybrid 2.0 Beta battery-charge windows; also manual |
+| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | Manual; earlier Hybrid 2.0 beta.6/beta.7 experiment |
 | **3** | Discharge PV | PV + battery supply | `Xmax` allowable battery discharge; PV has priority | manual only |
 | **4** | Import AC | Inverter import / AC charging | `Xset` inverter-level grid purchase target | manual only |
 | **5** | Export AC | Inverter export power | `Xset` inverter-level grid sale/export target | manual only |
@@ -118,12 +118,15 @@ The neutral battery branch is evaluated first so ordinary forecast house import 
 
 ### Hybrid 2.0 Beta
 
-The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
-Other steps retain Hybrid behavior without EV. During EV charging, all other
-valid plan steps use mode 8 Hold, including PV-only charging around zero grid
-and PV export. Missing required inputs still wait. Actual charging and SOC can exceed
-the EMHASS forecast. No existing selection is migrated; manual modes remain
+The opt-in `hybrid_2` strategy uses **mode 11 at bounded `abs(P_batt)`**
+when battery charging and grid import are both outside their deadbands.
+During EV charging, self-use (including positive `P_batt` with neutral grid)
+and PV charging use **mode 9 at measured EV power**, refreshed every 15 seconds.
+Pause and explicit planned discharge use mode 8. A fresh measured EV power
+sensor is required for self-use; missing/stale/out-of-range references select
+Hold. Missing/non-ready plan inputs during EV charging also select Hold.
+Other steps retain Hybrid behavior without EV. No existing selection is
+migrated; manual modes remain
 exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
 
 ## Why mode 1 is used around zero grid target

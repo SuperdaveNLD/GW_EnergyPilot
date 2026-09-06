@@ -202,12 +202,14 @@ const HYBRID2_NOTE = Object.freeze({
   en: Object.freeze({
     ...HYBRID_NOTE.en,
     label: "Hybrid 2.0 Beta",
-    description: "Planned battery charging with grid import uses mode 2 at the configured maximum power with PV priority. While the EV charges, all other plan steps use mode 8 Hold; without EV, they follow Hybrid. Charging and SOC can exceed the EMHASS forecast.",
+    description: "Planned grid charging follows the EMHASS battery power in mode 11. During EV charging, self-use and PV charging use mode 9 with measured EV power as the import target, updated every 15 seconds. Pause and planned discharge use mode 8 Hold. Self-use requires a fresh EV power sensor.",
+    safety: "During EV charging, the battery may supply the house; explicit battery export is held.",
   }),
   nl: Object.freeze({
     ...HYBRID_NOTE.nl,
     label: "Hybrid 2.0 Beta",
-    description: "Geplande batterijlading met netimport gebruikt modus 2 op het maximale regelvermogen met PV-voorrang. Tijdens EV-laden gebruiken alle overige planstappen modus 8 Hold; zonder EV volgen ze Hybrid. Lading en SOC kunnen de EMHASS-prognose overschrijden.",
+    description: "Gepland netladen volgt het EMHASS-accuvermogen in modus 11. Tijdens EV-laden gebruiken zelfconsumptie en PV-laden modus 9 met het gemeten EV-vermogen als importdoel, elke 15 seconden bijgewerkt. Pauze en geplande ontlading gebruiken modus 8 Hold. Zelfconsumptie vereist een verse EV-vermogensmeting.",
+    safety: "Tijdens EV-laden mag de accu het huis voeden; expliciete batterij-export wordt gepauzeerd.",
   }),
 });
 

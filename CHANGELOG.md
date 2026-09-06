@@ -8,10 +8,18 @@ All notable changes to GW EnergyPilot are documented here.
 
 ### Fixed
 
-- Correct Hybrid 2.0's EV policy: keep maximum mode-2 charging only for an
-  explicit battery-charge plan with grid import above its separate deadband.
-  EV active with any other valid plan uses mode 8 Hold, including PV-only
-  charging around zero grid or alongside PV export.
+- Follow planned battery watts in mode 11 during Hybrid 2.0 net-charge windows,
+  bounded by maximum control power; stop replacing the requested amplitude
+  with maximum mode-2 assistance.
+- Preserve house self-consumption during EV charging, including positive
+  P_batt with neutral grid. Self-use and PV-charge steps use mode 9 at measured
+  EV power, refreshed every 15 seconds by the existing controller. Pause and
+  explicit planned discharge remain mode 8 Hold.
+- Require a fresh measured EV reference with explicit units and report time;
+  stale, unavailable or out-of-range references select Hold. Missing/non-ready
+  or suspended plans during EV charging also select Hold. Preserve the active
+  session on missing activity data and apply Hold immediately on confirmed
+  native EV stop before waiting for a fresh plan.
 - Restore normal Hybrid mapping without EV outside net-charge windows. A
   negative battery plan alone no longer authorizes maximum grid purchases.
 - Restore the common finite-grid gate for both Hybrid variants, preventing
@@ -19,6 +27,9 @@ All notable changes to GW EnergyPilot are documented here.
 - Retain optimizer readiness, valid persistent-plan fallback, EV-stop freshness,
   manual modes and existing Battery/Grid/Hybrid behavior. Update English/Dutch
   explanations and prepare one complete beta.8 frontend cache boundary.
+
+- Distinguish house self-consumption from charging and Hold in the dashboard;
+  record the EV reference without mislabeling self-use as charge-only history.
 
 ## [1.3.0-beta.7] - 2026-09-06
 

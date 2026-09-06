@@ -301,17 +301,22 @@ The Hybrid neutral-battery branch is evaluated first so ordinary forecast house 
 
 ### Hybrid 2.0 Beta
 
-The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
-Other steps retain Hybrid behavior without EV. During EV charging, all other
-valid plan steps use mode 8 Hold, including PV-only charging around zero grid
-and PV export. Missing required inputs still wait. Actual charging and SOC can exceed
-the EMHASS forecast. No existing selection is migrated; manual modes remain
+The opt-in `hybrid_2` strategy uses **mode 11 at bounded `abs(P_batt)`**
+when battery charging and grid import are both outside their deadbands.
+During EV charging, self-use (including positive `P_batt` with neutral grid)
+and PV charging use **mode 9 at measured EV power**, refreshed every 15 seconds.
+Pause and explicit planned discharge use mode 8. A fresh measured EV power
+sensor is required for self-use; missing/stale/out-of-range references select
+Hold. Missing/non-ready plan inputs during EV charging also select Hold.
+Other steps retain Hybrid behavior without EV. No existing selection is
+migrated; manual modes remain
 exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
 
 ### EV anti-discharge override
 
-While the configured EV source is actively charging, `P_batt` remains the directional safety guard:
+For Battery, Grid and original Hybrid, `P_batt` remains the directional safety
+guard while the configured EV source is actively charging. Hybrid 2.0 uses
+the house-self-consumption exception above:
 
 ```text
 P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
@@ -324,7 +329,7 @@ For an explicit home-battery charge request:
 Battery -> mode 11 using abs(P_batt)
 Grid    -> normal strategy mode/setpoint; wait if required P_grid is unavailable
 Hybrid  -> normal strategy mode/setpoint; wait if required P_grid is unavailable
-Hybrid 2.0 -> mode 2 with planned net charging; otherwise mode 8; wait if P_grid is unavailable
+Hybrid 2.0 -> self-use/PV charge via mode 9 at measured EV power; net charge via 11 at planned watts; pause/explicit discharge via 8
 ```
 
 `ev_detection.py` is the single interpretation owner. Explicit power mode

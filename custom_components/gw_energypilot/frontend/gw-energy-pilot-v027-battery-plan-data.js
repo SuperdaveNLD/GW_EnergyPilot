@@ -341,7 +341,7 @@ export function normalizeExecutionEvIntervals(execution, startMs, endMs) {
     const outcome = event?.outcome || {};
     const session = String(event?.runtime_session_id || "");
     const command = String(outcome.command || "");
-    const kind = command === "ev_anti_discharge_hold"
+    const kind = ["ev_anti_discharge_hold", "ev_self_consumption_hold"].includes(command)
       ? "discharge_blocked"
       : chargeCommands.has(command)
         ? "battery_charge_allowed"

@@ -229,7 +229,7 @@ This distinction is important. Modes that all accept a value in watts are **not 
 | Mode | GoodWe/OpenEMS name | EnergyPilot label | Meaning of `47512` | Current EnergyPilot use |
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | Not used; EnergyPilot writes `0 W` | Return ownership to the inverter / normal self-use |
-| **2** | Charge PV | PV-priority charging | `Xmax`: maximum grid power allowed to assist charging; `0 W` means PV-only charging | Hybrid 2.0 Beta battery-charge windows at maximum control power; also manual |
+| **2** | Charge PV | PV-priority charging | `Xmax`: maximum grid power allowed to assist charging; `0 W` means PV-only charging | Manual; earlier Hybrid 2.0 beta.6/beta.7 experiment |
 | **3** | Discharge PV | PV + battery supply | `Xmax`: allowable battery discharge power while PV remains higher priority | Manual only |
 | **4** | Import AC | Inverter import / AC charging | `Xset`: target grid purchase/import for inverter-level scheduling | Manual only |
 | **5** | Export AC | Inverter export power | `Xset`: target grid sale/export for inverter-level scheduling | Manual only |
@@ -260,12 +260,10 @@ Purpose: keep the battery charging while **PV has first priority** and the grid 
 
 This is **not a direct battery charge-power target**. The actual battery charge can include PV plus permitted grid power and is still limited by BMS/inverter charge limits.
 
-The opt-in Hybrid 2.0 Beta strategy uses mode 2 at configured maximum control
-power when `P_batt` requests charging and `P_grid` requests import, each outside
-its own deadband. Outside those windows, grid-neutral steps retain mode 1
-without EV; EV charging selects mode 8 for every other valid plan. External AC-coupled
-generation is not necessarily represented as GoodWe PV input; mode 2 must not
-be interpreted as a whole-site import target. See
+Hybrid 2.0 used mode 2 in beta.6/beta.7. The beta.8 candidate instead uses mode
+11 for planned grid charging because its setpoint means total battery watts.
+External AC-coupled generation is not necessarily represented as GoodWe PV
+input; mode 2 must not be interpreted as a whole-site import target. See
 [Hybrid 2.0 policy and field evidence](HYBRID_2.md).
 
 ### Mode 3 — Discharge PV / PV + battery supply
@@ -351,7 +349,7 @@ Purpose: control **net grid import at the GoodWe smart-meter / point of common c
 
 The inverter may charge **or discharge** the battery to maintain that import target. If PV is excessive it may also limit PV; if load is high the battery may discharge to avoid exceeding the requested import.
 
-Mode 9 owns battery direction as part of a grid target. Grid and Hybrid strategies use it for planned import. Hybrid 2.0 Beta replaces that branch with mode 2 only when the battery plan explicitly requests charging. During EV charging, Hybrid 2.0 uses mode 8 for all other valid plans, so Auto/PCC control cannot discharge into an unexpected EV load.
+Mode 9 owns battery direction as part of a grid target. Grid and Hybrid strategies use it for planned import. Hybrid 2.0 uses mode 11 for explicit net charging. During EV charging, its self-use/PV-charge branches use mode 9 with measured EV power as the PCC import target. This allows the battery to supply the ordinary house or absorb PV surplus; explicit planned discharge and pause use mode 8.
 
 ### Mode 10 — Sell Power / smart-meter grid-export target
 
@@ -375,7 +373,7 @@ Purpose: command the battery itself to charge at a requested power.
 
 PV has priority; if PV is insufficient, grid power may fill the remaining charging demand. The final achievable charge remains bounded by BMS/inverter limits.
 
-Battery strategy uses mode 11 for automatic charging. Grid and Hybrid use mode 1 around a neutral grid target; there is no active EnergyPilot meter-feedback loop trimming mode 11.
+Battery strategy and Hybrid 2.0 net-charge windows use mode 11 for automatic charging. Grid and Hybrid use mode 1 around a neutral grid target; there is no active EnergyPilot meter-feedback loop trimming mode 11.
 
 ### Mode 12 — Discharge Bat / direct battery discharging power
 

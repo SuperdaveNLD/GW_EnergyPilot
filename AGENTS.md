@@ -189,18 +189,28 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 Hybrid first preserves an explicit neutral battery plan, then uses PCC control for every non-neutral plan. The Battery Hold deadband is applied to `P_batt`; the separate GoodWe Auto deadband is applied to `P_grid`. Exact boundaries remain neutral. Each deadband selects its branch only and must never be subtracted from a mode-9/10 setpoint.
 
 Hybrid 2.0 Beta (`hybrid_2`) is opt-in: explicit battery charging below
-its deadband AND planned grid import above the grid deadband select mode 2
-at configured maximum control power (capped at 15,000 W). Other steps retain
-Hybrid mapping without EV. EV active preserves mode 2 and selects mode 8 for
-all other valid plans, including PV-only charging with neutral/exporting grid.
-Missing required inputs still wait; EV neutral/discharge Hold needs no P_grid.
-It follows plan timing rather than charge amplitude; actual SOC can exceed
-the forecast. No migration, charger writes or second feedback loop. See
+its deadband AND planned grid import above the grid deadband select mode 11
+at bounded abs(P_batt), not the configured maximum. Other steps retain Hybrid
+mapping without EV. During EV charging, non-neutral battery plans with neutral
+grid (either battery sign), and PV charging with export, use mode 9 at measured
+EV power. Pause and explicit planned discharge use mode 8. Classify self-use
+before treating positive P_batt as explicit discharge. The existing controller
+refreshes this reference every 15 seconds through its same lock/write path;
+it must never introduce a separate competing controller or charger writes.
+Require finite EV power with explicit units and last_reported (fallback
+last_updated) no older than 30 seconds; reject future/naive timestamps. Missing,
+zero or out-of-range self-use references select Hold, never a clamped PCC target.
+Missing/non-ready/suspended plans during EV charging select Hold too. Without
+EV, missing plans retain waiting behavior. Preserve the guard on unavailable
+activity telemetry, and keep confirmed EV-stop fresh-plan gating intact. See
 `docs/HYBRID_2.md` for the exact rule and qualified field evidence.
 
 Legacy compatibility remains: missing/false old smart-meter flag -> Battery; explicit true -> Grid.
 
 EV anti-discharge is a higher-priority directional override, but it must only block battery discharge while the EV is charging:
+
+Hybrid 2.0 uses the house-self-consumption exception above. The following
+direction-only rule remains the compatibility contract for Battery/Grid/Hybrid:
 
 ```text
 EV active + P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
@@ -208,7 +218,6 @@ EV active + explicit charge plan:
   Battery strategy -> mode 11 using abs(P_batt)
   Grid strategy -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
   Hybrid strategy -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
-  Hybrid 2.0 Beta -> mode 2 only with planned import above grid deadband; otherwise mode 8; wait if P_grid is unavailable
 ```
 
 The EV feature does not control the charger and must not introduce a second fast power-control loop. EV-stop stale-plan protection remains intact. See `docs/EV_ANTI_DISCHARGE.md`.
