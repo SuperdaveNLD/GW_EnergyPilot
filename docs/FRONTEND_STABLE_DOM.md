@@ -4,8 +4,7 @@
 ## Status
 
 This document is the canonical frontend render/interaction decision for **GW
-EnergyPilot v1.2.0**. The stable release promotes the validated beta.7
-candidate, is based on v1.1.1 and retains all earlier v1 behavior through
+EnergyPilot v1.2.1**. The stable release is based on v1.2.0 and retains all earlier v1 behavior through
 presentation-only wrappers; its nested v0.51 feature layer supplies the scoped
 execution-history card.
 
@@ -29,27 +28,27 @@ shared ownership instead of adding another press-specific workaround.
 
 ```text
 Home Assistant PANEL_MODULE
-  -> gw-energy-pilot-v110.js?v=1.2.0-stable1
-       -> gw-energy-pilot-v101.js?v=1.2.0-stable1
-            -> gw-energy-pilot-v051.js?v=1.2.0-stable1
-                 -> gw-energy-pilot-v051-history.js?v=1.2.0-stable1
-                 -> gw-energy-pilot-v050.js?v=1.2.0-stable1
-                 -> gw-energy-pilot-v049.js?v=1.2.0-stable1
-                      -> gw-energy-pilot-v048.js?v=1.2.0-stable1
-                           -> gw-energy-pilot-v047.js?v=1.2.0-stable1
-                                -> gw-energy-pilot-v046.js?v=1.2.0-stable1
-                                     -> gw-energy-pilot-v045.js?v=1.2.0-stable1
-                                          -> gw-energy-pilot-v044.js?v=1.2.0-stable1
-                                               -> gw-energy-pilot-v043.js?v=1.2.0-stable1
-                                                    -> gw-energy-pilot-v042.js?v=1.2.0-stable1
-                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.0-stable1
-                                                              -> gw-energy-pilot-v041.js?v=1.2.0-stable1
-                                                                   -> gw-energy-pilot-v039.js?v=1.2.0-stable1
-                                                                        -> gw-energy-pilot-v038.js?v=1.2.0-stable1
-                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.0-stable1
+  -> gw-energy-pilot-v110.js?v=1.2.1-stable1
+       -> gw-energy-pilot-v101.js?v=1.2.1-stable1
+            -> gw-energy-pilot-v051.js?v=1.2.1-stable1
+                 -> gw-energy-pilot-v051-history.js?v=1.2.1-stable1
+                 -> gw-energy-pilot-v050.js?v=1.2.1-stable1
+                 -> gw-energy-pilot-v049.js?v=1.2.1-stable1
+                      -> gw-energy-pilot-v048.js?v=1.2.1-stable1
+                           -> gw-energy-pilot-v047.js?v=1.2.1-stable1
+                                -> gw-energy-pilot-v046.js?v=1.2.1-stable1
+                                     -> gw-energy-pilot-v045.js?v=1.2.1-stable1
+                                          -> gw-energy-pilot-v044.js?v=1.2.1-stable1
+                                               -> gw-energy-pilot-v043.js?v=1.2.1-stable1
+                                                    -> gw-energy-pilot-v042.js?v=1.2.1-stable1
+                                                         -> gw-energy-pilot-v041-emhass-settings.js?v=1.2.1-stable1
+                                                              -> gw-energy-pilot-v041.js?v=1.2.1-stable1
+                                                                   -> gw-energy-pilot-v039.js?v=1.2.1-stable1
+                                                                        -> gw-energy-pilot-v038.js?v=1.2.1-stable1
+                                                                             -> gw-energy-pilot-v038-runtime.js?v=1.2.1-stable1
 ```
 
-Every import in the active graph uses `1.2.0-stable1`. This ensures an
+Every import in the active graph uses `1.2.1-stable1`. This ensures an
 upgraded browser cannot reuse older button, strategy, settings or nested
 plan/history modules while both release wrappers remain presentation-only.
 
@@ -172,7 +171,7 @@ A complete render is allowed for Home Assistant language/locale, user/admin cont
 
 ### Normal telemetry patch
 
-When context and structure signatures are unchanged, the `hass` setter does not queue the inherited complete render. It batches a live patch and mutates existing power/SOC/energy text, configured PV-source values, status classes, controller/EMHASS metrics, sliders, meter widths, diagnostics, static flow semantics and thermal values. The existing `main`, cards and controls remain connected.
+When context and structure signatures are unchanged, the `hass` setter does not queue the inherited complete render. It batches a live patch and mutates existing power/SOC/energy text, configured PV-source values, status classes, controller/EMHASS metrics, sliders, meter widths, diagnostics, flow semantics and thermal values. The existing `main`, cards and controls remain connected.
 
 Automatic Control ownership changes patch the existing Lit manual EMS pad in place.
 While automatic ownership is active, the manual mode grid and power row use the
@@ -244,9 +243,9 @@ On coarse-pointer/touch devices, native `:hover` never owns selected presentatio
 
 ## Motion contract
 
-EnergyPilot-owned content has no CSS animations, CSS transitions, moving flow particles, animated pseudo-elements or modal backdrop filters. The policy is applied after complete renders and after scoped strategy, graph and modal updates.
+EnergyPilot-owned content has no CSS transitions, animated pseudo-elements or modal backdrop filters. The only animation exception is one non-interactive round energy particle on each finite active connector. The policy is applied after complete renders and after scoped strategy, graph and modal updates.
 
-The live-flow alternative is deliberately static. Existing connector nodes receive a fixed pipeline with an integrated arrowhead and directional brightness for active power, a quiet dot for finite near-zero idle power or a dashed line/question mark for unavailable power. Low/medium/high line thickness uses restrained 3/4/5-pixel steps relative to the strongest finite active connector in the same telemetry snapshot. Arrow/state children are created once per structural render and patched in place; they never pulse, move or transition. Each connector exposes a localized `role="img"` accessible name.
+Existing connector nodes receive a fixed pipeline with a single glowing ball that travels in the physical flow direction for active power, a quiet stationary dot for finite near-zero idle power or a dashed line/question mark for unavailable power. Low/medium/high line thickness uses restrained 3/4/5-pixel steps relative to the strongest finite active connector in the same telemetry snapshot, while particle speed and glow increase with intensity. Particle/state children are created once per structural render and patched in place; there are no redundant arrow nodes. A reduced-motion preference keeps the ball stationary. Each connector exposes a localized `role="img"` accessible name.
 
 PV remains one compact group with one combined total. A structural render creates at most one internal ETA/DC source node and one aggregated external AC/PCC source node. Ordinary telemetry patches their values, link state and accessibility text without replacing either node or connector. Internal PV ends at the battery-side branch; external AC-coupled PV ends at the shared PCC side. The split is display-only and does not infer source-to-load attribution or alter EMHASS/control inputs.
 
@@ -255,8 +254,8 @@ PV remains one compact group with one combined total. A structural render create
 A normal telemetry burst must preserve the ShadowRoot, `main`, permanent
 surface and every operational control node; keep idle scroll drift within two
 pixels; produce no backward controlled-scroll samples; emit no JavaScript/page
-errors or unknown WebSocket calls; and have zero
-computed active EnergyPilot animations and transitions. One thousand telemetry
+errors or unknown WebSocket calls; and have zero computed active EnergyPilot
+transitions or animations outside active flow particles. One thousand telemetry
 updates, a plan refresh, language/narrow/panel structural changes and Settings
 open/close must satisfy the same operational-control identity invariant. An
 Automatic Control ON/OFF cycle must change the manual pad's semantic disabled
@@ -310,6 +309,10 @@ late-click suppression, checks the self-removing history close action and
 requires 44 CSS-pixel targets without horizontal card overflow on touch
 profiles.
 
+The same matrix verifies one active energy ball on every finite active route,
+including the external AC/PCC PV connector, no legacy arrow nodes, stationary
+idle/unavailable states and stationary particles under reduced motion.
+
 ## Contributor rules
 
 - Do not call `_queueRender()` for normal v0.41 telemetry feedback when an existing scoped callback owns the update.
@@ -321,5 +324,5 @@ profiles.
   native element handlers.
 - Do not interpret a resolved service call as confirmed selected state; wait
   for the matching Home Assistant/API model.
-- Do not re-enable motion without a separately documented ownership model and browser regressions on all three profiles.
+- Keep motion limited to the documented single-particle flow contract and preserve its browser regressions on all three profiles.
 - Preserve entity IDs, unique IDs, settings, backend APIs and GoodWe/EMHASS semantics unless a separate change explicitly requires them.

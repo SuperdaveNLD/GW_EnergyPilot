@@ -150,8 +150,8 @@ def animation_summary(page: Page) -> dict[str, int]:
 
 
 def exercise_static_flow(page: Page) -> dict[str, object]:
-    """Verify static direction, state, intensity, accessibility and DOM identity."""
-    return page.evaluate(
+    """Verify flow motion, state, intensity, accessibility and DOM identity."""
+    result = page.evaluate(
         """
         async () => {
           const panel = window.__epPanel;
@@ -165,42 +165,40 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
           const links = Object.fromEntries(
             Object.entries(selectors).map(([key, selector]) => [key, root.querySelector(selector)])
           );
-          const arrows = Object.fromEntries(
-            Object.entries(links).map(([key, link]) => [key, link?.querySelector('.ep-v041-flow-arrow')])
+          const particles = Object.fromEntries(
+            Object.entries(links).map(([key, link]) => [key, link?.querySelector('.ep-v041-flow-particle')])
           );
           const main = root.querySelector('main');
           const overview = root.querySelector('.ep-flow-overview');
           const read = () => {
             const overviewRect = overview?.getBoundingClientRect();
             return Object.fromEntries(Object.entries(links).map(([key, link]) => {
-              const arrow = link?.querySelector('.ep-v041-flow-arrow');
+              const particle = link?.querySelector('.ep-v041-flow-particle');
               const state = link?.querySelector('.ep-v041-flow-state');
               const track = link?.querySelector('.ep-flow-track');
-              const arrowRect = arrow?.getBoundingClientRect();
+              const particleRect = particle?.getBoundingClientRect();
               const vertical = key === 'house' || key === 'battery';
               const trackStyle = track ? getComputedStyle(track) : null;
-              const arrowStyle = arrow ? getComputedStyle(arrow) : null;
+              const particleStyle = particle ? getComputedStyle(particle) : null;
               return [key, {
                 status: link?.dataset.epV041FlowStatus || '',
                 direction: link?.dataset.epV038Motion || '',
                 intensity: link?.dataset.epV041FlowIntensity || '',
                 role: link?.getAttribute('role') || '',
                 label: link?.getAttribute('aria-label') || '',
-                arrow: arrow?.textContent || '',
-                arrowDisplay: arrow ? getComputedStyle(arrow).display : '',
-                arrowBorder: arrowStyle?.borderStyle || '',
-                arrowClipPath: arrowStyle?.clipPath || arrowStyle?.webkitClipPath || '',
-                arrowFontSize: arrowStyle ? parseFloat(arrowStyle.fontSize) : -1,
+                particleDisplay: particleStyle?.display || '',
+                particleAnimation: particleStyle?.animationName || '',
+                particleRadius: particleStyle?.borderRadius || '',
                 state: state?.textContent || '',
                 stateDisplay: state ? getComputedStyle(state).display : '',
                 thickness: trackStyle ? parseFloat(vertical ? trackStyle.width : trackStyle.height) : 0,
                 trackMask: trackStyle?.maskImage || trackStyle?.webkitMaskImage || '',
                 inside: Boolean(
-                  overviewRect && arrowRect &&
-                  arrowRect.left >= overviewRect.left - 1 &&
-                  arrowRect.right <= overviewRect.right + 1 &&
-                  arrowRect.top >= overviewRect.top - 1 &&
-                  arrowRect.bottom <= overviewRect.bottom + 1
+                  overviewRect && particleRect &&
+                  particleRect.left >= overviewRect.left - 8 &&
+                  particleRect.right <= overviewRect.right + 8 &&
+                  particleRect.top >= overviewRect.top - 8 &&
+                  particleRect.bottom <= overviewRect.bottom + 8
                 ),
               }];
             }));
@@ -283,18 +281,29 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
               links: Object.entries(selectors).every(
                 ([key, selector]) => links[key] === root.querySelector(selector)
               ),
-              arrows: Object.entries(links).every(
-                ([key, link]) => arrows[key] === link?.querySelector('.ep-v041-flow-arrow')
+              particles: Object.entries(links).every(
+                ([key, link]) => particles[key] === link?.querySelector('.ep-v041-flow-particle')
               ),
             },
             responsive: Boolean(
               overview && overview.scrollWidth <= overview.clientWidth + 1 &&
               overview.getBoundingClientRect().width <= window.__epScroller.clientWidth + 1
             ),
+            arrowsAbsent: !root.querySelector('.ep-flow-arrows, .ep-v041-flow-arrow'),
           };
         }
         """
     )
+    page.emulate_media(reduced_motion="reduce")
+    result["reduced_motion"] = page.evaluate(
+        """
+        () => [...window.__epPanel.shadowRoot.querySelectorAll(
+          '.ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle'
+        )].every((particle) => getComputedStyle(particle).animationName === 'none')
+        """
+    )
+    page.emulate_media(reduced_motion="no-preference")
+    return result
 
 
 def exercise_connectivity_status(page: Page, profile: Profile) -> dict[str, object]:
@@ -3663,6 +3672,7 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
         "flow_matches": False,
         "split_nodes": False,
         "routes_match": False,
+        "external_flow_moves": False,
         "telemetry_main_stable": False,
         "external_value_matches": False,
         "flow_values_match": False,
@@ -3754,6 +3764,14 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                   externalRect.right >= hubRect.left - 18 &&
                   externalRect.right <= hubRect.right
                 ),
+                externalFlowMoves: Boolean(
+                  externalLink?.dataset.epV041FlowStatus === 'active' &&
+                  externalLink?.dataset.epV038Motion === 'right' &&
+                  getComputedStyle(
+                    externalLink.querySelector('.ep-v041-flow-particle')
+                  ).animationName === 'ep-v041-flow-horizontal' &&
+                  !externalLink.querySelector('.ep-v041-flow-arrow')
+                ),
               };
             }
             """
@@ -3806,6 +3824,7 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                 "flow_matches": topology["flowMatches"],
                 "split_nodes": topology["splitNodes"],
                 "routes_match": topology["routesMatch"],
+                "external_flow_moves": topology["externalFlowMoves"],
                 "telemetry_main_stable": telemetry["mainStable"],
                 "external_value_matches": telemetry["externalMatches"],
                 "flow_values_match": telemetry["flowValuesMatch"],
@@ -5271,7 +5290,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
         "v101": "v1.0.1-beta.4 BETA",
-        "v110": "v1.2.0 STABLE",
+        "v110": "v1.2.1 STABLE",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
@@ -5332,15 +5351,15 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             f"{emhass_mapping}"
         )
     expected_initial = {
-        "pv": ("active", "right", "high", "→"),
-        "grid": ("active", "right", "low", "→"),
-        "house": ("active", "up", "medium", "↑"),
-        "battery": ("active", "down", "low", "↓"),
+        "pv": ("active", "right", "high"),
+        "grid": ("active", "right", "low"),
+        "house": ("active", "up", "medium"),
+        "battery": ("active", "down", "low"),
     }
     for key, expected in expected_initial.items():
         state = static_flow["initial"][key]
         actual = (
-            state["status"], state["direction"], state["intensity"], state["arrow"]
+            state["status"], state["direction"], state["intensity"]
         )
         if actual != expected:
             failures.append(f"{name}: initial {key} flow {actual} != {expected}")
@@ -5348,10 +5367,9 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             state["role"] != "img"
             or not state["label"]
             or "relative flow" not in state["label"]
-            or state["arrowDisplay"] != "flex"
-            or state["arrowBorder"] != "none"
-            or "polygon" not in state["arrowClipPath"]
-            or state["arrowFontSize"] != 0
+            or state["particleDisplay"] != "flex"
+            or not state["particleAnimation"].startswith("ep-v041-flow-")
+            or state["particleRadius"] != "50%"
             or "gradient" not in state["trackMask"]
             or state["stateDisplay"] != "none"
             or not state["inside"]
@@ -5365,9 +5383,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: low flow pipeline is not visually bounded")
     if (
         static_flow["reversed"]["grid"]["direction"] != "left"
-        or static_flow["reversed"]["grid"]["arrow"] != "←"
         or static_flow["reversed"]["battery"]["direction"] != "up"
-        or static_flow["reversed"]["battery"]["arrow"] != "↑"
     ):
         failures.append(f"{name}: import/discharge physical direction is wrong")
     for key, state in static_flow["unknown"].items():
@@ -5390,6 +5406,10 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: {key} near-zero flow presentation is ambiguous")
     if not all(static_flow["identity"].values()):
         failures.append(f"{name}: flow telemetry replaced stable DOM nodes")
+    if static_flow["reduced_motion"] is not True:
+        failures.append(f"{name}: reduced-motion preference did not stop flow particles")
+    if static_flow["arrowsAbsent"] is not True:
+        failures.append(f"{name}: redundant flow arrows remain in the active DOM")
     if not static_flow["responsive"]:
         failures.append(f"{name}: flow overview overflows its responsive container")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS:
@@ -5421,11 +5441,12 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: EV protection banner interaction error")
         pv_required = (
             "ran", "total_matches", "flow_matches", "split_nodes", "routes_match",
+            "external_flow_moves",
             "telemetry_main_stable", "external_value_matches", "flow_values_match",
             "flow_nodes_stable",
         ) if control_architecture else (
             "ran", "topology_rendered", "total_matches", "flow_matches",
-            "split_nodes", "routes_match", "telemetry_main_stable",
+            "split_nodes", "routes_match", "external_flow_moves", "telemetry_main_stable",
             "external_value_matches", "flow_values_match", "flow_nodes_stable",
         )
         if not all(pv_insight[key] is True for key in pv_required) or pv_insight["source_count"] != 2:
@@ -5783,10 +5804,10 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     if structural["error"] and not control_architecture:
         failures.append(f"{name}: post-structure menu interaction error")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and (
-        animation["animations"] != 0 or animation["transitions"] != 0
+        animation["animations"] < 4 or animation["transitions"] != 0
     ):
         failures.append(
-            f"{name}: stable-DOM frontend still has {animation['animations']} animations and "
+            f"{name}: stable-DOM flow motion has {animation['animations']} animations and "
             f"{animation['transitions']} transitions"
         )
     if result["errors"] or page_errors:
@@ -5825,6 +5846,7 @@ def main() -> int:
                 has_touch=profile.touch,
                 device_scale_factor=2 if profile.mobile else 1,
                 locale="en-US",
+                reduced_motion="no-preference",
             )
             page = context.new_page()
             page_errors: list[str] = []

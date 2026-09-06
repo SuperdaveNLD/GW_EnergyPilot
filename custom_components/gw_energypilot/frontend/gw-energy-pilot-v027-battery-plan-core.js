@@ -1,12 +1,12 @@
-import "./gw-energy-pilot-v026-complete.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v026-complete.js?v=1.2.1-stable1";
 import {
   CARD_ID, DATA_CACHE_MS, PANEL_NAME, VERSION, chartHidden, chartRange,
   chartSize, chartSubtitle, chartWindowData, formatTime, loadChartData,
   saveChartRange, saveChartSize, t,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.1-stable1";
 import {
   cardBody, ensureStyles, rangeControlHtml, sizeControlHtml,
-} from "./gw-energy-pilot-v027-battery-plan-view.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v027-battery-plan-view.js?v=1.2.1-stable1";
 
 const V041_PANEL_STYLE_ID = "ep-v041-scoped-no-motion";
 const V041_GLOBAL_STYLE_ID = "ep-v041-scoped-global-no-motion";
@@ -17,9 +17,15 @@ const BOUND_CARD_CONTROLS = new WeakSet();
 function freezeV041Element(element) {
   if (!(element instanceof Element)) return;
   element.setAttribute(V041_STATIC_ATTRIBUTE, "");
-  element.style.setProperty("animation", "none", "important");
-  element.style.setProperty("animation-name", "none", "important");
-  element.style.setProperty("animation-duration", "0s", "important");
+  if (element.matches(".ep-v041-flow-particle")) {
+    element.style.removeProperty("animation");
+    element.style.removeProperty("animation-name");
+    element.style.removeProperty("animation-duration");
+  } else {
+    element.style.setProperty("animation", "none", "important");
+    element.style.setProperty("animation-name", "none", "important");
+    element.style.setProperty("animation-duration", "0s", "important");
+  }
   element.style.setProperty("transition", "none", "important");
   element.style.setProperty("transition-property", "none", "important");
   element.style.setProperty("transition-duration", "0s", "important");
