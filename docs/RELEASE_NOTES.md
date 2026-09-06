@@ -17,6 +17,12 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.5 — EV direction guard
+
+Explicit battery charging retains the configured strategy mode and setpoint.
+Discharge/neutral plans remain held; unavailable grid targets wait. See
+[release notes](releases/v1.3.0-beta.5.md) for hardware validation and rollout gates.
+
 # v1.3.0-beta.4 — Solar production visible in every chart size
 
 The Battery · Plan · Price graph now shows actual and expected solar production
@@ -407,10 +413,12 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.5** | 2026-09-06 | **Beta** | EV charge plans preserve strategy mode/setpoint; discharge/neutral Hold and unavailable-plan waits remain. |
 | **1.3.0-beta.4** | 2026-09-05 | **Beta** | Shows actual and expected solar production in every chart size, including the default M. |
 | **1.3.0-beta.3** | 2026-09-05 | **Beta** | Adds actual-versus-expected solar production to the detailed Battery · Plan · Price graph. |
 | **1.3.0-beta.2** | 2026-09-04 | **Beta** | Adds responsive S/M/L Power overview sizing and an optional EV branch, and fixes control-overlay stacking plus the oversized AUTO badge. |
 | **1.3.0-beta.1** | 2026-09-04 | **Beta** | Adds compact permanent controls, scoped live-flow animation, a localized built-in manual and a clearer product introduction without changing control semantics. |
+| **1.2.1** | 2026-09-06 | **Stable** | Shows one moving energy ball on every active connector, including external PV, and removes redundant arrows. |
 | **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |
 | **1.2.0-beta.7** | 2026-09-02 | **Beta** | Republishes the fully validated beta.6 mobile-control behavior behind a new complete frontend cache boundary. |
 | **1.2.0-beta.6** | 2026-09-02 | **Beta** | Enlarges the remaining chart/history touch targets and adds real missing-click coverage for S/M/L, 12h/24h/36h and full history. |

@@ -4,6 +4,21 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.5] - 2026-09-06
+
+### Fixed
+
+- Preserve normal strategy mode/setpoint during EV charging for explicit battery
+  charge plans; remove the Grid/Hybrid mode-11 fallback.
+- Wait safely for missing/non-finite grid plans in the EV controller path.
+- Retain neutral/discharge Hold, EV-stop freshness, existing status labels and
+  persistent storage compatibility. No register semantics change.
+
+### Changed
+
+- Prepare beta.5 with a synchronized frontend version/cache boundary and
+  direction, strategy, missing-data and deadband regression coverage.
+
 ## [1.3.0-beta.4] - 2026-09-05
 
 ### Fixed
@@ -103,6 +118,24 @@ All notable changes to GW EnergyPilot are documented here.
 - Keep general animations, CSS transitions and modal backdrop filters frozen;
   switching Flow animations off or requesting reduced motion produces zero
   active dashboard animations.
+
+## [1.2.1] - 2026-09-06
+
+### Fixed
+
+- Animate the external AC/PCC PV connector whenever it carries finite active
+  power, using the same single energy-ball contract as the other routes.
+- Remove redundant directional arrows from all live-flow connectors; direction
+  is conveyed by the moving ball and the existing physical-flow model.
+- Keep idle, unavailable and reduced-motion particles stationary while
+  preserving stable connector-node identity during telemetry updates.
+
+### Changed
+
+- Advance the complete active frontend module graph to cache boundary
+  `1.2.1-stable1` without changing GoodWe, EMS, EMHASS, entity or persistent
+  storage semantics.
+
 
 ## [1.2.0] - 2026-09-03
 

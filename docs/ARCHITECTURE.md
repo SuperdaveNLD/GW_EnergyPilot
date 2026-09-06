@@ -207,12 +207,12 @@ P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
 P_batt < -Battery Hold deadband  -> explicit home-battery charge remains allowed
 ```
 
-Charge execution follows the selected strategy as far as safely possible:
+Charge execution follows the selected strategy without changing its mode or setpoint:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Grid    -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+Hybrid  -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
 ```
 
 The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. `ev_detection.py` owns the exclusive power-versus-status interpretation used by the controller and event listener. Explicit status mode accepts `on`, `true`, `charging` and `connected_charging`; explicit power mode evaluates only finite, unit-normalized measured power above its threshold. Allocated or maximum charger current is not an activity signal. Entries without the method key retain the exact historical `connected_charging`-or-power interpretation until saved.

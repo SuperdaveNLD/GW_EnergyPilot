@@ -5,7 +5,6 @@ from __future__ import annotations
 from .control_decision import resolve_control_decision
 from .const import (
     CONF_OPTIM_STATUS_ENTITY,
-    CONTROL_STRATEGY_BATTERY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
 )
@@ -70,6 +69,11 @@ class GWEnergyPilotController(_BaseController):
             max_power=max_power,
             ev_active=True,
         )
+        if not decision.ready:
+            self.last_command = decision.command
+            self._notify_state()
+            await self._async_record_waiting(self.last_command)
+            return
         await self._async_apply_command(
             int(decision.mode),
             int(decision.power),

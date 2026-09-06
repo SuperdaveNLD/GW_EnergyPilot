@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.4.md)
+[Latest beta](docs/releases/v1.3.0-beta.5.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,7 +66,7 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.4 · Beta prerelease**
+**v1.3.0-beta.5 · Beta prerelease**
 
 Latest production release: **v1.2.0 · Stable**
 
@@ -85,10 +85,11 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.2.0` is the stable production release promoted from the fully validated
-beta.7 candidate. It retains the measured missing-click recovery and enlarged
+The merged `main` line contains the v1.2.1 stable preparation. It retains v1.2.0's measured
+missing-click recovery and enlarged
 Battery · Plan · Price and execution-history controls behind a new complete
-frontend cache boundary. Every recovered touch still enters the existing
+frontend cache boundary, and replaces connector arrows with one moving energy
+ball on each active power route, including external PV. Every recovered touch still enters the existing
 native click, form-submit or change route exactly once. Local Modbus remains
 mandatory for every EMS and minimum-SOC write/read-back. Normal HACS users
 receive this release without enabling prereleases.
@@ -103,7 +104,8 @@ Release documentation:
 - `docs/releases/v1.3.0-beta.2.md` — responsive Power overview and optional EV charger beta notes;
 - `docs/releases/v1.3.0-beta.1.md` — compact-controls, flow-motion and built-in-help beta notes;
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
-- `docs/releases/v1.2.0.md` — current stable mobile-control and telemetry release notes;
+- `docs/releases/v1.2.1.md` — merged main live-flow release notes;
+- `docs/releases/v1.2.0.md` — previous stable mobile-control and telemetry release notes;
 - `docs/releases/v1.2.0-beta.7.md` — validated beta.6 touch-control roll-forward notes;
 - `docs/releases/v1.2.0-beta.6.md` — chart/history mobile touch-target notes;
 - `docs/releases/v1.2.0-beta.5.md` — Companion touch-click recovery notes;
@@ -155,6 +157,12 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.5 highlights
+
+- EV charging preserves the normal strategy mode and setpoint for explicit battery-charge plans.
+- Discharge and neutral battery plans remain on Hold; unavailable grid plans wait.
+- See [beta.5 release notes](docs/releases/v1.3.0-beta.5.md).
 
 ## v1.3.0-beta.4 highlights
 
@@ -213,7 +221,7 @@ Release documentation:
   recovery and at least 44 × 44 CSS-pixel graph/history touch targets.
 - Includes optional SEMS+ Beta telemetry, persistent plan resilience and the
   EMHASS AUTO/CUSTOM fixed-load forecast introduced across the beta line.
-- Advances the complete frontend cache boundary to `1.2.0-stable1`.
+- Uses the complete frontend cache boundary `1.2.0-stable1`.
 
 ## v1.2.0-beta.7 highlights
 
@@ -695,11 +703,11 @@ For an explicit home-battery charge plan:
 
 ```text
 Battery strategy -> mode 11 using abs(P_batt)
-Grid strategy    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
-Hybrid strategy  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Grid strategy    -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+Hybrid strategy  -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
 ```
 
-This prevents the home battery from feeding the EV while avoiding the previous blanket hold on legitimate charging. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.
+This blocks planned battery discharge while allowing explicit charging plans. It does not guarantee instantaneous battery direction in PCC/Auto modes when actual load differs from the forecast. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.
 
 ### EV charger load balancing
 
