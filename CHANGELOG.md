@@ -4,6 +4,21 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.5] - 2026-09-06
+
+### Fixed
+
+- Preserve normal strategy mode/setpoint during EV charging for explicit battery
+  charge plans; remove the Grid/Hybrid mode-11 fallback.
+- Wait safely for missing/non-finite grid plans in the EV controller path.
+- Retain neutral/discharge Hold, EV-stop freshness, existing status labels and
+  persistent storage compatibility. No register semantics change.
+
+### Changed
+
+- Prepare beta.5 with a synchronized frontend version/cache boundary and
+  direction, strategy, missing-data and deadband regression coverage.
+
 ## [1.3.0-beta.4] - 2026-09-05
 
 ### Fixed

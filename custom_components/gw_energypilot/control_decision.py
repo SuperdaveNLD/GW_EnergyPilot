@@ -75,23 +75,24 @@ def resolve_control_decision(
                 0,
                 "ev_anti_discharge_hold",
             )
-        if strategy in {CONTROL_STRATEGY_GRID, CONTROL_STRATEGY_HYBRID}:
-            if grid is not None and grid > grid_boundary:
-                return ControlDecision(
-                    MODE_GRID_IMPORT_TARGET,
-                    _bounded_power(grid, max_power),
-                    "ev_grid_import_charge",
-                )
-            return ControlDecision(
-                MODE_CHARGE_BATTERY,
-                _bounded_power(battery, max_power),
-                "ev_charge_fallback",
-            )
-        return ControlDecision(
-            MODE_CHARGE_BATTERY,
-            _bounded_power(battery, max_power),
-            "ev_battery_charge",
+        # EV activity gates battery direction; the normal strategy still owns
+        # the actuator mode and setpoint, including Auto and PV export.
+        decision = resolve_control_decision(
+            strategy=strategy,
+            p_batt=battery,
+            p_grid=grid,
+            battery_deadband=battery_boundary,
+            grid_deadband=grid_boundary,
+            max_power=max_power,
         )
+        if not decision.ready:
+            return decision
+        command = "ev_charge_allowed"
+        if decision.mode == MODE_CHARGE_BATTERY:
+            command = "ev_battery_charge"
+        elif decision.mode == MODE_GRID_IMPORT_TARGET:
+            command = "ev_grid_import_charge"
+        return ControlDecision(decision.mode, decision.power, command)
 
     if strategy == CONTROL_STRATEGY_BATTERY:
         if battery > battery_boundary:

@@ -1,6 +1,6 @@
-import "./gw-energy-pilot-v130.js?v=1.3.0-beta.4";
+import "./gw-energy-pilot-v130.js?v=1.3.0-beta.5";
 
-const VERSION = "1.3.0-beta.4";
+const VERSION = "1.3.0-beta.5";
 const PANEL_NAME = "gw-energypilot-panel";
 
 function patchBetaReleaseVersion(panel) {

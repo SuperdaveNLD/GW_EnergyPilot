@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
+from types import SimpleNamespace
 import unittest
 
 from test_controller import ControllerSafetyTests, PACKAGE_NAME, const
@@ -89,7 +91,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.last_command, "ev_grid_import_charge")
         self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
-    async def test_ev_hybrid_charge_without_import_falls_back_to_mode11(self):
+    async def test_ev_hybrid_charge_without_import_preserves_auto(self):
         controller, client = self.make_controller(
             p_batt="-2500",
             p_grid="0",
@@ -98,9 +100,52 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
 
         await controller.async_evaluate()
 
-        self.assertEqual(client.calls, [(const.MODE_CHARGE_BATTERY, 2500)])
-        self.assertEqual(controller.last_command, "ev_charge_fallback")
+        self.assertEqual(client.calls, [(const.MODE_AUTO, 0)])
+        self.assertEqual(controller.last_command, "ev_charge_allowed")
         self.assertEqual(controller.ev_protection_state, "allowing_charge")
+
+    async def test_ev_charge_missing_grid_waits_without_write(self):
+        for strategy in (const.CONTROL_STRATEGY_GRID, const.CONTROL_STRATEGY_HYBRID):
+            for grid in ("unknown", "unavailable", "nan", "inf"):
+                with self.subTest(strategy=strategy, grid=grid):
+                    controller, client = self.make_controller(
+                        p_batt="-2500", p_grid=grid, strategy=strategy)
+                    await controller.async_evaluate()
+                    self.assertEqual(client.calls, [])
+                    self.assertEqual(controller.last_command, "waiting_for_p_grid")
+
+    async def test_ev_charge_with_pv_export_preserves_grid_target(self):
+        for strategy in (const.CONTROL_STRATEGY_GRID, const.CONTROL_STRATEGY_HYBRID):
+            controller, client = self.make_controller(
+                p_batt="-2500", p_grid="-4000", strategy=strategy)
+            await controller.async_evaluate()
+            self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 4000)])
+            self.assertEqual(controller.ev_protection_state, "allowing_charge")
+
+    async def test_ev_start_event_preserves_existing_charge_command(self):
+        for strategy in ("battery", "grid", "hybrid"):
+            for grid in ("-4000", "0", "9574"):
+                with self.subTest(strategy=strategy, grid=grid):
+                    controller, client = self.make_controller(
+                        p_batt="-15000", p_grid=grid, strategy=strategy)
+                    controller.hass.states.set("sensor.ev_power", "0")
+                    await controller.async_evaluate()
+                    normal = (controller.expected_mode, controller.target_power)
+                    controller.hass.states.set("sensor.ev_power", "11000")
+                    controller._async_source_changed(SimpleNamespace(
+                        data={"entity_id": "sensor.ev_power"}))
+                    await asyncio.gather(*controller.hass.tasks)
+                    self.assertEqual((controller.expected_mode, controller.target_power), normal)
+                    self.assertTrue(all(call == normal for call in client.calls))
+                    self.assertEqual(controller.ev_protection_state, "allowing_charge")
+
+    async def test_ev_charge_uses_valid_persistent_grid_plan(self):
+        controller, client = self.make_controller(
+            p_batt="-2500", p_grid="unavailable", strategy="hybrid")
+        controller.entry.runtime_data = SimpleNamespace(
+            plan_runtime=SimpleNamespace(current_p_grid=lambda: 4000, diagnostics={}))
+        await controller.async_evaluate()
+        self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 4000)])
 
 
 if __name__ == "__main__":

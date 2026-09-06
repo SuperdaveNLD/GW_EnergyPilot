@@ -1,6 +1,6 @@
 # EV anti-discharge protection
 
-This document defines the EV protection behavior for GW EnergyPilot v0.34.
+This document defines the EV protection behavior for GW EnergyPilot v1.3.0-beta.5.
 
 ## Purpose
 
@@ -45,12 +45,21 @@ This means EV coordination is strictly anti-discharge: discharge and neutral are
 
 ## GoodWe execution while EV charging
 
-When EMHASS requests battery charging while the EV is active, GW EnergyPilot preserves the configured control strategy as far as safely possible:
+When EMHASS requests battery charging while the EV is active, the canonical
+normal strategy selects exactly the same mode and setpoint as without EV:
 
-- **Battery control**: mode `11` (**Battery charge power**) using the requested `P_batt` magnitude.
-- **Grid control**: mode `9` (**Grid import target**) when `P_grid` contains a positive import target.
-- **Hybrid control**: mode `9` when `P_grid` contains a positive import target.
-- **Grid/Hybrid fallback**: when `P_batt` explicitly requests charging but there is no positive usable `P_grid` import target, mode `11` is used so the valid battery-charge request is not incorrectly converted to Hold.
+- **Battery control**: mode `11` using the requested `P_batt` magnitude.
+- **Grid/Hybrid control**: mode `9` for import, mode `1` inside the grid
+  deadband, or mode `10` for export. Export alongside a charging battery plan
+  can represent PV export and is not itself a battery-discharge request.
+- Missing/non-finite required `P_grid`: wait without an EMS write, just as
+  normal Grid/Hybrid control does. A valid persistent plan may supply it.
+
+EV activity must not convert a Grid/Hybrid command to mode `11`. Only the
+explicit planned battery direction gates this override. This is a plan-based
+guard, not a guarantee of instantaneous battery direction in PCC/Auto modes
+when actual load differs from the forecast. ETA retains local power control;
+no new hardware limit or register semantics are inferred from this fix.
 
 For discharge or neutral plans, EnergyPilot always uses mode `8` (**Battery Hold**) at `0 W` while EV charging is active.
 

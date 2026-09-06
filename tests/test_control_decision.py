@@ -92,7 +92,27 @@ class ControlDecisionTests(unittest.TestCase):
         fallback = self.resolve(c.CONTROL_STRATEGY_GRID, -2000, -1000, True)
         self.assertEqual((hold.mode, hold.command), (c.MODE_BATTERY_HOLD, "ev_anti_discharge_hold"))
         self.assertEqual((import_charge.mode, import_charge.power), (c.MODE_GRID_IMPORT_TARGET, 3500))
-        self.assertEqual((fallback.mode, fallback.command), (c.MODE_CHARGE_BATTERY, "ev_charge_fallback"))
+        self.assertEqual((fallback.mode, fallback.command), (c.MODE_AUTO, "ev_charge_allowed"))
+
+    def test_ev_charge_preserves_normal_mode_and_setpoint(self):
+        for strategy in ("battery", "grid", "hybrid"):
+            for grid in (-20000, -1001, -1000, 0, 1000, 1001, 9574, 20000,
+                         None, float("nan"), float("inf")):
+                with self.subTest(strategy=strategy, grid=grid):
+                    normal = self.resolve(strategy, -15000, grid)
+                    active = self.resolve(strategy, -15000, grid, True)
+                    self.assertEqual((active.mode, active.power),
+                                     (normal.mode, normal.power))
+                    if not normal.ready:
+                        self.assertEqual(active.command, normal.command)
+
+    def test_ev_hold_boundaries_ignore_grid_availability(self):
+        for strategy in ("battery", "grid", "hybrid"):
+            for battery in (-100, 0, 100, 15000):
+                for grid in (None, -15000, 0, 15000):
+                    with self.subTest(strategy=strategy, battery=battery, grid=grid):
+                        decision = self.resolve(strategy, battery, grid, True)
+                        self.assertEqual((decision.mode, decision.power), (8, 0))
 
     def test_hybrid_field_example_uses_mode1_between_deadbands(self):
         c = self.const

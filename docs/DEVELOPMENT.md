@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.3.0-beta.4 runtime structure
+## Current v1.3.0-beta.5 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.3.0-beta.4 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.3.0-beta.5 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -182,8 +182,8 @@ gw-energy-pilot-v131.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.3.0-beta.4 uses a presentation-only beta wrapper over the v1.2.0 stable
-wrapper and advances one complete `1.3.0-beta.4` active-graph cache boundary. The bounded
+v1.3.0-beta.5 uses a presentation-only beta wrapper over the v1.2.0 stable
+wrapper and advances one complete `1.3.0-beta.5` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The local-only Beta tests component additionally buffers pointer/click evidence
 until after the synthesis window and compares five guarded activation methods;
@@ -312,8 +312,8 @@ For an explicit home-battery charge request:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Grid    -> normal strategy mode/setpoint; wait if required P_grid is unavailable
+Hybrid  -> normal strategy mode/setpoint; wait if required P_grid is unavailable
 ```
 
 `ev_detection.py` is the single interpretation owner. Explicit power mode
@@ -716,3 +716,11 @@ Publishing is tag-only. Use `v1.x.x-beta.N` for a prerelease from the exact
 remote `beta` head and `v1.x.x` for stable from the exact remote `main` head.
 Never reuse or move a published tag. The workflow marks beta as prerelease and
 not Latest; stable is a normal/latest release. See `docs/RELEASE_WORKFLOW.md`.
+
+## Beta.5 EV direction regression
+
+The canonical `control_decision.py` EV charge path delegates to its normal
+strategy mapping; it must preserve mode/setpoint and missing-input waits.
+`controller_v033.py` checks readiness before applying that decision. Regression
+tests cover all strategies, PV export, deadband boundaries and unavailable grid
+plans. Existing EV-stop, ownership and persistent-plan tests remain mandatory.
