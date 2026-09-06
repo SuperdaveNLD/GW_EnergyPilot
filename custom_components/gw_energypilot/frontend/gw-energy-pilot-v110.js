@@ -1,6 +1,6 @@
-import "./gw-energy-pilot-v101.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v101.js?v=1.2.1-stable1";
 
-const VERSION = "1.2.0";
+const VERSION = "1.2.1";
 const PANEL_NAME = "gw-energypilot-panel";
 const TOUCH_TARGET_STYLE_ID = "ep-v110-chart-touch-target-style";
 

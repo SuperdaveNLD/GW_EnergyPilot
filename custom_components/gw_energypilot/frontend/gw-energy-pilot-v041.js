@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.2.0-stable1";
+import "./gw-energy-pilot-v039.js?v=1.2.1-stable1";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v038-model.js?v=1.2.1-stable1";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.2.0-stable1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.0-stable1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.0-stable1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.2.1-stable1";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.1-stable1";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.1-stable1";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.2.0-stable1";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.2.0-stable1";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.2.0-stable1";
+} from "./ep-control-surface.js?v=1.2.1-stable1";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.2.1-stable1";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.2.1-stable1";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -327,7 +327,7 @@ const NO_MOTION_CSS = `
   :host .ep-link-battery[data-ep-v041-flow-status="unknown"] .ep-flow-track {
     background: repeating-linear-gradient(180deg,currentColor 0 5px,transparent 5px 9px);
   }
-  :host .ep-v041-flow-arrow,
+  :host .ep-v041-flow-particle,
   :host .ep-v041-flow-state {
     position: absolute;
     left: 50%;
@@ -348,33 +348,51 @@ const NO_MOTION_CSS = `
     transform: translate(-50%, -50%);
     pointer-events: none;
   }
-  :host .ep-v041-flow-arrow {
-    width: 22px;
-    height: 12px;
-    -webkit-clip-path: polygon(0 34%, 66% 34%, 66% 0, 100% 50%, 66% 100%, 66% 66%, 0 66%);
-    clip-path: polygon(0 34%, 66% 34%, 66% 0, 100% 50%, 66% 100%, 66% 66%, 0 66%);
+  :host .ep-v041-flow-particle {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 6px 2px currentColor, 0 0 14px 5px currentColor;
+    opacity: .96;
   }
-  :host .ep-flow-link[data-ep-v038-motion="left"] .ep-v041-flow-arrow {
-    transform: translate(-50%, -50%) rotate(180deg);
-  }
-  :host .ep-flow-link[data-ep-v038-motion="down"] .ep-v041-flow-arrow {
-    transform: translate(-50%, -50%) rotate(90deg);
-  }
-  :host .ep-flow-link[data-ep-v038-motion="up"] .ep-v041-flow-arrow {
-    transform: translate(-50%, -50%) rotate(-90deg);
-  }
-  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-arrow,
+  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle,
   :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state,
   :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-v041-flow-state {
     display: flex;
   }
-  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] .ep-v041-flow-arrow {
-    width: 24px;
-    height: 13px;
+  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle {
+    animation: ep-v041-flow-horizontal 2.6s linear infinite !important;
   }
-  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] .ep-v041-flow-arrow {
-    width: 26px;
-    height: 14px;
+  :host .ep-link-house[data-ep-v041-flow-status="active"] .ep-v041-flow-particle,
+  :host .ep-link-battery[data-ep-v041-flow-status="active"] .ep-v041-flow-particle {
+    animation-name: ep-v041-flow-vertical !important;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] .ep-v041-flow-particle {
+    animation-duration: 1.9s !important;
+  }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] .ep-v041-flow-particle {
+    width: 12px;
+    height: 12px;
+    animation-duration: 1.35s !important;
+  }
+  :host .ep-flow-link[data-ep-v038-motion="left"] .ep-v041-flow-particle,
+  :host .ep-flow-link[data-ep-v038-motion="up"] .ep-v041-flow-particle {
+    animation-direction: reverse !important;
+  }
+  @keyframes ep-v041-flow-horizontal {
+    from { left: 0%; }
+    to { left: 100%; }
+  }
+  @keyframes ep-v041-flow-vertical {
+    from { top: 0%; }
+    to { top: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle {
+      left: 50%;
+      top: 50%;
+      animation: none !important;
+    }
   }
   :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state {
     width: 7px;
@@ -535,9 +553,9 @@ const NO_MOTION_CSS = `
     grid-template-columns: 1fr;
     justify-items: center;
   }
-  :host .ep-v034-flow-tight .ep-v041-flow-arrow {
-    width: 18px;
-    height: 10px;
+  :host .ep-v034-flow-tight .ep-v041-flow-particle {
+    width: 9px;
+    height: 9px;
   }
   :host .ep-connectivity-wrap {
     position: relative;
@@ -806,6 +824,8 @@ function installPvFlowGroup(root) {
   const internalLink = root?.querySelector(".ep-link-pv");
   if (!group || !internalLink || group.dataset.epPvFlowGroup === "1") return;
 
+  for (const arrows of root.querySelectorAll(".ep-flow-arrows")) arrows.remove();
+
   const initialTotal = group.querySelector(".ep-flow-node-value")?.textContent || "—";
   group.classList.remove("ep-flow-node");
   group.classList.add("ep-flow-pv-group");
@@ -834,9 +854,7 @@ function installPvFlowGroup(root) {
   externalLink.className = "ep-flow-link ep-link-pv-external idle";
   externalLink.dataset.epPvRoute = "external";
   externalLink.hidden = true;
-  externalLink.innerHTML = `
-    <div class="ep-flow-track"></div>
-    <div class="ep-flow-arrows"><span>›</span><span>›</span><span>›</span></div>`;
+  externalLink.innerHTML = `<div class="ep-flow-track"></div>`;
   internalLink.insertAdjacentElement("afterend", externalLink);
 }
 
@@ -1154,20 +1172,13 @@ function formatDecimal(value, decimals = 4) {
   return number === null ? "—" : number.toFixed(decimals);
 }
 
-const FLOW_ARROWS = Object.freeze({
-  right: "→",
-  left: "←",
-  up: "↑",
-  down: "↓",
-});
-
-function ensureStaticFlowNodes(link) {
-  let arrow = link.querySelector(".ep-v041-flow-arrow");
-  if (!arrow) {
-    arrow = document.createElement("span");
-    arrow.className = "ep-v041-flow-arrow";
-    arrow.setAttribute("aria-hidden", "true");
-    link.appendChild(arrow);
+function ensureFlowNodes(link) {
+  let particle = link.querySelector(".ep-v041-flow-particle");
+  if (!particle) {
+    particle = document.createElement("span");
+    particle.className = "ep-v041-flow-particle";
+    particle.setAttribute("aria-hidden", "true");
+    link.appendChild(particle);
   }
   let state = link.querySelector(".ep-v041-flow-state");
   if (!state) {
@@ -1176,7 +1187,7 @@ function ensureStaticFlowNodes(link) {
     state.setAttribute("aria-hidden", "true");
     link.appendChild(state);
   }
-  return { arrow, state };
+  return { particle, state };
 }
 
 function flowDirectionText(panel, key, direction) {
@@ -1200,13 +1211,12 @@ function flowSourceText(panel, key) {
   }[key];
 }
 
-function patchStaticFlowLink(panel, link, key, presentation) {
-  const { arrow, state } = ensureStaticFlowNodes(link);
+function patchFlowLink(panel, link, key, presentation) {
+  const { state } = ensureFlowNodes(link);
   const t = copy(panel);
   link.dataset.epV038Motion = presentation.direction;
   link.dataset.epV041FlowStatus = presentation.status;
   link.dataset.epV041FlowIntensity = presentation.intensity;
-  arrow.textContent = FLOW_ARROWS[presentation.direction] || "";
   state.textContent = presentation.status === "unknown" ? "?" : "•";
 
   let label;
@@ -1334,7 +1344,7 @@ function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
     if (!link) continue;
     link.classList.remove("idle", "inbound", "outbound");
     link.classList.add(semantic[key]);
-    patchStaticFlowLink(panel, link, key, visual[key]);
+    patchFlowLink(panel, link, key, visual[key]);
   }
 }
 

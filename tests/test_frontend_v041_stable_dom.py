@@ -41,7 +41,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=1.2.0-stable1"', self.source
+            'import "./gw-energy-pilot-v039.js?v=1.2.1-stable1"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -187,7 +187,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertNotIn("setPointerCapture", self.plan_core)
         self.assertNotIn("preventDefault", self.plan_core)
 
-    def test_all_dashboard_motion_is_disabled(self) -> None:
+    def test_only_live_flow_particles_can_animate(self) -> None:
         self.assertIn("animation: none !important", self.source)
         self.assertIn("transition: none !important", self.source)
         self.assertIn("scroll-behavior: auto !important", self.source)
@@ -196,6 +196,12 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn(".ep-v011-particles span", self.source)
         self.assertIn(".ep-v027-backdrop", self.source)
         self.assertIn("display: none !important", self.source)
+        self.assertIn(".ep-v041-flow-particle", self.source)
+        self.assertIn("@keyframes ep-v041-flow-horizontal", self.source)
+        self.assertIn("@keyframes ep-v041-flow-vertical", self.source)
+        self.assertIn("prefers-reduced-motion: reduce", self.source)
+        self.assertNotIn(".ep-v041-flow-arrow", self.source)
+        self.assertIn('root.querySelectorAll(".ep-flow-arrows")', self.source)
         self.assertIn('input.disabled = true', self.source)
 
     def test_browser_matrix_uses_one_deterministic_harness(self) -> None:
@@ -216,7 +222,8 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn('Profile("iphone-webkit"', browser_test)
         self.assertIn("telemetry_identity", browser_test)
         self.assertIn("exercise_plan_refresh", browser_test)
-        self.assertIn("animation[\"animations\"] != 0", browser_test)
+        self.assertIn("animation[\"animations\"] < 4", browser_test)
+        self.assertIn('"external_flow_moves"', browser_test)
         self.assertIn("frontend_harness.html?entry=v110", wrapper)
         self.assertIn('stability.EXPECTED_ENTRYPOINT = "v110"', wrapper)
         self.assertIn(

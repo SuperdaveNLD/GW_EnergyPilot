@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.2.0 runtime structure
+## Current v1.2.1 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.2.0 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.2.1 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -180,8 +180,8 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.0 uses the final presentation-only stable wrapper and advances one
-complete `1.2.0-stable1` active-graph cache boundary. The bounded
+v1.2.1 uses the final presentation-only stable wrapper and advances one
+complete `1.2.1-stable1` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The local-only Beta tests component additionally buffers pointer/click evidence
 until after the synthesis window and compares five guarded activation methods;
@@ -204,7 +204,7 @@ strategy/settings typography and field-tuned profile presentation; v0.46
 retains external-PV presentation, v0.44 owns the bounded Optimize
 listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS
 settings overview, and v0.41 ordinary telemetry patching, targeted plan
-refresh, PV presentation and static-flow DOM/CSS. The v0.41 PV flow keeps one
+refresh, PV presentation and live-flow DOM/CSS. The v0.41 PV flow keeps one
 combined group total while patching one internal ETA/DC node and one aggregated
 external AC/PCC node; it remains independent of control and EMHASS inputs.
 

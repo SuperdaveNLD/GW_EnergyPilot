@@ -17,6 +17,20 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.2.1 — Clear live-flow movement for every active route
+
+The stable dashboard now shows one moving round energy ball on each finite
+active connector, including external AC/PCC PV. The redundant arrows are
+removed because the particle itself communicates direction. Idle and
+unavailable routes remain stationary, and the browser's reduced-motion
+preference also keeps every ball stationary.
+
+Telemetry continues to patch the existing connector nodes rather than rebuild
+the dashboard. No GoodWe register, EMS/EMHASS behavior, entity identity,
+persistent store or mobile-control behavior changes. The release uses the
+complete `1.2.1-stable1` frontend cache boundary. See
+`docs/releases/v1.2.1.md`.
+
 # v1.3.0-beta.1 — Compact controls, scoped live-flow motion and built-in help
 
 This beta adds a localized **?** control to the dashboard header. Dutch Home
@@ -366,6 +380,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
 | **1.3.0-beta.1** | 2026-09-04 | **Beta** | Adds compact permanent controls, scoped live-flow animation, a localized built-in manual and a clearer product introduction without changing control semantics. |
+| **1.2.1** | 2026-09-06 | **Stable** | Shows one moving energy ball on every active connector, including external PV, and removes redundant arrows. |
 | **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |
 | **1.2.0-beta.7** | 2026-09-02 | **Beta** | Republishes the fully validated beta.6 mobile-control behavior behind a new complete frontend cache boundary. |
 | **1.2.0-beta.6** | 2026-09-02 | **Beta** | Enlarges the remaining chart/history touch targets and adds real missing-click coverage for S/M/L, 12h/24h/36h and full history. |
