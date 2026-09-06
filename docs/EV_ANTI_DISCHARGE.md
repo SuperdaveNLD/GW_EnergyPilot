@@ -52,8 +52,9 @@ normal strategy selects exactly the same mode and setpoint as without EV:
 - **Grid/Hybrid control**: mode `9` for import, mode `1` inside the grid
   deadband, or mode `10` for export. Export alongside a charging battery plan
   can represent PV export and is not itself a battery-discharge request.
-- **Hybrid 2.0 Beta**: mode `2` at configured maximum power in net-charge
-  windows; otherwise normal Hybrid. See [Hybrid 2.0](HYBRID_2.md).
+- **Hybrid 2.0 Beta**: mode `2` at configured maximum power whenever `P_batt`
+  explicitly requests charging, independent of `P_grid`; otherwise normal
+  Hybrid. See [Hybrid 2.0](HYBRID_2.md).
 - Missing/non-finite required `P_grid`: wait without an EMS write, just as
   normal Grid/Hybrid control does. A valid persistent plan may supply it.
 

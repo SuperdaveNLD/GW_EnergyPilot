@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.6";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.7";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.6";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.6";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.7";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.7";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -202,12 +202,12 @@ const HYBRID2_NOTE = Object.freeze({
   en: Object.freeze({
     ...HYBRID_NOTE.en,
     label: "Hybrid 2.0 Beta",
-    description: "Grid-charge windows use mode 2 at the configured maximum power with PV priority. Other steps follow Hybrid. Charging and SOC can exceed the EMHASS forecast.",
+    description: "Battery-charge windows use mode 2 at the configured maximum power with PV priority, independent of P_grid. Other steps follow Hybrid. Charging and SOC can exceed the EMHASS forecast.",
   }),
   nl: Object.freeze({
     ...HYBRID_NOTE.nl,
     label: "Hybrid 2.0 Beta",
-    description: "Netlaadvensters gebruiken modus 2 op het maximale regelvermogen met PV-voorrang. Overige stappen volgen Hybrid. Lading en SOC kunnen de EMHASS-prognose overschrijden.",
+    description: "Acculaadvensters gebruiken modus 2 op het maximale regelvermogen met PV-voorrang, onafhankelijk van P_grid. Overige stappen volgen Hybrid. Lading en SOC kunnen de EMHASS-prognose overschrijden.",
   }),
 });
 

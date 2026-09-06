@@ -111,22 +111,20 @@ def resolve_control_decision(
             )
         return ControlDecision(MODE_BATTERY_HOLD, 0, "battery_hold")
 
+    # Hybrid 2.0 follows the explicit battery-charge window. P_grid is not a
+    # second gate: EV load can be absent from EMHASS P_Load and leave the plan
+    # near zero even while the actual site imports heavily.
+    if strategy == CONTROL_STRATEGY_HYBRID_2 and battery < -battery_boundary:
+        return ControlDecision(
+            MODE_CHARGE_PV,
+            _bounded_power(max_power, max_power),
+            "hybrid2_pv_priority_charge",
+        )
+
     if grid is None:
         return ControlDecision(None, None, "waiting_for_p_grid")
 
     if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
-        # Opt-in maximum AC assistance with PV priority. The plan selects the
-        # grid-charge window, not the amplitude of this mode-specific limit.
-        if (
-            strategy == CONTROL_STRATEGY_HYBRID_2
-            and battery < -battery_boundary
-            and grid > grid_boundary
-        ):
-            return ControlDecision(
-                MODE_CHARGE_PV,
-                _bounded_power(max_power, max_power),
-                "hybrid2_pv_priority_charge",
-            )
         if abs(battery) <= battery_boundary:
             return ControlDecision(
                 MODE_BATTERY_HOLD,

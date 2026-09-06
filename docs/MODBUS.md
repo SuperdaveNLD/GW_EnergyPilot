@@ -229,7 +229,7 @@ This distinction is important. Modes that all accept a value in watts are **not 
 | Mode | GoodWe/OpenEMS name | EnergyPilot label | Meaning of `47512` | Current EnergyPilot use |
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | Not used; EnergyPilot writes `0 W` | Return ownership to the inverter / normal self-use |
-| **2** | Charge PV | PV-priority charging | `Xmax`: maximum grid power allowed to assist charging; `0 W` means PV-only charging | Hybrid 2.0 Beta net-charge windows at maximum control power; also manual |
+| **2** | Charge PV | PV-priority charging | `Xmax`: maximum grid power allowed to assist charging; `0 W` means PV-only charging | Hybrid 2.0 Beta battery-charge windows at maximum control power; also manual |
 | **3** | Discharge PV | PV + battery supply | `Xmax`: allowable battery discharge power while PV remains higher priority | Manual only |
 | **4** | Import AC | Inverter import / AC charging | `Xset`: target grid purchase/import for inverter-level scheduling | Manual only |
 | **5** | Export AC | Inverter export power | `Xset`: target grid sale/export for inverter-level scheduling | Manual only |
@@ -260,7 +260,12 @@ Purpose: keep the battery charging while **PV has first priority** and the grid 
 
 This is **not a direct battery charge-power target**. The actual battery charge can include PV plus permitted grid power and is still limited by BMS/inverter charge limits.
 
-The opt-in Hybrid 2.0 Beta strategy uses mode 2 at configured maximum control power during explicit net-charge windows. Grid-neutral steps retain mode 1. External AC-coupled generation is not necessarily represented as GoodWe PV input; mode 2 must not be interpreted as a whole-site import target. See [Hybrid 2.0 policy and field evidence](HYBRID_2.md).
+The opt-in Hybrid 2.0 Beta strategy uses mode 2 at configured maximum control
+power during explicit `P_batt` charge windows, independent of `P_grid`.
+Outside those windows, grid-neutral steps retain mode 1. External AC-coupled
+generation is not necessarily represented as GoodWe PV input; mode 2 must not
+be interpreted as a whole-site import target. See
+[Hybrid 2.0 policy and field evidence](HYBRID_2.md).
 
 ### Mode 3 — Discharge PV / PV + battery supply
 
