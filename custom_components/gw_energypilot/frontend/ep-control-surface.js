@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.7";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.8";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.7";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.7";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.8";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.8";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -202,12 +202,12 @@ const HYBRID2_NOTE = Object.freeze({
   en: Object.freeze({
     ...HYBRID_NOTE.en,
     label: "Hybrid 2.0 Beta",
-    description: "Battery-charge windows use mode 2 at the configured maximum power with PV priority, independent of P_grid. Other steps follow Hybrid. Charging and SOC can exceed the EMHASS forecast.",
+    description: "Planned battery charging with grid import uses mode 2 at the configured maximum power with PV priority. While the EV charges, all other plan steps use mode 8 Hold; without EV, they follow Hybrid. Charging and SOC can exceed the EMHASS forecast.",
   }),
   nl: Object.freeze({
     ...HYBRID_NOTE.nl,
     label: "Hybrid 2.0 Beta",
-    description: "Acculaadvensters gebruiken modus 2 op het maximale regelvermogen met PV-voorrang, onafhankelijk van P_grid. Overige stappen volgen Hybrid. Lading en SOC kunnen de EMHASS-prognose overschrijden.",
+    description: "Geplande batterijlading met netimport gebruikt modus 2 op het maximale regelvermogen met PV-voorrang. Tijdens EV-laden gebruiken alle overige planstappen modus 8 Hold; zonder EV volgen ze Hybrid. Lading en SOC kunnen de EMHASS-prognose overschrijden.",
   }),
 });
 

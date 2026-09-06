@@ -197,9 +197,10 @@ Hybrid first preserves an explicit neutral battery plan through mode 8. Every no
 ### Hybrid 2.0 Beta
 
 The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** whenever `P_batt < -battery_deadband`, independent of `P_grid`.
-Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
-windows and holds neutral/discharge plans. Actual charging and SOC can exceed
+power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
+Other steps retain Hybrid behavior without EV. During EV charging, all other
+valid plan steps use mode 8 Hold, including PV-only charging around zero grid
+and PV export. Missing required inputs still wait. Actual charging and SOC can exceed
 the EMHASS forecast. No existing selection is migrated; manual modes remain
 exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
 

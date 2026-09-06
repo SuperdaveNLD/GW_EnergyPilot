@@ -17,7 +17,15 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
-# v1.3.0-beta.7 — Hybrid 2.0 follows the battery charge plan
+# v1.3.0-beta.8 candidate — EV Hold outside planned net charging
+
+Hybrid 2.0 requests maximum mode 2 only when EMHASS plans both battery charging
+and grid import. EV charging with any other valid plan selects mode 8 Hold;
+without EV those steps retain normal Hybrid mapping. This corrects beta.7's
+unintended grid purchases during PV-only charging. See
+[candidate notes](releases/v1.3.0-beta.8.md).
+
+# v1.3.0-beta.7 — Hybrid 2.0 follows the battery charge plan (superseded policy)
 
 Hybrid 2.0 now enters mode 2 whenever EMHASS explicitly plans battery
 charging. `P_grid` is no longer a second gate, fixing mode 1 while an active EV
@@ -427,6 +435,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.8** | 2026-09-06 | **Beta** | Candidate: Hybrid 2.0 holds during EV charging except in planned net-charge windows; corrects beta.7's PV-only grid buying. |
 | **1.3.0-beta.7** | 2026-09-06 | **Beta** | Hybrid 2.0 follows explicit battery charging independent of a neutral/exporting/missing grid plan. |
 | **1.3.0-beta.6** | 2026-09-06 | **Beta** | Opt-in Hybrid 2.0 maximum mode-2 charging with PV priority; field validation pending. |
 | **1.3.0-beta.5** | 2026-09-06 | **Beta** | EV charge plans preserve strategy mode/setpoint; discharge/neutral Hold and unavailable-plan waits remain. |

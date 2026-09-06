@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v023.js?v=1.3.0-beta.7";
+import "./gw-energy-pilot-v023.js?v=1.3.0-beta.8";
 
 const VERSION = "0.24";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -11,7 +11,7 @@ const STRATEGY_LABELS = {
 };
 
 const STRATEGY_DESCRIPTIONS = {
-  hybrid_2: "Acculaadvensters: modus 2 met maximaal regelvermogen en PV-voorrang, onafhankelijk van P_grid. Overige stappen volgen Hybrid.",
+  hybrid_2: "Geplande batterijlading met netimport: modus 2 met maximaal regelvermogen en PV-voorrang. Tijdens EV-laden gaan overige planstappen naar modus 8 Hold; zonder EV volgen ze Hybrid.",
   battery: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
   grid: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
   hybrid: "Regelt inkoop/laden op accuvermogen (11) en verkoop/export op netvermogen (10).",

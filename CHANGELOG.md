@@ -4,6 +4,22 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.8] - 2026-09-06
+
+### Fixed
+
+- Correct Hybrid 2.0's EV policy: keep maximum mode-2 charging only for an
+  explicit battery-charge plan with grid import above its separate deadband.
+  EV active with any other valid plan uses mode 8 Hold, including PV-only
+  charging around zero grid or alongside PV export.
+- Restore normal Hybrid mapping without EV outside net-charge windows. A
+  negative battery plan alone no longer authorizes maximum grid purchases.
+- Restore the common finite-grid gate for both Hybrid variants, preventing
+  beta.7's missing-grid charge dispatch and neutral/discharge conversion error.
+- Retain optimizer readiness, valid persistent-plan fallback, EV-stop freshness,
+  manual modes and existing Battery/Grid/Hybrid behavior. Update English/Dutch
+  explanations and prepare one complete beta.8 frontend cache boundary.
+
 ## [1.3.0-beta.7] - 2026-09-06
 
 ### Fixed

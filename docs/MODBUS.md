@@ -261,8 +261,9 @@ Purpose: keep the battery charging while **PV has first priority** and the grid 
 This is **not a direct battery charge-power target**. The actual battery charge can include PV plus permitted grid power and is still limited by BMS/inverter charge limits.
 
 The opt-in Hybrid 2.0 Beta strategy uses mode 2 at configured maximum control
-power during explicit `P_batt` charge windows, independent of `P_grid`.
-Outside those windows, grid-neutral steps retain mode 1. External AC-coupled
+power when `P_batt` requests charging and `P_grid` requests import, each outside
+its own deadband. Outside those windows, grid-neutral steps retain mode 1
+without EV; EV charging selects mode 8 for every other valid plan. External AC-coupled
 generation is not necessarily represented as GoodWe PV input; mode 2 must not
 be interpreted as a whole-site import target. See
 [Hybrid 2.0 policy and field evidence](HYBRID_2.md).
@@ -350,7 +351,7 @@ Purpose: control **net grid import at the GoodWe smart-meter / point of common c
 
 The inverter may charge **or discharge** the battery to maintain that import target. If PV is excessive it may also limit PV; if load is high the battery may discharge to avoid exceeding the requested import.
 
-Mode 9 owns battery direction as part of a grid target. Grid and Hybrid strategies use it for planned import. Hybrid 2.0 Beta replaces that branch with mode 2 only when the battery plan explicitly requests charging; EV protection still uses planned battery direction as its guard.
+Mode 9 owns battery direction as part of a grid target. Grid and Hybrid strategies use it for planned import. Hybrid 2.0 Beta replaces that branch with mode 2 only when the battery plan explicitly requests charging. During EV charging, Hybrid 2.0 uses mode 8 for all other valid plans, so Auto/PCC control cannot discharge into an unexpected EV load.
 
 ### Mode 10 — Sell Power / smart-meter grid-export target
 

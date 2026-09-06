@@ -4197,9 +4197,12 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
             timeout=10_000,
         )
         result["selected"] = shadow(page, select).input_value() == "hybrid_2"
-        result["explanation"] = "planned SOC maximum" in shadow(
+        explanation = shadow(
             page, ".ep-v024-control-strategy-field .ep-v016-field-description"
         ).inner_text()
+        result["explanation"] = all(text in explanation for text in (
+            "with grid import", "mode 8 Hold", "planned SOC maximum",
+        ))
         activate(page, profile, ".ep-v016-back")
         page.wait_for_function(
             "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
@@ -4217,6 +4220,8 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
                 note: Boolean(note && !note.hidden &&
                   note.textContent.includes('Hybrid 2.0 Beta') &&
                   note.textContent.includes('mode 2') &&
+                  note.textContent.includes('with grid import') &&
+                  note.textContent.includes('mode 8 Hold') &&
                   note.textContent.includes('forecast')),
                 stable: root.querySelector('main') === main &&
                   root.querySelector('ep-control-surface') === surface &&
@@ -5751,7 +5756,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.7 BETA",
+        "v131": "v1.3.0-beta.8 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(

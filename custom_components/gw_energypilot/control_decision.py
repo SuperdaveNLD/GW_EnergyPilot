@@ -77,8 +77,7 @@ def resolve_control_decision(
                 0,
                 "ev_anti_discharge_hold",
             )
-        # EV activity gates battery direction; the normal strategy still owns
-        # the actuator mode and setpoint, including Auto and PV export.
+        # Resolve the normal plan first so missing required inputs still wait.
         decision = resolve_control_decision(
             strategy=strategy,
             p_batt=battery,
@@ -89,6 +88,11 @@ def resolve_control_decision(
         )
         if not decision.ready:
             return decision
+        # A PV-only charge plan is not permission to buy grid energy. Auto/PCC
+        # modes can discharge into the EV when actual load exceeds the forecast.
+        # Hybrid 2.0 therefore only continues an explicit grid-charge window.
+        if strategy == CONTROL_STRATEGY_HYBRID_2 and decision.mode != MODE_CHARGE_PV:
+            return ControlDecision(MODE_BATTERY_HOLD, 0, "ev_anti_discharge_hold")
         command = "ev_charge_allowed"
         if decision.mode == MODE_CHARGE_BATTERY:
             command = "ev_battery_charge"
@@ -111,18 +115,21 @@ def resolve_control_decision(
             )
         return ControlDecision(MODE_BATTERY_HOLD, 0, "battery_hold")
 
-    # Hybrid 2.0 follows the explicit battery-charge window. P_grid is not a
-    # second gate: EV load can be absent from EMHASS P_Load and leave the plan
-    # near zero even while the actual site imports heavily.
-    if strategy == CONTROL_STRATEGY_HYBRID_2 and battery < -battery_boundary:
+    if grid is None:
+        return ControlDecision(None, None, "waiting_for_p_grid")
+
+    # Require planned import as well as battery charging: P_batt < 0 alone
+    # can represent PV-only charging, including during expensive grid periods.
+    if (
+        strategy == CONTROL_STRATEGY_HYBRID_2
+        and battery < -battery_boundary
+        and grid > grid_boundary
+    ):
         return ControlDecision(
             MODE_CHARGE_PV,
             _bounded_power(max_power, max_power),
             "hybrid2_pv_priority_charge",
         )
-
-    if grid is None:
-        return ControlDecision(None, None, "waiting_for_p_grid")
 
     if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
         if abs(battery) <= battery_boundary:

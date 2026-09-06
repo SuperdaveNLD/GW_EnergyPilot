@@ -1,31 +1,37 @@
 # Hybrid 2.0 Beta
 
 Hybrid 2.0 Beta is an opt-in automatic strategy added in v1.3.0-beta.6 and
-corrected in v1.3.0-beta.7. Select **Settings → GoodWe → Automatic control strategy → Hybrid
+corrected in the v1.3.0-beta.8 candidate. Select **Settings → GoodWe → Automatic control strategy → Hybrid
 2.0 Beta**. Existing Battery, Grid and Hybrid selections keep their behavior.
 The stored strategy key is `hybrid_2`; no existing config value is migrated.
 
 ## Charging rule
 
-EMHASS selects the charging window through `P_batt`. A battery charge plan
-below the Battery Hold deadband requests **mode 2, Charge PV**, at the
-configured **Maximum control power**, capped at 15,000 W. `P_grid` is not a
-second charging gate and is not used as the total house-import target. This is
-required when EV consumption is absent from the EMHASS load forecast: the
-planned grid value can remain around zero while the actual house imports for
-the EV.
+EMHASS selects the grid-charging window through both `P_batt` and `P_grid`.
+A battery charge plan below the Battery Hold deadband **and** grid import
+above the GoodWe Auto deadband request **mode 2, Charge PV**, at the configured
+**Maximum control power**, capped at 15,000 W. `P_grid` selects the window;
+its magnitude is not used as the total house-import target.
 
-| Valid plan | GoodWe request |
-|---|---|
-| `P_batt < -battery_deadband`, any/missing `P_grid` | **2**, configured maximum control power |
-| Battery inside its deadband | **8**, 0 W |
-| Other non-neutral battery plan, grid inside its deadband | **1**, 0 W |
-| Other non-neutral battery plan, positive grid target | **9**, bounded `abs(P_grid)` |
-| Other non-neutral battery plan, negative grid target | **10**, bounded `abs(P_grid)` |
+Negative `P_batt` alone can represent PV-only charging, even during expensive
+periods. Beta.7 incorrectly treated that as permission to buy maximum grid
+energy. This candidate restores the planned-import gate and makes EV start
+select Hold for these PV-only windows. Actual EV consumption or measured
+grid import never opens a new grid-charging window. Price evaluation remains
+with EMHASS; EnergyPilot adds no separate cheap/expensive threshold.
 
-Exact deadband boundaries remain neutral. `P_batt` must be finite and the
-optimizer ready. Outside a Hybrid 2.0 charge window, missing required `P_grid`
-still waits without a new EMS write; an unexpired persistent plan can bridge
+| Valid plan | Without EV | EV charging |
+|---|---|---|
+| `P_batt < -battery_deadband` and `P_grid > grid_deadband` | **2**, configured maximum control power | **2**, same maximum |
+| Battery inside its deadband | **8**, 0 W | **8**, 0 W |
+| Non-neutral battery plan, grid inside its deadband | **1**, 0 W | **8**, 0 W |
+| Discharge plan, positive grid target | **9**, bounded `abs(P_grid)` | **8**, 0 W |
+| Non-neutral battery plan, negative grid target | **10**, bounded `abs(P_grid)` | **8**, 0 W |
+
+Exact deadband boundaries remain neutral. The optimizer must be ready and
+required plan inputs finite. Missing `P_grid` waits without a new EMS write;
+EV neutral/discharge plans still select Hold without needing `P_grid`.
+An unexpired persistent plan can bridge
 missing publication through the existing live-first source order. Explicit
 non-ready optimizer status remains authoritative.
 
@@ -47,11 +53,10 @@ Choose existing Hybrid or Battery when following planned amplitudes is required.
 
 ## EV and ownership
 
-EV start does not change a mode-2 charging command. EV active with a neutral
-or discharge battery plan selects mode 8 Hold. For other explicit charge
-plans the normal Hybrid mapping remains in effect, including PV export.
-The guard uses planned battery direction; PCC/Auto modes do not guarantee
-instantaneous battery direction under a different actual site balance.
+EV start preserves an explicitly planned mode-2 grid-charging command. Every
+other valid plan selects mode 8 Hold during EV charging, including PV-only
+battery charging with neutral grid or PV export. Auto/PCC modes can otherwise
+discharge into the EV when actual load differs from the forecast.
 EV-stop fresh-plan protection remains unchanged.
 
 This choice does not enable, disable or reconfigure the separately opt-in EV
@@ -61,6 +66,13 @@ regulation. Manual modes remain exact; Automatic Control OFF returns mode 1
 at 0 W. Register definitions and `47512 → brief wait → 47511` writes are unchanged.
 
 ## Evidence and limits
+
+The user's beta.6 EV-active snapshot at about 15:37 had `P_batt = -1.33 kW`,
+`P_grid = -29 W`, mode 1 and about 7.94 kW actual battery discharge. The
+corrected result for that plan is mode 1 without EV and mode 8 with EV.
+The later planned charging window (`P_batt = -4.3 kW`, `P_grid = +3.6 kW`)
+selects mode 2 with or without EV. This distinguishes an omitted EV load from
+EMHASS permission to buy battery energy.
 
 The GoodWe **ARM 745 Modbus protocol**, V1.2 dated 2024-02-02, table 8-16
 (pp. 164–165), describes mode 2 as grid assistance with PV priority. The
@@ -84,6 +96,23 @@ support AC assistance plus PV and local adaptation to EV load, but do not
 prove a strict 25 A cap, synchronized energy balance, or uncurtailed PV.
 Firmware identity and synchronized readback of the new automatic strategy
 remain field-validation work; unit/browser tests cannot supply that evidence.
+
+Further user snapshots at about 16:15 used manual modes 2, 4, 9 and 11, each
+at 15,000 W, with EV load 11.1 kW and battery SOC 95%:
+
+| Mode readback | House grid import card | Internal PV | Battery charging |
+|---|---:|---:|---:|
+| 2 | 12.9 kW | 4 W | 2.96 kW |
+| 4 | 13.8 kW | 2.45 kW | 2.92 kW |
+| 9 | 14.5 kW | 2 W | 2.93 kW |
+| 11 | 12.8 kW | 4 W | 2.94 kW |
+
+These are short sequential snapshots, not settled measurements under identical
+conditions. Diagnostics remained at 14 W grid and an older battery/grid plan
+while the main cards changed. The samples record accepted manual modes and
+similar battery charging at high SOC; they cannot attribute PV curtailment or
+the charging limit to a particular mode. Manual ownership also means they do
+not validate automatic Hybrid 2.0 or its EV override.
 
 ## Implementation
 

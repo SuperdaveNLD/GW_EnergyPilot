@@ -1,5 +1,5 @@
-import "./gw-energy-pilot-v050.js?v=1.3.0-beta.7";
-import { refreshHistoryCard } from "./gw-energy-pilot-v051-history.js?v=1.3.0-beta.7";
+import "./gw-energy-pilot-v050.js?v=1.3.0-beta.8";
+import { refreshHistoryCard } from "./gw-energy-pilot-v051-history.js?v=1.3.0-beta.8";
 
 const VERSION = "0.51";
 const PANEL_NAME = "gw-energypilot-panel";

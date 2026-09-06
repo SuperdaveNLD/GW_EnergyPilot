@@ -102,8 +102,9 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
             "outside it -> modes 9/10"
         ),
         "hybrid_2_strategy": (
-            "Explicit battery charging -> mode 2 at configured maximum power, "
-            "PV priority, independent of P_grid; otherwise normal Hybrid. "
+            "Planned battery charging with planned grid import -> mode 2 at "
+            "configured maximum power with PV priority; otherwise normal Hybrid. "
+            "During EV charging, every other valid plan uses mode 8 Hold. "
             "Actual charging and SOC can exceed the EMHASS forecast."
         ),
         "storage": "home_assistant_config_entry_data",

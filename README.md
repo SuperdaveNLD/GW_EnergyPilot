@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta candidate](docs/releases/v1.3.0-beta.7.md)
+[Latest beta candidate](docs/releases/v1.3.0-beta.8.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,9 +66,10 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.7 · Beta candidate**
+**v1.3.0-beta.8 · Beta candidate**
 
-Latest production release: **v1.2.0 · Stable**
+Latest production release: **v1.2.1 · Stable**
+Latest published beta: **v1.3.0-beta.7**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -158,7 +159,18 @@ Release documentation:
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
 
-## v1.3.0-beta.7 highlights
+## v1.3.0-beta.8 highlights
+
+- Hybrid 2.0 requests maximum mode-2 charging only when EMHASS plans both
+  battery charging and grid import, each beyond its own deadband.
+- During EV charging, all other valid steps use mode 8 Hold. PV-only charging
+  around zero grid must neither buy maximum grid energy nor stay in self-use
+  and discharge into the EV. Without EV these steps retain Hybrid behavior.
+- Missing required grid inputs wait for all battery directions; beta.7 could
+  enter the Hybrid command path without a usable grid value.
+- See [beta.8 candidate notes](docs/releases/v1.3.0-beta.8.md).
+
+## v1.3.0-beta.7 highlights (superseded by beta.8 candidate)
 
 - Fixes the reported EV-active case where `P_batt = -1.33 kW` but
   `P_grid = -29 W` kept Hybrid 2.0 in mode 1.
@@ -709,9 +721,10 @@ For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around z
 ### Hybrid 2.0 Beta
 
 The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** whenever `P_batt < -battery_deadband`, independent of `P_grid`.
-Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
-windows and holds neutral/discharge plans. Actual charging and SOC can exceed
+power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
+Other steps retain Hybrid behavior without EV. During EV charging, all other
+valid plan steps use mode 8 Hold, including PV-only charging around zero grid
+and PV export. Missing required inputs still wait. Actual charging and SOC can exceed
 the EMHASS forecast. No existing selection is migrated; manual modes remain
 exact. See [Hybrid 2.0 behavior and hardware evidence](docs/HYBRID_2.md).
 
@@ -730,6 +743,7 @@ For an explicit home-battery charge plan:
 Battery strategy -> mode 11 using abs(P_batt)
 Grid strategy    -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
 Hybrid strategy  -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+Hybrid 2.0 Beta  -> mode 2 with planned net charging; otherwise mode 8; wait if P_grid is unavailable
 ```
 
 This blocks planned battery discharge while allowing explicit charging plans. It does not guarantee instantaneous battery direction in PCC/Auto modes when actual load differs from the forecast. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.

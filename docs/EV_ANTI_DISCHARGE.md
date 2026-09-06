@@ -1,12 +1,12 @@
 # EV anti-discharge protection
 
-This document defines the EV protection behavior for GW EnergyPilot v1.3.0-beta.6.
+This document defines the EV protection behavior for the GW EnergyPilot v1.3.0-beta.8 candidate.
 
 ## Purpose
 
 The EV feature is an **anti-discharge protection**, not an EV charging controller.
 
-While the EV is charging, the home battery must not discharge into the EV. If EMHASS explicitly requests home-battery charging at the same time, GW EnergyPilot must continue that charge request instead of holding the battery.
+While the EV is charging, the home battery must not discharge into the EV. Hybrid 2.0 continues maximum mode-2 charging only when EMHASS plans both battery charging and grid import. Every other valid plan uses Hold. Battery, Grid and Hybrid retain their existing plan-direction guards described below.
 
 The anti-discharge feature only observes the configured EV state/power entities.
 The separately opt-in EV load balancer may modulate one charger current entity,
@@ -39,28 +39,30 @@ During an active EV charging session, `P_batt` is the directional safety guard:
 | Not charging | Any valid plan | Normal configured automatic strategy |
 | Charging | `P_batt > +deadband` — discharge | **Mode 8 Battery Hold** |
 | Charging | `P_batt` inside deadband — neutral | **Mode 8 Battery Hold** |
-| Charging | `P_batt < -deadband` — charge | **Continue charging** |
+| Charging | `P_batt < -deadband` — charge | **Continue according to strategy below** |
 
-This means EV coordination is strictly anti-discharge: discharge and neutral are paused, charging is allowed to proceed.
+Discharge and neutral plans are paused. Hybrid 2.0 also holds PV-only charging
+plans with neutral/exporting grid targets: negative `P_batt` alone is not
+permission to buy grid energy. EMHASS remains the owner of price-based timing.
 
 ## GoodWe execution while EV charging
 
-When EMHASS requests battery charging while the EV is active, the canonical
-normal strategy selects exactly the same mode and setpoint as without EV:
+When EMHASS requests battery charging while the EV is active:
 
 - **Battery control**: mode `11` using the requested `P_batt` magnitude.
 - **Grid/Hybrid control**: mode `9` for import, mode `1` inside the grid
   deadband, or mode `10` for export. Export alongside a charging battery plan
   can represent PV export and is not itself a battery-discharge request.
-- **Hybrid 2.0 Beta**: mode `2` at configured maximum power whenever `P_batt`
-  explicitly requests charging, independent of `P_grid`; otherwise normal
-  Hybrid. See [Hybrid 2.0](HYBRID_2.md).
+- **Hybrid 2.0 Beta**: mode `2` at configured maximum power only when `P_batt`
+  explicitly requests charging and `P_grid` requests import above its deadband.
+  Neutral grid or PV export selects mode `8` Hold, even with a negative battery
+  plan. Without EV these steps retain normal Hybrid mapping. See [Hybrid 2.0](HYBRID_2.md).
 - Missing/non-finite required `P_grid`: wait without an EMS write, just as
   normal Grid/Hybrid control does. A valid persistent plan may supply it.
 
 EV activity must not convert a Grid/Hybrid command to mode `11`. Only the
-explicit planned battery direction gates this override. This is a plan-based
-guard, not a guarantee of instantaneous battery direction in PCC/Auto modes
+planned battery direction gates the original Battery/Grid/Hybrid override.
+Their plan-based guard is not a guarantee of instantaneous battery direction in PCC/Auto modes
 when actual load differs from the forecast. ETA retains local power control;
 no new hardware limit or register semantics are inferred from this fix.
 
@@ -127,7 +129,7 @@ existing controller command:
 - **Anti-discharge active**: EV charging is active and home-battery discharge is
   blocked with mode `8` (**Battery Hold**).
 - **Battery charge allowed**: EV charging is active and the explicit
-  home-battery charging plan continues.
+  home-battery charging plan continues (Hybrid 2.0 requires planned net charging).
 - **Fresh plan required**: EV charging has stopped, but Battery Hold remains
   active until the native orchestrator publishes a fresh EMHASS plan.
 
