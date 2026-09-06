@@ -41,6 +41,7 @@ class ControlDecisionTests(unittest.TestCase):
         ev_active=False,
         battery_deadband=100,
         grid_deadband=1000,
+        max_power=10000,
     ):
         return self.module.resolve_control_decision(
             strategy=strategy,
@@ -48,7 +49,7 @@ class ControlDecisionTests(unittest.TestCase):
             p_grid=p_grid,
             battery_deadband=battery_deadband,
             grid_deadband=grid_deadband,
-            max_power=10000,
+            max_power=max_power,
             ev_active=ev_active,
         )
 
@@ -95,7 +96,7 @@ class ControlDecisionTests(unittest.TestCase):
         self.assertEqual((fallback.mode, fallback.command), (c.MODE_AUTO, "ev_charge_allowed"))
 
     def test_ev_charge_preserves_normal_mode_and_setpoint(self):
-        for strategy in ("battery", "grid", "hybrid"):
+        for strategy in ("battery", "grid", "hybrid", "hybrid_2"):
             for grid in (-20000, -1001, -1000, 0, 1000, 1001, 9574, 20000,
                          None, float("nan"), float("inf")):
                 with self.subTest(strategy=strategy, grid=grid):
@@ -107,7 +108,7 @@ class ControlDecisionTests(unittest.TestCase):
                         self.assertEqual(active.command, normal.command)
 
     def test_ev_hold_boundaries_ignore_grid_availability(self):
-        for strategy in ("battery", "grid", "hybrid"):
+        for strategy in ("battery", "grid", "hybrid", "hybrid_2"):
             for battery in (-100, 0, 100, 15000):
                 for grid in (None, -15000, 0, 15000):
                     with self.subTest(strategy=strategy, battery=battery, grid=grid):
@@ -121,6 +122,29 @@ class ControlDecisionTests(unittest.TestCase):
             (decision.mode, decision.power, decision.command),
             (c.MODE_AUTO, 0, "hybrid_grid_zero_auto"),
         )
+
+    def test_hybrid2_grid_charge_uses_configured_maximum_not_plan_amplitude(self):
+        for battery, grid in ((-15000, 9574), (-8400, 2900), (-101, 1001)):
+            for maximum, expected in ((0, 0), (8000, 8000), (15000, 15000), (20000, 15000)):
+                with self.subTest(battery=battery, grid=grid, maximum=maximum):
+                    decision = self.resolve("hybrid_2", battery, grid, max_power=maximum)
+                    self.assertEqual((decision.mode, decision.power, decision.command),
+                                     (2, expected, "hybrid2_pv_priority_charge"))
+
+    def test_hybrid2_retains_hybrid_outside_grid_charge_windows(self):
+        for battery in (-15000, -101, -100, 0, 100, 101, 15000):
+            for grid in (-15000, -1001, -1000, 0, 1000, 1001, 15000):
+                if battery < -100 and grid > 1000:
+                    continue
+                with self.subTest(battery=battery, grid=grid):
+                    self.assertEqual(self.resolve("hybrid_2", battery, grid),
+                                     self.resolve("hybrid", battery, grid))
+
+    def test_hybrid2_requires_finite_plan_inputs(self):
+        for missing in (None, float("nan"), float("inf"), float("-inf")):
+            with self.subTest(missing=missing):
+                self.assertFalse(self.resolve("hybrid_2", missing, 9574).ready)
+                self.assertFalse(self.resolve("hybrid_2", -15000, missing).ready)
 
 
 if __name__ == "__main__":

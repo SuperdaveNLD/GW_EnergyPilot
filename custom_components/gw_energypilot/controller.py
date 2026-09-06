@@ -40,6 +40,7 @@ from .const import (
     CONTROL_STRATEGY_BATTERY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
+    CONTROL_STRATEGY_HYBRID_2,
     DEFAULT_DEADBAND,
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
@@ -836,9 +837,9 @@ class GWEnergyPilotController:
         grid_deadband: float,
         max_power: int,
     ) -> None:
-        """Hold neutral battery plans, otherwise execute the signed PCC plan."""
+        """Apply the selected Hybrid variant through the shared decision mapping."""
         decision = resolve_control_decision(
-            strategy=CONTROL_STRATEGY_HYBRID,
+            strategy=self.control_strategy,
             p_batt=p_batt,
             p_grid=p_grid,
             battery_deadband=battery_deadband,
@@ -896,7 +897,7 @@ class GWEnergyPilotController:
             self._notify_state()
             await self._async_record_waiting(self.last_command)
             return
-        if strategy == CONTROL_STRATEGY_HYBRID:
+        if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
             await self._async_apply_hybrid_plan(
                 p_batt,
                 p_grid,

@@ -4,6 +4,28 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.6] - 2026-09-06
+
+### Added
+
+- Opt-in Hybrid 2.0 Beta automatic strategy (`hybrid_2`): explicit battery
+  charging with planned grid import selects mode 2 at configured maximum
+  control power, with PV priority. Other steps retain Hybrid mapping.
+- Preserve this charging command during EV activity; continue holding neutral
+  and discharge plans, waiting for unavailable inputs and requiring a fresh
+  plan after EV stop.
+- English/Dutch selector and permanent control explanation, backed by the
+  existing command sensor's new `control_strategy` attribute. No entity or
+  storage migration; manual modes and other strategies retain their behavior.
+
+### Changed
+
+- Prepare beta.6 with one complete frontend cache boundary, mapping/runtime
+  regressions and native strategy selection in all three browser profiles.
+- Document mode-2 hardware observations, their telemetry limits, and actual
+  charging/SOC divergence from the optimizer forecast. Correct stale mode-9/10
+  and mode-11 feedback descriptions in the Modbus reference.
+
 ## [1.3.0-beta.5] - 2026-09-06
 
 ### Fixed

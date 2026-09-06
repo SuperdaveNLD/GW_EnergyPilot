@@ -25,7 +25,7 @@ Xset = target value the inverter tries to reach.
 | Mode | GoodWe/OpenEMS name | EnergyPilot label | `47512` meaning | EnergyPilot policy |
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | unused / `0 W` | normal inverter ownership; also used around a zero `P_grid` target when smart-meter control is enabled |
-| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | manual only |
+| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | Hybrid 2.0 Beta net-charge windows; also manual |
 | **3** | Discharge PV | PV + battery supply | `Xmax` allowable battery discharge; PV has priority | manual only |
 | **4** | Import AC | Inverter import / AC charging | `Xset` inverter-level grid purchase target | manual only |
 | **5** | Export AC | Inverter export power | `Xset` inverter-level grid sale/export target | manual only |
@@ -115,6 +115,15 @@ else P_grid < -GoodWe Auto deadband -> mode 10 -> export target = abs(P_grid)
 ```
 
 The neutral battery branch is evaluated first so ordinary forecast house import or PV export cannot turn an idle EMHASS battery plan into active buying or selling. Every non-neutral plan then follows the signed PCC target. Exact positive and negative boundaries remain neutral. Each deadband only selects its own branch and is never subtracted from the transmitted mode-9/10 setpoint; maximum-power clamping remains the only reduction.
+
+### Hybrid 2.0 Beta
+
+The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
+power** when `P_batt < -battery_deadband` and `P_grid > grid_deadband`.
+Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
+windows and holds neutral/discharge plans. Actual charging and SOC can exceed
+the EMHASS forecast. No existing selection is migrated; manual modes remain
+exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
 
 ## Why mode 1 is used around zero grid target
 

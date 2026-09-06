@@ -17,6 +17,13 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.6 — Hybrid 2.0 Beta candidate
+
+An extra opt-in strategy uses mode 2 with maximum grid assistance and PV
+priority during planned net-charge windows. EV start preserves charging;
+neutral/discharge plans remain held. Existing strategies retain their behavior.
+See [candidate notes](releases/v1.3.0-beta.6.md) and [the full policy](HYBRID_2.md).
+
 # v1.3.0-beta.5 — EV direction guard
 
 Explicit battery charging retains the configured strategy mode and setpoint.
@@ -413,6 +420,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.6** | 2026-09-06 | **Beta** | Prepared candidate: opt-in Hybrid 2.0 maximum mode-2 charging with PV priority; field validation pending. |
 | **1.3.0-beta.5** | 2026-09-06 | **Beta** | EV charge plans preserve strategy mode/setpoint; discharge/neutral Hold and unavailable-plan waits remain. |
 | **1.3.0-beta.4** | 2026-09-05 | **Beta** | Shows actual and expected solar production in every chart size, including the default M. |
 | **1.3.0-beta.3** | 2026-09-05 | **Beta** | Adds actual-versus-expected solar production to the detailed Battery · Plan · Price graph. |

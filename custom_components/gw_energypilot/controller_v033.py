@@ -7,6 +7,7 @@ from .const import (
     CONF_OPTIM_STATUS_ENTITY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
+    CONTROL_STRATEGY_HYBRID_2,
 )
 from .controller import GWEnergyPilotController as _BaseController
 
@@ -58,7 +59,7 @@ class GWEnergyPilotController(_BaseController):
         """Block discharge during EV charging while allowing planned charging."""
         strategy = self.control_strategy
         p_grid = None
-        if strategy in {CONTROL_STRATEGY_GRID, CONTROL_STRATEGY_HYBRID}:
+        if strategy in {CONTROL_STRATEGY_GRID, CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
             p_grid = self._state_float(self._p_grid_entity_id())
         decision = resolve_control_decision(
             strategy=strategy,

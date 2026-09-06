@@ -548,6 +548,7 @@ class GWControlCommandSensor(GWEnergyPilotEntity, SensorEntity):
                 ev_power_entity or None,
             ),
             "ev_protection_state": controller.ev_protection_state,
+            "control_strategy": controller.control_strategy,
             "execution_history_revision": (
                 controller.execution_history.revision
                 if controller.execution_history is not None

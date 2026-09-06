@@ -395,3 +395,11 @@ Before adding one, check:
 8. Does the dashboard or documentation need updating?
 
 Avoid duplicate representations of the same measurement unless the electrical measurement points are genuinely different and clearly named.
+
+## Hybrid 2.0 strategy diagnostic
+
+The existing control-command sensor exposes `control_strategy` as an attribute
+in v1.3.0-beta.6. Its value is the effective stored strategy (`battery`, `grid`,
+`hybrid` or `hybrid_2`), including legacy fallback. The dashboard uses it for
+its strategy explanation. This does not create a new strategy entity or change
+any unique ID, Recorder identity or statistics source.

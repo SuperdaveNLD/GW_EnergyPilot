@@ -229,17 +229,17 @@ This distinction is important. Modes that all accept a value in watts are **not 
 | Mode | GoodWe/OpenEMS name | EnergyPilot label | Meaning of `47512` | Current EnergyPilot use |
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | Not used; EnergyPilot writes `0 W` | Return ownership to the inverter / normal self-use |
-| **2** | Charge PV | PV-priority charging | `Xmax`: maximum grid power allowed to assist charging; `0 W` means PV-only charging | Manual only; deliberately not used for AC-coupled PV control |
+| **2** | Charge PV | PV-priority charging | `Xmax`: maximum grid power allowed to assist charging; `0 W` means PV-only charging | Hybrid 2.0 Beta net-charge windows at maximum control power; also manual |
 | **3** | Discharge PV | PV + battery supply | `Xmax`: allowable battery discharge power while PV remains higher priority | Manual only |
 | **4** | Import AC | Inverter import / AC charging | `Xset`: target grid purchase/import for inverter-level scheduling | Manual only |
 | **5** | Export AC | Inverter export power | `Xset`: target grid sale/export for inverter-level scheduling | Manual only |
 | **6** | Conserve | Reserve / Conserve | Not used; EnergyPilot writes `0 W` | Manual only; reserve/off-grid preparation behavior |
 | **7** | Off-Grid | Off-grid | Not used; EnergyPilot writes `0 W` | Manual only; forces off-grid operation |
 | **8** | Battery Standby | Battery Hold | Not used; EnergyPilot writes `0 W` | Automatic hold/deadband/EV/protective hold and manual pause |
-| **9** | Buy Power | Grid import target | `Xset`: target import at the GoodWe smart-meter/PCC; battery may charge or discharge to hold it | Manual only; intentionally not automatic ownership |
-| **10** | Sell Power | Grid export target | `Xset`: target export at the GoodWe smart-meter/PCC | Manual selector and Maximum export quick action |
-| **11** | Charge Bat | Battery charge power | `Xset`: direct battery charging-power target | Main automatic charge mode and manual control |
-| **12** | Discharge Bat | Battery discharge power | `Xset`: direct battery discharging-power target | Main automatic discharge mode and manual control |
+| **9** | Buy Power | Grid import target | `Xset`: target import at the GoodWe smart-meter/PCC; battery may charge or discharge to hold it | Grid/Hybrid automatic import target; manual import |
+| **10** | Sell Power | Grid export target | `Xset`: target export at the GoodWe smart-meter/PCC | Grid/Hybrid automatic export, manual selector and Maximum export quick action |
+| **11** | Charge Bat | Battery charge power | `Xset`: direct battery charging-power target | Battery-strategy automatic charge and manual control |
+| **12** | Discharge Bat | Battery discharge power | `Xset`: direct battery discharging-power target | Battery-strategy automatic discharge and manual control |
 
 The EnergyPilot labels above are the current stable labels from `const.py`. They are intentionally not renamed casually because the manual Home Assistant select exposes the label as part of its option string.
 
@@ -260,7 +260,7 @@ Purpose: keep the battery charging while **PV has first priority** and the grid 
 
 This is **not a direct battery charge-power target**. The actual battery charge can include PV plus permitted grid power and is still limited by BMS/inverter charge limits.
 
-EnergyPilot deliberately does not use mode 2 for its AC-coupled-PV grid-neutral controller. External AC-coupled generation is visible at the grid meter but is not necessarily represented as GoodWe PV input, so mode 2 cannot be assumed to express the desired whole-site behavior.
+The opt-in Hybrid 2.0 Beta strategy uses mode 2 at configured maximum control power during explicit net-charge windows. Grid-neutral steps retain mode 1. External AC-coupled generation is not necessarily represented as GoodWe PV input; mode 2 must not be interpreted as a whole-site import target. See [Hybrid 2.0 policy and field evidence](HYBRID_2.md).
 
 ### Mode 3 — Discharge PV / PV + battery supply
 
@@ -331,8 +331,7 @@ EnergyPilot uses mode 8 extensively for:
 - normal `P_batt` deadband;
 - manual battery pause;
 - EV charging hold;
-- missing/unsafe grid-neutral feedback;
-- the grid-neutral anti-flap dwell period.
+- scheduled-plan failure protection.
 
 EnergyPilot forces `47512 = 0 W`.
 
@@ -346,7 +345,7 @@ Purpose: control **net grid import at the GoodWe smart-meter / point of common c
 
 The inverter may charge **or discharge** the battery to maintain that import target. If PV is excessive it may also limit PV; if load is high the battery may discharge to avoid exceeding the requested import.
 
-This makes mode 9 fundamentally different from direct battery mode 11. Mode 9 owns battery direction as part of a grid target. EnergyPilot therefore does not currently use it for automatic EMHASS execution: `P_batt` remains the authoritative battery-direction request.
+Mode 9 owns battery direction as part of a grid target. Grid and Hybrid strategies use it for planned import. Hybrid 2.0 Beta replaces that branch with mode 2 only when the battery plan explicitly requests charging; EV protection still uses planned battery direction as its guard.
 
 ### Mode 10 — Sell Power / smart-meter grid-export target
 
@@ -358,7 +357,7 @@ Purpose: control **net export at the GoodWe smart-meter / point of common coupli
 
 PV is preferred and the battery may discharge when PV alone is insufficient. The inverter may limit PV to avoid exceeding the requested export target.
 
-This is the correct GoodWe primitive when the intention is a net export target at the connection point. EnergyPilot currently exposes it through the manual EMS selector and the **Maximum export** quick action; it is not the normal EMHASS automatic-control primitive.
+This is the correct GoodWe primitive when the intention is a net export target at the connection point. EnergyPilot uses it for automatic Grid/Hybrid export, the manual EMS selector and the **Maximum export** quick action.
 
 ### Mode 11 — Charge Bat / direct battery charging power
 
@@ -370,7 +369,7 @@ Purpose: command the battery itself to charge at a requested power.
 
 PV has priority; if PV is insufficient, grid power may fill the remaining charging demand. The final achievable charge remains bounded by BMS/inverter limits.
 
-This is EnergyPilot's normal automatic charging mode. During a planned near-zero-`P_grid` charge interval, EnergyPilot still uses mode 11 but treats the EMHASS `P_batt` value as a **maximum charge cap** and trims the actual `47512` value from smart-meter feedback.
+Battery strategy uses mode 11 for automatic charging. Grid and Hybrid use mode 1 around a neutral grid target; there is no active EnergyPilot meter-feedback loop trimming mode 11.
 
 ### Mode 12 — Discharge Bat / direct battery discharging power
 
@@ -382,7 +381,7 @@ Purpose: command the battery itself to discharge at a requested power.
 
 Battery discharge has high priority and is bounded by BMS/inverter discharge limits. GoodWe may limit PV under operating conditions where the requested battery discharge and PV together would exceed the applicable inverter/grid constraints.
 
-This is EnergyPilot's normal automatic discharge mode.
+Battery strategy uses mode 12 for automatic discharge.
 
 ### Similar-looking modes that must not be confused
 

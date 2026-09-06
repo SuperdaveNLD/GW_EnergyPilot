@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v025.js?v=1.3.0-beta.5";
+import "./gw-energy-pilot-v025.js?v=1.3.0-beta.6";
 
 const VERSION = "0.26";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -22,6 +22,8 @@ const TEXT = {
     batteryControl: "Battery control",
     gridControl: "Grid control",
     hybridControl: "Hybrid control",
+    hybrid2Control: "Hybrid 2.0 Beta",
+    hybrid2Description: "Planned battery charging with grid import uses mode 2 at the configured maximum power, with PV priority. Other steps follow Hybrid. Charging and SOC can exceed the EMHASS forecast and its planned SOC maximum; EV protection remains active.",
     batteryDescription: "Controls charging and discharging using the requested battery power (GoodWe 11/12).",
     gridDescription: "Controls import and export using the requested grid power (GoodWe 9/10).",
     hybridDescription: "Uses battery power for buying/charging (11) and grid power for selling/export (10).",
@@ -121,6 +123,8 @@ const TEXT = {
     batteryControl: "Accuregeling",
     gridControl: "Netregeling",
     hybridControl: "Hybride regeling",
+    hybrid2Control: "Hybrid 2.0 Beta",
+    hybrid2Description: "Geplande batterijlading met netimport gebruikt modus 2 op het ingestelde maximale regelvermogen, met PV-voorrang. Overige stappen volgen Hybrid. Lading en SOC kunnen de EMHASS-prognose en het geplande SOC-maximum overschrijden; EV-beveiliging blijft actief.",
     batteryDescription: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
     gridDescription: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
     hybridDescription: "Regelt inkoop/laden op accuvermogen (11) en verkoop/export op netvermogen (10).",
@@ -208,6 +212,7 @@ const STRATEGY_KEYS = {
   battery: ["batteryControl", "batteryDescription"],
   grid: ["gridControl", "gridDescription"],
   hybrid: ["hybridControl", "hybridDescription"],
+  hybrid_2: ["hybrid2Control", "hybrid2Description"],
 };
 
 const FIELD_NL = {
@@ -271,7 +276,7 @@ async function saveStrategy(panel, entryId, strategy, select) {
   const next = strategyText(panel, strategy);
   if (automaticOn) {
     const confirmed = window.confirm(
-      `${t(panel, "confirmAutoStrategy")}\n\n${t(panel, "confirmSwitch", { strategy: next.label })}\n\n${t(panel, "confirmReevaluate")}`
+      `${t(panel, "confirmAutoStrategy")}\n\n${t(panel, "confirmSwitch", { strategy: next.label })}\n\n${strategy === "hybrid_2" ? `${next.description}\n\n` : ""}${t(panel, "confirmReevaluate")}`
     );
     if (!confirmed) {
       select.value = cache.data?.strategy || "battery";
@@ -318,13 +323,13 @@ function localizeControlStrategy(panel, root) {
   old.innerHTML = `
     <div>
       <div class="ep-v016-field-label"><span>${panel._escape(t(panel, "controlStrategy"))}</span><span>GoodWe EMS</span></div>
-      <div class="ep-v016-field-description">${panel._escape(t(panel, "controlStrategyHelp"))}</div>
+      <div class="ep-v016-field-description">${panel._escape(strategy === "hybrid_2" ? current.description : t(panel, "controlStrategyHelp"))}</div>
       <div class="ep-v022-smart-meter-status ${meterAvailable ? "ok" : strategy === "battery" ? "" : "warning"}">
         ${panel._escape(cache.error || cache.message || current.description)}
       </div>
     </div>
     <select class="ep-v016-input" ${busy ? "disabled" : ""} aria-label="${panel._escape(t(panel, "controlStrategy"))}">
-      ${["battery", "grid", "hybrid"].map((value) => `<option value="${value}" ${strategy === value ? "selected" : ""}>${panel._escape(strategyText(panel, value).label)}</option>`).join("")}
+      ${["battery", "grid", "hybrid", "hybrid_2"].map((value) => `<option value="${value}" ${strategy === value ? "selected" : ""}>${panel._escape(strategyText(panel, value).label)}</option>`).join("")}
     </select>`;
 
   const select = old.querySelector("select");
