@@ -168,7 +168,7 @@ class Hybrid2EVReferenceTests(unittest.IsolatedAsyncioTestCase):
         controller, client = self.make_controller()
         controller.hass.states.set("sensor.ev_power", "0")
         for battery, grid, expected in (("0", "700", (1, 0)), ("5000", "-4000", (3, 5000)),
-                                       ("-8400", "2900", (11, 8400)), ("0", "-4000", (10, 4000))):
+                                       ("-8400", "2900", (2, 8400)), ("0", "-4000", (10, 4000))):
             controller.hass.states.set("sensor.p_batt", battery)
             controller.hass.states.set("sensor.p_grid", grid)
             await controller.async_evaluate()

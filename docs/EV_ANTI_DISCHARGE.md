@@ -1,6 +1,6 @@
 # EV anti-discharge protection
 
-This document defines current development behavior, including the v1.3.0-beta.9 Hybrid 2.0 test mapping. Published beta.8 used the earlier EV import reference.
+This document defines v1.3.0-beta.10 behavior: beta.9's grid-first Hybrid 2.0 mapping with the charging-mode change from 11 to 2. Published beta.9 still used mode 11; beta.8 used the earlier EV import reference.
 
 ## Purpose
 
@@ -9,8 +9,9 @@ The EV feature is an **anti-discharge protection**, not an EV charging controlle
 While the EV is charging, the home battery should not supply the EV. The
 Hybrid 2.0 test uses mode 5 with inverter output set to fresh local load 35172
 minus measured EV power for grid-neutral self-use, including neutral P_batt.
-Outside the grid deadband, planned battery charging uses mode 11 at the
-planned watts and explicit discharge is held. The load boundary and PV
+Outside the grid deadband, planned battery charging uses mode 2 at the
+bounded planned watt magnitude as a grid-assistance allowance. PV can add
+to battery charging; explicit discharge is held. The load boundary and PV
 surplus behavior still need field validation. Battery, Grid and original
 Hybrid retain their existing plan-direction guards below.
 
@@ -49,8 +50,8 @@ For the original Battery, Grid and Hybrid strategies, `P_batt` is the directiona
 
 Hybrid 2.0 classifies the grid deadband first, including P_batt = 0 and
 positive battery plans for house self-use. Within the band it uses mode 5 at
-bounded max(0, local load minus EV). Outside it, charging follows battery watts
-in mode 11 and explicit discharge uses mode 8. Neutral battery/net-only EV
+bounded max(0, local load minus EV). Outside it, charging uses bounded
+abs(P_batt) as mode-2 grid assistance and explicit discharge uses mode 8. Neutral battery/net-only EV
 plans are unresolved and use protective Hold. This does not make a zero
 battery plan an explicit Pause. See [the complete test matrix](HYBRID_2.md).
 
@@ -62,8 +63,10 @@ When EMHASS requests battery charging while the EV is active:
 - **Grid/Hybrid control**: mode `9` for import, mode `1` inside the grid
   deadband, or mode `10` for export. Export alongside a charging battery plan
   can represent PV export and is not itself a battery-discharge request.
-- **Hybrid 2.0 Beta**: mode `11` at bounded `abs(P_batt)` for battery charging
-  outside the grid deadband. Grid-neutral self-use uses mode `5` at local
+- **Hybrid 2.0 Beta**: mode `2` at bounded `abs(P_batt)` for PV-priority grid
+  assistance outside the grid deadband, with or without EV. PV can add to
+  actual battery charging; no EV scheduling or maximum dispatch is inferred.
+  Grid-neutral self-use uses mode `5` at local
   load minus EV, updated every 15 seconds. Both local load and EV power must
   be finite and fresh within 30 seconds; stale/failed/missing inputs Hold.
   Missing/non-ready/suspended plans also Hold. Mode 5 may curtail PV rather

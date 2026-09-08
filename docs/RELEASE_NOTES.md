@@ -17,6 +17,17 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.10 — Hybrid 2.0 PV-priority charging
+
+This beta changes only Hybrid 2.0's directed charging mode
+from 11 to 2. The existing bounded planned watt magnitude is retained as
+grid assistance, with or without EV; PV can add to actual battery charging.
+Manual mode 11 and other strategies remain unchanged. This is an opt-in Beta
+release with a complete 1.3.0-beta.10 frontend cache boundary. See
+[release notes](releases/v1.3.0-beta.10.md) and [current policy](HYBRID_2.md).
+Automatic mode-2/PV/EV hardware validation remains open; the separate delayed
+read-back/EV-stop issue and mode-5/Hold transitions are not fixed here.
+
 # v1.3.0-beta.9 — Hybrid 2.0 grid-first test
 
 The selected Hybrid 2.0 strategy now checks the grid deadband before the
@@ -449,6 +460,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.10** | 2026-09-08 | **Beta** | Hybrid 2.0 charging via mode 2 with bounded planned grid assistance and additive PV, with or without EV. |
 | **1.3.0-beta.9** | 2026-09-06 | **Beta** | Grid-first Hybrid 2.0; planned watts via 11/3 and EV house output via 5 with fresh local load. |
 | **1.3.0-beta.8** | 2026-09-06 | **Beta** | Hybrid 2.0 house self-consumption via a measured EV import reference; planned battery charging watts and protective Hold. |
 | **1.3.0-beta.7** | 2026-09-06 | **Beta** | Hybrid 2.0 follows explicit battery charging independent of a neutral/exporting/missing grid plan. |

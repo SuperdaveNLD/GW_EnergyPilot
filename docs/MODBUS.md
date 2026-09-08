@@ -349,7 +349,7 @@ Purpose: control **net grid import at the GoodWe smart-meter / point of common c
 
 The inverter may charge **or discharge** the battery to maintain that import target. If PV is excessive it may also limit PV; if load is high the battery may discharge to avoid exceeding the requested import.
 
-Mode 9 owns battery direction as part of a grid target. Grid and Hybrid strategies use it for planned import. Hybrid 2.0 uses mode 11 for explicit net charging. During EV charging, its self-use/PV-charge branches use mode 9 with measured EV power as the PCC import target. This allows the battery to supply the ordinary house or absorb PV surplus; explicit planned discharge and pause use mode 8.
+Mode 9 owns battery direction as part of a grid target. Grid and Hybrid strategies use it for planned import. Hybrid 2.0 in v1.3.0-beta.10 checks the grid deadband first and uses mode 2 at bounded abs(P_batt) as PV-priority grid assistance for directed charging. Its EV self-use branch uses mode 5 at fresh local load minus measured EV power; explicit planned discharge and pause use mode 8. Published beta.8 used the mode-9 EV reference and beta.9 used mode 11 for directed charging. See the current matrix in HYBRID_2.md.
 
 ### Mode 10 — Sell Power / smart-meter grid-export target
 
@@ -373,7 +373,7 @@ Purpose: command the battery itself to charge at a requested power.
 
 PV has priority; if PV is insufficient, grid power may fill the remaining charging demand. The final achievable charge remains bounded by BMS/inverter limits.
 
-Battery strategy and Hybrid 2.0 net-charge windows use mode 11 for automatic charging. Grid and Hybrid use mode 1 around a neutral grid target; there is no active EnergyPilot meter-feedback loop trimming mode 11.
+Battery strategy retains mode 11 for automatic charging. Hybrid 2.0 in v1.3.0-beta.10 uses mode 2 at the same bounded planned watt magnitude, now a grid-assistance allowance to which PV can contribute. This changes the selected mode, not register semantics. Grid and Hybrid use mode 1 around a neutral grid target; there is no active EnergyPilot meter-feedback loop trimming mode 11.
 
 ### Mode 12 — Discharge Bat / direct battery discharging power
 

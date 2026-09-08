@@ -4222,7 +4222,7 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
             page, ".ep-v024-control-strategy-field .ep-v016-field-description"
         ).inner_text()
         result["explanation"] = all(text in explanation for text in (
-            "grid deadband first", "mode 11", "mode 3", "mode 5", "mode 8 Hold", "15 seconds", "30 seconds",
+            "grid deadband first", "mode 2", "grid assistance", "PV can add", "mode 3", "mode 5", "mode 8 Hold", "15 seconds", "30 seconds",
         ))
         activate(page, profile, ".ep-v016-back")
         page.wait_for_function(
@@ -4240,7 +4240,9 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
               return {
                 note: Boolean(note && !note.hidden &&
                   note.textContent.includes('Hybrid 2.0 Beta') &&
-                  note.textContent.includes('mode 11') &&
+                  note.textContent.includes('mode 2') &&
+                  note.textContent.includes('grid assistance') &&
+                  note.textContent.includes('PV can add') &&
                   note.textContent.includes('mode 3') &&
                   note.textContent.includes('mode 5') &&
                   note.textContent.includes('mode 8 Hold') &&
@@ -5778,7 +5780,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.9 BETA",
+        "v131": "v1.3.0-beta.10 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(

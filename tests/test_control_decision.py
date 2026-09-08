@@ -127,7 +127,7 @@ class ControlDecisionTests(unittest.TestCase):
             (c.MODE_AUTO, 0, "hybrid_grid_zero_auto"),
         )
 
-    def test_hybrid2_charge_plan_follows_battery_watts_with_maximum_as_cap(self):
+    def test_hybrid2_mode2_assistance_uses_planned_watts_with_maximum_as_cap(self):
         for battery, grid in (
             (-15000, 9574),
             (-8400, 2900),
@@ -141,14 +141,14 @@ class ControlDecisionTests(unittest.TestCase):
                         self.assertEqual((decision.mode, decision.power), (8, 0))
                         continue
                     self.assertEqual((decision.mode, decision.power, decision.command),
-                                     (11, min(abs(battery), maximum, 15000), "hybrid2_planned_battery_charge"))
+                                     (2, min(abs(battery), maximum, 15000), "hybrid2_planned_battery_charge"))
 
     def test_hybrid2_uses_grid_deadband_before_battery_direction(self):
         for battery in (-15000, -101, -100, 0, 100, 101, 15000):
             for grid in (-15000, -1001, -1000, 0, 1000, 1001, 15000):
                 with self.subTest(battery=battery, grid=grid):
                     expected = (1, 0) if abs(grid) <= 1000 else (
-                        (11, min(abs(battery), 10000)) if battery < -100 else
+                        (2, min(abs(battery), 10000)) if battery < -100 else
                         (3, min(battery, 10000)) if battery > 100 else
                         (9 if grid > 0 else 10, min(abs(grid), 10000))
                     )
@@ -173,7 +173,7 @@ class ControlDecisionTests(unittest.TestCase):
                     if abs(grid) <= 1000:
                         expected = (5, 1000, "ev_house_self_consumption")
                     elif battery < -100:
-                        expected = (11, min(abs(battery), 10000), "ev_battery_charge")
+                        expected = (2, min(abs(battery), 10000), "ev_battery_charge")
                     elif battery > 100:
                         expected = (8, 0, "ev_anti_discharge_hold")
                     else:
@@ -185,6 +185,23 @@ class ControlDecisionTests(unittest.TestCase):
         active = self.resolve("hybrid_2", -1330, -29, True)
         self.assertEqual((normal.mode, normal.power), (1, 0))
         self.assertEqual((active.mode, active.power), (5, 1000))
+
+    def test_mode2_change_is_scoped_to_hybrid2_with_and_without_ev(self):
+        for ev in (False, True):
+            for strategy, expected in (
+                ("battery", (11, 5000)), ("grid", (9, 4300)),
+                ("hybrid", (9, 4300)), ("hybrid_2", (2, 5000)),
+            ):
+                with self.subTest(strategy=strategy, ev=ev):
+                    result = self.resolve(strategy, -5000, 4300, ev)
+                    self.assertEqual((result.mode, result.power), expected)
+
+    def test_hybrid2_charge_does_not_require_self_use_measurements(self):
+        for grid in (4300, -4300):
+            result = self.resolve("hybrid_2", -5000, grid, True,
+                                  ev_power_w=None, load_power_w=None)
+            self.assertEqual((result.mode, result.power), (2, 5000))
+        self.assertEqual(self.resolve("hybrid_2", -5000, 4300, True, max_power=0).mode, 8)
 
     def test_hybrid2_ev_missing_or_invalid_measurement_holds(self):
         for power in (None, float("nan"), float("inf"), -1, 0):

@@ -13,6 +13,7 @@ from .const import (
     MODE_AUTO,
     MODE_BATTERY_HOLD,
     MODE_CHARGE_BATTERY,
+    MODE_CHARGE_PV,
     MODE_DISCHARGE_BATTERY,
     MODE_DISCHARGE_PV,
     MODE_GRID_EXPORT_TARGET,
@@ -143,11 +144,16 @@ def preview_hybrid_mapping(
     if battery < -battery_boundary:
         if maximum == 0:
             return HybridMappingPreview(MODE_BATTERY_HOLD, 0, "zero_dispatch_limit")
+        # Retain the planned watt magnitude as a grid-assistance allowance.
+        # Mode 2 prioritizes PV, which can add to the resulting battery charge;
+        # this is not mode 11's fixed battery-power target or maximum dispatch.
         return HybridMappingPreview(
-            MODE_CHARGE_BATTERY,
+            MODE_CHARGE_PV,
             _bounded_power(battery, maximum),
             "planned_battery_charge",
-            ("mode11_charge_during_planned_export",) if grid < 0 else (),
+            ("mode2_pv_additive_charge",) + (
+                ("mode2_charge_during_planned_export",) if grid < 0 else ()
+            ),
         )
     if battery > battery_boundary:
         if ev_active:

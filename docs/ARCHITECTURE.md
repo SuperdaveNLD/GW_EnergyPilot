@@ -197,8 +197,11 @@ Hybrid first preserves an explicit neutral battery plan through mode 8. Every no
 ### Hybrid 2.0 Beta
 
 The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
-mode **1**, including `P_batt = 0`. Outside it, charging uses **11** at planned
-battery watts, discharging uses **3** at planned battery watts, and neutral
+mode **1**, including `P_batt = 0`. Outside it, charging uses **2** at bounded
+`abs(P_batt)` as PV-priority grid assistance. PV can add to actual battery
+charging; the existing watt calculation is retained, not maximum dispatch.
+Published beta.9 used mode 11 for this branch. Discharging uses **3** at
+planned battery watts, and neutral
 battery plans use net targets **9/10**. Explicit manual Pause remains **8**.
 With EV active, self-use uses **5** at fresh local 35172 minus measured EV
 power, updated every 15 seconds. Explicit planned discharge and unsupported

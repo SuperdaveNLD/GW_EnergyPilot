@@ -25,7 +25,7 @@ Xset = target value the inverter tries to reach.
 | Mode | GoodWe/OpenEMS name | EnergyPilot label | `47512` meaning | EnergyPilot policy |
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | unused / `0 W` | normal inverter ownership; also used around a zero `P_grid` target when smart-meter control is enabled |
-| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | Manual; earlier Hybrid 2.0 beta.6/beta.7 experiment |
+| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | Manual; v1.3.0-beta.10 Hybrid 2.0 uses bounded planned watts as allowance |
 | **3** | Discharge PV | PV + battery supply | `Xmax` allowable battery discharge; documented PV priority | manual + opt-in Hybrid 2.0 test |
 | **4** | Import AC | Inverter import / AC charging | `Xset` inverter-level grid purchase target | manual only |
 | **5** | Export AC | Inverter export power | `Xset` inverter-level grid sale/export target | manual + opt-in Hybrid 2.0 EV house test |
@@ -118,16 +118,17 @@ The neutral battery branch is evaluated first so ordinary forecast house import 
 
 ### Hybrid 2.0 Beta
 
-The opt-in `hybrid_2` strategy uses **mode 11 at bounded `abs(P_batt)`**
-when battery charging and grid import are both outside their deadbands.
-During EV charging, self-use (including positive `P_batt` with neutral grid)
-and PV charging use **mode 9 at measured EV power**, refreshed every 15 seconds.
-Pause and explicit planned discharge use mode 8. A fresh measured EV power
-sensor is required for self-use; missing/stale/out-of-range references select
-Hold. Missing/non-ready plan inputs during EV charging also select Hold.
-Other steps retain Hybrid behavior without EV. No existing selection is
-migrated; manual modes remain
-exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+The v1.3.0-beta.10 `hybrid_2` strategy checks the grid deadband first.
+Within it, self-use uses mode 1 without EV and mode 5 at fresh local load
+minus measured EV power with EV. Outside it, charging uses **mode 2 at
+bounded `abs(P_batt)`** as PV-priority grid assistance, with or without EV.
+PV can add to actual battery charging; the allowance is not a fixed battery
+target and is not replaced by maximum dispatch. Discharge uses mode 3 without
+EV and Hold with EV; neutral battery plans use 9/10 without EV and Hold with
+EV. Explicit Pause remains mode 8. Existing freshness/readiness gates remain.
+Published beta.9 used mode 11 for charging. Manual modes remain exact,
+including direct battery charging in mode 11 and Battery strategy's mode 11.
+See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
 
 ## Why mode 1 is used around zero grid target
 

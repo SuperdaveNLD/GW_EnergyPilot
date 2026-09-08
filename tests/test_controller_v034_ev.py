@@ -128,11 +128,11 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(client.calls, [(const.MODE_GRID_EXPORT_TARGET, 4000)])
             self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
-    async def test_hybrid2_ev_planned_charge_with_export_follows_battery_watts(self):
+    async def test_hybrid2_ev_planned_charge_with_export_uses_mode2_assistance(self):
         controller, client = self.make_controller(
             p_batt="-2500", p_grid="-4000", strategy="hybrid_2")
         await controller.async_evaluate()
-        self.assertEqual(client.calls, [(11, 2500)])
+        self.assertEqual(client.calls, [(2, 2500)])
         self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
     async def test_ev_start_event_preserves_existing_charge_command(self):
@@ -165,7 +165,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, [(const.MODE_GRID_IMPORT_TARGET, 4000)])
 
 
-    async def test_hybrid2_charge_uses_planned_watts_with_and_without_ev(self):
+    async def test_hybrid2_mode2_uses_planned_watts_with_and_without_ev(self):
         for ev in ("0", "11000"):
             for grid in ("2900", "9574"):
                 with self.subTest(ev=ev, grid=grid):
@@ -174,7 +174,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
                     controller.entry.options[const.CONF_MAX_POWER] = 12000
                     controller.hass.states.set("sensor.ev_power", ev)
                     await controller.async_evaluate()
-                    self.assertEqual(client.calls, [(11, 1330)])
+                    self.assertEqual(client.calls, [(2, 1330)])
                     self.assertEqual(controller.control_strategy, "hybrid_2")
 
     async def test_hybrid2_ev_start_excludes_ev_and_follows_charge_window(self):
@@ -195,7 +195,7 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         controller.hass.states.set("sensor.p_batt", "-4300")
         controller.hass.states.set("sensor.p_grid", "3600")
         await controller.async_evaluate()
-        self.assertEqual(client.calls[-1], (11, 4300))
+        self.assertEqual(client.calls[-1], (2, 4300))
         self.assertEqual(controller.ev_protection_state, "allowing_charge")
 
         # A following PV-only window must end grid-assisted charging again.
@@ -242,7 +242,22 @@ class EVAntiDischargeStrategyTests(unittest.IsolatedAsyncioTestCase):
         controller.entry.runtime_data = SimpleNamespace(plan_runtime=SimpleNamespace(
             current_p_grid=lambda: 2900, diagnostics={}))
         await controller.async_evaluate()
-        self.assertEqual(client.calls, [(11, 8400)])
+        self.assertEqual(client.calls, [(2, 8400)])
+
+    async def test_hybrid2_old_mode11_readback_does_not_skip_new_mode2_command(self):
+        for ev in ("0", "11000"):
+            with self.subTest(ev=ev):
+                controller, client = self.make_controller(
+                    p_batt="-8400", p_grid="2900", strategy="hybrid_2")
+                controller.hass.states.set("sensor.ev_power", ev)
+                controller.coordinator.data.mode = 11
+                controller.coordinator.data.power = 8400
+                preview = controller.mapping_preview()
+                self.assertEqual((preview["mode"], preview["power_w"]), (2, 8400))
+                self.assertEqual(client.calls, [])
+                await controller.async_evaluate()
+                self.assertEqual(client.calls, [(2, 8400)])
+                self.assertEqual((controller.expected_mode, controller.target_power), (2, 8400))
 
     async def test_hybrid2_ev_stop_still_requires_fresh_native_plan(self):
         controller, client = self.make_controller(

@@ -36,12 +36,13 @@ class EMSMappingPreviewTests(unittest.TestCase):
         self.assertEqual((result.mode, result.power_w, result.reason), (8, 0, "explicit_pause"))
         self.assertEqual(self.preview(0, 0).mode, 1)
 
-    def test_charging_follows_planned_watts_with_and_without_ev(self):
+    def test_mode2_assistance_uses_planned_watts_with_and_without_ev(self):
         for ev in (False, True):
             for grid in (2900, -4000):
                 result = self.preview(-8400, grid, ev_active=ev)
-                self.assertEqual((result.mode, result.power_w), (11, 8400))
-        self.assertIn("mode11_charge_during_planned_export", self.preview(-8400, -4000).validation_required)
+                self.assertEqual((result.mode, result.power_w), (2, 8400))
+                self.assertIn("mode2_pv_additive_charge", result.validation_required)
+        self.assertIn("mode2_charge_during_planned_export", self.preview(-8400, -4000).validation_required)
 
     def test_measured_discharge_is_a_candidate_with_high_pv_test_still_open(self):
         for watts in (1000, 5000, 15000):
@@ -89,7 +90,7 @@ class EMSMappingPreviewTests(unittest.TestCase):
                 self.assertEqual(self.preview(**{field: value}).reason, "invalid_mapping_limits")
 
     def test_power_caps_and_preview_only_result_contract(self):
-        for battery, expected in ((-15000, 11), (15000, 3)):
+        for battery, expected in ((-15000, 2), (15000, 3)):
             self.assertEqual(self.preview(battery, 20000, max_power=8000).power_w, 8000)
             self.assertEqual(self.preview(battery, 20000, max_power=20000).power_w, 15000)
             result = self.preview(battery, 20000)
