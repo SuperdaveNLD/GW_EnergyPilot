@@ -5490,6 +5490,59 @@ def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, obj
     return result
 
 
+def exercise_controller_target_labels(page: Page) -> dict[str, object]:
+    """Mode-2 assistance and subsequent targets patch the same metric in EN/NL."""
+    result: dict[str, object] = {"passed": False, "error": None}
+    original = page.evaluate("""() => Object.fromEntries(
+        ['control_command', 'ems_mode', 'target_power'].map(key =>
+          [key, window.__epPanel._stateByKey(key)])
+    )""")
+    try:
+        for language, labels in (
+            ("en", ("Grid assistance allowance", "Battery target", "Inverter AC target", "PCC target", "Control target")),
+            ("nl", ("Netassistentie-limiet", "Accudoel", "Inverter-AC-doel", "PCC-doel", "Regeldoel")),
+        ):
+            page.evaluate("language => window.__epSetLanguage(language)", language)
+            wait_render_idle(page)
+            identity = page.evaluate_handle("window.__epPanel.shadowRoot.querySelector('main')")
+            for command, strategy, expected, watts in (
+                ("hybrid2_planned_battery_charge", "hybrid_2", labels[0], 8400),
+                ("ev_battery_charge", "hybrid_2", labels[0], 4300),
+                ("ev_battery_charge", "battery", labels[1], 3200),
+                ("hybrid2_planned_battery_charge", "hybrid_2", labels[0], 2100),
+                ("hybrid2_planned_battery_discharge", "hybrid_2", labels[1], 1800),
+                ("ev_house_self_consumption", "hybrid_2", labels[2], 1500),
+                ("grid_import", "grid", labels[3], 1200),
+                ("manual_mode_11", "hybrid_2", labels[4], 900),
+            ):
+                page.evaluate("""({command, strategy, watts}) => {
+                    window.__epSetEntityByKey('ems_mode', '11');
+                    window.__epSetEntityByKey('target_power', watts);
+                    window.__epSetEntityByKey('control_command', command, {control_strategy: strategy});
+                }""", {"command": command, "strategy": strategy, "watts": watts})
+                page.wait_for_function("""({expected, watts, main}) => {
+                    const panel = window.__epPanel;
+                    const root = panel.shadowRoot;
+                    const metric = Array.from(root.querySelectorAll('.panel-card.controller .metric'))
+                      .find(item => item.querySelector('.metric-label')?.textContent === expected);
+                    return root.querySelector('main') === main && metric?.querySelector('.metric-value')
+                      ?.textContent === panel._formatPower(watts);
+                }""", arg={"expected": expected, "watts": watts, "main": identity}, timeout=5000)
+            identity.dispose()
+        result["passed"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    finally:
+        page.evaluate("""original => {
+            for (const [key, state] of Object.entries(original)) {
+              window.__epSetEntityByKey(key, state.state, state.attributes);
+            }
+            window.__epSetLanguage('en');
+        }""", original)
+        wait_render_idle(page)
+    return result
+
+
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
@@ -5635,6 +5688,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         """
     )
 
+    controller_target_labels = exercise_controller_target_labels(page)
     pv_insight = exercise_pv_insight(page)
     hybrid2_settings = exercise_hybrid2_settings(page, profile)
     deadband_settings = exercise_deadband_settings(page, profile)
@@ -5663,6 +5717,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 
     return {
         "profile": profile.name,
+        "controller_target_labels": controller_target_labels,
         "initial": initial,
         "idle_before": idle_before,
         "idle_after": idle_after,
@@ -5710,6 +5765,8 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 def result_failures(profile: Profile, result: dict[str, object], page_errors: list[str]) -> list[str]:
     failures: list[str] = []
     name = profile.name
+    if result["controller_target_labels"]["passed"] is not True:
+        failures.append(f"{name}: controller target classification regression: {result['controller_target_labels']}")
     initial = result["initial"]
     control_architecture = bool(initial.get("controlArchitecture"))
     identity = result["telemetry_identity"]

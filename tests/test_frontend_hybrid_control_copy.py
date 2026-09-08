@@ -42,6 +42,13 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
         ):
             self.assertIn(expected, self.source)
 
+    def test_hybrid2_mode2_target_is_presented_as_grid_assistance(self) -> None:
+        source = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
+        self.assertIn('gridAssistanceTarget: "Grid assistance allowance"', source)
+        self.assertIn('gridAssistanceTarget: "Netassistentie-limiet"', source)
+        self.assertIn('command === "ev_battery_charge" && strategy === "hybrid_2"', source)
+        self.assertIn('const targetText = controllerTargetLabel(panel, t)', source)
+
     def test_hybrid2_mode2_copy_explains_pv_addition_without_changing_other_modes(self) -> None:
         for name in ("ep-control-surface.js", "gw-energy-pilot-v026.js", "gw-energy-pilot-v024.js"):
             with self.subTest(module=name):

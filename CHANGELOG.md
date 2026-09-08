@@ -20,6 +20,9 @@ All notable changes to GW EnergyPilot are documented here.
   read-back/EV-stop race or repeated self-use/Hold transitions.
 - Advance the manifest, beta badge and complete frontend module cache boundary
   to 1.3.0-beta.10. Publish as an opt-in prerelease, never Latest.
+- Classify the live mode-2 target as grid assistance in English/Dutch, using
+  the requested command and strategy rather than delayed inverter read-back.
+  Preserve stable metric DOM while updating labels and watts across commands.
 
 ## [1.3.0-beta.9] - 2026-09-06
 
