@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta release](docs/releases/v1.3.0-beta.9.md)
+[Latest beta release](docs/releases/v1.3.0-beta.10.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,10 +66,10 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.9 · Beta**
+**v1.3.0-beta.10 · Beta**
 
 Latest production release: **v1.2.1 · Stable**
-Latest beta release: **v1.3.0-beta.9**
+Latest beta release: **v1.3.0-beta.10**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -158,6 +158,15 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.10 highlights
+
+Hybrid 2.0 directed charging changes from mode 11 to mode 2, retaining
+bounded `abs(P_batt)` as a PV-priority grid-assistance allowance. Available
+PV can add to battery charging; actual charge power/SOC can exceed the plan.
+This applies with and without EV. Other strategies and manual mode 11 remain
+unchanged. See [beta.10 release notes](docs/releases/v1.3.0-beta.10.md).
+Synchronized automatic mode-2/PV/EV hardware validation remains required.
 
 ## v1.3.0-beta.9 highlights
 
@@ -732,8 +741,11 @@ For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around z
 ### Hybrid 2.0 Beta
 
 The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
-mode **1**, including `P_batt = 0`. Outside it, charging uses **11** at planned
-battery watts, discharging uses **3** at planned battery watts, and neutral
+mode **1**, including `P_batt = 0`. Outside it, charging uses **2** at bounded
+`abs(P_batt)` as PV-priority grid assistance. PV can add to actual battery
+charging; the existing watt calculation is retained, not maximum dispatch.
+Published beta.9 used mode 11 for this branch. Discharging uses **3** at
+planned battery watts, and neutral
 battery plans use net targets **9/10**. Explicit manual Pause remains **8**.
 With EV active, self-use uses **5** at fresh local 35172 minus measured EV
 power, updated every 15 seconds. Explicit planned discharge and unsupported

@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v025.js?v=1.3.0-beta.9";
+import "./gw-energy-pilot-v025.js?v=1.3.0-beta.10";
 
 const VERSION = "0.26";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -23,7 +23,7 @@ const TEXT = {
     gridControl: "Grid control",
     hybridControl: "Hybrid control",
     hybrid2Control: "Hybrid 2.0 Beta",
-    hybrid2Description: "Test mapping: grid deadband first, then Auto (also at P_batt = 0). Outside it, mode 11 follows planned charging watts and mode 3 follows planned discharging watts; neutral battery plans use mode 9/10 net targets. With EV, self-use uses mode 5 at measured load minus EV every 15 seconds; planned discharge uses mode 8 Hold. Explicit pause stays Hold. PV priority and the EV load boundary still require field validation. Fresh local load and EV reports no older than 30 seconds are required.",
+    hybrid2Description: "Test mapping: grid deadband first, then Auto (also at P_batt = 0). Outside it, mode 2 uses planned charging watts as grid assistance with PV priority; PV can add to battery charging; mode 3 follows planned discharging watts; neutral battery plans use mode 9/10 net targets. With EV, self-use uses mode 5 at measured load minus EV every 15 seconds; planned discharge uses mode 8 Hold. Explicit pause stays Hold. PV priority and the EV load boundary still require field validation. Fresh local load and EV reports no older than 30 seconds are required.",
     batteryDescription: "Controls charging and discharging using the requested battery power (GoodWe 11/12).",
     gridDescription: "Controls import and export using the requested grid power (GoodWe 9/10).",
     hybridDescription: "Uses battery power for buying/charging (11) and grid power for selling/export (10).",
@@ -124,7 +124,7 @@ const TEXT = {
     gridControl: "Netregeling",
     hybridControl: "Hybride regeling",
     hybrid2Control: "Hybrid 2.0 Beta",
-    hybrid2Description: "Testmapping: eerst de net-deadband, daarbinnen Auto (ook bij P_batt = 0). Daarbuiten volgt modus 11 de geplande laadwatts en modus 3 de ontlaadwatts; een neutraal accuplan gebruikt netdoelen via modus 9/10. Met EV gebruikt zelfconsumptie modus 5 op gemeten load minus EV, elke 15 seconden; geplande ontlading gaat naar modus 8 Hold. Expliciete pauze blijft Hold. PV-voorrang en de EV-meetgrens vereisen nog praktijktests. Verse lokale load- en EV-metingen van maximaal 30 seconden oud zijn vereist.",
+    hybrid2Description: "Testmapping: eerst de net-deadband, daarbinnen Auto (ook bij P_batt = 0). Daarbuiten gebruikt modus 2 de geplande laadwatts als netassistentie met PV-voorrang; PV kan extra bijdragen aan acculaden; modus 3 volgt de ontlaadwatts; een neutraal accuplan gebruikt netdoelen via modus 9/10. Met EV gebruikt zelfconsumptie modus 5 op gemeten load minus EV, elke 15 seconden; geplande ontlading gaat naar modus 8 Hold. Expliciete pauze blijft Hold. PV-voorrang en de EV-meetgrens vereisen nog praktijktests. Verse lokale load- en EV-metingen van maximaal 30 seconden oud zijn vereist.",
     batteryDescription: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
     gridDescription: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
     hybridDescription: "Regelt inkoop/laden op accuvermogen (11) en verkoop/export op netvermogen (10).",

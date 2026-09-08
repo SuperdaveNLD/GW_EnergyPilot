@@ -1,8 +1,9 @@
 # Hybrid 2.0 Beta — grid-first test mapping
 
-This is the **v1.3.0-beta.9 opt-in test mapping** requested after the owner's
-2026-09-06 ETA tests. The published beta.8 used a different mode-9 EV reference;
-its release notes remain historical. Select **Settings → GoodWe → Automatic
+This is the **v1.3.0-beta.10 opt-in test mapping**, based on beta.9's
+grid-first model with the owner's 2026-09-08 change from charging mode 11 to
+mode 2. Published beta.9 still used mode 11; beta.8 used a different mode-9
+EV reference. Their release notes remain historical. Select **Settings → GoodWe → Automatic
 control strategy → Hybrid 2.0 Beta** after installing this change. The stored
 key remains `hybrid_2`. Battery, Grid and original Hybrid behavior is unchanged.
 
@@ -15,7 +16,7 @@ EMHASS signs: battery negative = charging; grid positive = import.
 | Valid plan | Without EV | EV charging |
 |---|---|---|
 | Grid inside its deadband, including exact boundaries and any battery sign/zero | **1**, 0 W | **5**, bounded actual load minus EV |
-| Grid outside deadband, battery below its negative deadband | **11**, bounded `abs(P_batt)` | **11**, same watts |
+| Grid outside deadband, battery below its negative deadband | **2**, bounded `abs(P_batt)` grid assistance | **2**, same allowance |
 | Grid outside deadband, battery above its positive deadband | **3**, bounded `P_batt` | **8**, 0 W |
 | Grid outside deadband, battery inside its deadband | **9** import / **10** export, bounded `abs(P_grid)` | **8**, unresolved net-only EV case |
 | Explicit manual Pause | **8**, 0 W | **8**, 0 W |
@@ -30,9 +31,16 @@ A plan of battery 300 W and grid 400 W gives Auto with a 1,000 W grid deadband,
 but mode 3 at **300 W**, not 400 W, with a 300 W grid deadband. Battery 0 W and
 grid 700 W also gives Auto with the default 1,000 W band.
 
-Outside the grid band, planned battery charging follows watts even alongside
-planned export. This is a test choice: mode 11 can buy grid energy when actual
-PV falls, and no extra tariff gate is inferred. A net-only mode 9/10 target can
+Outside the grid band, planned charging uses mode 2 with the existing
+bounded `abs(P_batt)` watt calculation, even alongside planned export.
+The setpoint is now a PV-priority grid-assistance allowance, not a fixed
+battery-power target. Available GoodWe-visible PV can contribute on top;
+actual battery charging and SOC may therefore exceed the EMHASS forecast.
+Do not add measured PV to the setpoint or substitute maximum control power
+for the planned magnitude. Inverter/BMS limits remain authoritative, and
+synchronized automatic mode-2/PV/EV validation remains required. Mode 2 can
+buy grid energy when actual PV falls; no extra tariff gate is inferred.
+A net-only mode 9/10 target can
 move the battery in either direction; it does not enforce neutral battery
 power. The unresolved EV variant therefore uses protective Hold, not a mode-9
 EV import reference. This fallback is labelled house-control Hold, not an

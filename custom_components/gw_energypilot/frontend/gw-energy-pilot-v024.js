@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v023.js?v=1.3.0-beta.9";
+import "./gw-energy-pilot-v023.js?v=1.3.0-beta.10";
 
 const VERSION = "0.24";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -11,7 +11,7 @@ const STRATEGY_LABELS = {
 };
 
 const STRATEGY_DESCRIPTIONS = {
-  hybrid_2: "Testmapping: eerst de net-deadband, daarbinnen Auto (ook bij P_batt = 0). Daarbuiten volgt modus 11 de geplande laadwatts en modus 3 de ontlaadwatts; een neutraal accuplan gebruikt netdoelen via modus 9/10. Met EV gebruikt zelfconsumptie modus 5 op gemeten load minus EV, elke 15 seconden; geplande ontlading gaat naar modus 8 Hold. Expliciete pauze blijft Hold. PV-voorrang en de EV-meetgrens vereisen nog praktijktests.",
+  hybrid_2: "Testmapping: eerst de net-deadband, daarbinnen Auto (ook bij P_batt = 0). Daarbuiten gebruikt modus 2 de geplande laadwatts als netassistentie met PV-voorrang; PV kan extra bijdragen aan acculaden; modus 3 volgt de ontlaadwatts; een neutraal accuplan gebruikt netdoelen via modus 9/10. Met EV gebruikt zelfconsumptie modus 5 op gemeten load minus EV, elke 15 seconden; geplande ontlading gaat naar modus 8 Hold. Expliciete pauze blijft Hold. PV-voorrang en de EV-meetgrens vereisen nog praktijktests.",
   battery: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
   grid: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
   hybrid: "Regelt inkoop/laden op accuvermogen (11) en verkoop/export op netvermogen (10).",

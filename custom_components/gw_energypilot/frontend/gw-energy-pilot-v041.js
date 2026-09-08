@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.3.0-beta.9";
+import "./gw-energy-pilot-v039.js?v=1.3.0-beta.10";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.9";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.10";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.9";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.9";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.9";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.10";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.10";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.10";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.3.0-beta.9";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.9";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.9";
+} from "./ep-control-surface.js?v=1.3.0-beta.10";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.10";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.10";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -118,6 +118,9 @@ const COPY = Object.freeze({
     evHouseTitle: "EV CHARGING · HOUSE SELF-CONSUMPTION",
     evInverterTarget: "Inverter AC target",
     evBatteryTarget: "Battery target",
+    gridAssistanceTarget: "Grid assistance allowance",
+    pccTarget: "PCC target",
+    controlTarget: "Control target",
     evHouseDetail: "Mode 5 test · Inverter output follows measured load minus EV",
     evReferenceHoldTitle: "EV CHARGING · HOUSE CONTROL ON HOLD",
     evReferenceHoldDetail: "Mode 8 · Requires a supported plan and fresh local load and EV power",
@@ -205,6 +208,9 @@ const COPY = Object.freeze({
     evHouseTitle: "EV LAADT · ZELFCONSUMPTIE VOOR HET HUIS",
     evInverterTarget: "Inverter-AC-doel",
     evBatteryTarget: "Accudoel",
+    gridAssistanceTarget: "Netassistentie-limiet",
+    pccTarget: "PCC-doel",
+    controlTarget: "Regeldoel",
     evHouseDetail: "Modus 5-test · Invertervermogen volgt gemeten load minus EV",
     evReferenceHoldTitle: "EV LAADT · HUISREGELING OP HOLD",
     evReferenceHoldDetail: "Modus 8 · Ondersteund plan en verse lokale load- en EV-meting vereist",
@@ -1546,6 +1552,25 @@ function patchEvProtectionBanner(panel, root) {
   if (detail) detail.textContent = presentation[1];
 }
 
+function controllerTargetLabel(panel, t) {
+  const state = panel._stateByKey?.("control_command");
+  const command = String(state?.state || "");
+  const strategy = state?.attributes?.control_strategy
+    || panel._stateByKey?.("control_strategy")?.state;
+  // Classify the requested command, not potentially delayed EMS read-back.
+  if (command === "hybrid2_planned_battery_charge"
+    || (command === "ev_battery_charge" && strategy === "hybrid_2")) {
+    return t.gridAssistanceTarget;
+  }
+  if (command === "ev_house_self_consumption") return t.evInverterTarget;
+  if (command === "hybrid2_planned_battery_discharge"
+    || command.startsWith("battery_") || command.startsWith("ev_")) {
+    return t.evBatteryTarget;
+  }
+  return command.startsWith("grid_") || command === "goodwe_auto"
+    ? t.pccTarget : t.controlTarget;
+}
+
 function patchController(panel, root, automaticOn) {
   const card = root.querySelector(".panel-card.controller");
   if (!card) return;
@@ -1575,18 +1600,17 @@ function patchController(panel, root, automaticOn) {
       commandAttrs.last_ems_setpoint_updated_at
     )}`
   );
+  const targetLabels = ["EnergyPilot target", "Inverter AC target", "Inverter-AC-doel", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel", "Grid assistance allowance", "Netassistentie-limiet"];
   patchMetric(
     card,
-    ["EnergyPilot target", "Inverter AC target", "Inverter-AC-doel", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel"],
+    targetLabels,
     panel._formatPower(finite(panel, "target_power"))
   );
   patchMetric(card, ["Command", "Commando"], panel._textByKey?.("control_command") || "—");
-  const command = String(panel._stateByKey?.("control_command")?.state || "");
-  if (["ev_house_self_consumption", "hybrid2_planned_battery_charge", "hybrid2_planned_battery_discharge", "ev_battery_charge"].includes(command)) {
-    const target = metricByLabels(card, ["EnergyPilot target", "Inverter AC target", "Inverter-AC-doel", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel"]);
-    const label = target?.querySelector(".metric-label");
-    if (label) label.textContent = command === "ev_house_self_consumption" ? t.evInverterTarget : t.evBatteryTarget;
-  }
+  const target = metricByLabels(card, targetLabels);
+  const targetLabel = target?.querySelector(".metric-label");
+  const targetText = controllerTargetLabel(panel, t);
+  if (targetLabel && targetLabel.textContent !== targetText) targetLabel.textContent = targetText;
 
   const manual = legacyControls ? card.querySelector(".ep-v021-manual-pad") : null;
   if (manual) {
