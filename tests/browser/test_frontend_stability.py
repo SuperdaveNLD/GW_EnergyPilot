@@ -4318,6 +4318,8 @@ def exercise_hybrid3_settings(page: Page, profile: Profile) -> dict[str, object]
                 const rows = [...table.querySelectorAll('tbody tr')];
                 const note = root.querySelector('.ep-v022-strategy-note');
                 const modes = rows.map(row => row.children[2].textContent.trim());
+                const modeHeading = document.createRange();
+                modeHeading.selectNodeContents(table.querySelector('thead th:nth-child(3)'));
                 const target = detail.querySelector('summary').getBoundingClientRect();
                 window.__epSetEntityByKey('battery_power', -7500);
                 await new Promise(resolve => setTimeout(resolve, 300));
@@ -4327,6 +4329,7 @@ def exercise_hybrid3_settings(page: Page, profile: Profile) -> dict[str, object]
                     modes,
                     width: [table.scrollWidth, table.clientWidth],
                     table: !detail.hidden && detail.open && rows.length === 6 &&
+                        modeHeading.getClientRects().length === 1 &&
                         modes.join(',') === '1,5,3,5,2,2' &&
                         rows[0].children[0].textContent.trim() === (language === 'nl' ? 'Zelfverbruik' : 'Self-use') &&
                         note.textContent.includes('Tibber Grid Rewards') &&

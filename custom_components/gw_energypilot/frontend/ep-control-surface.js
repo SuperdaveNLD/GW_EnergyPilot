@@ -253,7 +253,8 @@ const CONTROL_SURFACE_CSS = `
   .ep-hybrid3-scenarios summary { min-height:44px; padding:12px 0; cursor:pointer; }
   .ep-hybrid3-scenarios table { width:100%; border-collapse:collapse; table-layout:fixed; }
   .ep-hybrid3-scenarios th, .ep-hybrid3-scenarios td { text-align:left; padding:8px 4px; border-bottom:1px solid rgba(74,190,229,.2); overflow-wrap:anywhere; }
-  .ep-hybrid3-scenarios th:nth-child(2), .ep-hybrid3-scenarios th:nth-child(3) { width:14%; }
+  .ep-hybrid3-scenarios th:nth-child(2) { width:12%; }
+  .ep-hybrid3-scenarios th:nth-child(3) { width:17%; white-space:nowrap; }
   ep-control-surface,
   ep-battery-actions,
   ep-automatic-control,
