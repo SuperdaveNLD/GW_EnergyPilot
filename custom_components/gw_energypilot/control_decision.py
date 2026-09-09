@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import isfinite
 
 from .const import (
@@ -10,6 +10,7 @@ from .const import (
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
     CONTROL_STRATEGY_HYBRID_2,
+    CONTROL_STRATEGY_HYBRID_3,
     MODE_AUTO,
     MODE_BATTERY_HOLD,
     MODE_CHARGE_BATTERY,
@@ -53,8 +54,8 @@ class HybridMappingPreview:
     """A proposed mapping, never a live ControlDecision or write permission.
 
     Validation requirements describe unresolved hardware/model assumptions.
-    Serialization is read-only. Only the explicitly selected Hybrid 2.0
-    strategy may translate this model into a live ControlDecision.
+    Serialization is read-only. Only the explicitly selected Hybrid 2.0/3.0
+    strategy may translate its corresponding model into a live ControlDecision.
     """
 
     mode: int | None
@@ -62,10 +63,11 @@ class HybridMappingPreview:
     reason: str
     validation_required: tuple[str, ...] = ()
     house_reference_w: float | None = None
+    model: str = "hybrid_grid_first_v1"
 
     def as_dict(self) -> dict[str, object]:
         return {
-            "model": "hybrid_grid_first_v1",
+            "model": self.model,
             "preview_only": True,
             "mode": self.mode,
             "power_w": self.power_w,
@@ -182,6 +184,25 @@ def preview_hybrid_mapping(
     )
 
 
+def preview_hybrid3_mapping(**kwargs) -> HybridMappingPreview:
+    """Six-scenario EV-excluded variant; preserve Hybrid 2.0's boundaries.
+
+    Grid-neutral plans still mean self-use, not a new grid-charge request.
+    Neutral-battery net-only plans also mean self-use (no 9/10). During EV
+    charging an otherwise directed discharge is reduced to the measured
+    house reference. Reuse the same validated mode-2/3/5 watt semantics.
+    """
+    model = preview_hybrid_mapping(**kwargs)
+    if model.reason in {
+        "net_only_import_candidate", "net_only_export_candidate",
+        "ev_net_only_action_unresolved", "ev_planned_discharge_blocked",
+    }:
+        model = preview_hybrid_mapping(**{**kwargs, "p_grid": 0})
+    if model.mode is None:
+        model = replace(model, mode=MODE_BATTERY_HOLD, power_w=0)
+    return replace(model, model="hybrid_3_ev_excluded_v1")
+
+
 def resolve_control_decision(
     *,
     strategy: str,
@@ -200,17 +221,19 @@ def resolve_control_decision(
     controller. It can therefore also project future plan rows without moving
     any GoodWe actuator. Exact deadband boundaries remain neutral.
     """
-    if strategy == CONTROL_STRATEGY_HYBRID_2:
-        model = preview_hybrid_mapping(
+    if strategy in {CONTROL_STRATEGY_HYBRID_2, CONTROL_STRATEGY_HYBRID_3}:
+        preview = preview_hybrid3_mapping if strategy == CONTROL_STRATEGY_HYBRID_3 else preview_hybrid_mapping
+        prefix = "hybrid3" if strategy == CONTROL_STRATEGY_HYBRID_3 else "hybrid2"
+        model = preview(
             p_batt=p_batt, p_grid=p_grid,
             battery_deadband=battery_deadband, grid_deadband=grid_deadband,
             max_power=max_power, ev_active=ev_active,
             ev_power_w=ev_power_w, load_power_w=load_power_w,
         )
         commands = {
-            "grid_deadband_self_consumption": "hybrid2_grid_zero_auto",
-            "planned_battery_charge": "ev_battery_charge" if ev_active else "hybrid2_planned_battery_charge",
-            "planned_pv_priority_discharge_candidate": "hybrid2_planned_battery_discharge",
+            "grid_deadband_self_consumption": f"{prefix}_grid_zero_auto",
+            "planned_battery_charge": "ev_battery_charge" if ev_active else f"{prefix}_planned_battery_charge",
+            "planned_pv_priority_discharge_candidate": f"{prefix}_planned_battery_discharge",
             "ev_house_inverter_export_candidate": "ev_house_self_consumption",
             "ev_planned_discharge_blocked": "ev_anti_discharge_hold",
             "waiting_for_ev_house_measurements": "ev_self_consumption_hold",

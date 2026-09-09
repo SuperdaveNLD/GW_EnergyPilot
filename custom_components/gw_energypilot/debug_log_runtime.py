@@ -103,6 +103,8 @@ class GWEnergyPilotDebugRuntime:
         return {
             "enabled": controller.enabled,
             "control_strategy": controller.control_strategy,
+            "hybrid3": (getattr(controller, "hybrid3_diagnostics", None)
+                        if controller.control_strategy == "hybrid_3" else None),
             "last_command": controller.last_command,
             "target_power": controller.target_power,
             "expected_mode": controller.expected_mode,

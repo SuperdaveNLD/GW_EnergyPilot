@@ -126,6 +126,15 @@ active GoodWe mode.
 
 ## Choose an automatic-control strategy
 
+Beta testers can also explicitly select **Hybrid 3.0 excl. EV** in GoodWe
+settings. It is designed for independently scheduled Tibber Grid Rewards
+charging: self-use/discharge/charge use **1/3/2**, or **5/5/2** while EV charges.
+Mode 5 uses fresh measured house load excluding EV every 15 seconds; mode 2
+retains planned grid-assistance watts plus available PV. The dashboard shows
+all six scenarios. Missing required data selects Hold; existing selections
+are not migrated. See [the complete policy and field limits](HYBRID_3.md).
+This does not guarantee rewards or zero instantaneous battery-to-EV flow.
+
 ### Battery
 
 Use the planned battery power directly. Charge plans select GoodWe mode 11,

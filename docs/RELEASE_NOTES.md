@@ -17,6 +17,17 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.3.0-beta.11 — Hybrid 3.0 excl. EV
+
+A new opt-in strategy uses Auto/discharge/charge modes **1/3/2** without EV
+and **5/5/2** with EV, intended to support independently scheduled Tibber Grid
+Rewards charging without deliberately feeding the EV from the home battery.
+The dashboard includes the EN/NL scenario table. Fresh house-reference recovery,
+direct bounded command readback and EV-stop freshness are explicitly guarded
+and diagnosed. Existing selections, other strategies and EMHASS settings remain.
+This is **Beta**, not guaranteed rewards or physically proven instantaneous EV
+exclusion. See [release notes](releases/v1.3.0-beta.11.md) and [policy](HYBRID_3.md).
+
 # v1.3.0-beta.10 — Hybrid 2.0 PV-priority charging
 
 This beta changes only Hybrid 2.0's directed charging mode
@@ -460,6 +471,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.3.0-beta.11** | 2026-09-09 | **Beta** | Opt-in Hybrid 3.0 excl. EV; six scenarios, Tibber Grid Rewards purpose, measured house reference and explicit recovery/readback evidence. |
 | **1.3.0-beta.10** | 2026-09-08 | **Beta** | Hybrid 2.0 charging via mode 2 with bounded planned grid assistance and additive PV, with or without EV. |
 | **1.3.0-beta.9** | 2026-09-06 | **Beta** | Grid-first Hybrid 2.0; planned watts via 11/3 and EV house output via 5 with fresh local load. |
 | **1.3.0-beta.8** | 2026-09-06 | **Beta** | Hybrid 2.0 house self-consumption via a measured EV import reference; planned battery charging watts and protective Hold. |

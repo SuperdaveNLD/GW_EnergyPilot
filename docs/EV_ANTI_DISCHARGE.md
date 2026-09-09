@@ -1,6 +1,22 @@
 # EV anti-discharge protection
 
-This document defines v1.3.0-beta.10 behavior: beta.9's grid-first Hybrid 2.0 mapping with the charging-mode change from 11 to 2. Published beta.9 still used mode 11; beta.8 used the earlier EV import reference.
+This document defines v1.3.0-beta.11 behavior, including a separate opt-in
+Hybrid 3.0 excl. EV strategy. Existing Hybrid 2.0 retains beta.10's grid-first
+mapping and mode-2 charging. Published beta.9 still used mode 11; beta.8 used
+the earlier EV import reference.
+
+## Hybrid 3.0 excl. EV / Tibber Grid Rewards
+
+This opt-in strategy aims to keep independently scheduled EV grid draw from
+being compensated by the home battery, while allowing house self-use and
+planned battery charging. Normal self-use/discharge/charge select **1/3/2**;
+with EV they select **5/5/2**. Mode 5 uses fresh local load minus measured EV
+every 15 seconds; mode 2 retains exactly the same planned grid-assistance
+allowance with available PV able to add. Grid-neutral and neutral-battery plans
+mean self-use, not explicit Pause. Invalid required data selects Hold, with
+distinct-source recovery and direct bounded command readback. Native EV-stop
+freshness remains required. This does not control Tibber's charger or guarantee
+rewards/instantaneous EV exclusion. See [full table and limits](HYBRID_3.md).
 
 ## Purpose
 

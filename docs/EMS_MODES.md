@@ -116,6 +116,15 @@ else P_grid < -GoodWe Auto deadband -> mode 10 -> export target = abs(P_grid)
 
 The neutral battery branch is evaluated first so ordinary forecast house import or PV export cannot turn an idle EMHASS battery plan into active buying or selling. Every non-neutral plan then follows the signed PCC target. Exact positive and negative boundaries remain neutral. Each deadband only selects its own branch and is never subtracted from the transmitted mode-9/10 setpoint; maximum-power clamping remains the only reduction.
 
+### Hybrid 3.0 excl. EV
+
+The opt-in `hybrid_3` strategy has six normal scenarios: self-use/discharge/
+charge use **1/3/2** without EV and **5/5/2** with EV. Mode 5 is bounded measured
+house load excluding EV; mode 2 retains planned grid-assistance watts + PV.
+There are no net-only 9/10 branches. Manual modes are never remapped. Required
+data/plan failure uses Hold. These are existing register meanings, not newly
+claimed hardware semantics. See [decision order, evidence and limits](HYBRID_3.md).
+
 ### Hybrid 2.0 Beta
 
 The v1.3.0-beta.10 `hybrid_2` strategy checks the grid deadband first.

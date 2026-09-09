@@ -194,6 +194,22 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 
 Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance inside the separate GoodWe Auto deadband, while modes 9/10 own non-zero planned import/export outside it. Exact boundaries remain neutral and neither threshold is ever subtracted from the final mode-9/10 setpoint.
 
+### Hybrid 3.0 excl. EV
+
+`hybrid_3` is a separate opt-in beta, with no migration of existing settings.
+`preview_hybrid3_mapping` shares the validated base model and translates
+neutral-battery net-only plans to self-use; EV directed discharge becomes
+measured house self-use too. Normal modes 1/3/2 become 5/5/2 with EV. Keep the
+grid-first deadband, mode-specific planned watts and manual ownership.
+
+`controller_v033.py` owns measurement-skew checks, a pure in-memory
+`EVReferenceRecovery` latch, native EV-stop fresh-plan gating and bounded direct
+canonical EMS readback. These extend the existing controller/lock/cadence;
+there is no new scheduler or charger controller. Readback does not refresh load
+telemetry. Existing command-sensor, debug and execution-history paths carry
+guard diagnostics without new IDs or Store versions. The permanent Lit surface
+owns the bilingual scenario table. See [purpose, table and limits](HYBRID_3.md).
+
 ### Hybrid 2.0 Beta
 
 The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,

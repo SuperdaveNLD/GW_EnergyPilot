@@ -4281,6 +4281,84 @@ def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]
     return result
 
 
+def exercise_hybrid3_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Six-scenario opt-in selection, EN/NL table and permanent telemetry DOM."""
+    result = {"ran": EXPECTED_ENTRYPOINT == "v131", "selected": False,
+              "persisted": False, "explanation": False, "table": False,
+              "stable": False, "touch_target": False, "restored": False, "error": None}
+    if not result["ran"]:
+        return result
+    select = ".ep-v024-control-strategy-field select"
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        shadow(page, select).select_option("hybrid_3", timeout=10_000)
+        page.wait_for_function("() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid_3'")
+        result["selected"] = shadow(page, select).input_value() == "hybrid_3"
+        explanation = shadow(page, ".ep-v024-control-strategy-field .ep-v016-field-description").inner_text()
+        result["explanation"] = all(text in explanation for text in (
+            "Tibber Grid Rewards", "mode 1", "mode 2", "mode 3", "mode 5",
+            "15 seconds", "30 seconds", "two fresh pairs", "unchanged"))
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function("() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')")
+        table_results = []
+        for language in ("en", "nl"):
+            page.evaluate("language => window.__epSetLanguage(language)", language)
+            wait_render_idle(page)
+            # Language changes may preserve the permanent disclosure's open
+            # state. Do not turn a retained open table into a closed one.
+            if not page.evaluate("window.__epPanel.shadowRoot.querySelector('.ep-hybrid3-scenarios').open"):
+                activate(page, profile, ".ep-hybrid3-scenarios summary")
+            table_results.append(page.evaluate("""async (language) => {
+                const root = window.__epPanel.shadowRoot;
+                const main = root.querySelector('main');
+                const surface = root.querySelector('ep-control-surface');
+                const detail = root.querySelector('.ep-hybrid3-scenarios');
+                const table = detail.querySelector('table');
+                const rows = [...table.querySelectorAll('tbody tr')];
+                const note = root.querySelector('.ep-v022-strategy-note');
+                const modes = rows.map(row => row.children[2].textContent.trim());
+                const modeHeading = document.createRange();
+                modeHeading.selectNodeContents(table.querySelector('thead th:nth-child(3)'));
+                const target = detail.querySelector('summary').getBoundingClientRect();
+                window.__epSetEntityByKey('battery_power', -7500);
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return {
+                    language,
+                    open: detail.open,
+                    modes,
+                    width: [table.scrollWidth, table.clientWidth],
+                    table: !detail.hidden && detail.open && rows.length === 6 &&
+                        modeHeading.getClientRects().length === 1 &&
+                        modes.join(',') === '1,5,3,5,2,2' &&
+                        rows[0].children[0].textContent.trim() === (language === 'nl' ? 'Zelfverbruik' : 'Self-use') &&
+                        note.textContent.includes('Tibber Grid Rewards') &&
+                        table.scrollWidth <= table.clientWidth + 1,
+                    stable: root.querySelector('main') === main &&
+                        root.querySelector('ep-control-surface') === surface &&
+                        root.querySelector('.ep-hybrid3-scenarios table') === table && detail.open,
+                    touch_target: target.height >= 44,
+                };
+            }""", language))
+        for key in ("table", "stable", "touch_target"):
+            result[key] = all(item[key] for item in table_results)
+        result["languages"] = table_results
+        page.evaluate("window.__epSetLanguage('en')")
+        wait_render_idle(page)
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        result["persisted"] = shadow(page, select).input_value() == "hybrid_3"
+        shadow(page, select).select_option("hybrid", timeout=10_000)
+        page.wait_for_function("() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid'")
+        activate(page, profile, '[data-settings-tab="energypilot"]')
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function("() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')")
+        result["restored"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the beta.2 EP deadband panel, validation and responsive fit."""
     enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
@@ -5508,6 +5586,10 @@ def exercise_controller_target_labels(page: Page) -> dict[str, object]:
             for command, strategy, expected, watts in (
                 ("hybrid2_planned_battery_charge", "hybrid_2", labels[0], 8400),
                 ("ev_battery_charge", "hybrid_2", labels[0], 4300),
+                ("hybrid3_planned_battery_charge", "hybrid_3", labels[0], 700),
+                ("ev_battery_charge", "hybrid_3", labels[0], 15000),
+                ("hybrid3_planned_battery_discharge", "hybrid_3", labels[1], 1400),
+                ("ev_house_self_consumption", "hybrid_3", labels[2], 700),
                 ("ev_battery_charge", "battery", labels[1], 3200),
                 ("hybrid2_planned_battery_charge", "hybrid_2", labels[0], 2100),
                 ("hybrid2_planned_battery_discharge", "hybrid_2", labels[1], 1800),
@@ -5691,6 +5773,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     controller_target_labels = exercise_controller_target_labels(page)
     pv_insight = exercise_pv_insight(page)
     hybrid2_settings = exercise_hybrid2_settings(page, profile)
+    hybrid3_settings = exercise_hybrid3_settings(page, profile)
     deadband_settings = exercise_deadband_settings(page, profile)
     sems_settings = exercise_sems_settings(page, profile)
     pv_settings = exercise_pv_settings(page, profile)
@@ -5733,6 +5816,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "motion": motion,
         "pv_insight": pv_insight,
         "hybrid2_settings": hybrid2_settings,
+        "hybrid3_settings": hybrid3_settings,
         "deadband_settings": deadband_settings,
         "sems_settings": sems_settings,
         "pv_settings": pv_settings,
@@ -5810,6 +5894,11 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "ran", "selected", "persisted", "explanation", "note", "stable", "restored"
         )) or hybrid2["error"]:
             failures.append(f"{name}: Hybrid 2.0 selection/persistence/live note failed")
+        hybrid3 = result["hybrid3_settings"]
+        if not all(hybrid3[key] is True for key in (
+            "ran", "selected", "persisted", "explanation", "table", "stable", "touch_target", "restored"
+        )) or hybrid3["error"]:
+            failures.append(f"{name}: Hybrid 3.0 selection/table/persistence/stable DOM failed: {hybrid3}")
 
     if EXPECTED_ENTRYPOINT == "v110":
         required_flow_sizes_ev = (
@@ -5837,7 +5926,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.10 BETA",
+        "v131": "v1.3.0-beta.11 BETA",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(

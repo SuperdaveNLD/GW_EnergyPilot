@@ -64,6 +64,18 @@ class SmartMeterStrategyApiTests(unittest.IsolatedAsyncioTestCase):
         self.controller.async_evaluate.assert_not_awaited()
         self.assertFalse(self.controller.enabled)
 
+    async def test_hybrid3_round_trip_and_tibber_description(self):
+        result = await self.set_strategy(strategy="hybrid_3")
+        self.assertIn("hybrid_3", self.const.CONTROL_STRATEGIES)
+        self.assertEqual(result["strategy"], "hybrid_3")
+        self.assertEqual(result["strategies"]["hybrid_3"], "Hybrid 3.0 excl. EV")
+        self.assertIn("Tibber Grid Rewards", result["hybrid_3_strategy"])
+        self.assertEqual(self.entry.data["unrelated"], "preserved")
+        self.assertEqual(self.entry.options, {"unchanged": 42})
+        self.controller.async_evaluate.assert_awaited_once()
+        self.entry.runtime_data = None
+        self.assertEqual(self.api._payload(self.entry)["strategy"], "hybrid_3")
+
     async def test_switching_back_to_hybrid_preserves_existing_mapping_key(self):
         await self.set_strategy(strategy="hybrid_2")
         result = await self.set_strategy(strategy="hybrid")

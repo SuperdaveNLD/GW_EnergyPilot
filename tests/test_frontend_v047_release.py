@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "gw_energypilot"
 FRONTEND = INTEGRATION / "frontend"
-CACHE_KEY = "1.3.0-beta.10"
+CACHE_KEY = "1.3.0-beta.11"
 
 
 class FrontendV047ReleaseTests(unittest.TestCase):
@@ -25,15 +25,15 @@ class FrontendV047ReleaseTests(unittest.TestCase):
         v049 = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v048.js").read_text(encoding="utf-8")
 
-        self.assertEqual(manifest["version"], "1.3.0-beta.10")
-        self.assertIn("gw-energy-pilot-v131.js?v=1.3.0-beta.10", init_source)
-        self.assertIn('import "./gw-energy-pilot-v048.js?v=1.3.0-beta.10"', v049)
+        self.assertEqual(manifest["version"], "1.3.0-beta.11")
+        self.assertIn("gw-energy-pilot-v131.js?v=1.3.0-beta.11", init_source)
+        self.assertIn('import "./gw-energy-pilot-v048.js?v=1.3.0-beta.11"', v049)
         self.assertIn(
-            'import "./gw-energy-pilot-v047.js?v=1.3.0-beta.10"',
+            'import "./gw-energy-pilot-v047.js?v=1.3.0-beta.11"',
             active,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v046.js?v=1.3.0-beta.10"',
+            'import "./gw-energy-pilot-v046.js?v=1.3.0-beta.11"',
             self.source,
         )
         self.assertIn('const VERSION = "0.47"', self.source)

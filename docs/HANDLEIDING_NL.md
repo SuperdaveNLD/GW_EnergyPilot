@@ -126,6 +126,30 @@ GoodWe-modus heeft geleid.
 
 ## Kies een automatische strategie
 
+Betatesters kunnen in de GoodWe-instellingen ook expliciet **Hybrid 3.0 excl.
+EV** kiezen. Deze regeling is bedoeld om **Tibber Grid Rewards optimaal te
+benutten**, terwijl Tibber de EV onafhankelijk laat laden. De thuisaccu moet
+de EV-netafname niet doelbewust compenseren, maar mag wel het huis voeden.
+
+| Intentie | Zonder EV | Met ladende EV |
+|---|---|---|
+| Zelfverbruik / neutraal | **Stand 1 — Auto** | **Stand 5 — gemeten huis excl. EV** |
+| Ontladen | **Stand 3 — geplande ontlaadwatts** | **Stand 5 — gemeten huis excl. EV** |
+| Laden | **Stand 2 — geplande netassistentie + PV** | **Stand 2 — ongewijzigd** |
+
+Stand 5 wordt elke **15 seconden** bijgewerkt op verse lokale load minus
+gemeten EV-vermogen. Ontbrekende vereiste data betekent Hold; herstel vraagt
+minimaal 15 seconden en twee verse meetparen. Stand 2 houdt hetzelfde geplande
+vermogen aan; PV kan erbij komen. De bestaande net-deadband blijft eerst
+zelfverbruik kiezen; ook een neutraal accuplan kiest zelfverbruik. Dat is geen
+expliciete batterijpauze. De update wijzigt je strategiekeuze of 700 W CUSTOM
+load forecast niet automatisch. De tabel staat ook op het dashboard.
+
+Dit is een **opt-in beta**, geen opbrengstgarantie of garantie dat er op ieder
+moment nul accuvermogen naar de EV gaat. De meetgrens en reactie op snel
+wisselende EV/PV-belasting vragen nog praktijktests. Zie [volledige werking en
+grenzen](HYBRID_3.md).
+
 ### Battery
 
 Volgt rechtstreeks het geplande batterijvermogen. Een laadplan kiest GoodWe
