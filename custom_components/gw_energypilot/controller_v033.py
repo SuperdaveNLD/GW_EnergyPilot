@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from time import monotonic
 
 from homeassistant.core import callback
 
-from .control_decision import preview_hybrid_mapping, resolve_control_decision
+from .control_decision import preview_hybrid_mapping, preview_hybrid3_mapping, resolve_control_decision
 from .const import (
     CONF_DEADBAND,
     CONF_ENABLE_EMHASS_ORCHESTRATOR,
@@ -20,6 +21,7 @@ from .const import (
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
     CONTROL_STRATEGY_HYBRID_2,
+    CONTROL_STRATEGY_HYBRID_3,
     DEFAULT_DEADBAND,
     DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_MAX_POWER,
@@ -27,6 +29,7 @@ from .const import (
     MODE_BATTERY_HOLD,
 )
 from .controller import GWEnergyPilotController as _BaseController
+from .hybrid3_reference import EVReferenceRecovery
 from .ev_detection import (
     EV_POWER_MAX_AGE_SECONDS,
     EV_SELF_CONSUMPTION_INTERVAL_SECONDS,
@@ -35,10 +38,20 @@ from .ev_detection import (
 )
 
 _MISSING_STATES = {"unknown", "unavailable", "none", ""}
+_HOUSE_STRATEGIES = {CONTROL_STRATEGY_HYBRID_2, CONTROL_STRATEGY_HYBRID_3}
 
 
 class GWEnergyPilotController(_BaseController):
     """Keep Automatic Control usable while EMHASS HA entities are rebuilding."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._h3_reference = EVReferenceRecovery()
+        self._h3_ack: tuple[int, int] | None = None
+        self._h3_ack_at: float | None = None
+        self._h3_readback_status = "not_attempted"
+        self._h3_hold_reason: str | None = None
+        self._h3_ev_stop_at: datetime | None = None
 
     async def async_setup(self) -> None:
         from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
@@ -47,7 +60,7 @@ class GWEnergyPilotController(_BaseController):
         self._ev_reference_task = None
         self._ev_reference_unloading = False
         # A live strategy selection need not reload the entry. Observe the
-        # optional measured source now, but act on it only in Hybrid 2.0.
+        # optional measured source now, but act on it only in Hybrid 2.0/3.0.
         power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
         if power_entity and power_entity not in self.ev_source_ids:
             self._unsubs.append(async_track_state_change_event(
@@ -60,7 +73,7 @@ class GWEnergyPilotController(_BaseController):
 
     @callback
     def _async_ev_power_reference_changed(self, event) -> None:
-        if self.control_strategy == CONTROL_STRATEGY_HYBRID_2:
+        if self.control_strategy in _HOUSE_STRATEGIES:
             self._async_source_changed(event)
 
     async def async_unload(self) -> None:
@@ -75,7 +88,7 @@ class GWEnergyPilotController(_BaseController):
     @property
     def ev_source_ids(self) -> set[str]:
         sources = super().ev_source_ids
-        if self.control_strategy == CONTROL_STRATEGY_HYBRID_2:
+        if self.control_strategy in _HOUSE_STRATEGIES:
             power_entity = self.entry.options.get(CONF_EV_POWER_ENTITY)
             if power_entity:
                 sources.add(power_entity)
@@ -86,7 +99,7 @@ class GWEnergyPilotController(_BaseController):
 
     def ev_is_active(self) -> bool:
         active = super().ev_is_active()
-        if (active or self.control_strategy != CONTROL_STRATEGY_HYBRID_2
+        if (active or self.control_strategy not in _HOUSE_STRATEGIES
                 or not self._ev_coordination_effective() or not self._ev_was_active):
             return active
         # An unavailable reading is not a confirmed EV stop. Keep the guard
@@ -100,7 +113,7 @@ class GWEnergyPilotController(_BaseController):
     @callback
     def _async_ev_reference_tick(self, _now) -> None:
         if (getattr(self, "_ev_reference_unloading", False) or not self.enabled
-                or self.control_strategy != CONTROL_STRATEGY_HYBRID_2
+                or self.control_strategy not in _HOUSE_STRATEGIES
                 or not self.ev_is_active()):
             return
         pending = getattr(self, "_ev_reference_task", None)
@@ -113,18 +126,20 @@ class GWEnergyPilotController(_BaseController):
     @callback
     def _async_source_changed(self, event) -> None:
         native_ev_stop = (
-            self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_2
+            self.enabled and self.control_strategy in _HOUSE_STRATEGIES
             and event.data.get("entity_id") in self.ev_source_ids
             and self._ev_was_active and not self.ev_is_active()
             and self.entry.options.get(CONF_ENABLE_EMHASS_ORCHESTRATOR, False)
         )
+        if native_ev_stop and self.control_strategy == CONTROL_STRATEGY_HYBRID_3:
+            self._h3_ev_stop_at = datetime.now(timezone.utc)
         super()._async_source_changed(event)
         if native_ev_stop:
             self.hass.async_create_task(self._async_hold_after_ev_stop(), "gw-energypilot-ev-stop-hold")
 
     async def _async_hold_after_ev_stop(self) -> None:
         async with self._control_lock:
-            if (self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_2
+            if (self.enabled and self.control_strategy in _HOUSE_STRATEGIES
                     and not self.ev_is_active()
                     and self.last_command == "waiting_for_ev_stop_optimization"):
                 await self._async_apply_command(
@@ -133,7 +148,45 @@ class GWEnergyPilotController(_BaseController):
                 )
 
     async def _async_evaluate_locked(self) -> None:
-        if (self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_2
+        if self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_3:
+            if self.ev_is_active():
+                self._ev_was_active = True
+                self._h3_ev_stop_at = None
+            elif self._h3_ev_stop_at is not None:
+                # Repeated idle EV events must not release an old plan while
+                # the native optimizer is still preparing a replacement.
+                runtime = getattr(self.entry, "runtime_data", None)
+                success = getattr(getattr(runtime, "orchestrator", None), "last_success", None)
+                states = [self.hass.states.get(entity)
+                          for entity in (self._p_batt_entity_id(), self._p_grid_entity_id())]
+                reports = [getattr(state, "last_reported", None) or
+                           getattr(state, "last_updated", None) for state in states]
+                stop = self._h3_ev_stop_at
+                now = datetime.now(timezone.utc)
+                fresh = (isinstance(success, datetime) and success.tzinfo is not None
+                         and stop < success <= now and all(isinstance(report, datetime)
+                         and report.tzinfo is not None and stop < report <= now for report in reports)
+                         and self._optim_is_ready() and not self._plan_update_suspensions
+                         and all(self._raw_state_float(entity) is not None for entity in
+                                 (self._p_batt_entity_id(), self._p_grid_entity_id())))
+                if not fresh:
+                    await self._async_hybrid3_hold("waiting_for_ev_stop_optimization",
+                                                  command="waiting_for_ev_stop_optimization")
+                    return
+                self._h3_ev_stop_at = None
+            if not self.ev_is_active():
+                self._h3_hold_reason = None
+            if (self._plan_update_suspensions or not self._optim_is_ready()
+                    or self._state_float(self._p_batt_entity_id()) is None
+                    or self._state_float(self._p_grid_entity_id()) is None):
+                reason = ("plan_suspended" if self._plan_update_suspensions else
+                          "optimizer_not_ready" if not self._optim_is_ready() else
+                          "p_batt_unavailable" if self._state_float(self._p_batt_entity_id()) is None else
+                          "p_grid_unavailable")
+                await self._async_hybrid3_hold(reason, command=("ev_self_consumption_hold"
+                    if self.ev_is_active() else "hybrid3_plan_hold"))
+                return
+        if (self.enabled and self.control_strategy in _HOUSE_STRATEGIES
                 and self.ev_is_active()):
             self._ev_was_active = True
             if (self._plan_update_suspensions or not self._optim_is_ready()
@@ -150,6 +203,8 @@ class GWEnergyPilotController(_BaseController):
         snapshot = super()._actual_snapshot()
         snapshot["ev_reference_power_w"] = self._ev_reference_power()
         snapshot["ev_house_load_power_w"] = self._ev_house_load_power()
+        if self.control_strategy == CONTROL_STRATEGY_HYBRID_3:
+            snapshot["hybrid3"] = self.hybrid3_diagnostics
         return snapshot
 
     def _ev_house_load_power(self) -> float | None:
@@ -183,7 +238,9 @@ class GWEnergyPilotController(_BaseController):
             self._optim_is_ready() and not self._plan_update_suspensions
             and self.last_command != "waiting_for_ev_stop_optimization"
         )
-        preview = preview_hybrid_mapping(
+        preview_function = (preview_hybrid3_mapping if self.control_strategy == CONTROL_STRATEGY_HYBRID_3
+                            else preview_hybrid_mapping)
+        preview = preview_function(
             p_batt=p_batt,
             p_grid=p_grid,
             battery_deadband=self.entry.options.get(CONF_DEADBAND, DEFAULT_DEADBAND),
@@ -214,6 +271,8 @@ class GWEnergyPilotController(_BaseController):
                 "load_fresh": load is not None,
             },
         })
+        if self.control_strategy == CONTROL_STRATEGY_HYBRID_3:
+            preview["runtime_guard"] = self.hybrid3_diagnostics
         return preview
 
     def _plan_runtime(self):
@@ -258,7 +317,7 @@ class GWEnergyPilotController(_BaseController):
         """Block discharge during EV charging while allowing planned charging."""
         strategy = self.control_strategy
         p_grid = None
-        if strategy in {CONTROL_STRATEGY_GRID, CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
+        if strategy in {CONTROL_STRATEGY_GRID, CONTROL_STRATEGY_HYBRID, *_HOUSE_STRATEGIES}:
             p_grid = self._state_float(self._p_grid_entity_id())
         decision = resolve_control_decision(
             strategy=strategy,
@@ -271,6 +330,23 @@ class GWEnergyPilotController(_BaseController):
             ev_power_w=self._ev_reference_power(),
             load_power_w=self._ev_house_load_power(),
         )
+        if strategy == CONTROL_STRATEGY_HYBRID_3:
+            measurements = self._hybrid3_measurements()
+            if decision.command == "ev_self_consumption_hold":
+                await self._async_hybrid3_hold(measurements["reason"] or "mapping_unavailable")
+                return
+            if decision.command == "ev_house_self_consumption":
+                if measurements["reason"]:
+                    await self._async_hybrid3_hold(measurements["reason"])
+                    return
+                pair = tuple(datetime.fromisoformat(measurements[key])
+                             for key in ("load_reported_at", "ev_reported_at"))
+                if not self._h3_reference.ready(pair, monotonic()):
+                    self._h3_hold_reason = "recovering_fresh_measurements"
+                    await self._async_apply_command(8, 0, "ev_self_consumption_hold",
+                                                    skip_if_readback_matches=True)
+                    return
+            self._h3_hold_reason = None
         if not decision.ready:
             self.last_command = decision.command
             self._notify_state()
@@ -289,3 +365,108 @@ class GWEnergyPilotController(_BaseController):
             decision.command,
             skip_if_readback_matches=True,
         )
+
+    def _hybrid3_measurements(self) -> dict[str, object]:
+        """Read-only source ages/reasons; never make a control read look fresh."""
+        data = self.coordinator.data
+        entity_id = self.entry.options.get(CONF_EV_POWER_ENTITY)
+        state = self.hass.states.get(entity_id) if entity_id else None
+        load_time = getattr(data, "source_updated_at", None)
+        ev_time = getattr(state, "last_reported", None) or getattr(state, "last_updated", None)
+        now = datetime.now(timezone.utc)
+        def age(value):
+            return ((now - value).total_seconds() if isinstance(value, datetime)
+                    and value.tzinfo is not None else None)
+        load_age, ev_age = age(load_time), age(ev_time)
+        load, ev = self._ev_house_load_power(), self._ev_reference_power()
+        reason = None
+        if ev is None or ev <= 0:
+            unit = (getattr(state, "attributes", {}) or {}).get("unit_of_measurement")
+            reason = ("ev_missing" if state is None else "ev_units_invalid" if
+                      unit not in {"W", "kW", "MW", "mW"} else "ev_timestamp_invalid" if ev_age is None else
+                      "ev_timestamp_future" if ev_age < 0 else "ev_stale" if ev_age > EV_POWER_MAX_AGE_SECONDS else
+                      "ev_power_invalid_or_zero")
+        elif load is None:
+            reason = ("load_not_local" if getattr(data, "source", None) != "modbus" else
+                      "load_read_failed" if not self.coordinator.last_update_success else
+                      "load_timestamp_invalid" if load_age is None else "load_timestamp_future" if load_age < 0 else
+                      "load_stale" if load_age > EV_POWER_MAX_AGE_SECONDS else "load_invalid")
+        elif abs(load_age - ev_age) > EV_SELF_CONSUMPTION_INTERVAL_SECONDS:
+            reason = "measurement_time_skew"
+        return {"reason": reason, "load_age_seconds": load_age, "ev_age_seconds": ev_age,
+                "load_reported_at": load_time.isoformat() if load_age is not None else None,
+                "ev_reported_at": ev_time.isoformat() if ev_age is not None else None,
+                "load_w": load, "ev_w": ev}
+
+    @property
+    def hybrid3_diagnostics(self) -> dict[str, object]:
+        return {**self._hybrid3_measurements(), "hold_reason": self._h3_hold_reason,
+                "recovering": self._h3_reference.recovering,
+                "fresh_pairs": self._h3_reference.fresh_pairs,
+                "last_fault": self._h3_reference.last_fault,
+                "command_readback": self._h3_readback_status}
+
+    async def _async_hybrid3_hold(self, reason: str, *, command="ev_self_consumption_hold") -> None:
+        self._h3_hold_reason = reason
+        self._h3_reference.invalidate(reason)
+        await self._async_apply_command(MODE_BATTERY_HOLD, 0, command, skip_if_readback_matches=True)
+
+    def _actual_command_matches(self, mode: int, power: int) -> bool:
+        if self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_3:
+            if (self._h3_ack != (mode, power) or self._h3_ack_at is None
+                    or monotonic() - self._h3_ack_at > EV_POWER_MAX_AGE_SECONDS
+                    or not getattr(self.coordinator, "last_control_update_success", False)):
+                return False
+        return super()._actual_command_matches(mode, power)
+
+    async def _async_apply_command(self, mode: int, power: int, command: str, *, skip_if_readback_matches=False) -> None:
+        if self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_3:
+            if not (skip_if_readback_matches and self._actual_command_matches(mode, power)):
+                # Invalidate BEFORE writing: old mode-5 telemetry must never
+                # skip a new mode-5 command after an unconfirmed Hold write.
+                self._h3_ack = None
+                self._h3_ack_at = None
+                self._h3_readback_status = "pending"
+                skip_if_readback_matches = False
+            try:
+                await super()._async_apply_command(mode, power, command, skip_if_readback_matches=skip_if_readback_matches)
+            except Exception:
+                if self._h3_readback_status == "pending":
+                    self._h3_readback_status = "write_failed"
+                raise
+            if self._h3_ack is None:
+                raise RuntimeError("Hybrid 3.0 command readback is not confirmed")
+            return
+        self._h3_ack = None
+        self._h3_ack_at = None
+        self._h3_ev_stop_at = None
+        self._h3_reference = EVReferenceRecovery()
+        await super()._async_apply_command(mode, power, command, skip_if_readback_matches=skip_if_readback_matches)
+
+    async def _async_refresh_command_readback(self) -> None:
+        if not (self.enabled and self.control_strategy == CONTROL_STRATEGY_HYBRID_3):
+            await super()._async_refresh_command_readback()
+            return
+        try:
+            # Direct canonical EMS read, not HA's debounced full-telemetry
+            # refresh. At most three read attempts within this transaction;
+            # never rewrite or create a competing feedback timer here.
+            for attempt in range(3):
+                control = await self.client.async_read_control_status()
+                self.coordinator.last_control_update_success = True
+                self.coordinator.last_control_exception = None
+                self.coordinator.async_publish_local_readback(control)
+                if ((control.mode, control.power) == (self.expected_mode, self.target_power)
+                        and super()._actual_command_matches(self.expected_mode, self.target_power)):
+                    self._h3_ack = (control.mode, control.power)
+                    self._h3_ack_at = monotonic()
+                    self._h3_readback_status = "verified"
+                    return
+                if attempt < 2:
+                    await asyncio.sleep(0.5)
+            self._h3_readback_status = "mismatch"
+        except Exception as err:
+            self._h3_readback_status = "unavailable"
+            self.coordinator.last_control_update_success = False
+            self.coordinator.last_control_exception = err
+            raise

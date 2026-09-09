@@ -238,12 +238,22 @@ P_grid inside GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
 
 **Hybrid 2.0 Beta**
 
-The opt-in `hybrid_2` strategy uses **mode 2 at configured maximum control
-power** whenever `P_batt < -battery_deadband`, independent of `P_grid`.
-Other steps retain Hybrid behavior. EV charging keeps mode 2 for these charge
-windows and holds neutral/discharge plans. Actual charging and SOC can exceed
-the EMHASS forecast. No existing selection is migrated; manual modes remain
-exact. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+The opt-in `hybrid_2` strategy checks the grid deadband first: self-use means
+Auto, or mode 5 at fresh local load minus EV. Outside that band, planned charge
+uses mode 2 at bounded planned watts (not automatic maximum control power),
+discharge uses mode 3 and neutral battery uses 9/10. With EV, planned discharge
+and net-only plans Hold; directed charge retains mode 2. PV may add to actual
+charging. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
+**Hybrid 3.0 excl. EV**
+
+The separate `hybrid_3` option targets independently scheduled Tibber Grid
+Rewards charging: normal self-use/discharge/charge **1/3/2**, with EV **5/5/2**.
+No migration selects it automatically. Keep fresh measured EV power and local
+Modbus load available for the 15-second house reference; invalid required data
+Hold with explicit recovery diagnostics. Charging keeps planned mode-2 watts
+unchanged. The dashboard shows the six-scenario table in EN/NL. Manual modes,
+CUSTOM load forecast and other settings remain intact. See [Hybrid 3.0](HYBRID_3.md).
 
 **Hybrid control**
 

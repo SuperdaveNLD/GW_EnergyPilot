@@ -19,13 +19,13 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
         init_source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
         active = (FRONTEND / "gw-energy-pilot-v049.js").read_text(encoding="utf-8")
 
-        self.assertIn("gw-energy-pilot-v131.js?v=1.3.0-beta.10", init_source)
+        self.assertIn("gw-energy-pilot-v131.js?v=1.3.0-beta.11", init_source)
         self.assertIn(
-            'import "./gw-energy-pilot-v048.js?v=1.3.0-beta.10";',
+            'import "./gw-energy-pilot-v048.js?v=1.3.0-beta.11";',
             active,
         )
         self.assertIn(
-            'import "./gw-energy-pilot-v047.js?v=1.3.0-beta.10";',
+            'import "./gw-energy-pilot-v047.js?v=1.3.0-beta.11";',
             self.source,
         )
         self.assertIn('panel._stateByKey?.("control_strategy")?.state', self.source)
@@ -46,8 +46,24 @@ class HybridControlFrontendCopyTests(unittest.TestCase):
         source = (FRONTEND / "gw-energy-pilot-v041.js").read_text(encoding="utf-8")
         self.assertIn('gridAssistanceTarget: "Grid assistance allowance"', source)
         self.assertIn('gridAssistanceTarget: "Netassistentie-limiet"', source)
-        self.assertIn('command === "ev_battery_charge" && strategy === "hybrid_2"', source)
+        self.assertIn('command === "ev_battery_charge" && ["hybrid_2", "hybrid_3"].includes(strategy)', source)
+        self.assertIn('command === "hybrid3_planned_battery_charge"', source)
         self.assertIn('const targetText = controllerTargetLabel(panel, t)', source)
+
+    def test_hybrid3_scenario_copy_and_error_evidence(self) -> None:
+        surface = (FRONTEND / "ep-control-surface.js").read_text(encoding="utf-8")
+        self.assertIn("Hybrid 3.0 excl. EV", surface)
+        self.assertIn("Tibber Grid Rewards", surface)
+        self.assertIn("zes scenario’s", surface)
+        self.assertIn("two fresh pairs", surface)
+        self.assertIn('class="ep-hybrid3-scenarios"', surface)
+        history = (FRONTEND / "gw-energy-pilot-v051-history.js").read_text(encoding="utf-8")
+        start = history.index("function statusModel")
+        end = history.index("function sourceModel", start)
+        status = history[start:end]
+        self.assertLess(status.index('verification_status === "mismatch"'),
+                        status.index('command.startsWith("ev_")'))
+        self.assertIn("guard.hold_reason", history)
 
     def test_hybrid2_mode2_copy_explains_pv_addition_without_changing_other_modes(self) -> None:
         for name in ("ep-control-surface.js", "gw-energy-pilot-v026.js", "gw-energy-pilot-v024.js"):

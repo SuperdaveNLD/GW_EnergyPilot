@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v025.js?v=1.3.0-beta.10";
+import "./gw-energy-pilot-v025.js?v=1.3.0-beta.11";
 
 const VERSION = "0.26";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -23,6 +23,8 @@ const TEXT = {
     gridControl: "Grid control",
     hybridControl: "Hybrid control",
     hybrid2Control: "Hybrid 2.0 Beta",
+    hybrid3Control: "Hybrid 3.0 excl. EV",
+    hybrid3Description: "Opt-in beta for Tibber Grid Rewards: self-use → mode 1, discharge → mode 3, charge → mode 2 (planned grid assistance + PV). With EV, self-use and discharge use mode 5 at measured local load minus EV, every 15 seconds; charging stays mode 2 unchanged. Fresh local load and EV reports ≤30 seconds old and ≤15 seconds apart are required. Missing data means Hold; recovery needs two fresh pairs over at least 15 seconds. Tibber controls the EV independently. EV exclusion and reward gains are not guaranteed; field validation is required.",
     hybrid2Description: "Test mapping: grid deadband first, then Auto (also at P_batt = 0). Outside it, mode 2 uses planned charging watts as grid assistance with PV priority; PV can add to battery charging; mode 3 follows planned discharging watts; neutral battery plans use mode 9/10 net targets. With EV, self-use uses mode 5 at measured load minus EV every 15 seconds; planned discharge uses mode 8 Hold. Explicit pause stays Hold. PV priority and the EV load boundary still require field validation. Fresh local load and EV reports no older than 30 seconds are required.",
     batteryDescription: "Controls charging and discharging using the requested battery power (GoodWe 11/12).",
     gridDescription: "Controls import and export using the requested grid power (GoodWe 9/10).",
@@ -124,6 +126,8 @@ const TEXT = {
     gridControl: "Netregeling",
     hybridControl: "Hybride regeling",
     hybrid2Control: "Hybrid 2.0 Beta",
+    hybrid3Control: "Hybrid 3.0 excl. EV",
+    hybrid3Description: "Opt-in beta voor Tibber Grid Rewards: zelfverbruik → stand 1, ontladen → stand 3, laden → stand 2 (geplande netassistentie + PV). Met EV gebruiken zelfverbruik en ontladen stand 5 op gemeten lokale load minus EV, elke 15 seconden; laden blijft ongewijzigd stand 2. Lokale load- en EV-metingen moeten maximaal 30 seconden oud zijn en maximaal 15 seconden uiteenlopen. Ontbrekende data betekent Hold; herstel vraagt twee verse meetparen over minimaal 15 seconden. Tibber stuurt de EV onafhankelijk. EV-uitsluiting en extra opbrengst zijn niet gegarandeerd; praktijktests blijven nodig.",
     hybrid2Description: "Testmapping: eerst de net-deadband, daarbinnen Auto (ook bij P_batt = 0). Daarbuiten gebruikt modus 2 de geplande laadwatts als netassistentie met PV-voorrang; PV kan extra bijdragen aan acculaden; modus 3 volgt de ontlaadwatts; een neutraal accuplan gebruikt netdoelen via modus 9/10. Met EV gebruikt zelfconsumptie modus 5 op gemeten load minus EV, elke 15 seconden; geplande ontlading gaat naar modus 8 Hold. Expliciete pauze blijft Hold. PV-voorrang en de EV-meetgrens vereisen nog praktijktests. Verse lokale load- en EV-metingen van maximaal 30 seconden oud zijn vereist.",
     batteryDescription: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
     gridDescription: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
@@ -213,6 +217,7 @@ const STRATEGY_KEYS = {
   grid: ["gridControl", "gridDescription"],
   hybrid: ["hybridControl", "hybridDescription"],
   hybrid_2: ["hybrid2Control", "hybrid2Description"],
+  hybrid_3: ["hybrid3Control", "hybrid3Description"],
 };
 
 const FIELD_NL = {
@@ -276,7 +281,7 @@ async function saveStrategy(panel, entryId, strategy, select) {
   const next = strategyText(panel, strategy);
   if (automaticOn) {
     const confirmed = window.confirm(
-      `${t(panel, "confirmAutoStrategy")}\n\n${t(panel, "confirmSwitch", { strategy: next.label })}\n\n${strategy === "hybrid_2" ? `${next.description}\n\n` : ""}${t(panel, "confirmReevaluate")}`
+      `${t(panel, "confirmAutoStrategy")}\n\n${t(panel, "confirmSwitch", { strategy: next.label })}\n\n${["hybrid_2", "hybrid_3"].includes(strategy) ? `${next.description}\n\n` : ""}${t(panel, "confirmReevaluate")}`
     );
     if (!confirmed) {
       select.value = cache.data?.strategy || "battery";
@@ -323,13 +328,13 @@ function localizeControlStrategy(panel, root) {
   old.innerHTML = `
     <div>
       <div class="ep-v016-field-label"><span>${panel._escape(t(panel, "controlStrategy"))}</span><span>GoodWe EMS</span></div>
-      <div class="ep-v016-field-description">${panel._escape(strategy === "hybrid_2" ? current.description : t(panel, "controlStrategyHelp"))}</div>
+      <div class="ep-v016-field-description">${panel._escape(["hybrid_2", "hybrid_3"].includes(strategy) ? current.description : t(panel, "controlStrategyHelp"))}</div>
       <div class="ep-v022-smart-meter-status ${meterAvailable ? "ok" : strategy === "battery" ? "" : "warning"}">
         ${panel._escape(cache.error || cache.message || current.description)}
       </div>
     </div>
     <select class="ep-v016-input" ${busy ? "disabled" : ""} aria-label="${panel._escape(t(panel, "controlStrategy"))}">
-      ${["battery", "grid", "hybrid", "hybrid_2"].map((value) => `<option value="${value}" ${strategy === value ? "selected" : ""}>${panel._escape(strategyText(panel, value).label)}</option>`).join("")}
+      ${["battery", "grid", "hybrid", "hybrid_2", "hybrid_3"].map((value) => `<option value="${value}" ${strategy === value ? "selected" : ""}>${panel._escape(strategyText(panel, value).label)}</option>`).join("")}
     </select>`;
 
   const select = old.querySelector("select");

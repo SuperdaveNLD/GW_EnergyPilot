@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.10";
+} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.11";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.10";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.10";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.11";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.11";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
@@ -213,7 +213,47 @@ const HYBRID2_NOTE = Object.freeze({
   }),
 });
 
+const HYBRID3_NOTE = Object.freeze({
+  en: Object.freeze({
+    ...HYBRID_NOTE.en,
+    label: "Hybrid 3.0 excl. EV",
+    description: "Designed for independently scheduled Tibber Grid Rewards charging: keep the home battery from compensating the EV's grid draw while the house may use PV and battery. Self-use is not Battery Hold. The grid deadband still selects self-use first; neutral battery plans also select self-use. Directed charging stays mode 2 with the same planned grid-assistance allowance, with or without EV; PV can add.",
+    safety: "Opt-in beta: no charger control or reward guarantee. Mode 5 uses fresh local load minus measured EV every 15 seconds. Required reports must be ≤30 seconds old and ≤15 seconds apart. Invalid data means Hold; recovery needs two fresh pairs over at least 15 seconds. EV-stop fresh-plan protection remains active. The load boundary and transient EV exclusion require field validation.",
+    summary: "Hybrid 3.0 · six scenarios",
+    headers: ["Intent", "EV", "Mode", "Setpoint"],
+    rows: [
+      ["Self-use", "Off", "1", "Auto · 0 W"],
+      ["Self-use", "On", "5", "Measured house excl. EV"],
+      ["Discharge", "Off", "3", "Planned discharge watts"],
+      ["Discharge", "On", "5", "Measured house excl. EV"],
+      ["Charge", "Off", "2", "Planned grid assistance + PV"],
+      ["Charge", "On", "2", "Same allowance; no EV correction"],
+    ],
+  }),
+  nl: Object.freeze({
+    ...HYBRID_NOTE.nl,
+    label: "Hybrid 3.0 excl. EV",
+    description: "Bedoeld om Tibber Grid Rewards optimaal te benutten terwijl Tibber de EV onafhankelijk laat laden: de thuisaccu compenseert de netafname van de EV niet doelbewust, maar mag wel het huis voeden met PV en accu. Zelfverbruik is geen Battery Hold. De net-deadband kiest nog steeds eerst zelfverbruik; een neutraal accuplan kiest ook zelfverbruik. Gepland laden blijft stand 2 met dezelfde geplande netassistentie, met én zonder EV; PV kan erbij komen.",
+    safety: "Opt-in beta: geen laadpaalsturing of opbrengstgarantie. Stand 5 gebruikt verse lokale load minus gemeten EV, elke 15 seconden. Vereiste metingen zijn maximaal 30 seconden oud en lopen maximaal 15 seconden uiteen. Ongeldige data betekent Hold; herstel vraagt twee verse meetparen over minimaal 15 seconden. Bij EV-stop blijft een vers plan vereist. De meetgrens en EV-uitsluiting bij snelle wisselingen vragen nog praktijktests.",
+    summary: "Hybrid 3.0 · zes scenario’s",
+    headers: ["Intentie", "EV", "Stand", "Setpoint"],
+    rows: [
+      ["Zelfverbruik", "Uit", "1", "Auto · 0 W"],
+      ["Zelfverbruik", "Aan", "5", "Gemeten huis excl. EV"],
+      ["Ontladen", "Uit", "3", "Geplande ontlaadwatts"],
+      ["Ontladen", "Aan", "5", "Gemeten huis excl. EV"],
+      ["Laden", "Uit", "2", "Geplande netassistentie + PV"],
+      ["Laden", "Aan", "2", "Zelfde ruimte; geen EV-correctie"],
+    ],
+  }),
+});
+
 const CONTROL_SURFACE_CSS = `
+  .ep-hybrid3-scenarios { font-size:12px; line-height:1.5; }
+  .ep-hybrid3-scenarios summary { min-height:44px; padding:12px 0; cursor:pointer; }
+  .ep-hybrid3-scenarios table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  .ep-hybrid3-scenarios th, .ep-hybrid3-scenarios td { text-align:left; padding:8px 4px; border-bottom:1px solid rgba(74,190,229,.2); overflow-wrap:anywhere; }
+  .ep-hybrid3-scenarios th:nth-child(2), .ep-hybrid3-scenarios th:nth-child(3) { width:14%; }
   ep-control-surface,
   ep-battery-actions,
   ep-automatic-control,
@@ -445,7 +485,9 @@ export function buildControlSurfaceModel(panel, gateway = controlGateway(panel))
     narrow: Boolean(panel?.narrow),
     strategy: {
       value: strategyValue,
-      note: strategyValue === "hybrid_2" ? HYBRID2_NOTE[language] : HYBRID_NOTE[language] || HYBRID_NOTE.en,
+      note: strategyValue === "hybrid_3" ? HYBRID3_NOTE[language] || HYBRID3_NOTE.en
+        : strategyValue === "hybrid_2" ? HYBRID2_NOTE[language] : HYBRID_NOTE[language] || HYBRID_NOTE.en,
+      scenarios: HYBRID3_NOTE[language] || HYBRID3_NOTE.en,
     },
     battery: {
       language,
@@ -1139,11 +1181,19 @@ class EpControlSurface extends LitElement {
         </div>
         <p class="section-note ep-v022-strategy-note"
           data-ep-v048-presentation-key=${`${this.model.language}:${this.model.strategy?.value}`}
-          ?hidden=${!["hybrid", "hybrid_2"].includes(this.model.strategy?.value)}>
+          ?hidden=${!["hybrid", "hybrid_2", "hybrid_3"].includes(this.model.strategy?.value)}>
           <strong>${this.model.strategy?.note?.title || ""}</strong>
           ${this.model.strategy?.note?.label || ""} · ${this.model.strategy?.note?.description || ""}
           ${this.model.strategy?.note?.safety || ""}
         </p>
+        <details class="ep-hybrid3-scenarios" ?hidden=${this.model.strategy?.value !== "hybrid_3"}>
+          <summary>${this.model.strategy?.scenarios?.summary || ""}</summary>
+          <table>
+            <caption class="ep-control-surface-detail">${this.model.strategy?.scenarios?.summary || ""}</caption>
+            <thead><tr>${(this.model.strategy?.scenarios?.headers || []).map((label) => html`<th scope="col">${label}</th>`)}</tr></thead>
+            <tbody>${(this.model.strategy?.scenarios?.rows || []).map((row) => html`<tr>${row.map((cell, index) => index === 0 ? html`<th scope="row">${cell}</th>` : html`<td>${cell}</td>`)}</tr>`)}</tbody>
+          </table>
+        </details>
       </section>`;
   }
 }

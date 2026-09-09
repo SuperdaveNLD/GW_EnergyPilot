@@ -27,7 +27,7 @@ Current release lines:
 
 ```text
 v1.2.1 Stable
-v1.3.0-beta.10 Current beta
+v1.3.0-beta.11 Current beta
 ```
 
 Release-channel migration is prepared for v1:
@@ -61,11 +61,11 @@ EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must 
   reports must exclude all credentials.
 - See `docs/SEMS_API.md` for the current mapped subset and limits.
 
-## Frontend stability contract (v0.41+, active v1.3.0-beta.10)
+## Frontend stability contract (v0.41+, active v1.3.0-beta.11)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.3.0-beta.10 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.3.0-beta.11 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - The beta.5 iOS adapter may recover a missing touch click after 120 ms only
   through the same native element's existing click path, with a 12 px movement
   guard and late-click deduplication.
@@ -217,6 +217,25 @@ and cloud load. EV needs explicit W/kW/MW/mW units; load is canonical local
 `mapping_preview` is read-only even when the selected Hybrid 2.0 strategy
 is executing that model. Keep unverified PV behavior visible in diagnostics
 and docs. See `docs/HYBRID_2.md` for the matrix and hardware evidence.
+
+Hybrid 3.0 excl. EV (`hybrid_3`) is a separate opt-in beta, not a migration of
+Hybrid 2.0. Its purpose is to support independently scheduled Tibber Grid Rewards
+charging without intentionally compensating the EV's grid draw from the home
+battery. Preserve grid-first self-use; neutral battery plans also mean self-use.
+Normal self-use/discharge/charge select 1/3/2; with EV they select 5/5/2.
+No 9/10 net-only branch. Mode 2 retains planned grid-assistance watts + available
+PV; never force maximum charging or introduce PV-only mode 2/0 automatically.
+
+Hybrid 3.0 uses the same local-load-minus-EV reference, existing 15-second
+callback and control lock. Both reports must be at most 30 seconds old and at
+most 15 seconds apart. Missing required measurements/plans Hold; recovery needs
+two distinct fresh pairs with both sources advancing and at least 15 seconds.
+Valid directed charging is independent of house-reference recovery. Native
+EV-stop Hold requires new optimization success and both fresh finite live plan
+outputs after stop. Direct canonical local EMS readback is bounded to three
+attempts after a write; invalidate the previous acknowledgement before writing.
+Control-only readback never makes telemetry fresh. Keep diagnostic rejection
+reasons visible and field-validation limits explicit. See `docs/HYBRID_3.md`.
 
 Legacy compatibility remains: missing/false old smart-meter flag -> Battery; explicit true -> Grid.
 
@@ -457,7 +476,7 @@ gw-energy-pilot-v131.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.3.0-beta.10 owns the beta presentation and complete `1.3.0-beta.10` cache
+v1.3.0-beta.11 owns the beta presentation and complete `1.3.0-beta.11` cache
 boundary. It retains v1.2.0's stable safety,
 diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
 missing-click recovery, and expands the remaining graph/history touch targets

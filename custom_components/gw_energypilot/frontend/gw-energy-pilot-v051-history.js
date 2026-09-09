@@ -4,7 +4,7 @@ import {
   language,
   loadChartData,
   timestampMs,
-} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.10";
+} from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.11";
 
 const PANEL_NAME = "gw-energypilot-panel";
 const CARD_ID = "emhass-goodwe-history";
@@ -143,10 +143,10 @@ function statusModel(panel, row) {
   const outcome = row?.outcome || {};
   const command = String(outcome.command || "");
   if (row?.kind === "projection") return { key: "future", label: text.projected };
-  if (command.startsWith("ev_")) return { key: "ev", label: text.evOverride };
   if (outcome.write_status === "failed") return { key: "bad", label: text.failed };
   if (outcome.verification_status === "mismatch") return { key: "bad", label: text.mismatch };
   if (outcome.verification_status === "unavailable") return { key: "warn", label: text.unavailable };
+  if (command.startsWith("ev_")) return { key: "ev", label: text.evOverride };
   if (outcome.verification_status === "verified") {
     return {
       key: "ok",
@@ -227,6 +227,8 @@ function compactRow(panel, row) {
 
 function fullRow(panel, row) {
   const outcome = row?.outcome || {};
+  const guard = row?.actual?.hybrid3;
+  const guardEvidence = guard ? `Hybrid 3.0: ${guard.hold_reason || guard.reason || "ready"} · load ${finiteNumber(guard.load_age_seconds)?.toFixed(1) ?? "—"} s · EV ${finiteNumber(guard.ev_age_seconds)?.toFixed(1) ?? "—"} s · ${guard.command_readback || "—"}` : "";
   const wantedSoc = finiteNumber(row?.plan?.soc_opt_pct);
   const evidence = `${outcome.write_status || "—"} · ${outcome.verification_status || "—"}`;
   return `<tr data-kind="${esc(panel, row?.kind || "history")}">
@@ -237,7 +239,7 @@ function fullRow(panel, row) {
     <td>${esc(panel, modeText(panel, outcome.readback_mode, outcome.readback_setpoint_w))}</td>
     <td>${esc(panel, actualsText(row))}</td>
     <td><div class="ep-v051-statuses">${statusPills(panel, row)}</div></td>
-    <td>${esc(panel, evidence)}<small>${esc(panel, outcome.error_type || "")}</small></td>
+    <td>${esc(panel, evidence)}<small>${esc(panel, outcome.error_type || "")}</small><small>${esc(panel, guardEvidence)}</small></td>
   </tr>`;
 }
 

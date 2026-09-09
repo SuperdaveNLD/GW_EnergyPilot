@@ -4,6 +4,41 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.11] - 2026-09-09
+
+### Added
+
+- Opt-in `hybrid_3` / Hybrid 3.0 excl. EV for independently scheduled Tibber
+  Grid Rewards charging. Self-use/discharge/charge use modes 1/3/2 without EV
+  and 5/5/2 with EV. Preserve grid-first self-use and planned mode-2 watts;
+  neutral battery plans also select self-use, with no mode-9/10 net-only path.
+- A six-scenario table in the permanent EN/NL dashboard control surface and
+  documented purpose, mode-specific watt semantics and field-validation limits.
+- Hybrid 3.0 measurement-age/skew diagnostics, fail-closed Hold and recovery
+  requiring two distinct fresh report pairs and at least 15 seconds. Use the
+  existing controller cadence/lock; no second feedback loop or charger writes.
+
+### Fixed
+
+- Hybrid 3.0 invalidates old acknowledgements before each write and obtains
+  bounded direct local EMS readback. Failed refreshes cannot verify stale
+  matching telemetry. Do not refresh the local-load timestamp with control data.
+- Keep native Hybrid 3.0 EV-stop Hold until a new successful optimization and
+  both fresh finite live plan publications; repeated idle events cannot release
+  the previous plan. Preserve valid plan resilience and manual ownership.
+- Surface readback/write failures before the EV-override history label, and
+  include Hybrid 3.0 hold reason and measurement ages in the full history table.
+- Correct stale Hybrid 2.0 settings/API documentation to its actual existing
+  grid-first mode-2 planned-assistance behavior; its control logic is unchanged.
+
+### Unchanged / validation
+
+- Existing selections, manual modes, stable channel, CUSTOM load forecast,
+  SOC/EMHASS settings and persistent identifiers/Store versions are unchanged.
+- Complete manifest/frontend cache boundary is 1.3.0-beta.11. Software tests
+  do not establish physical EV exclusion, PV behavior or Grid Rewards gains;
+  synchronized inverter field validation remains required.
+
 ## [1.3.0-beta.10] - 2026-09-08
 
 ### Changed

@@ -41,6 +41,7 @@ from .const import (
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
     CONTROL_STRATEGY_HYBRID_2,
+    CONTROL_STRATEGY_HYBRID_3,
     DEFAULT_DEADBAND,
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
@@ -604,6 +605,14 @@ class GWEnergyPilotController:
         actual_power = getattr(data, "power", None)
         return actual_power is not None and int(actual_power) == int(power)
 
+    async def _async_refresh_command_readback(self) -> None:
+        """Refresh command evidence through the active telemetry transport."""
+        refresh_control = getattr(self.coordinator, "async_refresh_control_readback", None)
+        if callable(refresh_control):
+            await refresh_control()
+        else:
+            await self.coordinator.async_request_refresh()
+
     async def _async_apply_command(self, mode: int, power: int, command: str, *, skip_if_readback_matches: bool = False) -> None:
         context = self._execution_context()
         power = max(0, min(int(power), 15000))
@@ -655,15 +664,7 @@ class GWEnergyPilotController:
         self._notify_state()
         refresh_error: Exception | None = None
         try:
-            refresh_control = getattr(
-                self.coordinator,
-                "async_refresh_control_readback",
-                None,
-            )
-            if callable(refresh_control):
-                await refresh_control()
-            else:
-                await self.coordinator.async_request_refresh()
+            await self._async_refresh_command_readback()
         except Exception as err:  # preserve the established propagation contract
             refresh_error = err
         readback_at = datetime.now(timezone.utc)
@@ -672,7 +673,7 @@ class GWEnergyPilotController:
         readback_power = actual.get("ems_setpoint_w")
         verification_status = (
             "verified"
-            if readback_mode == mode and readback_power == power
+            if readback_mode == mode and readback_power == power and refresh_error is None
             else "unavailable"
             if readback_mode is None or readback_power is None or refresh_error
             else "mismatch"
@@ -918,7 +919,7 @@ class GWEnergyPilotController:
             self._notify_state()
             await self._async_record_waiting(self.last_command)
             return
-        if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2}:
+        if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2, CONTROL_STRATEGY_HYBRID_3}:
             await self._async_apply_hybrid_plan(
                 p_batt,
                 p_grid,

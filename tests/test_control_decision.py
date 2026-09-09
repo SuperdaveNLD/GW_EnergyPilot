@@ -68,6 +68,56 @@ class ControlDecisionTests(unittest.TestCase):
         self.assertEqual((charge.mode, charge.power, charge.command), (c.MODE_CHARGE_BATTERY, 10000, "battery_charge"))
         self.assertEqual((discharge.mode, discharge.power), (c.MODE_DISCHARGE_BATTERY, 4200))
 
+    def test_hybrid3_six_scenarios(self):
+        for battery, grid, ev, expected in (
+            (0, 700, False, (1, 0)), (0, 700, True, (5, 1000)),
+            (4000, -5000, False, (3, 4000)), (4000, -5000, True, (5, 1000)),
+            (-4300, 7000, False, (2, 4300)), (-4300, 7000, True, (2, 4300)),
+        ):
+            with self.subTest(battery=battery, grid=grid, ev=ev):
+                decision = self.resolve("hybrid_3", battery, grid, ev)
+                self.assertEqual((decision.mode, decision.power), expected)
+
+    def test_hybrid3_neutral_boundaries_have_no_net_only_branch(self):
+        for battery in (-100, 0, 100):
+            for grid in (-15000, -1000, 0, 1000, 15000):
+                for ev in (False, True):
+                    result = self.resolve("hybrid_3", battery, grid, ev)
+                    self.assertEqual((result.mode, result.power), (5, 1000) if ev else (1, 0))
+        for battery in (-15000, 15000):
+            for grid in (-1000, 0, 1000):
+                self.assertEqual(self.resolve("hybrid_3", battery, grid).mode, 1)
+
+    def test_hybrid3_charge_ignores_ev_house_measurements_and_preserves_watts(self):
+        for watts in (101, 700, 15000, 24000):
+            for grid in (-7000, 7000):
+                for ev in (False, True):
+                    result = self.resolve("hybrid_3", -watts, grid, ev,
+                                          ev_power_w=None, load_power_w=None)
+                    self.assertEqual((result.mode, result.power), (2, min(watts, 10000)))
+
+    def test_hybrid3_fail_closed_and_house_clamps(self):
+        for ev in (False, True):
+            for invalid in (None, True, float("nan"), float("inf")):
+                for battery, grid in ((invalid, 5000), (5000, invalid)):
+                    result = self.resolve("hybrid_3", battery, grid, ev)
+                    self.assertEqual((result.mode, result.power), (8, 0))
+            self.assertEqual(self.resolve("hybrid_3", -5000, 5000, ev, max_power=0).mode, 8)
+        for load, ev_w, expected in ((11000, 11000, 0), (500, 11000, 0),
+                                      (30000, 16000, 10000), (16700, 16000, 700)):
+            result = self.resolve("hybrid_3", 5000, -5000, True, load_power_w=load, ev_power_w=ev_w)
+            self.assertEqual((result.mode, result.power), (5, expected))
+        for load, ev_w in ((None, 11000), (12000, None), (12000, 0), (True, 11000)):
+            self.assertEqual(self.resolve("hybrid_3", 5000, -5000, True,
+                load_power_w=load, ev_power_w=ev_w).mode, 8)
+
+    def test_hybrid3_preview_identifies_the_selected_model(self):
+        result = self.module.preview_hybrid3_mapping(p_batt=0, p_grid=15000,
+            battery_deadband=100, grid_deadband=1000, max_power=15000).as_dict()
+        self.assertEqual(result["model"], "hybrid_3_ev_excluded_v1")
+        self.assertEqual(result["mode"], 1)
+        self.assertTrue(result["preview_only"])
+
     def test_grid_and_hybrid_mapping(self):
         c = self.const
         imported = self.resolve(c.CONTROL_STRATEGY_GRID, -2000, 3500)

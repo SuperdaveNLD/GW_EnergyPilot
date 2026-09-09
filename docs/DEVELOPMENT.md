@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.3.0-beta.10 runtime structure
+## Current v1.3.0-beta.11 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.3.0-beta.10 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.3.0-beta.11 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -182,8 +182,8 @@ gw-energy-pilot-v131.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.3.0-beta.10 uses a presentation-only beta wrapper over the v1.2.0 stable
-wrapper and advances one complete `1.3.0-beta.10` active-graph cache boundary. The bounded
+v1.3.0-beta.11 uses a presentation-only beta wrapper over the v1.2.0 stable
+wrapper and advances one complete `1.3.0-beta.11` active-graph cache boundary. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The local-only Beta tests component additionally buffers pointer/click evidence
 until after the synthesis window and compares five guarded activation methods;
@@ -299,6 +299,17 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 
 The Hybrid neutral-battery branch is evaluated first so ordinary forecast house import/export does not become an active PCC target while EMHASS asked the battery to remain idle. Every non-neutral plan is PCC-controlled: mode 1 owns `P_grid` inside the separate GoodWe Auto deadband, while modes 9/10 own import/export targets outside it. Both variable boundaries are inclusive and classify the branch only; never subtract either threshold from the transmitted setpoint.
 
+### Hybrid 3.0 excl. EV
+
+The separate `hybrid_3` strategy implements the six-scenario mapping in
+`preview_hybrid3_mapping`: normal modes 1/3/2 become 5/5/2 with EV. Its pure
+recovery state lives in `hybrid3_reference.py`; the existing v0.33 controller
+retains all actuator, polling and ownership responsibilities. Test stale/skewed
+EV/load data, two-pair recovery, delayed/failed targeted readback, acknowledgement
+invalidation and EV-stop fresh optimization/publication. No Store migration,
+new entity, register, optimizer objective or charger write is introduced.
+See [Hybrid 3.0 policy](HYBRID_3.md); physical EV/PV behavior remains a test gate.
+
 ### Hybrid 2.0 Beta
 
 The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
@@ -335,7 +346,8 @@ For an explicit home-battery charge request:
 Battery -> mode 11 using abs(P_batt)
 Grid    -> normal strategy mode/setpoint; wait if required P_grid is unavailable
 Hybrid  -> normal strategy mode/setpoint; wait if required P_grid is unavailable
-Hybrid 2.0 -> grid-first; EV self-use via mode 5 at load minus EV; directed charge via 11; explicit EV discharge via 8
+Hybrid 2.0 -> grid-first; EV self-use via mode 5 at load minus EV; directed charge via 2; explicit EV discharge via 8
+Hybrid 3.0 -> grid-first + neutral battery self-use; EV self-use/discharge via mode 5; directed charge via 2 unchanged
 ```
 
 `ev_detection.py` is the single interpretation owner. Explicit power mode

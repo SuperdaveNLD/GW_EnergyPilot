@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.3.0-beta.10";
+import "./gw-energy-pilot-v039.js?v=1.3.0-beta.11";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.10";
+} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.11";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.10";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.10";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.10";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.11";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.3.0-beta.11";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.3.0-beta.11";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.3.0-beta.10";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.10";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.10";
+} from "./ep-control-surface.js?v=1.3.0-beta.11";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.3.0-beta.11";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.3.0-beta.11";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -1559,11 +1559,13 @@ function controllerTargetLabel(panel, t) {
     || panel._stateByKey?.("control_strategy")?.state;
   // Classify the requested command, not potentially delayed EMS read-back.
   if (command === "hybrid2_planned_battery_charge"
-    || (command === "ev_battery_charge" && strategy === "hybrid_2")) {
+    || command === "hybrid3_planned_battery_charge"
+    || (command === "ev_battery_charge" && ["hybrid_2", "hybrid_3"].includes(strategy))) {
     return t.gridAssistanceTarget;
   }
   if (command === "ev_house_self_consumption") return t.evInverterTarget;
   if (command === "hybrid2_planned_battery_discharge"
+    || command === "hybrid3_planned_battery_discharge"
     || command.startsWith("battery_") || command.startsWith("ev_")) {
     return t.evBatteryTarget;
   }

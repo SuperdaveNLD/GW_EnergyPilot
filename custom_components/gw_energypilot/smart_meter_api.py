@@ -21,6 +21,7 @@ from .const import (
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
     CONTROL_STRATEGY_HYBRID_2,
+    CONTROL_STRATEGY_HYBRID_3,
     DEFAULT_DEADBAND,
     DEFAULT_GOODWE_AUTO_DEADBAND,
     DEFAULT_USE_GOODWE_SMART_METER,
@@ -93,6 +94,7 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
             CONTROL_STRATEGY_GRID: "Grid control",
             CONTROL_STRATEGY_HYBRID: "Hybrid control",
             CONTROL_STRATEGY_HYBRID_2: "Hybrid 2.0 Beta",
+            CONTROL_STRATEGY_HYBRID_3: "Hybrid 3.0 excl. EV",
         },
         "battery_strategy": "P_batt -> GoodWe modes 11/12; mode 8 around zero",
         "grid_strategy": "P_grid -> GoodWe modes 9/10; mode 1 around zero",
@@ -103,11 +105,20 @@ def _payload(entry: ConfigEntry) -> dict[str, Any]:
         ),
         "hybrid_2_strategy": (
             "Test mapping: grid deadband first -> Auto, including neutral P_batt. "
-            "Outside: planned charging watts -> mode 11; discharge watts -> mode 3; "
+            "Outside: planned charging watts -> mode 2 grid assistance plus PV; discharge watts -> mode 3; "
             "neutral battery -> mode 9/10 net target. EV self-use -> mode 5 at fresh "
             "local load minus measured EV power every 15 seconds. EV planned discharge, "
             "unresolved net-only EV plans or invalid measurements -> mode 8 Hold. "
             "Explicit pause stays Hold. PV priority and the EV load boundary require field validation."
+        ),
+        "hybrid_3_strategy": (
+            "Opt-in beta for independently scheduled Tibber Grid Rewards charging. "
+            "Self-use -> mode 1; directed discharge -> mode 3; directed charge -> mode 2 "
+            "at planned grid-assistance watts, with PV able to add. With EV: self-use and "
+            "discharge -> mode 5 at fresh local load minus measured EV every 15 seconds; "
+            "charge stays mode 2 unchanged. Missing required data -> Hold; recovery needs "
+            "two fresh pairs over at least 15 seconds. No charger control or reward guarantee. "
+            "Mode-5 load boundary and transient EV exclusion require field validation."
         ),
         "storage": "home_assistant_config_entry_data",
     }

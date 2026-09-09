@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta release](docs/releases/v1.3.0-beta.10.md)
+[Latest beta release](docs/releases/v1.3.0-beta.11.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -31,7 +31,7 @@ system's responsibility explicit:
   wall-clock boundaries with optional Nord Pool/runtime pricing;
 - **Control the inverter locally** — translate the active battery/grid plan to
   verified GoodWe EMS modes and setpoints over local Modbus TCP;
-- **Choose how the plan is followed** — Battery, Grid, Hybrid or opt-in Hybrid 2.0 Beta control, from
+- **Choose how the plan is followed** — Battery, Grid, Hybrid, Hybrid 2.0 Beta or opt-in Hybrid 3.0 excl. EV control, from
   direct battery power to GoodWe smart-meter/PCC targets;
 - **Protect the system when reality changes** — block home-battery discharge
   into a charging EV, wait for fresh plans and suspend EV coordination when
@@ -66,10 +66,10 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.10 · Beta**
+**v1.3.0-beta.11 · Beta**
 
 Latest production release: **v1.2.1 · Stable**
-Latest beta release: **v1.3.0-beta.10**
+Latest beta release: **v1.3.0-beta.11**
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -158,6 +158,22 @@ Release documentation:
 - `docs/SETTINGS.md` — settings and synchronized minimum-SOC contract;
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
+
+## v1.3.0-beta.11 highlights
+
+**Hybrid 3.0 excl. EV** is a new explicit strategy for independently scheduled
+Tibber Grid Rewards charging. Self-use uses mode 1, discharge mode 3 and charge
+mode 2. With EV, self-use and discharge use mode 5 at measured house load
+excluding EV every 15 seconds; charging keeps the same mode-2 allowance + PV.
+The existing grid-first deadband remains; neutral battery plans also mean
+self-use. New measurement/recovery diagnostics, direct bounded EMS readback
+and an EV-stop fresh-plan latch support validation of the reported transitions.
+The English/Dutch dashboard includes the six-scenario table. Existing
+strategies, CUSTOM forecasts and stable releases remain unchanged.
+
+This is an opt-in Beta, not a reward or instantaneous EV-exclusion guarantee.
+See [scenario table and safety limits](docs/HYBRID_3.md) and
+[beta.11 release notes](docs/releases/v1.3.0-beta.11.md).
 
 ## v1.3.0-beta.10 highlights
 
@@ -620,7 +636,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - direct local GoodWe Modbus TCP telemetry;
 - EMS mode/setpoint control;
 - manual access to all twelve EMS modes;
-- four Automatic Control strategies: Battery, Grid, Hybrid and Hybrid 2.0 Beta;
+- five Automatic Control strategies: Battery, Grid, Hybrid, Hybrid 2.0 Beta and Hybrid 3.0 excl. EV;
 - native EMHASS optimization/publishing;
 - safe EMHASS required-config synchronization that preserves installation topology;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
@@ -737,6 +753,17 @@ else P_grid < -deadband -> mode 10 Grid export target
 Hybrid first preserves an explicit neutral battery plan. This prevents ordinary site import or PV export from becoming an active target while EMHASS asks the battery to remain idle.
 
 For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around zero grid target, mode 1 lets GoodWe close the actual local balance for internal or AC-coupled PV. Outside the configured deadband, modes 9/10 receive the complete absolute `P_grid` magnitude, limited only by maximum power. Exact positive and negative deadband boundaries remain neutral.
+
+### Hybrid 3.0 excl. EV
+
+The new `hybrid_3` strategy aims to preserve Tibber Grid Rewards opportunities
+without deliberately feeding an independently charging EV from the home
+battery. Normal self-use/discharge/charge select **1/3/2**; with EV they select
+**5/5/2**. Stand 5 uses fresh local load minus measured EV every 15 seconds.
+Stand 2 retains planned grid-assistance watts and available PV may add.
+Invalid required data selects Hold; recovery and command confirmation are
+explicitly diagnosed. No user is migrated automatically. See the
+[complete six-scenario table, decision order and field limits](docs/HYBRID_3.md).
 
 ### Hybrid 2.0 Beta
 

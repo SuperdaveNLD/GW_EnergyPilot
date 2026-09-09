@@ -1,4 +1,4 @@
-import "./gw-energy-pilot-v023.js?v=1.3.0-beta.10";
+import "./gw-energy-pilot-v023.js?v=1.3.0-beta.11";
 
 const VERSION = "0.24";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -8,9 +8,11 @@ const STRATEGY_LABELS = {
   grid: "Netregeling",
   hybrid: "Hybride regeling",
   hybrid_2: "Hybrid 2.0 Beta",
+  hybrid_3: "Hybrid 3.0 excl. EV",
 };
 
 const STRATEGY_DESCRIPTIONS = {
+  hybrid_3: "Tibber Grid Rewards: zelfverbruik 1, ontladen 3, laden 2 (netassistentie + PV). Met EV: zelfverbruik/ontladen 5 op verse lokale load minus EV, elke 15 seconden; laden blijft 2. Zonder vereiste metingen Hold. Opt-in beta; praktijktests nodig, geen opbrengstgarantie.",
   hybrid_2: "Testmapping: eerst de net-deadband, daarbinnen Auto (ook bij P_batt = 0). Daarbuiten gebruikt modus 2 de geplande laadwatts als netassistentie met PV-voorrang; PV kan extra bijdragen aan acculaden; modus 3 volgt de ontlaadwatts; een neutraal accuplan gebruikt netdoelen via modus 9/10. Met EV gebruikt zelfconsumptie modus 5 op gemeten load minus EV, elke 15 seconden; geplande ontlading gaat naar modus 8 Hold. Expliciete pauze blijft Hold. PV-voorrang en de EV-meetgrens vereisen nog praktijktests.",
   battery: "Regelt laden en ontladen op het gewenste accuvermogen (GoodWe 11/12).",
   grid: "Regelt import en export op het gewenste netvermogen (GoodWe 9/10).",
@@ -86,6 +88,7 @@ function installControlStrategy(panel, root) {
       <option value="battery" ${strategy === "battery" ? "selected" : ""}>Accuregeling</option>
       <option value="grid" ${strategy === "grid" ? "selected" : ""}>Netregeling</option>
       <option value="hybrid_2" ${strategy === "hybrid_2" ? "selected" : ""}>Hybrid 2.0 Beta</option>
+      <option value="hybrid_3" ${strategy === "hybrid_3" ? "selected" : ""}>Hybrid 3.0 excl. EV</option>
       <option value="hybrid" ${strategy === "hybrid" ? "selected" : ""}>Hybride regeling</option>
     </select>
   `;
