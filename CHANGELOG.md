@@ -4,6 +4,16 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-13
+
+### Changed
+
+- Promote v1.3.0-beta.11 to the stable production channel as v1.4.0.
+- Synchronize the manifest, complete frontend cache boundary, dashboard badge
+  and release documentation. Runtime behavior remains identical to beta.11.
+- Retain Hybrid 2.0/3.0 as explicit opt-in strategies with their documented
+  field-validation limits; existing settings and stored history are preserved.
+
 ## [1.3.0-beta.11] - 2026-09-09
 
 ### Added

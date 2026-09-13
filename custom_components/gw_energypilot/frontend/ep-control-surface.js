@@ -2,13 +2,13 @@ import {
   LitElement,
   html,
   nothing,
-} from "./vendor/lit-3.3.3.js?v=1.3.0-beta.11";
+} from "./vendor/lit-3.3.3.js?v=1.4.0";
 import {
   CUSTOM_MODE,
   canonicalProfiles,
   normalizeLanguage,
-} from "./gw-energy-pilot-v038-model.js?v=1.3.0-beta.11";
-import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.3.0-beta.11";
+} from "./gw-energy-pilot-v038-model.js?v=1.4.0";
+import { localizedEmsMode } from "./gw-energy-pilot-v038-i18n.js?v=1.4.0";
 
 const ACK_TIMEOUT_MS = 15_000;
 const TRACE_LIMIT = 6_000;
