@@ -5926,7 +5926,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v101": "v1.0.1-beta.4 BETA",
         "v110": "v1.2.0 STABLE",
         "v130": "v1.3.0-beta.1 BETA",
-        "v131": "v1.3.0-beta.11 BETA",
+        "v131": "v1.4.0 STABLE",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(

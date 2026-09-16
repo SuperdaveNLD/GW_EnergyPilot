@@ -17,6 +17,15 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
+# v1.4.0 — Production promotion
+
+Stable production release of the v1.3.0-beta.11 candidate, with the same runtime
+behavior, a complete 1.4.0 frontend cache boundary and stable presentation.
+Includes the compact mobile controls, solar graphs, Hybrid 2.0 and opt-in
+Hybrid 3.0 excl. EV with explicit recovery/readback diagnostics. Optional
+hardware features retain their documented field-validation limits. See
+[v1.4.0 release notes](releases/v1.4.0.md).
+
 # v1.3.0-beta.11 — Hybrid 3.0 excl. EV
 
 A new opt-in strategy uses Auto/discharge/charge modes **1/3/2** without EV
@@ -471,6 +480,7 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.4.0** | 2026-09-13 | **Stable** | Production promotion of beta.11; same runtime behavior, stable presentation and cache boundary; optional hardware features retain field-validation limits. |
 | **1.3.0-beta.11** | 2026-09-09 | **Beta** | Opt-in Hybrid 3.0 excl. EV; six scenarios, Tibber Grid Rewards purpose, measured house reference and explicit recovery/readback evidence. |
 | **1.3.0-beta.10** | 2026-09-08 | **Beta** | Hybrid 2.0 charging via mode 2 with bounded planned grid assistance and additive PV, with or without EV. |
 | **1.3.0-beta.9** | 2026-09-06 | **Beta** | Grid-first Hybrid 2.0; planned watts via 11/3 and EV house output via 5 with fresh local load. |

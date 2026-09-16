@@ -1,8 +1,8 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.3.0-beta.4**. It retains v1.2.0 as the production base and adds a bounded
-beta presentation layer.
+v1.4.0**. It promotes the v1.3.0-beta.11 runtime with a bounded stable
+presentation layer. Optional strategies retain their field-validation limits.
 
 ## High-level flow
 
@@ -600,8 +600,8 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the previous stable
-base; v1.3.0-beta.4 owns the beta presentation over v1.2.0 and the complete
-`1.3.0-beta.4` active-graph cache boundary. Its EMHASS settings
+base; v1.4.0 owns the stable presentation in the existing v131 module and the
+complete `1.4.0` active-graph cache boundary. Its EMHASS settings
 select AUTO or a fixed CUSTOM household load at the final runtime request-body
 boundary; unrelated optimization parameters remain untouched. Its isolated
 Beta tests compare five iOS activation methods with deferred, observer-neutral

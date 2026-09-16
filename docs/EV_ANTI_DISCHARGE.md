@@ -1,6 +1,6 @@
 # EV anti-discharge protection
 
-This document defines v1.3.0-beta.11 behavior, including a separate opt-in
+This document defines v1.4.0 behavior, retained from v1.3.0-beta.11, including a separate opt-in
 Hybrid 3.0 excl. EV strategy. Existing Hybrid 2.0 retains beta.10's grid-first
 mapping and mode-2 charging. Published beta.9 still used mode 11; beta.8 used
 the earlier EV import reference.

@@ -26,8 +26,8 @@ GoodWe GW15K-ETA-G20
 Current release lines:
 
 ```text
-v1.2.1 Stable
-v1.3.0-beta.11 Current beta
+v1.4.0 Stable
+v1.3.0-beta.11 Previous beta candidate, promoted to v1.4.0
 ```
 
 Release-channel migration is prepared for v1:
@@ -61,11 +61,11 @@ EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must 
   reports must exclude all credentials.
 - See `docs/SEMS_API.md` for the current mapped subset and limits.
 
-## Frontend stability contract (v0.41+, active v1.3.0-beta.11)
+## Frontend stability contract (v0.41+, active v1.4.0)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.3.0-beta.11 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.4.0 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - The beta.5 iOS adapter may recover a missing touch click after 120 ms only
   through the same native element's existing click path, with a 12 px movement
   guard and late-click deduplication.
@@ -476,7 +476,7 @@ gw-energy-pilot-v131.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.3.0-beta.11 owns the beta presentation and complete `1.3.0-beta.11` cache
+v1.4.0 owns the stable presentation and complete `1.4.0` cache
 boundary. It retains v1.2.0's stable safety,
 diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
 missing-click recovery, and expands the remaining graph/history touch targets

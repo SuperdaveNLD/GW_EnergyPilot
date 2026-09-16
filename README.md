@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta release](docs/releases/v1.3.0-beta.11.md)
+[Latest production release](docs/releases/v1.4.0.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -66,10 +66,10 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.11 · Beta**
+**v1.4.0 · Stable**
 
-Latest production release: **v1.2.1 · Stable**
-Latest beta release: **v1.3.0-beta.11**
+Latest production release: **v1.4.0 · Stable**
+Previous beta candidate: **v1.3.0-beta.11**, promoted to v1.4.0.
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -86,21 +86,23 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-The merged `main` line contains the v1.2.1 stable preparation. It retains v1.2.0's measured
-missing-click recovery and enlarged
-Battery · Plan · Price and execution-history controls behind a new complete
-frontend cache boundary, and replaces connector arrows with one moving energy
-ball on each active power route, including external PV. Every recovered touch still enters the existing
-native click, form-submit or change route exactly once. Local Modbus remains
+v1.4.0 promotes the v1.3.0-beta.11 runtime to production with a complete new
+frontend cache boundary. It includes compact mobile controls, solar-production
+graphs, live-flow motion and the opt-in Hybrid 3.0 excl. EV strategy with
+explicit Hold/recovery and local command-readback diagnostics. Existing users
+keep their selected strategy, EMHASS settings and history. Hybrid 2.0/3.0 and
+SEMS+ retain their documented Beta/field-validation boundaries; promotion does
+not establish physical PV/EV behavior or Tibber rewards. Local Modbus remains
 mandatory for every EMS and minimum-SOC write/read-back. Normal HACS users
-receive this release without enabling prereleases.
+receive v1.4.0 without enabling prereleases.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
+- `docs/releases/v1.4.0.md` — current production release and upgrade boundaries;
 - `docs/USER_GUIDE.md` — English installation and daily-use guide;
 - `docs/HANDLEIDING_NL.md` — Nederlandse installatie- en gebruikershandleiding;
-- `docs/releases/v1.3.0-beta.4.md` — current solar-production visibility fix for every chart size;
+- `docs/releases/v1.3.0-beta.4.md` — historical solar-production visibility fix for every chart size;
 - `docs/releases/v1.3.0-beta.3.md` — actual-versus-expected solar-production graph beta notes;
 - `docs/releases/v1.3.0-beta.2.md` — responsive Power overview and optional EV charger beta notes;
 - `docs/releases/v1.3.0-beta.1.md` — compact-controls, flow-motion and built-in-help beta notes;
