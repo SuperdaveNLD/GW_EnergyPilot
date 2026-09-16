@@ -1,7 +1,8 @@
 # GW EnergyPilot architecture
 
 This document describes the current runtime architecture of **GW EnergyPilot
-v1.2.1**. It retains v1.2.0 as the previous production base.
+v1.4.0**. It promotes the v1.3.0-beta.11 runtime with a bounded stable
+presentation layer. Optional strategies retain their field-validation limits.
 
 ## High-level flow
 
@@ -193,25 +194,61 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 
 Hybrid first preserves an explicit neutral battery plan through mode 8. Every non-neutral plan is PCC-controlled: mode 1 lets GoodWe close the actual local balance inside the separate GoodWe Auto deadband, while modes 9/10 own non-zero planned import/export outside it. Exact boundaries remain neutral and neither threshold is ever subtracted from the final mode-9/10 setpoint.
 
+### Hybrid 3.0 excl. EV
+
+`hybrid_3` is a separate opt-in beta, with no migration of existing settings.
+`preview_hybrid3_mapping` shares the validated base model and translates
+neutral-battery net-only plans to self-use; EV directed discharge becomes
+measured house self-use too. Normal modes 1/3/2 become 5/5/2 with EV. Keep the
+grid-first deadband, mode-specific planned watts and manual ownership.
+
+`controller_v033.py` owns measurement-skew checks, a pure in-memory
+`EVReferenceRecovery` latch, native EV-stop fresh-plan gating and bounded direct
+canonical EMS readback. These extend the existing controller/lock/cadence;
+there is no new scheduler or charger controller. Readback does not refresh load
+telemetry. Existing command-sensor, debug and execution-history paths carry
+guard diagnostics without new IDs or Store versions. The permanent Lit surface
+owns the bilingual scenario table. See [purpose, table and limits](HYBRID_3.md).
+
+### Hybrid 2.0 Beta
+
+The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
+mode **1**, including `P_batt = 0`. Outside it, charging uses **2** at bounded
+`abs(P_batt)` as PV-priority grid assistance. PV can add to actual battery
+charging; the existing watt calculation is retained, not maximum dispatch.
+Published beta.9 used mode 11 for this branch. Discharging uses **3** at
+planned battery watts, and neutral
+battery plans use net targets **9/10**. Explicit manual Pause remains **8**.
+With EV active, self-use uses **5** at fresh local 35172 minus measured EV
+power, updated every 15 seconds. Explicit planned discharge and unsupported
+net-only EV cases use Hold. Missing/stale load or EV measurements also hold.
+This assumes an unverified 35172/external-PV boundary; PV priority at the
+inverter limit and mode-5 surplus behavior still need field testing. Other
+strategies and manual modes retain their behavior. The existing command sensor
+exposes a read-only `mapping_preview`; it does not control the actuator.
+See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
+
 Legacy compatibility remains: without explicit `control_strategy`, old `use_goodwe_smart_meter=false/missing` maps to Battery and `true` maps to Grid.
 
 ### EV anti-discharge override
 
 The EV feature is a higher-priority directional safety guard, not an EV charger controller.
 
-During an active EV charging session:
+For Battery, Grid and original Hybrid during an active EV charging session
+(Hybrid 2.0 uses the house-self-consumption exception above):
 
 ```text
 P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
 P_batt < -Battery Hold deadband  -> explicit home-battery charge remains allowed
 ```
 
-Charge execution follows the selected strategy as far as safely possible:
+Charge execution follows the selected strategy without changing its mode or setpoint:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Grid    -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+Hybrid  -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
 ```
 
 The v0.34 override is implemented in `controller_v033.py` so the existing canonical controller and EMS write path remain single-owner. `ev_detection.py` owns the exclusive power-versus-status interpretation used by the controller and event listener. Explicit status mode accepts `on`, `true`, `charging` and `connected_charging`; explicit power mode evaluates only finite, unit-normalized measured power above its threshold. Allocated or maximum charger current is not an activity signal. Entries without the method key retain the exact historical `connected_charging`-or-power interpretation until saved.
@@ -494,6 +531,13 @@ market - sell deduction = effective prod_price
 
 Actual bars remain Recorder history from the existing GoodWe battery-power entity. Actual SOC is read separately as Recorder 5-minute means from the registry-resolved GoodWe `battery_soc` percentage entity. The dashed wanted-SOC line uses immutable execution snapshots for elapsed time and exact validated `SOC_opt` from the current official plan for current/future time. EMHASS computes `SOC_opt` after each row's power interval, so schema 7 retains the row `start` but plots/persists explicit `target_at = start + inferred step`; no output-entity fallback, hardcoded 15-minute shift or multi-battery aggregate is guessed. Native GoodWe day counters remain the headline charged/discharged energy values.
 
+All chart sizes and expanded views plot the existing combined `pv_generation_power`
+Recorder means as solid actual solar production and the non-negative official
+plan `P_PV` points as a dashed expected-production step line. `P_PV` is only
+returned through the optional read-only `pv_plan` payload when the current
+validated official mirror provides it; it has no entity fallback and never
+enters control or accounting.
+
 The same bounded Recorder request includes combined display-only PV, load and
 fast grid power. Large/expanded views apply a load-first balance and draw
 grid/solar charge plus battery/solar export with an explicit unknown residual.
@@ -518,8 +562,10 @@ The header reachability pill is also canonical stable DOM. It is created only du
 Active top-level module:
 
 ```text
-gw-energy-pilot-v110.js
-  -> gw-energy-pilot-v101.js
+gw-energy-pilot-v131.js
+  -> gw-energy-pilot-v130.js
+       -> gw-energy-pilot-v110.js
+       -> gw-energy-pilot-v101.js
        -> gw-energy-pilot-v051.js
        -> gw-energy-pilot-v051-history.js
        -> gw-energy-pilot-v050.js
@@ -554,8 +600,8 @@ history card and source-attributed detailed plan graph. The settings module
 owns the two-deadband panel and zero-centered explanatory scale while backend
 config/controller modules own their semantics. v1.0.1-beta.4 remains in the
 chain as its bounded presentation layer. v1.1.1 remains the previous stable
-base; v1.2.1 owns final stable presentation and the complete
-`1.2.1-stable1` active-graph cache boundary. Its EMHASS settings
+base; v1.4.0 owns the stable presentation in the existing v131 module and the
+complete `1.4.0` active-graph cache boundary. Its EMHASS settings
 select AUTO or a fixed CUSTOM household load at the final runtime request-body
 boundary; unrelated optimization parameters remain untouched. Its isolated
 Beta tests compare five iOS activation methods with deferred, observer-neutral
@@ -566,9 +612,9 @@ The same final presentation gives the compact chart size/range and
 execution-history open/close controls real 44 CSS-pixel touch targets on
 coarse-pointer/narrow displays.
 
-The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with one moving round particle per finite active route, including external AC/PCC PV, plus explicit idle/unavailable markers and localized accessible labels. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
+The active frontend keeps `gw-energy-pilot-v038-model.js` as the pure localization/profile/physical-flow model owner. `gw-energy-pilot-v041.js` applies direction, state and relative intensity to stable connector nodes with fixed arrows plus explicit idle/unavailable markers and localized accessible labels. It also owns the only motion exception: browser-local, user-switchable particles on active connectors, suppressed by the off state and reduced-motion media preference. Every non-flow animation and every CSS transition remains frozen. `ep-control-surface.js` owns Battery actions, Automatic Control, EMHASS strategy, Battery Strategy/Custom/SOC, Optimize and manual EMS interaction. It receives frozen narrow models plus a gateway for the existing Home Assistant entity and WebSocket routes. The vendored Lit 3.3.3 runtime owns property-to-DOM reconciliation inside that boundary.
 
-Visible/translated text is never a control identity. Canonical action/profile keys plus confirmed Home Assistant/API models and `aria-pressed` define selected state. Each asynchronous action is `idle -> pending -> acknowledged | error`; a resolved service call cannot select a control before matching backend publication. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; connector state and particle direction are patched in place. See `docs/FRONTEND_CONTROL_ARCHITECTURE.md`, `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
+Visible/translated text is never a control identity. Canonical action/profile keys plus confirmed Home Assistant/API models and `aria-pressed` define selected state. Each asynchronous action is `idle -> pending -> acknowledged | error`; a resolved service call cannot select a control before matching backend publication. Live-flow direction is single-owner through the explicit physical mapping instead of accumulated reversal rules; the stable fixed presentation and optional particle state are patched in place. See `docs/FRONTEND_CONTROL_ARCHITECTURE.md`, `docs/FRONTEND_CONTROL_REBUILD.md` and `docs/FRONTEND_STABLE_DOM.md`.
 
 Historical frontend layering remains technical debt below the v0.34 base. The permanent control surface is the first consolidated functional boundary; dashboard cards, Settings, modals, diagnostics, layout/window controls, flow and graph/history presentation still use the historical chain. Further consolidation must preserve behavior under executable browser/model regression tests before historical assets are removed.
 

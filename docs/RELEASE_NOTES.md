@@ -17,19 +17,120 @@ Starting with v1, `v1.x.x-beta.N` is published as a GitHub prerelease from the
 `beta` line and `v1.x.x` as a normal release from `main`. Existing `0.x`
 history is retained unchanged. See `docs/RELEASE_WORKFLOW.md`.
 
-# v1.2.1 — Clear live-flow movement for every active route
+# v1.4.0 — Production promotion
 
-The stable dashboard now shows one moving round energy ball on each finite
-active connector, including external AC/PCC PV. The redundant arrows are
-removed because the particle itself communicates direction. Idle and
-unavailable routes remain stationary, and the browser's reduced-motion
-preference also keeps every ball stationary.
+Stable production release of the v1.3.0-beta.11 candidate, with the same runtime
+behavior, a complete 1.4.0 frontend cache boundary and stable presentation.
+Includes the compact mobile controls, solar graphs, Hybrid 2.0 and opt-in
+Hybrid 3.0 excl. EV with explicit recovery/readback diagnostics. Optional
+hardware features retain their documented field-validation limits. See
+[v1.4.0 release notes](releases/v1.4.0.md).
 
-Telemetry continues to patch the existing connector nodes rather than rebuild
-the dashboard. No GoodWe register, EMS/EMHASS behavior, entity identity,
-persistent store or mobile-control behavior changes. The release uses the
-complete `1.2.1-stable1` frontend cache boundary. See
-`docs/releases/v1.2.1.md`.
+# v1.3.0-beta.11 — Hybrid 3.0 excl. EV
+
+A new opt-in strategy uses Auto/discharge/charge modes **1/3/2** without EV
+and **5/5/2** with EV, intended to support independently scheduled Tibber Grid
+Rewards charging without deliberately feeding the EV from the home battery.
+The dashboard includes the EN/NL scenario table. Fresh house-reference recovery,
+direct bounded command readback and EV-stop freshness are explicitly guarded
+and diagnosed. Existing selections, other strategies and EMHASS settings remain.
+This is **Beta**, not guaranteed rewards or physically proven instantaneous EV
+exclusion. See [release notes](releases/v1.3.0-beta.11.md) and [policy](HYBRID_3.md).
+
+# v1.3.0-beta.10 — Hybrid 2.0 PV-priority charging
+
+This beta changes only Hybrid 2.0's directed charging mode
+from 11 to 2. The existing bounded planned watt magnitude is retained as
+grid assistance, with or without EV; PV can add to actual battery charging.
+Manual mode 11 and other strategies remain unchanged. This is an opt-in Beta
+release with a complete 1.3.0-beta.10 frontend cache boundary. See
+[release notes](releases/v1.3.0-beta.10.md) and [current policy](HYBRID_2.md).
+Automatic mode-2/PV/EV hardware validation remains open; the separate delayed
+read-back/EV-stop issue and mode-5/Hold transitions are not fixed here.
+
+# v1.3.0-beta.9 — Hybrid 2.0 grid-first test
+
+The selected Hybrid 2.0 strategy now checks the grid deadband before the
+battery direction: Auto inside it, planned watts via mode 11/3 outside it,
+and mode 9/10 for net-only plans. EV self-use tests mode 5 at fresh local load
+minus measured EV; planned discharge, unresolved net-only EV cases and
+unusable measurements Hold. Explicit Pause remains mode 8. Other strategies
+retain their behavior. This is an opt-in Beta release; see [release notes](releases/v1.3.0-beta.9.md).
+
+Mode 3 PV priority at the AC limit, mode 5 surplus charging and the 35172/EV/
+external-PV boundary are **not hardware-validated**. See [test policy and
+measurements](HYBRID_2.md). The new preview CLI replays every plan row without
+connecting to GoodWe; the existing command sensor exposes the same model.
+
+# v1.3.0-beta.8 — House self-consumption during EV charging
+
+Hybrid 2.0 follows EMHASS battery watts in mode 11 for planned net charging.
+During EV charging, self-use and PV-charge steps use mode 9 at measured EV
+power every 15 seconds. Pause, explicit discharge and unusable self-use inputs
+select mode 8 Hold. Other strategies retain their existing behavior. See
+[release notes](releases/v1.3.0-beta.8.md).
+
+# v1.3.0-beta.7 — Hybrid 2.0 follows the battery charge plan (superseded policy)
+
+Hybrid 2.0 now enters mode 2 whenever EMHASS explicitly plans battery
+charging. `P_grid` is no longer a second gate, fixing mode 1 while an active EV
+was omitted from the load forecast. See
+[release notes](releases/v1.3.0-beta.7.md).
+
+# v1.3.0-beta.6 — Hybrid 2.0 Beta
+
+An extra opt-in strategy uses mode 2 with maximum grid assistance and PV
+priority during planned net-charge windows. EV start preserves charging;
+neutral/discharge plans remain held. Existing strategies retain their behavior.
+See [release notes](releases/v1.3.0-beta.6.md) and [the full policy](HYBRID_2.md).
+
+# v1.3.0-beta.5 — EV direction guard
+
+Explicit battery charging retains the configured strategy mode and setpoint.
+Discharge/neutral plans remain held; unavailable grid targets wait. See
+[release notes](releases/v1.3.0-beta.5.md) for hardware validation and rollout gates.
+
+# v1.3.0-beta.4 — Solar production visible in every chart size
+
+The Battery · Plan · Price graph now shows actual and expected solar production
+in **S, M, L and expanded views**, including the default M size. Beta.3 only
+showed those curves and legend entries in Large and expanded views. Actuals
+remain a solid yellow line and the EMHASS forecast a dashed yellow line.
+Normal views also explain unavailable data. See `docs/releases/v1.3.0-beta.4.md`.
+
+# v1.3.0-beta.3 — Actual and expected solar production
+
+Large and expanded Battery · Plan · Price charts now compare a solid actual
+combined-PV series from Recorder with a dashed expected solar-production line
+from non-negative `P_PV` values in the current validated official EMHASS plan.
+The forecast is dashboard-only and is unavailable rather than guessed when
+the plan has no evidenced `P_PV` series. It does not alter GoodWe control,
+EMHASS ownership, accounting or persistent state. See
+`docs/releases/v1.3.0-beta.3.md`.
+
+# v1.3.0-beta.2 — Responsive Power overview and optional EV charger
+
+Power overview now has its own `S`, `M` and `L` card sizes: one dashboard
+column, two columns or the complete row. Its internal geometry follows the
+actual card width, which keeps the energy nodes aligned in narrow columns as
+well as at full width. On narrow mobile layouts every size safely resolves to
+one column.
+
+When an EV charger source is configured, Power overview adds a display-only
+charger branch with the configured power reading when available. The charger
+remains part of total household load; it is not added to canonical energy
+accounting and this release does not introduce charger control.
+
+Expanded EnergyPilot disclosures now stay above the red, amber and green
+card-window controls instead of allowing them to bleed through the overlay.
+The non-interactive `AUTO ACTIVE` badge is also substantially smaller; all
+operational controls retain their established touch targets.
+
+The complete desktop Chromium, iPad WebKit and iPhone WebKit matrix covers the
+three sizes, geometry, saved preference, conditional charger visibility and
+stable telemetry updates. GoodWe, EMS, EMHASS, Battery Saver, entity identity
+and persistent-store semantics remain unchanged. See
+`docs/releases/v1.3.0-beta.2.md`.
 
 # v1.3.0-beta.1 — Compact controls, scoped live-flow motion and built-in help
 
@@ -379,6 +480,17 @@ All four managed profiles can now reach 100% SOC. The former profile-specific ha
 
 | Version | Date | Status | Main release notes |
 |---|---|---|---|
+| **1.4.0** | 2026-09-13 | **Stable** | Production promotion of beta.11; same runtime behavior, stable presentation and cache boundary; optional hardware features retain field-validation limits. |
+| **1.3.0-beta.11** | 2026-09-09 | **Beta** | Opt-in Hybrid 3.0 excl. EV; six scenarios, Tibber Grid Rewards purpose, measured house reference and explicit recovery/readback evidence. |
+| **1.3.0-beta.10** | 2026-09-08 | **Beta** | Hybrid 2.0 charging via mode 2 with bounded planned grid assistance and additive PV, with or without EV. |
+| **1.3.0-beta.9** | 2026-09-06 | **Beta** | Grid-first Hybrid 2.0; planned watts via 11/3 and EV house output via 5 with fresh local load. |
+| **1.3.0-beta.8** | 2026-09-06 | **Beta** | Hybrid 2.0 house self-consumption via a measured EV import reference; planned battery charging watts and protective Hold. |
+| **1.3.0-beta.7** | 2026-09-06 | **Beta** | Hybrid 2.0 follows explicit battery charging independent of a neutral/exporting/missing grid plan. |
+| **1.3.0-beta.6** | 2026-09-06 | **Beta** | Opt-in Hybrid 2.0 maximum mode-2 charging with PV priority; field validation pending. |
+| **1.3.0-beta.5** | 2026-09-06 | **Beta** | EV charge plans preserve strategy mode/setpoint; discharge/neutral Hold and unavailable-plan waits remain. |
+| **1.3.0-beta.4** | 2026-09-05 | **Beta** | Shows actual and expected solar production in every chart size, including the default M. |
+| **1.3.0-beta.3** | 2026-09-05 | **Beta** | Adds actual-versus-expected solar production to the detailed Battery · Plan · Price graph. |
+| **1.3.0-beta.2** | 2026-09-04 | **Beta** | Adds responsive S/M/L Power overview sizing and an optional EV branch, and fixes control-overlay stacking plus the oversized AUTO badge. |
 | **1.3.0-beta.1** | 2026-09-04 | **Beta** | Adds compact permanent controls, scoped live-flow animation, a localized built-in manual and a clearer product introduction without changing control semantics. |
 | **1.2.1** | 2026-09-06 | **Stable** | Shows one moving energy ball on every active connector, including external PV, and removes redundant arrows. |
 | **1.2.0** | 2026-09-03 | **Stable** | Promotes beta.7 with permanent mobile controls, bounded touch recovery, larger graph/history targets, optional SEMS+ telemetry and resilient EMHASS operation. |

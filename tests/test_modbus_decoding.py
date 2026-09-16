@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import importlib
 from pathlib import Path
 import sys
@@ -149,6 +150,21 @@ class ModbusDecodingTests(unittest.TestCase):
 
 
 class BetaSocWriteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_only_complete_telemetry_read_timestamps_the_load_sample(self):
+        instance = _beta_test_client()
+        for start, count in (*registers.TELEMETRY_BLOCKS, *registers.OPTIONAL_TELEMETRY_BLOCKS):
+            for address in range(start, start + count):
+                instance._client.values.setdefault(address, 0)
+        before = datetime.now(timezone.utc)
+        telemetry = await instance.async_read_data()
+        after = datetime.now(timezone.utc)
+        self.assertLessEqual(before, telemetry.source_updated_at)
+        self.assertLessEqual(telemetry.source_updated_at, after)
+        self.assertIn("total_load_power", telemetry.values)
+        control = await instance.async_read_control_status()
+        self.assertIsNone(control.source_updated_at)
+        self.assertNotIn("total_load_power", control.values)
+
     async def test_cloud_control_readback_keeps_local_soc_floor_values(self):
         instance = _beta_test_client()
 

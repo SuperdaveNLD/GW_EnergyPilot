@@ -86,6 +86,8 @@ class ExecutionHistoryTests(unittest.IsolatedAsyncioTestCase):
                 "occurred_at": self.now,
                 "plan": {"p_batt_w": -3000, "soc_opt_pct": 55},
                 "outcome": {"expected_mode": 9, "verification_status": "verified"},
+                "actual": {"hybrid3": {"hold_reason": "load_stale", "load_age_seconds": 31,
+                                       "command_readback": "verified"}},
             }
         )
         restored = self.history()
@@ -95,6 +97,7 @@ class ExecutionHistoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["plan"]["p_batt_w"], -3000)
         self.assertEqual(rows[0]["outcome"]["verification_status"], "verified")
+        self.assertEqual(rows[0]["actual"]["hybrid3"]["hold_reason"], "load_stale")
         self.assertTrue(rows[0]["event_id"].endswith(":1"))
 
     async def test_revision_advances_for_each_append(self):

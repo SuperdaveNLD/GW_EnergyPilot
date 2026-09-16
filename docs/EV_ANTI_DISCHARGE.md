@@ -1,12 +1,35 @@
 # EV anti-discharge protection
 
-This document defines the EV protection behavior for GW EnergyPilot v0.34.
+This document defines v1.4.0 behavior, retained from v1.3.0-beta.11, including a separate opt-in
+Hybrid 3.0 excl. EV strategy. Existing Hybrid 2.0 retains beta.10's grid-first
+mapping and mode-2 charging. Published beta.9 still used mode 11; beta.8 used
+the earlier EV import reference.
+
+## Hybrid 3.0 excl. EV / Tibber Grid Rewards
+
+This opt-in strategy aims to keep independently scheduled EV grid draw from
+being compensated by the home battery, while allowing house self-use and
+planned battery charging. Normal self-use/discharge/charge select **1/3/2**;
+with EV they select **5/5/2**. Mode 5 uses fresh local load minus measured EV
+every 15 seconds; mode 2 retains exactly the same planned grid-assistance
+allowance with available PV able to add. Grid-neutral and neutral-battery plans
+mean self-use, not explicit Pause. Invalid required data selects Hold, with
+distinct-source recovery and direct bounded command readback. Native EV-stop
+freshness remains required. This does not control Tibber's charger or guarantee
+rewards/instantaneous EV exclusion. See [full table and limits](HYBRID_3.md).
 
 ## Purpose
 
 The EV feature is an **anti-discharge protection**, not an EV charging controller.
 
-While the EV is charging, the home battery must not discharge into the EV. If EMHASS explicitly requests home-battery charging at the same time, GW EnergyPilot must continue that charge request instead of holding the battery.
+While the EV is charging, the home battery should not supply the EV. The
+Hybrid 2.0 test uses mode 5 with inverter output set to fresh local load 35172
+minus measured EV power for grid-neutral self-use, including neutral P_batt.
+Outside the grid deadband, planned battery charging uses mode 2 at the
+bounded planned watt magnitude as a grid-assistance allowance. PV can add
+to battery charging; explicit discharge is held. The load boundary and PV
+surplus behavior still need field validation. Battery, Grid and original
+Hybrid retain their existing plan-direction guards below.
 
 The anti-discharge feature only observes the configured EV state/power entities.
 The separately opt-in EV load balancer may modulate one charger current entity,
@@ -32,27 +55,49 @@ GoodWe ETA / BMS / smart meter
 
 ## Control rule
 
-During an active EV charging session, `P_batt` is the directional safety guard:
+For the original Battery, Grid and Hybrid strategies, `P_batt` is the directional safety guard:
 
 | EV state | EMHASS `P_batt` plan | EnergyPilot behavior |
 |---|---|---|
 | Not charging | Any valid plan | Normal configured automatic strategy |
 | Charging | `P_batt > +deadband` — discharge | **Mode 8 Battery Hold** |
 | Charging | `P_batt` inside deadband — neutral | **Mode 8 Battery Hold** |
-| Charging | `P_batt < -deadband` — charge | **Continue charging** |
+| Charging | `P_batt < -deadband` — charge | **Continue according to strategy below** |
 
-This means EV coordination is strictly anti-discharge: discharge and neutral are paused, charging is allowed to proceed.
+Hybrid 2.0 classifies the grid deadband first, including P_batt = 0 and
+positive battery plans for house self-use. Within the band it uses mode 5 at
+bounded max(0, local load minus EV). Outside it, charging uses bounded
+abs(P_batt) as mode-2 grid assistance and explicit discharge uses mode 8. Neutral battery/net-only EV
+plans are unresolved and use protective Hold. This does not make a zero
+battery plan an explicit Pause. See [the complete test matrix](HYBRID_2.md).
 
 ## GoodWe execution while EV charging
 
-When EMHASS requests battery charging while the EV is active, GW EnergyPilot preserves the configured control strategy as far as safely possible:
+When EMHASS requests battery charging while the EV is active:
 
-- **Battery control**: mode `11` (**Battery charge power**) using the requested `P_batt` magnitude.
-- **Grid control**: mode `9` (**Grid import target**) when `P_grid` contains a positive import target.
-- **Hybrid control**: mode `9` when `P_grid` contains a positive import target.
-- **Grid/Hybrid fallback**: when `P_batt` explicitly requests charging but there is no positive usable `P_grid` import target, mode `11` is used so the valid battery-charge request is not incorrectly converted to Hold.
+- **Battery control**: mode `11` using the requested `P_batt` magnitude.
+- **Grid/Hybrid control**: mode `9` for import, mode `1` inside the grid
+  deadband, or mode `10` for export. Export alongside a charging battery plan
+  can represent PV export and is not itself a battery-discharge request.
+- **Hybrid 2.0 Beta**: mode `2` at bounded `abs(P_batt)` for PV-priority grid
+  assistance outside the grid deadband, with or without EV. PV can add to
+  actual battery charging; no EV scheduling or maximum dispatch is inferred.
+  Grid-neutral self-use uses mode `5` at local
+  load minus EV, updated every 15 seconds. Both local load and EV power must
+  be finite and fresh within 30 seconds; stale/failed/missing inputs Hold.
+  Missing/non-ready/suspended plans also Hold. Mode 5 may curtail PV rather
+  than charge the battery from surplus; that field test remains open.
+- Original Grid/Hybrid with missing/non-finite required `P_grid`: wait without
+  an EMS write. A valid persistent plan may supply it. Hybrid 2.0 with active
+  EV charging uses Hold for missing plan inputs as described above.
 
-For discharge or neutral plans, EnergyPilot always uses mode `8` (**Battery Hold**) at `0 W` while EV charging is active.
+EV activity must not convert a Grid/Hybrid command to mode `11`. Only the
+planned battery direction gates the original Battery/Grid/Hybrid override.
+Their plan-based guard is not a guarantee of instantaneous battery direction in PCC/Auto modes
+when actual load differs from the forecast. ETA retains local power control;
+no new hardware limit or register semantics are inferred from this fix.
+
+The original Battery/Grid/Hybrid strategies hold neutral and discharge plans. Hybrid 2.0 uses the grid-first exception above; an explicit manual Pause always retains mode `8` and manual ownership.
 
 No new Modbus registers are introduced. The existing EMS registers remain:
 
@@ -115,7 +160,11 @@ existing controller command:
 - **Anti-discharge active**: EV charging is active and home-battery discharge is
   blocked with mode `8` (**Battery Hold**).
 - **Battery charge allowed**: EV charging is active and the explicit
-  home-battery charging plan continues.
+  home-battery charging plan continues (Hybrid 2.0 classifies the grid deadband first).
+- **House self-consumption**: Hybrid 2.0 tests inverter AC output at measured
+  local load minus EV. Battery discharge for the ordinary house is allowed.
+- **House control on Hold**: required plan/reference data is missing or cannot
+  be used within the configured power range. Do not reuse a stale house-output target.
 - **Fresh plan required**: EV charging has stopped, but Battery Hold remains
   active until the native orchestrator publishes a fresh EMHASS plan.
 
@@ -123,6 +172,17 @@ The status is presentation-only. It does not add an override, charger control,
 new controller ownership mode or additional Modbus write path. A future
 override would change safety and control ownership semantics and therefore
 requires a separate explicit design decision and review.
+
+Hybrid 2.0's house-self-consumption exception is the explicit user-requested
+test policy. Its periodic reference update remains inside the same controller.
+
+The Power overview flow also shows a charger branch only when an existing EV
+status, power, online or load-balancing charger source is configured. When the
+selected charging-power sensor is available, its value is normalized to watts
+and displayed live; otherwise the node remains a status-only configured branch.
+It is drawn beneath House ownership because charger demand is already included
+in total house load. This visualization does not add the value again or change
+control, accounting or optimization inputs.
 
 ### Historical chart evidence
 

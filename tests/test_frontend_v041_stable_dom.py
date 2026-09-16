@@ -41,7 +41,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
 
     def test_v041_bypasses_the_v040_render_settle_layer(self) -> None:
         self.assertIn(
-            'import "./gw-energy-pilot-v039.js?v=1.2.1-stable1"', self.source
+            'import "./gw-energy-pilot-v039.js?v=1.4.0"', self.source
         )
         self.assertNotIn('import "./gw-energy-pilot-v040.js', self.source)
         self.assertIn('const VERSION = "0.41"', self.source)
@@ -111,6 +111,19 @@ class FrontendV041StableDomTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("exercise_ev_protection_banner", browser_test)
+
+    def test_configured_ev_charger_is_a_display_only_house_flow_branch(self) -> None:
+        self.assertIn("function installEvFlowNode(root)", self.source)
+        self.assertIn("function patchEvFlowNode(panel, root, snapshot)", self.source)
+        self.assertIn("attrs.ev_charger_configured === true", self.source)
+        self.assertIn("finiteValue(attrs.ev_power_w)", self.source)
+        self.assertIn('className = "ep-flow-node ep-flow-ev"', self.source)
+        self.assertIn('className = "ep-flow-link ep-link-ev idle"', self.source)
+        self.assertIn("houseToEv", self.source)
+        self.assertIn("evPartOfLoad", self.source)
+        self.assertIn("installEvFlowNode(this.shadowRoot)", self.source)
+        self.assertIn("_async_ev_power_updated", self.sensor)
+        self.assertIn("power_value_w", self.sensor)
 
     def test_other_persistent_selectors_use_stable_live_state(self) -> None:
         self.assertIn("function patchCostFunctionSelector", self.source)
@@ -187,7 +200,7 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertNotIn("setPointerCapture", self.plan_core)
         self.assertNotIn("preventDefault", self.plan_core)
 
-    def test_only_live_flow_particles_can_animate(self) -> None:
+    def test_only_opt_in_flow_particles_may_animate(self) -> None:
         self.assertIn("animation: none !important", self.source)
         self.assertIn("transition: none !important", self.source)
         self.assertIn("scroll-behavior: auto !important", self.source)
@@ -196,19 +209,25 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn(".ep-v011-particles span", self.source)
         self.assertIn(".ep-v027-backdrop", self.source)
         self.assertIn("display: none !important", self.source)
-        self.assertIn(".ep-v041-flow-particle", self.source)
-        self.assertIn("@keyframes ep-v041-flow-horizontal", self.source)
-        self.assertIn("@keyframes ep-v041-flow-vertical", self.source)
-        self.assertIn("prefers-reduced-motion: reduce", self.source)
-        self.assertNotIn(".ep-v041-flow-arrow", self.source)
-        self.assertIn('root.querySelectorAll(".ep-flow-arrows")', self.source)
-        self.assertIn('input.disabled = true', self.source)
+        self.assertIn(".ep-dashboard-layout:not(.ep-animations-off)", self.source)
+        self.assertIn('data-ep-v041-flow-status="active"', self.source)
+        self.assertIn("animation-name: epV038HRight !important", self.source)
+        self.assertIn("animation-name: epV038VUp !important", self.source)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", self.source)
+        self.assertIn('input.disabled = false', self.source)
+        self.assertIn('input.removeAttribute("aria-disabled")', self.source)
+        self.assertIn("function isV041FlowParticle", self.plan_core)
+        self.assertIn("releaseV041FlowParticle(element)", self.plan_core)
+        self.assertNotIn(
+            '".ep-flow-arrows, .ep-flow-live span, .ep-v011-particles, .ep-v011-particles span"',
+            self.plan_core,
+        )
 
     def test_browser_matrix_uses_one_deterministic_harness(self) -> None:
         browser_test = (BROWSER / "test_frontend_stability.py").read_text(
             encoding="utf-8"
         )
-        wrapper = (BROWSER / "test_frontend_stability_v110.py").read_text(
+        wrapper = (BROWSER / "test_frontend_stability_v131.py").read_text(
             encoding="utf-8"
         )
         harness = (BROWSER / "frontend_harness.html").read_text(
@@ -222,12 +241,13 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn('Profile("iphone-webkit"', browser_test)
         self.assertIn("telemetry_identity", browser_test)
         self.assertIn("exercise_plan_refresh", browser_test)
-        self.assertIn("animation[\"animations\"] < 4", browser_test)
-        self.assertIn('"external_flow_moves"', browser_test)
-        self.assertIn("frontend_harness.html?entry=v110", wrapper)
-        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v110"', wrapper)
+        self.assertIn('animation["flowParticleAnimations"] <= 0', browser_test)
+        self.assertIn('animation["otherAnimations"] != 0', browser_test)
+        self.assertIn('page.emulate_media(reduced_motion="reduce")', browser_test)
+        self.assertIn("frontend_harness.html?entry=v131", wrapper)
+        self.assertIn('stability.EXPECTED_ENTRYPOINT = "v131"', wrapper)
         self.assertIn(
-            '"v050", "v051", "v100", "v101", "v110"].includes(requestedEntry)',
+            '"v050", "v051", "v100", "v101", "v110", "v130", "v131"].includes(requestedEntry)',
             harness,
         )
         self.assertIn("exercise_touch_controls", browser_test)
@@ -238,14 +258,14 @@ class FrontendV041StableDomTests(unittest.TestCase):
         self.assertIn("exercise_chart_size_press", browser_test)
         self.assertIn("exercise_chart_range_press", browser_test)
         self.assertIn("exercise_soc_slider_draft", browser_test)
-        self.assertIn("exercise_soc_limit_fallback", browser_test)
+        self.assertIn("exercise_emhass_overview_controls", browser_test)
         self.assertIn("exercise_emhass_mapping", browser_test)
         self.assertIn("window.__epBeforeNarrowMain", browser_test)
         self.assertIn(
             "window.__epPanel.shadowRoot.querySelector('main') !==",
             browser_test,
         )
-        self.assertIn("test_frontend_stability_v110.py", workflow)
+        self.assertIn("test_frontend_stability_v131.py", workflow)
         self.assertIn("window.__epReady = new Promise", harness)
         self.assertNotIn("document.write", harness)
         self.assertFalse((BROWSER / "frontend_harness_v041.html").exists())

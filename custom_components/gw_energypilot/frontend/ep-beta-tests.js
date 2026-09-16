@@ -1,7 +1,7 @@
 import {
   LitElement,
   html,
-} from "./vendor/lit-3.3.3.js?v=1.2.1-stable1";
+} from "./vendor/lit-3.3.3.js?v=1.4.0";
 
 const METRIC_KEYS = Object.freeze([
   "pointerdown",

@@ -151,6 +151,33 @@ def _battery_soc_plan_payload(entry: ConfigEntry) -> dict[str, Any]:
     }
 
 
+def _pv_plan_payload(entry: ConfigEntry) -> dict[str, Any]:
+    """Return evidenced PV-production forecast points for the chart only."""
+    runtime_data = getattr(entry, "runtime_data", None)
+    plan_runtime = getattr(runtime_data, "plan_runtime", None)
+    diagnostics = dict(plan_runtime.diagnostics) if plan_runtime is not None else {}
+    source = diagnostics.get("source")
+    raw_points = (
+        plan_runtime.points("p_pv")
+        if plan_runtime is not None and source == "emhass_api_v1_plan"
+        else []
+    )
+    points: list[dict[str, Any]] = []
+    for point in raw_points:
+        parsed = normalized_timestamp(point.get("start"))
+        value = nonnegative_number(point.get("value_w"))
+        if parsed is None or value is None:
+            continue
+        points.append({"start": parsed[0], "value_w": round(value, 3)})
+    return {
+        "available": bool(points),
+        "unit": "W",
+        "source": source if points else None,
+        "source_column": "P_PV" if points else None,
+        "points": points,
+    }
+
+
 def _points_by_start(
     points: list[dict[str, Any]],
     value_key: str,
@@ -371,6 +398,7 @@ async def websocket_get_battery_price(
             "battery_energy": _battery_energy_payload(runtime_data),
             "battery_plan": _battery_plan_payload(hass, entry),
             "battery_soc_plan": _battery_soc_plan_payload(entry),
+            "pv_plan": _pv_plan_payload(entry),
             "execution": await _execution_payload(hass, entry),
         },
     )

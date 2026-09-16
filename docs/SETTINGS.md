@@ -1,6 +1,6 @@
 # Dedicated EnergyPilot settings
 
-GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.2.0-beta.4 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
+GW EnergyPilot exposes administrator configuration inside the built-in dashboard. The active v1.3.0-beta.4 settings chain keeps EnergyPilot, EV, EMHASS, PV and GoodWe ownership separated.
 
 ## Ownership
 
@@ -27,6 +27,19 @@ gw_energypilot/battery_price/get
 ```
 
 The active frontend chain is documented in `docs/FRONTEND_STABLE_DOM.md`. The settings shell remains owned by `gw-energy-pilot-settings-v016.js`; later release layers extend presentation without creating a second configuration database.
+
+## Dashboard layout preferences
+
+**Dashboard → Layout & visibility** stores its presentation preferences only in
+the browser's existing `gw_energypilot_dashboard_v008` local-storage record; it
+does not call Home Assistant or change integration configuration.
+
+**Flow animations** is enabled by default for a fresh browser profile and may
+be switched off independently. It controls only particles on finite, active
+energy-flow connectors. Idle and unavailable flows remain static, and the
+device/browser `prefers-reduced-motion: reduce` setting always suppresses the
+particles even when the dashboard switch is on. General interface animations,
+transitions and modal backdrop filters remain disabled.
 
 ## EP page
 
@@ -223,6 +236,25 @@ P_grid < -GoodWe Auto deadband -> mode 10 Grid export target
 P_grid inside GoodWe Auto deadband -> mode 1 GoodWe Auto / self-use
 ```
 
+**Hybrid 2.0 Beta**
+
+The opt-in `hybrid_2` strategy checks the grid deadband first: self-use means
+Auto, or mode 5 at fresh local load minus EV. Outside that band, planned charge
+uses mode 2 at bounded planned watts (not automatic maximum control power),
+discharge uses mode 3 and neutral battery uses 9/10. With EV, planned discharge
+and net-only plans Hold; directed charge retains mode 2. PV may add to actual
+charging. See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
+**Hybrid 3.0 excl. EV**
+
+The separate `hybrid_3` option targets independently scheduled Tibber Grid
+Rewards charging: normal self-use/discharge/charge **1/3/2**, with EV **5/5/2**.
+No migration selects it automatically. Keep fresh measured EV power and local
+Modbus load available for the 15-second house reference; invalid required data
+Hold with explicit recovery diagnostics. Charging keeps planned mode-2 watts
+unchanged. The dashboard shows the six-scenario table in EN/NL. Manual modes,
+CUSTOM load forecast and other settings remain intact. See [Hybrid 3.0](HYBRID_3.md).
+
 **Hybrid control**
 
 ```text
@@ -242,6 +274,15 @@ legacy use_goodwe_smart_meter true          -> Grid
 ```
 
 Manual EMS selections are never remapped by the automatic strategy.
+
+## Dashboard ownership of EMHASS controls
+
+The EMHASS overview card is not a second editor for battery SOC limits.
+Minimum and maximum SOC are edited only under **Battery Strategy → Custom** in
+the permanent control surface, alongside the other Custom profile values. The
+overview card retains the compact Profit/Cost/Self-consumption selector and
+highlights only the `costfun` value confirmed by the stateful Home Assistant
+select; direct EMHASS changes therefore update the same active indication.
 
 ## Low-level Beta SOC API
 

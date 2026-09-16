@@ -1,22 +1,22 @@
-import "./gw-energy-pilot-v039.js?v=1.2.1-stable1";
+import "./gw-energy-pilot-v039.js?v=1.4.0";
 import {
   FLOW_THRESHOLD_W,
   resolveHousePower,
-} from "./gw-energy-pilot-v038-model.js?v=1.2.1-stable1";
+} from "./gw-energy-pilot-v038-model.js?v=1.4.0";
 import {
   dashboardLanguage,
   localizedEmsMode,
   localizeV038Controller,
-} from "./gw-energy-pilot-v038-i18n.js?v=1.2.1-stable1";
-import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.2.1-stable1";
-import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.2.1-stable1";
+} from "./gw-energy-pilot-v038-i18n.js?v=1.4.0";
+import { loadChartData } from "./gw-energy-pilot-v027-battery-plan-data.js?v=1.4.0";
+import { refreshBatteryPlanCard } from "./gw-energy-pilot-v027-battery-plan-core.js?v=1.4.0";
 import {
   mountEnergyPilotControlSurface,
   patchNarrowControlSurface,
   refreshEnergyPilotControlSurface,
-} from "./ep-control-surface.js?v=1.2.1-stable1";
-import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.2.1-stable1";
-import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.2.1-stable1";
+} from "./ep-control-surface.js?v=1.4.0";
+import { mountEnergyPilotBetaTests } from "./ep-beta-tests.js?v=1.4.0";
+import { installEnergyPilotTouchClickFallback } from "./ep-touch-click-fallback.js?v=1.4.0";
 
 const VERSION = "0.41";
 const PANEL_NAME = "gw-energypilot-panel";
@@ -67,7 +67,7 @@ const COPY = Object.freeze({
     hoverHint: "Hover a mode for its meaning.",
     today: "Today",
     yesterday: "Yesterday",
-    motionDisabled: "Disabled in v0.41 for stable desktop and mobile operation",
+    motionAvailable: "Moving energy particles · respects reduced-motion settings",
     flowUnknown: "power unavailable",
     flowIdle: "idle below 50 W",
     flowLow: "low relative flow",
@@ -79,6 +79,7 @@ const COPY = Object.freeze({
     gridToSystem: "Grid to system",
     systemToGrid: "System to grid",
     systemToHouse: "System to house",
+    houseToEv: "House to EV charger",
     batteryToSystem: "Battery to system",
     systemToBattery: "System to battery",
     pvSources: "PV sources",
@@ -97,6 +98,7 @@ const COPY = Object.freeze({
     connectivityChecking: "CHECKING",
     modbus: "Modbus",
     evCharger: "EV charger",
+    evPartOfLoad: "Part of total load",
     evCoordination: "EV coordination",
     online: "Online",
     unreachable: "Unknown / unreachable",
@@ -113,6 +115,15 @@ const COPY = Object.freeze({
     evBlockingDetail: "Home battery discharge is blocked · Mode 8 Battery Hold",
     evChargeAllowedTitle: "EV CHARGING · BATTERY CHARGE ALLOWED",
     evChargeAllowedDetail: "The home battery is following the active charging plan",
+    evHouseTitle: "EV CHARGING · HOUSE SELF-CONSUMPTION",
+    evInverterTarget: "Inverter AC target",
+    evBatteryTarget: "Battery target",
+    gridAssistanceTarget: "Grid assistance allowance",
+    pccTarget: "PCC target",
+    controlTarget: "Control target",
+    evHouseDetail: "Mode 5 test · Inverter output follows measured load minus EV",
+    evReferenceHoldTitle: "EV CHARGING · HOUSE CONTROL ON HOLD",
+    evReferenceHoldDetail: "Mode 8 · Requires a supported plan and fresh local load and EV power",
     evWaitingTitle: "EV CHARGING STOPPED · FRESH PLAN REQUIRED",
     evWaitingDetail: "Battery Hold remains active while EnergyPilot waits for a fresh EMHASS plan",
     evPendingTitle: "EV CHARGING · PROTECTION EVALUATING",
@@ -146,7 +157,7 @@ const COPY = Object.freeze({
     hoverHint: "Beweeg over een modus voor uitleg.",
     today: "Vandaag",
     yesterday: "Gisteren",
-    motionDisabled: "Uitgeschakeld in v0.41 voor stabiele werking op desktop en mobiel",
+    motionAvailable: "Bewegende energiedeeltjes · respecteert de instelling voor minder beweging",
     flowUnknown: "vermogen niet beschikbaar",
     flowIdle: "inactief onder 50 W",
     flowLow: "lage relatieve stroom",
@@ -158,6 +169,7 @@ const COPY = Object.freeze({
     gridToSystem: "Net naar systeem",
     systemToGrid: "Systeem naar net",
     systemToHouse: "Systeem naar woning",
+    houseToEv: "Woning naar laadpaal",
     batteryToSystem: "Batterij naar systeem",
     systemToBattery: "Systeem naar batterij",
     pvSources: "PV-bronnen",
@@ -176,6 +188,7 @@ const COPY = Object.freeze({
     connectivityChecking: "CONTROLEREN",
     modbus: "Modbus",
     evCharger: "Laadpaal",
+    evPartOfLoad: "Onderdeel totale belasting",
     evCoordination: "EV-regeling",
     online: "Online",
     unreachable: "Onbekend / niet bereikbaar",
@@ -192,6 +205,15 @@ const COPY = Object.freeze({
     evBlockingDetail: "Ontladen van de thuisaccu is geblokkeerd · Modus 8 Battery Hold",
     evChargeAllowedTitle: "EV LAADT · THUISACCU LADEN TOEGESTAAN",
     evChargeAllowedDetail: "De thuisaccu volgt het actieve laadplan",
+    evHouseTitle: "EV LAADT · ZELFCONSUMPTIE VOOR HET HUIS",
+    evInverterTarget: "Inverter-AC-doel",
+    evBatteryTarget: "Accudoel",
+    gridAssistanceTarget: "Netassistentie-limiet",
+    pccTarget: "PCC-doel",
+    controlTarget: "Regeldoel",
+    evHouseDetail: "Modus 5-test · Invertervermogen volgt gemeten load minus EV",
+    evReferenceHoldTitle: "EV LAADT · HUISREGELING OP HOLD",
+    evReferenceHoldDetail: "Modus 8 · Ondersteund plan en verse lokale load- en EV-meting vereist",
     evWaitingTitle: "EV-LADEN GESTOPT · NIEUW PLAN NODIG",
     evWaitingDetail: "Battery Hold blijft actief terwijl EnergyPilot op een nieuw EMHASS-plan wacht",
     evPendingTitle: "EV LAADT · BEVEILIGING WORDT BEOORDEELD",
@@ -228,12 +250,6 @@ const NO_MOTION_CSS = `
     -webkit-overflow-scrolling: touch;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-  }
-  :host .ep-v041-motion-disabled {
-    opacity: .58;
-  }
-  :host .ep-v041-motion-disabled input {
-    cursor: not-allowed !important;
   }
   :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:not(.active),
   :host main .ep-battery-actions .ep-battery-action[data-action="resume_auto"]:hover:not(:disabled):not(.active) {
@@ -327,7 +343,7 @@ const NO_MOTION_CSS = `
   :host .ep-link-battery[data-ep-v041-flow-status="unknown"] .ep-flow-track {
     background: repeating-linear-gradient(180deg,currentColor 0 5px,transparent 5px 9px);
   }
-  :host .ep-v041-flow-particle,
+  :host .ep-v041-flow-arrow,
   :host .ep-v041-flow-state {
     position: absolute;
     left: 50%;
@@ -348,51 +364,33 @@ const NO_MOTION_CSS = `
     transform: translate(-50%, -50%);
     pointer-events: none;
   }
-  :host .ep-v041-flow-particle {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    box-shadow: 0 0 6px 2px currentColor, 0 0 14px 5px currentColor;
-    opacity: .96;
+  :host .ep-v041-flow-arrow {
+    width: 22px;
+    height: 12px;
+    -webkit-clip-path: polygon(0 34%, 66% 34%, 66% 0, 100% 50%, 66% 100%, 66% 66%, 0 66%);
+    clip-path: polygon(0 34%, 66% 34%, 66% 0, 100% 50%, 66% 100%, 66% 66%, 0 66%);
   }
-  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle,
+  :host .ep-flow-link[data-ep-v038-motion="left"] .ep-v041-flow-arrow {
+    transform: translate(-50%, -50%) rotate(180deg);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="down"] .ep-v041-flow-arrow {
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+  :host .ep-flow-link[data-ep-v038-motion="up"] .ep-v041-flow-arrow {
+    transform: translate(-50%, -50%) rotate(-90deg);
+  }
+  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-arrow,
   :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state,
   :host .ep-flow-link[data-ep-v041-flow-status="unknown"] .ep-v041-flow-state {
     display: flex;
   }
-  :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle {
-    animation: ep-v041-flow-horizontal 2.6s linear infinite !important;
+  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] .ep-v041-flow-arrow {
+    width: 24px;
+    height: 13px;
   }
-  :host .ep-link-house[data-ep-v041-flow-status="active"] .ep-v041-flow-particle,
-  :host .ep-link-battery[data-ep-v041-flow-status="active"] .ep-v041-flow-particle {
-    animation-name: ep-v041-flow-vertical !important;
-  }
-  :host .ep-flow-link[data-ep-v041-flow-intensity="medium"] .ep-v041-flow-particle {
-    animation-duration: 1.9s !important;
-  }
-  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] .ep-v041-flow-particle {
-    width: 12px;
-    height: 12px;
-    animation-duration: 1.35s !important;
-  }
-  :host .ep-flow-link[data-ep-v038-motion="left"] .ep-v041-flow-particle,
-  :host .ep-flow-link[data-ep-v038-motion="up"] .ep-v041-flow-particle {
-    animation-direction: reverse !important;
-  }
-  @keyframes ep-v041-flow-horizontal {
-    from { left: 0%; }
-    to { left: 100%; }
-  }
-  @keyframes ep-v041-flow-vertical {
-    from { top: 0%; }
-    to { top: 100%; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    :host .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle {
-      left: 50%;
-      top: 50%;
-      animation: none !important;
-    }
+  :host .ep-flow-link[data-ep-v041-flow-intensity="high"] .ep-v041-flow-arrow {
+    width: 26px;
+    height: 14px;
   }
   :host .ep-flow-link[data-ep-v041-flow-status="idle"] .ep-v041-flow-state {
     width: 7px;
@@ -421,6 +419,8 @@ const NO_MOTION_CSS = `
   :host .ep-flow-stage {
     --ep-v041-pv-group-width: 112px;
     --ep-v041-pv-hub-half: 31px;
+    --ep-v041-node-width: 92px;
+    --ep-v041-node-height: 68px;
   }
   :host .ep-flow-pv-group {
     position: absolute;
@@ -544,6 +544,26 @@ const NO_MOTION_CSS = `
   :host .ep-v034-flow-compact .ep-flow-stage {
     --ep-v041-pv-group-width: calc(var(--ep-v034-node-width) + 16px);
     --ep-v041-pv-hub-half: var(--ep-v034-hub-half);
+    --ep-v041-node-width: var(--ep-v034-node-width);
+    --ep-v041-node-height: var(--ep-v034-node-height);
+  }
+  :host .ep-flow-ev {
+    top: 0;
+    right: 0;
+    border-color: rgba(151, 115, 255, .30);
+  }
+  :host .ep-flow-ev .ep-flow-icon svg {
+    stroke: #a98cff;
+    filter: drop-shadow(0 0 6px rgba(169,140,255,.42));
+  }
+  :host .ep-link-ev {
+    top: calc(var(--ep-v041-node-height) / 2);
+    left: calc(50% + var(--ep-v041-node-width) / 2 - 2px);
+    right: calc(var(--ep-v041-node-width) - 2px);
+    width: auto;
+    height: 18px;
+    transform: translateY(-50%);
+    color: #a98cff;
   }
   :host .ep-v034-flow-tight .ep-flow-pv-total-label,
   :host .ep-v034-flow-tight .ep-flow-pv-source .ep-flow-node-sub {
@@ -553,9 +573,9 @@ const NO_MOTION_CSS = `
     grid-template-columns: 1fr;
     justify-items: center;
   }
-  :host .ep-v034-flow-tight .ep-v041-flow-particle {
-    width: 9px;
-    height: 9px;
+  :host .ep-v034-flow-tight .ep-v041-flow-arrow {
+    width: 18px;
+    height: 10px;
   }
   :host .ep-connectivity-wrap {
     position: relative;
@@ -720,6 +740,43 @@ const NO_MOTION_CSS = `
     font-size: 11px;
     line-height: 1.4;
   }
+  /* Stable v0.41 keeps every general animation and transition frozen. The
+     existing dashboard preference may opt only active live-flow particles
+     back into their compositor-friendly v0.38 direction keyframes. */
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v011-particles,
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v011-particles span {
+    display: block !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"] .ep-v011-particles span {
+    animation-duration: 4.6s !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: infinite !important;
+    animation-play-state: running !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="right"] .ep-v011-particles span {
+    animation-name: epV038HRight !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="left"] .ep-v011-particles span {
+    animation-name: epV038HLeft !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="down"] .ep-v011-particles span {
+    animation-name: epV038VDown !important;
+  }
+  :host .ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link[data-ep-v041-flow-status="active"][data-ep-v038-motion="up"] .ep-v011-particles span {
+    animation-name: epV038VUp !important;
+  }
+  :host .ep-dashboard-layout.ep-animations-off .ep-flow-link .ep-v011-particles,
+  :host .ep-dashboard-layout.ep-animations-off .ep-flow-link .ep-v011-particles span {
+    display: none !important;
+    animation: none !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :host .ep-dashboard-layout.ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link.ep-flow-link[data-ep-v041-flow-status] .ep-v011-particles.ep-v011-particles,
+    :host .ep-dashboard-layout.ep-dashboard-layout:not(.ep-animations-off) .ep-flow-link.ep-flow-link[data-ep-v041-flow-status] .ep-v011-particles.ep-v011-particles span {
+      display: none !important;
+      animation: none !important;
+    }
+  }
   @media (max-width: 720px) {
     :host .ep-layout-menu {
       top: calc(74px + env(safe-area-inset-top)) !important;
@@ -824,8 +881,6 @@ function installPvFlowGroup(root) {
   const internalLink = root?.querySelector(".ep-link-pv");
   if (!group || !internalLink || group.dataset.epPvFlowGroup === "1") return;
 
-  for (const arrows of root.querySelectorAll(".ep-flow-arrows")) arrows.remove();
-
   const initialTotal = group.querySelector(".ep-flow-node-value")?.textContent || "—";
   group.classList.remove("ep-flow-node");
   group.classList.add("ep-flow-pv-group");
@@ -854,7 +909,9 @@ function installPvFlowGroup(root) {
   externalLink.className = "ep-flow-link ep-link-pv-external idle";
   externalLink.dataset.epPvRoute = "external";
   externalLink.hidden = true;
-  externalLink.innerHTML = `<div class="ep-flow-track"></div>`;
+  externalLink.innerHTML = `
+    <div class="ep-flow-track"></div>
+    <div class="ep-flow-arrows"><span>›</span><span>›</span><span>›</span></div>`;
   internalLink.insertAdjacentElement("afterend", externalLink);
 }
 
@@ -897,6 +954,59 @@ function patchPvFlowGroup(panel, root, snapshot) {
   setText(externalNode, ".ep-flow-node-title", t.externalPv);
   setText(externalNode, ".ep-flow-node-value", panel._formatPower(snapshot.externalPower));
   setText(externalNode, ".ep-flow-node-sub", t.externalPvRoute);
+}
+
+function evFlowSnapshot(panel) {
+  const attrs = panel._stateByKey?.("control_command")?.attributes || {};
+  return {
+    configured: attrs.ev_charger_configured === true,
+    active: attrs.ev_active === true,
+    power: finiteValue(attrs.ev_power_w),
+  };
+}
+
+function installEvFlowNode(root) {
+  const stage = root?.querySelector(".ep-flow-stage");
+  if (!stage || stage.querySelector(".ep-flow-ev")) return;
+
+  const node = document.createElement("div");
+  node.className = "ep-flow-node ep-flow-ev";
+  node.hidden = true;
+  node.innerHTML = `
+    <div class="ep-flow-node-title">EV CHARGER</div>
+    <div class="ep-flow-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M7 3h8v18H7zM9 6h4M9 10h4M15 7h2l2 2v6a2 2 0 0 0 2 2M10 17h2"/></svg>
+    </div>
+    <div class="ep-flow-node-value">—</div>
+    <div class="ep-flow-node-sub">Part of total load</div>`;
+
+  const link = document.createElement("div");
+  link.className = "ep-flow-link ep-link-ev idle";
+  link.hidden = true;
+  link.innerHTML = `
+    <div class="ep-flow-track"></div>
+    <div class="ep-flow-arrows"><span>›</span><span>›</span><span>›</span></div>`;
+  stage.append(link, node);
+}
+
+function patchEvFlowNode(panel, root, snapshot) {
+  const node = root?.querySelector(".ep-flow-ev");
+  const link = root?.querySelector(".ep-link-ev");
+  if (!node || !link) return;
+  node.hidden = !snapshot.configured;
+  link.hidden = !snapshot.configured;
+  if (!snapshot.configured) return;
+
+  const t = copy(panel);
+  setText(node, ".ep-flow-node-title", t.evCharger);
+  setText(
+    node,
+    ".ep-flow-node-value",
+    Number.isFinite(snapshot.power)
+      ? panel._formatPower(snapshot.power)
+      : snapshot.active ? t.charging : "—"
+  );
+  setText(node, ".ep-flow-node-sub", t.evPartOfLoad);
 }
 
 function patchPvSourceMetrics(panel, solar, snapshot) {
@@ -1172,13 +1282,20 @@ function formatDecimal(value, decimals = 4) {
   return number === null ? "—" : number.toFixed(decimals);
 }
 
-function ensureFlowNodes(link) {
-  let particle = link.querySelector(".ep-v041-flow-particle");
-  if (!particle) {
-    particle = document.createElement("span");
-    particle.className = "ep-v041-flow-particle";
-    particle.setAttribute("aria-hidden", "true");
-    link.appendChild(particle);
+const FLOW_ARROWS = Object.freeze({
+  right: "→",
+  left: "←",
+  up: "↑",
+  down: "↓",
+});
+
+function ensureStaticFlowNodes(link) {
+  let arrow = link.querySelector(".ep-v041-flow-arrow");
+  if (!arrow) {
+    arrow = document.createElement("span");
+    arrow.className = "ep-v041-flow-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    link.appendChild(arrow);
   }
   let state = link.querySelector(".ep-v041-flow-state");
   if (!state) {
@@ -1187,7 +1304,7 @@ function ensureFlowNodes(link) {
     state.setAttribute("aria-hidden", "true");
     link.appendChild(state);
   }
-  return { particle, state };
+  return { arrow, state };
 }
 
 function flowDirectionText(panel, key, direction) {
@@ -1196,6 +1313,7 @@ function flowDirectionText(panel, key, direction) {
   if (key === "pvInternal") return t.internalPvToEta;
   if (key === "pvExternal") return t.externalPvToPcc;
   if (key === "house") return t.systemToHouse;
+  if (key === "ev") return t.houseToEv;
   if (key === "grid") return direction === "left" ? t.gridToSystem : t.systemToGrid;
   return direction === "up" ? t.batteryToSystem : t.systemToBattery;
 }
@@ -1207,16 +1325,18 @@ function flowSourceText(panel, key) {
     pvExternal: language(panel) === "nl" ? "Externe PV" : "External PV",
     grid: language(panel) === "nl" ? "Net" : "Grid",
     house: language(panel) === "nl" ? "Woning" : "House",
+    ev: copy(panel).evCharger,
     battery: language(panel) === "nl" ? "Batterij" : "Battery",
   }[key];
 }
 
-function patchFlowLink(panel, link, key, presentation) {
-  const { state } = ensureFlowNodes(link);
+function patchStaticFlowLink(panel, link, key, presentation) {
+  const { arrow, state } = ensureStaticFlowNodes(link);
   const t = copy(panel);
   link.dataset.epV038Motion = presentation.direction;
   link.dataset.epV041FlowStatus = presentation.status;
   link.dataset.epV041FlowIntensity = presentation.intensity;
+  arrow.textContent = FLOW_ARROWS[presentation.direction] || "";
   state.textContent = presentation.status === "unknown" ? "?" : "•";
 
   let label;
@@ -1239,7 +1359,7 @@ function patchFlowLink(panel, link, key, presentation) {
   link.title = label;
 }
 
-function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery }) {
+function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery, ev }) {
   const directions = {
     pvInternal: Number.isFinite(pvInternal) && pvInternal > FLOW_THRESHOLD_W
       ? "right"
@@ -1253,11 +1373,12 @@ function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery }) 
     house: !Number.isFinite(house) || Math.abs(house) < FLOW_THRESHOLD_W
       ? "idle"
       : "up",
+    ev: !Number.isFinite(ev) || ev < FLOW_THRESHOLD_W ? "idle" : "right",
     battery: !Number.isFinite(battery) || Math.abs(battery) < FLOW_THRESHOLD_W
       ? "idle"
       : battery > 0 ? "up" : "down",
   };
-  const powers = { pvInternal, pvExternal, house, grid, battery };
+  const powers = { pvInternal, pvExternal, house, grid, battery, ev };
   const activeMaximum = Math.max(
     0,
     ...Object.entries(powers)
@@ -1295,6 +1416,7 @@ function splitPvFlowVisualMap({ pvInternal, pvExternal, house, grid, battery }) 
 function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
   const pv = pvSnapshot.power;
   const house = resolveHousePower(load, pv, grid, battery);
+  const evSnapshot = evFlowSnapshot(panel);
   const visual = splitPvFlowVisualMap({
     pvInternal: pvSnapshot.internalEnabled ? pvSnapshot.internalPower : null,
     pvExternal: pvSnapshot.externalEnabled && pvSnapshot.configuredExternal > 0
@@ -1303,12 +1425,14 @@ function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
     house,
     grid,
     battery,
+    ev: evSnapshot.configured ? evSnapshot.power : null,
   });
   const t = copy(panel);
   const gridMode = gridPresentation(panel, grid);
   const batteryMode = batteryPresentation(panel, battery);
 
   patchPvFlowGroup(panel, root, pvSnapshot);
+  patchEvFlowNode(panel, root, evSnapshot);
   setText(root, ".ep-flow-house .ep-flow-node-value", panel._formatPower(house));
   setText(root, ".ep-flow-grid .ep-flow-node-value", panel._formatPower(grid));
   setText(root, ".ep-flow-battery .ep-flow-node-value", panel._formatPower(battery));
@@ -1332,6 +1456,9 @@ function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
     battery: !Number.isFinite(battery) || Math.abs(battery) < FLOW_THRESHOLD_W
       ? "idle"
       : battery > 0 ? "inbound" : "outbound",
+    ev: !Number.isFinite(evSnapshot.power) || evSnapshot.power < FLOW_THRESHOLD_W
+      ? "idle"
+      : "outbound",
   };
   for (const [key, selector] of Object.entries({
     pvInternal: ".ep-link-pv-internal",
@@ -1339,12 +1466,13 @@ function patchFlow(panel, root, pvSnapshot, load, grid, battery, soc) {
     grid: ".ep-link-grid",
     house: ".ep-link-house",
     battery: ".ep-link-battery",
+    ev: ".ep-link-ev",
   })) {
     const link = root.querySelector(selector);
     if (!link) continue;
     link.classList.remove("idle", "inbound", "outbound");
     link.classList.add(semantic[key]);
-    patchFlowLink(panel, link, key, visual[key]);
+    patchStaticFlowLink(panel, link, key, visual[key]);
   }
 }
 
@@ -1386,6 +1514,8 @@ function evProtectionState(panel) {
   if (explicit) return explicit;
   const command = String(commandState?.state || "");
   if (command === "ev_anti_discharge_hold") return "blocking_discharge";
+  if (command === "ev_house_self_consumption") return "house_self_consumption";
+  if (command === "ev_self_consumption_hold") return "self_consumption_hold";
   if (command === "waiting_for_ev_stop_optimization") return "waiting_for_fresh_plan";
   if ([
     "ev_battery_charge",
@@ -1404,6 +1534,8 @@ function patchEvProtectionBanner(panel, root) {
   const presentation = {
     blocking_discharge: [t.evBlockingTitle, t.evBlockingDetail],
     allowing_charge: [t.evChargeAllowedTitle, t.evChargeAllowedDetail],
+    house_self_consumption: [t.evHouseTitle, t.evHouseDetail],
+    self_consumption_hold: [t.evReferenceHoldTitle, t.evReferenceHoldDetail],
     waiting_for_fresh_plan: [t.evWaitingTitle, t.evWaitingDetail],
     active_pending: [t.evPendingTitle, t.evPendingDetail],
   }[state];
@@ -1418,6 +1550,27 @@ function patchEvProtectionBanner(panel, root) {
   const detail = banner.querySelector(".ep-v041-ev-detail");
   if (title) title.textContent = presentation[0];
   if (detail) detail.textContent = presentation[1];
+}
+
+function controllerTargetLabel(panel, t) {
+  const state = panel._stateByKey?.("control_command");
+  const command = String(state?.state || "");
+  const strategy = state?.attributes?.control_strategy
+    || panel._stateByKey?.("control_strategy")?.state;
+  // Classify the requested command, not potentially delayed EMS read-back.
+  if (command === "hybrid2_planned_battery_charge"
+    || command === "hybrid3_planned_battery_charge"
+    || (command === "ev_battery_charge" && ["hybrid_2", "hybrid_3"].includes(strategy))) {
+    return t.gridAssistanceTarget;
+  }
+  if (command === "ev_house_self_consumption") return t.evInverterTarget;
+  if (command === "hybrid2_planned_battery_discharge"
+    || command === "hybrid3_planned_battery_discharge"
+    || command.startsWith("battery_") || command.startsWith("ev_")) {
+    return t.evBatteryTarget;
+  }
+  return command.startsWith("grid_") || command === "goodwe_auto"
+    ? t.pccTarget : t.controlTarget;
 }
 
 function patchController(panel, root, automaticOn) {
@@ -1449,12 +1602,17 @@ function patchController(panel, root, automaticOn) {
       commandAttrs.last_ems_setpoint_updated_at
     )}`
   );
+  const targetLabels = ["EnergyPilot target", "Inverter AC target", "Inverter-AC-doel", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel", "Grid assistance allowance", "Netassistentie-limiet"];
   patchMetric(
     card,
-    ["EnergyPilot target", "PCC target", "Battery target", "Control target", "PCC-doel", "Batterijdoel", "Regeldoel", "Accudoel"],
+    targetLabels,
     panel._formatPower(finite(panel, "target_power"))
   );
   patchMetric(card, ["Command", "Commando"], panel._textByKey?.("control_command") || "—");
+  const target = metricByLabels(card, targetLabels);
+  const targetLabel = target?.querySelector(".metric-label");
+  const targetText = controllerTargetLabel(panel, t);
+  if (targetLabel && targetLabel.textContent !== targetText) targetLabel.textContent = targetText;
 
   const manual = legacyControls ? card.querySelector(".ep-v021-manual-pad") : null;
   if (manual) {
@@ -1553,7 +1711,11 @@ function activeCostFunctionRaw(panel) {
 }
 
 function patchCostFunctionSelector(panel, root) {
-  const wrap = root.querySelector(".ep-v016-costfun");
+  // Scope the compatibility patch to the historical EMHASS overview. The
+  // permanent Lit selector owns and reconciles its own confirmed state.
+  const wrap = root.querySelector(
+    ".panel-card.emhass .ep-v016-costfun, .panel-card.emhass .ep-v015-costfun"
+  );
   if (!wrap) return;
   const activeRaw = activeCostFunctionRaw(panel);
   const activeDefinition = activeRaw ? EMHASS_COST_FUNCTIONS[activeRaw] : null;
@@ -1571,8 +1733,11 @@ function patchCostFunctionSelector(panel, root) {
   }
 
   const selectEntityId = panel._entityId?.("emhass_cost_function");
-  for (const button of wrap.querySelectorAll(".ep-v016-costfun-button[data-costfun]")) {
-    const raw = button.dataset.costfun;
+  for (const button of wrap.querySelectorAll(
+    ".ep-v016-costfun-button[data-costfun], " +
+    ".ep-v015-costfun-button[data-emhass-overview-costfun]"
+  )) {
+    const raw = button.dataset.costfun || button.dataset.emhassOverviewCostfun;
     const definition = EMHASS_COST_FUNCTIONS[raw];
     if (!definition) continue;
     const active = raw === activeRaw;
@@ -1613,7 +1778,7 @@ function socLimitValue(panel, kind) {
 function patchEmhass(panel, root) {
   const card = root.querySelector(".panel-card.emhass");
   if (!card) return;
-  if (!panel.__epControlSurfaceArchitecture) patchCostFunctionSelector(panel, root);
+  patchCostFunctionSelector(panel, root);
   const t = copy(panel);
   const pBattState = externalState(
     panel,
@@ -1918,13 +2083,12 @@ function installFreshDiagnosticsCopy(panel, root) {
 function patchMotionMenu(panel, root) {
   const input = root.querySelector('[data-ep-setting="animations"]');
   if (!input) return;
-  input.checked = false;
-  input.disabled = true;
-  input.setAttribute("aria-disabled", "true");
+  input.disabled = false;
+  input.removeAttribute("aria-disabled");
   const row = input.closest(".ep-menu-row");
-  row?.classList.add("ep-v041-motion-disabled");
+  row?.classList.remove("ep-v041-motion-disabled");
   const detail = row?.querySelector("small");
-  if (detail) detail.textContent = copy(panel).motionDisabled;
+  if (detail) detail.textContent = copy(panel).motionAvailable;
 }
 
 function patchLiveDom(panel) {
@@ -2215,6 +2379,7 @@ if (PanelClass && !PanelClass.prototype.__epV041Installed) {
     ensureNoMotionStyle(this.shadowRoot);
     ensureGlobalNoMotionStyle();
     installPvFlowGroup(this.shadowRoot);
+    installEvFlowNode(this.shadowRoot);
     installEvProtectionBanner(this.shadowRoot);
     this.__epV041RefreshLiveDom = () => {
       ensureNoMotionStyle(this.shadowRoot);

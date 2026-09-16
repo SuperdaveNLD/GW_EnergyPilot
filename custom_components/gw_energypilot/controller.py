@@ -40,6 +40,8 @@ from .const import (
     CONTROL_STRATEGY_BATTERY,
     CONTROL_STRATEGY_GRID,
     CONTROL_STRATEGY_HYBRID,
+    CONTROL_STRATEGY_HYBRID_2,
+    CONTROL_STRATEGY_HYBRID_3,
     DEFAULT_DEADBAND,
     DEFAULT_ENABLE_EXTERNAL_PV,
     DEFAULT_ENABLE_INTERNAL_PV,
@@ -84,7 +86,7 @@ _LOGGER = logging.getLogger(__name__)
 class GWEnergyPilotController:
     """Translate the current EMHASS plan into GoodWe EMS commands.
 
-    Automatic Control supports three strategies:
+    Automatic Control supports four strategies:
 
     Battery control:
       P_batt < 0 = mode 11 direct battery charge target
@@ -101,6 +103,13 @@ class GWEnergyPilotController:
       otherwise P_grid ~= 0 = mode 1 GoodWe Auto / self-use balancing
       otherwise P_grid > 0 = mode 9 import target at the PCC
       otherwise P_grid < 0 = mode 10 export target at the PCC
+
+    Hybrid 2.0:
+      grid inside its deadband = mode 1, including a neutral battery plan
+      outside: battery charge = mode 11; discharge = mode 3 at planned watts
+      neutral battery outside grid deadband = mode 9/10 net-only target
+      the active controller_v033 EV path uses mode 5 at fresh load minus EV
+      for house self-use, mode 11 for charging, and mode 8 to block discharge
 
     Hybrid gives an explicit neutral battery plan first priority. For every
     non-neutral battery plan it controls the PCC: GoodWe self-use owns a
@@ -198,6 +207,10 @@ class GWEnergyPilotController:
             return "waiting_for_fresh_plan"
         if not self.enabled or not self.ev_is_active():
             return "inactive"
+        if self.last_command == "ev_house_self_consumption":
+            return "house_self_consumption"
+        if self.last_command == "ev_self_consumption_hold":
+            return "self_consumption_hold"
         if self.last_command == "ev_anti_discharge_hold":
             return "blocking_discharge"
         if self.last_command in {
@@ -592,6 +605,14 @@ class GWEnergyPilotController:
         actual_power = getattr(data, "power", None)
         return actual_power is not None and int(actual_power) == int(power)
 
+    async def _async_refresh_command_readback(self) -> None:
+        """Refresh command evidence through the active telemetry transport."""
+        refresh_control = getattr(self.coordinator, "async_refresh_control_readback", None)
+        if callable(refresh_control):
+            await refresh_control()
+        else:
+            await self.coordinator.async_request_refresh()
+
     async def _async_apply_command(self, mode: int, power: int, command: str, *, skip_if_readback_matches: bool = False) -> None:
         context = self._execution_context()
         power = max(0, min(int(power), 15000))
@@ -643,15 +664,7 @@ class GWEnergyPilotController:
         self._notify_state()
         refresh_error: Exception | None = None
         try:
-            refresh_control = getattr(
-                self.coordinator,
-                "async_refresh_control_readback",
-                None,
-            )
-            if callable(refresh_control):
-                await refresh_control()
-            else:
-                await self.coordinator.async_request_refresh()
+            await self._async_refresh_command_readback()
         except Exception as err:  # preserve the established propagation contract
             refresh_error = err
         readback_at = datetime.now(timezone.utc)
@@ -660,7 +673,7 @@ class GWEnergyPilotController:
         readback_power = actual.get("ems_setpoint_w")
         verification_status = (
             "verified"
-            if readback_mode == mode and readback_power == power
+            if readback_mode == mode and readback_power == power and refresh_error is None
             else "unavailable"
             if readback_mode is None or readback_power is None or refresh_error
             else "mismatch"
@@ -775,6 +788,11 @@ class GWEnergyPilotController:
             grid_deadband=DEFAULT_GOODWE_AUTO_DEADBAND,
             max_power=max_power,
         )
+        if not decision.ready:
+            self.last_command = decision.command
+            self._notify_state()
+            await self._async_record_waiting(self.last_command)
+            return
         await self._async_apply_command(
             int(decision.mode),
             int(decision.power),
@@ -836,15 +854,20 @@ class GWEnergyPilotController:
         grid_deadband: float,
         max_power: int,
     ) -> None:
-        """Hold neutral battery plans, otherwise execute the signed PCC plan."""
+        """Apply the selected Hybrid variant through the shared decision mapping."""
         decision = resolve_control_decision(
-            strategy=CONTROL_STRATEGY_HYBRID,
+            strategy=self.control_strategy,
             p_batt=p_batt,
             p_grid=p_grid,
             battery_deadband=battery_deadband,
             grid_deadband=grid_deadband,
             max_power=max_power,
         )
+        if not decision.ready:
+            self.last_command = decision.command
+            self._notify_state()
+            await self._async_record_waiting(self.last_command)
+            return
         await self._async_apply_command(
             int(decision.mode),
             int(decision.power),
@@ -896,7 +919,7 @@ class GWEnergyPilotController:
             self._notify_state()
             await self._async_record_waiting(self.last_command)
             return
-        if strategy == CONTROL_STRATEGY_HYBRID:
+        if strategy in {CONTROL_STRATEGY_HYBRID, CONTROL_STRATEGY_HYBRID_2, CONTROL_STRATEGY_HYBRID_3}:
             await self._async_apply_hybrid_plan(
                 p_batt,
                 p_grid,

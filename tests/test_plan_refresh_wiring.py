@@ -26,6 +26,8 @@ class PlanRefreshWiringTests(unittest.TestCase):
         self.assertIn('"chart_schema_version": 7', source)
         self.assertIn('"chart_time": build_chart_time_payload(', source)
         self.assertIn('"battery_soc_plan": _battery_soc_plan_payload(entry)', source)
+        self.assertIn('"pv_plan": _pv_plan_payload(entry)', source)
+        self.assertIn('"source_column": "P_PV"', source)
         self.assertIn('"timestamp_semantics": "interval_end"', source)
         self.assertIn("soc_interval_end_points", source)
 

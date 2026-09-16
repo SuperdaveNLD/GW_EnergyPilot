@@ -26,8 +26,8 @@ GoodWe GW15K-ETA-G20
 Current release lines:
 
 ```text
-v1.2.1 Stable
-v1.3.0-beta.4 Current beta
+v1.4.0 Stable
+v1.3.0-beta.11 Previous beta candidate, promoted to v1.4.0
 ```
 
 Release-channel migration is prepared for v1:
@@ -61,18 +61,23 @@ EMHASS is an external prerequisite. EnergyPilot integrates with EMHASS but must 
   reports must exclude all credentials.
 - See `docs/SEMS_API.md` for the current mapped subset and limits.
 
-## Frontend stability contract (v0.41+, active v1.2.1 Stable)
+## Frontend stability contract (v0.41+, active v1.4.0)
 
 - Normal Home Assistant telemetry updates must patch the existing dashboard DOM; they must not replace `main`, controls, cards or the ShadowRoot.
 - A complete structural render is reserved for first initialization and genuine context/structure changes: language/user/theme, entity registry, optional-card topology or configured PV-source topology.
-- The active v1.2.1 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
+- The active v1.4.0 telemetry path must not write `scrollTop` or `scrollLeft`, capture touch pointers, cancel native vertical gestures or use a hover/render lock.
 - The beta.5 iOS adapter may recover a missing touch click after 120 ms only
   through the same native element's existing click path, with a 12 px movement
   guard and late-click deduplication.
 - Operational controls must remain in the permanent Lit surface and must not be
   recreated or mutated by historical presentation layers.
 - Battery Strategy feedback must remain scoped to `.ep-v038-strategy`; plan changes must remain scoped to the Battery · Plan · Price card.
-- EnergyPilot transitions, animated pseudo-elements and modal backdrop filters remain disabled. The only motion exception is the separately documented, browser-tested single energy ball on each active power connector; reduced-motion preferences keep it stationary.
+- General EnergyPilot animations, transitions, animated pseudo-elements and
+  modal backdrop filters remain disabled. The only motion exception is the
+  existing user-controlled live-flow particle layer: it may animate active
+  connectors when **Flow animations** is enabled, must stop completely when
+  disabled or when `prefers-reduced-motion: reduce` applies, and must retain
+  zero non-flow animations/transitions in the three-profile browser matrix.
 - Every frontend change affecting rendering, interaction or CSS must pass desktop Chromium, iPad WebKit touch and iPhone WebKit touch regressions before release.
 - `docs/FRONTEND_STABLE_DOM.md` is the canonical architecture decision for this contract.
 
@@ -131,6 +136,11 @@ write 47511
 
 - An incorrect EMS write can move significant real power; control changes require explicit tests and hardware evidence.
 
+Reference ETA-G20 field constraint (owner report, 2026-09-06): PV production
+stops in mode 12. Do not select mode 12 for the requested PV-first Hybrid 2.0
+redesign or assume that lowering its watt setpoint preserves PV. This is an
+installation-specific observation; see the evidence note in `docs/MODBUS.md`.
+
 ## Beta register policy
 
 For unconfirmed hardware semantics:
@@ -182,16 +192,64 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 
 Hybrid first preserves an explicit neutral battery plan, then uses PCC control for every non-neutral plan. The Battery Hold deadband is applied to `P_batt`; the separate GoodWe Auto deadband is applied to `P_grid`. Exact boundaries remain neutral. Each deadband selects its branch only and must never be subtracted from a mode-9/10 setpoint.
 
+Hybrid 2.0 Beta (`hybrid_2`) is an opt-in test strategy: evaluate P_grid
+against its deadband FIRST, including P_batt = 0. Without EV, grid-neutral
+means mode 1. Outside that band, charging uses mode 2 at bounded abs(P_batt)
+as a PV-priority grid-assistance allowance; PV can add to actual battery
+charging. Keep the planned watt magnitude, not automatic maximum dispatch.
+Discharge uses mode 3 at planned watts, and neutral battery uses mode
+9/10 at the net target. Explicit manual Pause remains mode 8. Mode 12 is not
+part of this redesign.
+
+With EV active, grid-neutral self-use uses mode 5 at bounded max(0, fresh
+local load 35172 - fresh measured EV power). Never subtract external PV again;
+this measurement boundary and mode-5 PV surplus behavior remain unverified
+hardware assumptions explicitly accepted for this test strategy. Outside the
+grid band, planned charging uses mode 2 with the same allowance and planned discharge is held.
+Unresolved net-only EV plans also Hold; they are not explicit optimizer Pause.
+Use the existing 15-second controller cadence and lock, never a second loop
+or charger writes. Both load and EV reports must be finite and at most 30
+seconds old; reject missing/future/naive timestamps, failed local telemetry,
+and cloud load. EV needs explicit W/kW/MW/mW units; load is canonical local
+35172 W. Preserve optimizer readiness, persistent-plan and EV-stop gates.
+
+`preview_hybrid_mapping` is the pure shared model. The command sensor's
+`mapping_preview` is read-only even when the selected Hybrid 2.0 strategy
+is executing that model. Keep unverified PV behavior visible in diagnostics
+and docs. See `docs/HYBRID_2.md` for the matrix and hardware evidence.
+
+Hybrid 3.0 excl. EV (`hybrid_3`) is a separate opt-in beta, not a migration of
+Hybrid 2.0. Its purpose is to support independently scheduled Tibber Grid Rewards
+charging without intentionally compensating the EV's grid draw from the home
+battery. Preserve grid-first self-use; neutral battery plans also mean self-use.
+Normal self-use/discharge/charge select 1/3/2; with EV they select 5/5/2.
+No 9/10 net-only branch. Mode 2 retains planned grid-assistance watts + available
+PV; never force maximum charging or introduce PV-only mode 2/0 automatically.
+
+Hybrid 3.0 uses the same local-load-minus-EV reference, existing 15-second
+callback and control lock. Both reports must be at most 30 seconds old and at
+most 15 seconds apart. Missing required measurements/plans Hold; recovery needs
+two distinct fresh pairs with both sources advancing and at least 15 seconds.
+Valid directed charging is independent of house-reference recovery. Native
+EV-stop Hold requires new optimization success and both fresh finite live plan
+outputs after stop. Direct canonical local EMS readback is bounded to three
+attempts after a write; invalidate the previous acknowledgement before writing.
+Control-only readback never makes telemetry fresh. Keep diagnostic rejection
+reasons visible and field-validation limits explicit. See `docs/HYBRID_3.md`.
+
 Legacy compatibility remains: missing/false old smart-meter flag -> Battery; explicit true -> Grid.
 
 EV anti-discharge is a higher-priority directional override, but it must only block battery discharge while the EV is charging:
+
+Hybrid 2.0 uses the house-self-consumption exception above. The following
+direction-only rule remains the compatibility contract for Battery/Grid/Hybrid:
 
 ```text
 EV active + P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
 EV active + explicit charge plan:
   Battery strategy -> mode 11 using abs(P_batt)
-  Grid strategy -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
-  Hybrid strategy -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+  Grid strategy -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+  Hybrid strategy -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
 ```
 
 The EV feature does not control the charger and must not introduce a second fast power-control loop. EV-stop stale-plan protection remains intact. See `docs/EV_ANTI_DISCHARGE.md`.
@@ -396,8 +454,10 @@ v0.44 schedules one non-blocking startup recovery attempt 60 seconds after setup
 The top-level module is selected in `__init__.py`:
 
 ```text
-gw-energy-pilot-v110.js
-  -> gw-energy-pilot-v101.js
+gw-energy-pilot-v131.js
+  -> gw-energy-pilot-v130.js
+       -> gw-energy-pilot-v110.js
+       -> gw-energy-pilot-v101.js
        -> gw-energy-pilot-v051.js
        -> gw-energy-pilot-v051-history.js
        -> gw-energy-pilot-v050.js
@@ -416,14 +476,12 @@ gw-energy-pilot-v110.js
                                                                    -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.1 owns final stable presentation and the complete `1.2.1-stable1` cache
-boundary. It retains the v1.2.0 safety,
+v1.4.0 owns the stable presentation and complete `1.4.0` cache
+boundary. It retains v1.2.0's stable safety,
 diagnostics, EMHASS AUTO/CUSTOM load-forecast control and bounded iOS
 missing-click recovery, and expands the remaining graph/history touch targets
-to at least 44 CSS pixels on coarse-pointer/narrow displays. It also replaces
-connector arrows with one moving energy ball on every finite active route,
-including external AC/PCC PV. v1.2.0 remains the previous stable base and
-v1.0.1-beta.4 remains in the chain as its bounded
+to at least 44 CSS pixels on coarse-pointer/narrow displays. v1.1.1
+remains the previous stable base and v1.0.1-beta.4 remains in the chain as its bounded
 historical beta presentation layer. v0.51 remains the bounded feature layer
 that owns the scoped EMHASS-to-GoodWe history card. The settings module owns
 the two-deadband configuration panel and explanatory scale; backend

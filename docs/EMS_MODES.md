@@ -25,10 +25,10 @@ Xset = target value the inverter tries to reach.
 | Mode | GoodWe/OpenEMS name | EnergyPilot label | `47512` meaning | EnergyPilot policy |
 |---:|---|---|---|---|
 | **1** | Auto | GoodWe Auto / AI | unused / `0 W` | normal inverter ownership; also used around a zero `P_grid` target when smart-meter control is enabled |
-| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | manual only |
-| **3** | Discharge PV | PV + battery supply | `Xmax` allowable battery discharge; PV has priority | manual only |
+| **2** | Charge PV | PV-priority charging | `Xmax` grid assist allowed for charging; `0 W` = GoodWe-visible PV only | Manual; v1.3.0-beta.10 Hybrid 2.0 uses bounded planned watts as allowance |
+| **3** | Discharge PV | PV + battery supply | `Xmax` allowable battery discharge; documented PV priority | manual + opt-in Hybrid 2.0 test |
 | **4** | Import AC | Inverter import / AC charging | `Xset` inverter-level grid purchase target | manual only |
-| **5** | Export AC | Inverter export power | `Xset` inverter-level grid sale/export target | manual only |
+| **5** | Export AC | Inverter export power | `Xset` inverter-level grid sale/export target | manual + opt-in Hybrid 2.0 EV house test |
 | **6** | Conserve | Reserve / Conserve | unused / `0 W` | manual reserve/off-grid preparation |
 | **7** | Off-Grid | Off-grid | unused / `0 W` | manual forced off-grid only |
 | **8** | Battery Standby | Battery Hold | unused / `0 W` | automatic fallback hold when direct battery strategy is selected; manual hold |
@@ -116,6 +116,29 @@ else P_grid < -GoodWe Auto deadband -> mode 10 -> export target = abs(P_grid)
 
 The neutral battery branch is evaluated first so ordinary forecast house import or PV export cannot turn an idle EMHASS battery plan into active buying or selling. Every non-neutral plan then follows the signed PCC target. Exact positive and negative boundaries remain neutral. Each deadband only selects its own branch and is never subtracted from the transmitted mode-9/10 setpoint; maximum-power clamping remains the only reduction.
 
+### Hybrid 3.0 excl. EV
+
+The opt-in `hybrid_3` strategy has six normal scenarios: self-use/discharge/
+charge use **1/3/2** without EV and **5/5/2** with EV. Mode 5 is bounded measured
+house load excluding EV; mode 2 retains planned grid-assistance watts + PV.
+There are no net-only 9/10 branches. Manual modes are never remapped. Required
+data/plan failure uses Hold. These are existing register meanings, not newly
+claimed hardware semantics. See [decision order, evidence and limits](HYBRID_3.md).
+
+### Hybrid 2.0 Beta
+
+The v1.3.0-beta.10 `hybrid_2` strategy checks the grid deadband first.
+Within it, self-use uses mode 1 without EV and mode 5 at fresh local load
+minus measured EV power with EV. Outside it, charging uses **mode 2 at
+bounded `abs(P_batt)`** as PV-priority grid assistance, with or without EV.
+PV can add to actual battery charging; the allowance is not a fixed battery
+target and is not replaced by maximum dispatch. Discharge uses mode 3 without
+EV and Hold with EV; neutral battery plans use 9/10 without EV and Hold with
+EV. Explicit Pause remains mode 8. Existing freshness/readiness gates remain.
+Published beta.9 used mode 11 for charging. Manual modes remain exact,
+including direct battery charging in mode 11 and Battery strategy's mode 11.
+See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
 ## Why mode 1 is used around zero grid target
 
 On the reference GW15K-ETA-G20, mode 1 was observed naturally consuming available PV surplus into the battery while holding grid flow close to zero. That behavior avoids maintaining a second slow EnergyPilot meter-feedback loop around mode 11.
@@ -155,3 +178,15 @@ write 47511 mode
 ```
 
 Do not change that ordering without hardware validation.
+
+
+## Current Hybrid 2.0 test evidence
+
+The beta.9 opt-in strategy now uses modes 3 and 5. At mode 3 / 5,000 W,
+the owner measured 5,030 W battery discharge (758 V × 6.60 A ≈ 5,003 W)
+while 157 W internal PV remained visible. This supports adjustability, not
+PV priority at the AC limit. Mode 3 / 0 W showed 285 W battery discharge;
+mode 8 later settled to 16 W with 0.00 A. Keep explicit Pause on mode 8.
+Mode 5 / 1,000 W gave 761 W load plus 244 W export; mode 10 / 1,000 W gave
+998 W net export. The 35172 measurement boundary still requires validation.
+See [the full measurement table and open tests](HYBRID_2.md).

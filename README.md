@@ -15,7 +15,7 @@ plan.
 [Get started](#installation--first-validation) ·
 [English user guide](docs/USER_GUIDE.md) ·
 [Nederlandse handleiding](docs/HANDLEIDING_NL.md) ·
-[Latest beta](docs/releases/v1.3.0-beta.1.md)
+[Latest production release](docs/releases/v1.4.0.md)
 
 > This project is independent and is not affiliated with or endorsed by GoodWe.
 
@@ -31,7 +31,7 @@ system's responsibility explicit:
   wall-clock boundaries with optional Nord Pool/runtime pricing;
 - **Control the inverter locally** — translate the active battery/grid plan to
   verified GoodWe EMS modes and setpoints over local Modbus TCP;
-- **Choose how the plan is followed** — Battery, Grid or Hybrid control, from
+- **Choose how the plan is followed** — Battery, Grid, Hybrid, Hybrid 2.0 Beta or opt-in Hybrid 3.0 excl. EV control, from
   direct battery power to GoodWe smart-meter/PCC targets;
 - **Protect the system when reality changes** — block home-battery discharge
   into a charging EV, wait for fresh plans and suspend EV coordination when
@@ -66,9 +66,10 @@ strategies, Battery Saver, EV features, troubleshooting and safe validation.
 
 ## Status
 
-**v1.3.0-beta.1 · Beta prerelease**
+**v1.4.0 · Stable**
 
-Latest production release: **v1.2.1 · Stable**
+Latest production release: **v1.4.0 · Stable**
+Previous beta candidate: **v1.3.0-beta.11**, promoted to v1.4.0.
 
 Primary reference hardware: **GoodWe GW15K-ETA-G20**.
 
@@ -85,23 +86,28 @@ release channels:
 - opt-in test releases use `v1.x.x-beta.N` and are GitHub prereleases;
 - branch pushes never publish a release; only a validated tag can do so.
 
-`v1.2.1` is the stable production release. It retains v1.2.0's measured
-missing-click recovery and enlarged
-Battery · Plan · Price and execution-history controls behind a new complete
-frontend cache boundary, and replaces connector arrows with one moving energy
-ball on each active power route, including external PV. Every recovered touch still enters the existing
-native click, form-submit or change route exactly once. Local Modbus remains
+v1.4.0 promotes the v1.3.0-beta.11 runtime to production with a complete new
+frontend cache boundary. It includes compact mobile controls, solar-production
+graphs, live-flow motion and the opt-in Hybrid 3.0 excl. EV strategy with
+explicit Hold/recovery and local command-readback diagnostics. Existing users
+keep their selected strategy, EMHASS settings and history. Hybrid 2.0/3.0 and
+SEMS+ retain their documented Beta/field-validation boundaries; promotion does
+not establish physical PV/EV behavior or Tibber rewards. Local Modbus remains
 mandatory for every EMS and minimum-SOC write/read-back. Normal HACS users
-receive this release without enabling prereleases.
+receive v1.4.0 without enabling prereleases.
 See `docs/RELEASE_WORKFLOW.md` for the exact maintainer and Home Assistant steps.
 
 Release documentation:
 
+- `docs/releases/v1.4.0.md` — current production release and upgrade boundaries;
 - `docs/USER_GUIDE.md` — English installation and daily-use guide;
 - `docs/HANDLEIDING_NL.md` — Nederlandse installatie- en gebruikershandleiding;
-- `docs/releases/v1.3.0-beta.1.md` — current compact-controls, flow-motion and built-in-help beta notes;
+- `docs/releases/v1.3.0-beta.4.md` — historical solar-production visibility fix for every chart size;
+- `docs/releases/v1.3.0-beta.3.md` — actual-versus-expected solar-production graph beta notes;
+- `docs/releases/v1.3.0-beta.2.md` — responsive Power overview and optional EV charger beta notes;
+- `docs/releases/v1.3.0-beta.1.md` — compact-controls, flow-motion and built-in-help beta notes;
 - `docs/RELEASE_NOTES.md` — current release index and channel scope;
-- `docs/releases/v1.2.1.md` — current stable live-flow release notes;
+- `docs/releases/v1.2.1.md` — merged main live-flow release notes;
 - `docs/releases/v1.2.0.md` — previous stable mobile-control and telemetry release notes;
 - `docs/releases/v1.2.0-beta.7.md` — validated beta.6 touch-control roll-forward notes;
 - `docs/releases/v1.2.0-beta.6.md` — chart/history mobile touch-target notes;
@@ -155,6 +161,108 @@ Release documentation:
 - `docs/PV_INSIGHT.md` — internal/external display-only PV source aggregation.
 - `docs/SEMS_API.md` — SEMS+ Beta login, mapping and local-control boundary.
 
+## v1.3.0-beta.11 highlights
+
+**Hybrid 3.0 excl. EV** is a new explicit strategy for independently scheduled
+Tibber Grid Rewards charging. Self-use uses mode 1, discharge mode 3 and charge
+mode 2. With EV, self-use and discharge use mode 5 at measured house load
+excluding EV every 15 seconds; charging keeps the same mode-2 allowance + PV.
+The existing grid-first deadband remains; neutral battery plans also mean
+self-use. New measurement/recovery diagnostics, direct bounded EMS readback
+and an EV-stop fresh-plan latch support validation of the reported transitions.
+The English/Dutch dashboard includes the six-scenario table. Existing
+strategies, CUSTOM forecasts and stable releases remain unchanged.
+
+This is an opt-in Beta, not a reward or instantaneous EV-exclusion guarantee.
+See [scenario table and safety limits](docs/HYBRID_3.md) and
+[beta.11 release notes](docs/releases/v1.3.0-beta.11.md).
+
+## v1.3.0-beta.10 highlights
+
+Hybrid 2.0 directed charging changes from mode 11 to mode 2, retaining
+bounded `abs(P_batt)` as a PV-priority grid-assistance allowance. Available
+PV can add to battery charging; actual charge power/SOC can exceed the plan.
+This applies with and without EV. Other strategies and manual mode 11 remain
+unchanged. See [beta.10 release notes](docs/releases/v1.3.0-beta.10.md).
+Synchronized automatic mode-2/PV/EV hardware validation remains required.
+
+## v1.3.0-beta.9 highlights
+
+- Hybrid 2.0 checks the grid deadband first, including neutral battery plans.
+- Directed battery charging uses mode 11 and discharging uses mode 3 at the
+  planned watts. Explicit Pause remains mode 8.
+- EV house self-use tests mode 5 at fresh local load minus EV power every
+  15 seconds. Missing/stale inputs and explicit EV discharge select Hold.
+- PV priority at the AC limit, mode-5 surplus behavior and the external-PV/EV
+  measurement boundary remain field-test items.
+- See [beta.9 release notes](docs/releases/v1.3.0-beta.9.md).
+
+## v1.3.0-beta.8 highlights
+
+- Hybrid 2.0 follows planned battery watts in mode 11 during net-charge windows.
+- During EV charging, house self-consumption and PV charging use mode 9 with
+  the measured EV power as import target, updated every 15 seconds. The battery
+  may supply the house; pause and explicit planned discharge use mode 8 Hold.
+- Self-use requires a fresh measured EV power sensor. Invalid references or
+  unavailable plans during EV charging select Hold instead of retaining an old
+  import target. Missing plan inputs without EV retain the existing wait.
+- See [beta.8 release notes](docs/releases/v1.3.0-beta.8.md).
+
+## v1.3.0-beta.7 highlights (superseded by beta.8)
+
+- Fixes the reported EV-active case where `P_batt = -1.33 kW` but
+  `P_grid = -29 W` kept Hybrid 2.0 in mode 1.
+- Every explicit battery-charge plan now selects mode 2 at configured maximum
+  power, independent of `P_grid`; neutral/discharge plans retain their guards.
+- See [beta.7 release notes](docs/releases/v1.3.0-beta.7.md).
+
+## v1.3.0-beta.6 highlights
+
+- Adds **Hybrid 2.0 Beta** in GoodWe settings: mode 2 at configured maximum
+  power during planned battery-charge windows, with PV priority.
+- EV start preserves charging; neutral/discharge plans remain held.
+- Existing strategies are retained. Actual charging and SOC can exceed the
+  EMHASS forecast. See [release notes](docs/releases/v1.3.0-beta.6.md).
+
+## v1.3.0-beta.5 highlights
+
+- EV charging preserves the normal strategy mode and setpoint for explicit battery-charge plans.
+- Discharge and neutral battery plans remain on Hold; unavailable grid plans wait.
+- See [beta.5 release notes](docs/releases/v1.3.0-beta.5.md).
+
+## v1.3.0-beta.4 highlights
+
+- Shows actual and expected solar production in every Battery · Plan · Price
+  size: **S**, the default **M**, **L** and the expanded graph. In beta.3 the
+  lines and legend were only visible in Large and expanded views.
+- Includes both yellow line styles in the legend and explains missing solar
+  data in the normal graph. The complete frontend cache boundary advances to
+  `1.3.0-beta.4`.
+
+## v1.3.0-beta.3 highlights
+
+- Adds solid actual and dashed expected solar-production lines to the Large
+  and expanded Battery · Plan · Price graph.
+- Uses existing combined-PV Recorder statistics for actuals and only
+  non-negative `P_PV` points from the validated official EMHASS plan for the
+  forecast; both remain display-only.
+- Advances the complete frontend cache boundary to `1.3.0-beta.3` without
+  changing GoodWe, EMS, EMHASS, Battery Saver or accounting semantics.
+
+## v1.3.0-beta.2 highlights
+
+- Adds `S`, `M` and `L` Power overview sizes for one column, two columns or a
+  complete dashboard row, with a safe single-column mobile fallback.
+- Corrects node alignment by selecting compact flow geometry from the actual
+  card width instead of the browser viewport.
+- Shows an EV charger branch only when a charger source is configured and
+  keeps it explicitly display-only and part of total household load.
+- Keeps expanded EnergyPilot disclosures above neighboring card-window
+  controls and makes the non-interactive `AUTO ACTIVE` badge substantially
+  smaller without changing operational touch targets.
+- Advances the complete frontend cache boundary to `1.3.0-beta.2` without
+  changing GoodWe, EMS, EMHASS, Battery Saver or accounting semantics.
+
 ## v1.3.0-beta.1 highlights
 
 - Consolidates operational controls into one normal-width, fixed dashboard
@@ -169,15 +277,6 @@ Release documentation:
 - Uses the complete `1.3.0-beta.1` frontend cache boundary. GoodWe registers,
   EMS semantics, EMHASS ownership, entity identities and persistent stores are
   unchanged.
-
-## v1.2.1 highlights
-
-- Replaces the connector arrows with one clearly visible moving energy ball on
-  every finite active route, including external AC/PCC PV.
-- Keeps idle, unavailable and reduced-motion flow particles stationary while
-  preserving the existing stable connector DOM.
-- Advances the complete frontend graph to `1.2.1-stable1` without changing
-  GoodWe registers, EMS/EMHASS behavior, entities or persistent stores.
 
 ## v1.2.0 highlights
 
@@ -539,7 +638,7 @@ When reporting compatibility, include inverter model/firmware, battery model, Go
 - direct local GoodWe Modbus TCP telemetry;
 - EMS mode/setpoint control;
 - manual access to all twelve EMS modes;
-- three Automatic Control strategies: Battery, Grid and Hybrid;
+- five Automatic Control strategies: Battery, Grid, Hybrid, Hybrid 2.0 Beta and Hybrid 3.0 excl. EV;
 - native EMHASS optimization/publishing;
 - safe EMHASS required-config synchronization that preserves installation topology;
 - persistent validated EMHASS plan continuity across temporary publication gaps;
@@ -657,9 +756,41 @@ Hybrid first preserves an explicit neutral battery plan. This prevents ordinary 
 
 For every non-neutral battery plan, Hybrid follows the signed PCC plan. Around zero grid target, mode 1 lets GoodWe close the actual local balance for internal or AC-coupled PV. Outside the configured deadband, modes 9/10 receive the complete absolute `P_grid` magnitude, limited only by maximum power. Exact positive and negative deadband boundaries remain neutral.
 
+### Hybrid 3.0 excl. EV
+
+The new `hybrid_3` strategy aims to preserve Tibber Grid Rewards opportunities
+without deliberately feeding an independently charging EV from the home
+battery. Normal self-use/discharge/charge select **1/3/2**; with EV they select
+**5/5/2**. Stand 5 uses fresh local load minus measured EV every 15 seconds.
+Stand 2 retains planned grid-assistance watts and available PV may add.
+Invalid required data selects Hold; recovery and command confirmation are
+explicitly diagnosed. No user is migrated automatically. See the
+[complete six-scenario table, decision order and field limits](docs/HYBRID_3.md).
+
+### Hybrid 2.0 Beta
+
+The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
+mode **1**, including `P_batt = 0`. Outside it, charging uses **2** at bounded
+`abs(P_batt)` as PV-priority grid assistance. PV can add to actual battery
+charging; the existing watt calculation is retained, not maximum dispatch.
+Published beta.9 used mode 11 for this branch. Discharging uses **3** at
+planned battery watts, and neutral
+battery plans use net targets **9/10**. Explicit manual Pause remains **8**.
+With EV active, self-use uses **5** at fresh local 35172 minus measured EV
+power, updated every 15 seconds. Explicit planned discharge and unsupported
+net-only EV cases use Hold. Missing/stale load or EV measurements also hold.
+This assumes an unverified 35172/external-PV boundary; PV priority at the
+inverter limit and mode-5 surplus behavior still need field testing. Other
+strategies and manual modes retain their behavior. The existing command sensor
+exposes a read-only `mapping_preview`; it does not control the actuator.
+See [Hybrid 2.0 behavior and hardware evidence](docs/HYBRID_2.md).
+
+
 ### EV anti-discharge override
 
-EV coordination is a directional anti-discharge guard, not an EV charging controller. While the configured EV source indicates active charging:
+EV coordination is an inverter policy, not an EV charging controller. Battery,
+Grid and original Hybrid use this directional guard while the configured EV
+source indicates active charging; Hybrid 2.0 has the self-consumption exception above:
 
 ```text
 P_batt > +deadband or inside deadband -> mode 8 Battery Hold
@@ -670,11 +801,12 @@ For an explicit home-battery charge plan:
 
 ```text
 Battery strategy -> mode 11 using abs(P_batt)
-Grid strategy    -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
-Hybrid strategy  -> mode 9 when P_grid > deadband, otherwise mode 11 fallback
+Grid strategy    -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+Hybrid strategy  -> normal strategy mode/setpoint (9 import, 1 neutral grid, 10 export); wait if P_grid is unavailable
+Hybrid 2.0 Beta  -> see the self-consumption exception above; positive P_batt with neutral grid may supply the house
 ```
 
-This prevents the home battery from feeding the EV while avoiding the previous blanket hold on legitimate charging. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.
+This blocks planned battery discharge while allowing explicit charging plans. It does not guarantee instantaneous battery direction in PCC/Auto modes when actual load differs from the forecast. EV-stop stale-plan protection still waits for a fresh optimization when the native orchestrator owns optimization timing.
 
 ### EV charger load balancing
 

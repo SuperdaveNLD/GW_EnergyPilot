@@ -18,7 +18,7 @@ from playwright.sync_api import BrowserType, Error as PlaywrightError, Page, syn
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = "/tests/browser/frontend_harness.html"
 EXPECTED_ENTRYPOINT: str | None = None
-STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
+STABLE_ENTRYPOINTS = {"v041", "v042", "v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
 
 
 @dataclass(frozen=True)
@@ -93,6 +93,22 @@ def wait_render_idle(page: Page) -> None:
 def activate(page: Page, profile: Profile, selector: str) -> None:
     """Use a real touch sequence for touch profiles and a mouse click otherwise."""
     wait_render_idle(page)
+    page.evaluate(
+        """
+        selector => {
+          const root = window.__epPanel.shadowRoot;
+          const node = root.querySelector(selector);
+          const disclosure = node?.tagName === 'SUMMARY' ? null : node?.closest('details');
+          if (disclosure) {
+            root.querySelectorAll('ep-control-surface details[open]').forEach(
+              candidate => { if (candidate !== disclosure) candidate.open = false; }
+            );
+            disclosure.open = true;
+          }
+        }
+        """,
+        selector,
+    )
     last_error: PlaywrightError | None = None
     for _attempt in range(3):
         control = shadow(page, selector)
@@ -124,6 +140,8 @@ def animation_summary(page: Page) -> dict[str, int]:
           let animations = 0;
           let transitions = 0;
           let animatedElements = 0;
+          let flowParticleAnimations = 0;
+          let otherAnimations = 0;
           const active = (style) => {
             const animationNames = style.animationName.split(',').map((item) => item.trim());
             const animationDurations = style.animationDuration.split(',').map((item) => item.trim());
@@ -135,23 +153,31 @@ def animation_summary(page: Page) -> dict[str, int]:
           };
           for (const element of root.querySelectorAll('*')) {
             let elementActive = false;
+            const flowParticle = element.matches('.ep-v011-particles span');
             for (const pseudo of [null, '::before', '::after']) {
               const state = active(getComputedStyle(element, pseudo));
-              if (state.hasAnimation) animations += 1;
+              if (state.hasAnimation) {
+                animations += 1;
+                if (flowParticle && pseudo === null) flowParticleAnimations += 1;
+                else otherAnimations += 1;
+              }
               if (state.hasTransition) transitions += 1;
               elementActive ||= state.hasAnimation || state.hasTransition;
             }
             if (elementActive) animatedElements += 1;
           }
-          return { animations, transitions, animatedElements };
+          return {
+            animations, transitions, animatedElements,
+            flowParticleAnimations, otherAnimations,
+          };
         }
         """
     )
 
 
 def exercise_static_flow(page: Page) -> dict[str, object]:
-    """Verify flow motion, state, intensity, accessibility and DOM identity."""
-    result = page.evaluate(
+    """Verify static direction, state, intensity, accessibility and DOM identity."""
+    return page.evaluate(
         """
         async () => {
           const panel = window.__epPanel;
@@ -165,40 +191,42 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
           const links = Object.fromEntries(
             Object.entries(selectors).map(([key, selector]) => [key, root.querySelector(selector)])
           );
-          const particles = Object.fromEntries(
-            Object.entries(links).map(([key, link]) => [key, link?.querySelector('.ep-v041-flow-particle')])
+          const arrows = Object.fromEntries(
+            Object.entries(links).map(([key, link]) => [key, link?.querySelector('.ep-v041-flow-arrow')])
           );
           const main = root.querySelector('main');
           const overview = root.querySelector('.ep-flow-overview');
           const read = () => {
             const overviewRect = overview?.getBoundingClientRect();
             return Object.fromEntries(Object.entries(links).map(([key, link]) => {
-              const particle = link?.querySelector('.ep-v041-flow-particle');
+              const arrow = link?.querySelector('.ep-v041-flow-arrow');
               const state = link?.querySelector('.ep-v041-flow-state');
               const track = link?.querySelector('.ep-flow-track');
-              const particleRect = particle?.getBoundingClientRect();
+              const arrowRect = arrow?.getBoundingClientRect();
               const vertical = key === 'house' || key === 'battery';
               const trackStyle = track ? getComputedStyle(track) : null;
-              const particleStyle = particle ? getComputedStyle(particle) : null;
+              const arrowStyle = arrow ? getComputedStyle(arrow) : null;
               return [key, {
                 status: link?.dataset.epV041FlowStatus || '',
                 direction: link?.dataset.epV038Motion || '',
                 intensity: link?.dataset.epV041FlowIntensity || '',
                 role: link?.getAttribute('role') || '',
                 label: link?.getAttribute('aria-label') || '',
-                particleDisplay: particleStyle?.display || '',
-                particleAnimation: particleStyle?.animationName || '',
-                particleRadius: particleStyle?.borderRadius || '',
+                arrow: arrow?.textContent || '',
+                arrowDisplay: arrow ? getComputedStyle(arrow).display : '',
+                arrowBorder: arrowStyle?.borderStyle || '',
+                arrowClipPath: arrowStyle?.clipPath || arrowStyle?.webkitClipPath || '',
+                arrowFontSize: arrowStyle ? parseFloat(arrowStyle.fontSize) : -1,
                 state: state?.textContent || '',
                 stateDisplay: state ? getComputedStyle(state).display : '',
                 thickness: trackStyle ? parseFloat(vertical ? trackStyle.width : trackStyle.height) : 0,
                 trackMask: trackStyle?.maskImage || trackStyle?.webkitMaskImage || '',
                 inside: Boolean(
-                  overviewRect && particleRect &&
-                  particleRect.left >= overviewRect.left - 8 &&
-                  particleRect.right <= overviewRect.right + 8 &&
-                  particleRect.top >= overviewRect.top - 8 &&
-                  particleRect.bottom <= overviewRect.bottom + 8
+                  overviewRect && arrowRect &&
+                  arrowRect.left >= overviewRect.left - 1 &&
+                  arrowRect.right <= overviewRect.right + 1 &&
+                  arrowRect.top >= overviewRect.top - 1 &&
+                  arrowRect.bottom <= overviewRect.bottom + 1
                 ),
               }];
             }));
@@ -281,29 +309,18 @@ def exercise_static_flow(page: Page) -> dict[str, object]:
               links: Object.entries(selectors).every(
                 ([key, selector]) => links[key] === root.querySelector(selector)
               ),
-              particles: Object.entries(links).every(
-                ([key, link]) => particles[key] === link?.querySelector('.ep-v041-flow-particle')
+              arrows: Object.entries(links).every(
+                ([key, link]) => arrows[key] === link?.querySelector('.ep-v041-flow-arrow')
               ),
             },
             responsive: Boolean(
               overview && overview.scrollWidth <= overview.clientWidth + 1 &&
               overview.getBoundingClientRect().width <= window.__epScroller.clientWidth + 1
             ),
-            arrowsAbsent: !root.querySelector('.ep-flow-arrows, .ep-v041-flow-arrow'),
           };
         }
         """
     )
-    page.emulate_media(reduced_motion="reduce")
-    result["reduced_motion"] = page.evaluate(
-        """
-        () => [...window.__epPanel.shadowRoot.querySelectorAll(
-          '.ep-flow-link[data-ep-v041-flow-status="active"] .ep-v041-flow-particle'
-        )].every((particle) => getComputedStyle(particle).animationName === 'none')
-        """
-    )
-    page.emulate_media(reduced_motion="no-preference")
-    return result
 
 
 def exercise_connectivity_status(page: Page, profile: Profile) -> dict[str, object]:
@@ -476,7 +493,11 @@ def open_and_close_menu(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "open": False,
         "close": False,
-        "motion_disabled": False,
+        "motion_available": False,
+        "motion_default_on": False,
+        "motion_off": False,
+        "motion_on": False,
+        "motion_reduced": False,
         "error": None,
     }
     try:
@@ -489,13 +510,82 @@ def open_and_close_menu(page: Page) -> dict[str, object]:
             timeout=5_000,
         )
         result["open"] = True
-        result["motion_disabled"] = page.evaluate(
+        if EXPECTED_ENTRYPOINT not in STABLE_ENTRYPOINTS:
+            close = shadow(page, ".ep-menu-close")
+            close.click(timeout=5_000)
+            page.wait_for_function(
+                "() => !window.__epPanel.shadowRoot.querySelector('.ep-layout-menu')",
+                timeout=5_000,
+            )
+            result["close"] = True
+            return result
+        result["motion_available"] = page.evaluate(
             """
             () => {
               const input = window.__epPanel.shadowRoot.querySelector('[data-ep-setting="animations"]');
-              return Boolean(input && input.disabled && !input.checked);
+              return Boolean(input && !input.disabled && input.getAttribute('aria-disabled') !== 'true');
             }
             """
+        )
+        result["motion_default_on"] = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const input = root.querySelector('[data-ep-setting="animations"]');
+              const layout = root.querySelector('.ep-dashboard-layout');
+              return Boolean(input?.checked && !layout?.classList.contains('ep-animations-off'));
+            }
+            """
+        )
+        motion_input = shadow(page, '[data-ep-setting="animations"]')
+        motion_input.uncheck(timeout=5_000)
+        page.wait_for_function(
+            "() => window.__epPanel.shadowRoot.querySelector('.ep-dashboard-layout')?.classList.contains('ep-animations-off')",
+            timeout=5_000,
+        )
+        off_summary = animation_summary(page)
+        result["motion_off_summary"] = off_summary
+        result["motion_off"] = (
+            off_summary["flowParticleAnimations"] == 0
+            and off_summary["otherAnimations"] == 0
+            and off_summary["transitions"] == 0
+        )
+
+        motion_input = shadow(page, '[data-ep-setting="animations"]')
+        motion_input.check(timeout=5_000)
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-dashboard-layout')?.classList.contains('ep-animations-off')",
+            timeout=5_000,
+        )
+        on_summary = animation_summary(page)
+        result["motion_on_summary"] = on_summary
+        result["motion_on"] = (
+            on_summary["flowParticleAnimations"] > 0
+            and on_summary["otherAnimations"] == 0
+            and on_summary["transitions"] == 0
+        )
+
+        page.emulate_media(reduced_motion="reduce")
+        page.wait_for_function(
+            """
+            () => [...window.__epPanel.shadowRoot.querySelectorAll('.ep-v011-particles span')]
+              .every((particle) => getComputedStyle(particle).animationName === 'none')
+            """,
+            timeout=5_000,
+        )
+        reduced_summary = animation_summary(page)
+        result["motion_reduced_summary"] = reduced_summary
+        result["motion_reduced"] = (
+            reduced_summary["animations"] == 0
+            and reduced_summary["transitions"] == 0
+        )
+        page.emulate_media(reduced_motion="no-preference")
+        page.wait_for_function(
+            """
+            () => [...window.__epPanel.shadowRoot.querySelectorAll('.ep-v011-particles span')]
+              .some((particle) => getComputedStyle(particle).animationName !== 'none')
+            """,
+            timeout=5_000,
         )
         close = shadow(page, ".ep-menu-close")
         close.click(timeout=5_000)
@@ -804,6 +894,9 @@ def exercise_automatic_control(page: Page) -> dict[str, object]:
             manual_mode_id,
         )
         mode_eight = shadow(page, '.ep-v021-mode-button[data-mode="8"]')
+        mode_eight.evaluate(
+            "node => { const disclosure = node.closest('details'); if (disclosure) disclosure.open = true; }"
+        )
         mode_eight.click(timeout=5_000)
         page.wait_for_function(
             """
@@ -872,7 +965,7 @@ def exercise_strategy_note_stability(page: Page) -> dict[str, object]:
         "context_refresh": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
+    if EXPECTED_ENTRYPOINT not in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         return result
     try:
         state = page.evaluate(
@@ -959,6 +1052,8 @@ def exercise_ev_protection_banner(page: Page) -> dict[str, object]:
         "initial_hidden": False,
         "blocking": False,
         "allowing": False,
+        "house_self_consumption": False,
+        "self_consumption_hold": False,
         "waiting": False,
         "inactive_hidden": False,
         "main_stable": False,
@@ -1040,6 +1135,25 @@ def exercise_ev_protection_banner(page: Page) -> dict[str, object]:
             )?.textContent?.trim() === 'EV CHARGING · BATTERY CHARGE ALLOWED'
             """
         )
+
+        for command, state, title in (
+            ("ev_house_self_consumption", "house_self_consumption", "EV CHARGING · HOUSE SELF-CONSUMPTION"),
+            ("ev_self_consumption_hold", "self_consumption_hold", "EV CHARGING · HOUSE CONTROL ON HOLD"),
+        ):
+            page.evaluate("""({command, state}) => window.__epSetEntityByKey(
+                'control_command', command, {ev_active: true, ev_protection_state: state}
+            )""", {"command": command, "state": state})
+            page.wait_for_function("""state => {
+                const banner = window.__epPanel.shadowRoot.querySelector('.ep-v041-ev-protection');
+                return banner && !banner.hidden && banner.dataset.state === state;
+            }""", arg=state)
+            result[state] = page.evaluate("""title => window.__epPanel.shadowRoot.querySelector(
+                '.ep-v041-ev-title')?.textContent?.trim() === title
+            """, title)
+            if state == "house_self_consumption":
+                result[state] = result[state] and page.evaluate("""() => Array.from(
+                    window.__epPanel.shadowRoot.querySelectorAll('.panel-card.controller .metric-label')
+                ).some(label => label.textContent.trim() === 'Inverter AC target')""")
 
         page.evaluate(
             """
@@ -1129,6 +1243,9 @@ def exercise_strategy(page: Page) -> dict[str, object]:
         )
         button = shadow(page, '[data-ep-v038-profile="mad_steve"]')
         result["present"] = button.count() == 1
+        button.evaluate(
+            "node => { const disclosure = node.closest('details'); if (disclosure) disclosure.open = true; }"
+        )
         button.scroll_into_view_if_needed(timeout=5_000)
         button.click(timeout=5_000)
         page.wait_for_function(
@@ -1295,38 +1412,54 @@ def exercise_soc_slider_draft(page: Page) -> dict[str, object]:
     return result
 
 
-def exercise_soc_limit_fallback(page: Page) -> dict[str, object]:
-    """Keep canonical SOC limits visible while NumberEntity startup is unknown."""
+def exercise_emhass_overview_controls(page: Page) -> dict[str, object]:
+    """Keep SOC writes single-owner and mirror confirmed overview costfun state."""
     return page.evaluate(
         """
         async () => {
           const panel = window.__epPanel;
           const root = panel.shadowRoot;
           const originalNarrow = panel.narrow;
+          const costfunId = panel._entityId('emhass_cost_function');
           window.__epSetEntityByKey('emhass_minimum_soc', 'unknown');
           window.__epSetEntityByKey('emhass_maximum_soc', 'unknown');
 
-          // A genuine context change rebuilds the legacy v0.11 card. This
-          // reproduces startup with registered NumberEntities whose states have
-          // not become numeric yet, while the canonical GoodWe/config sources
-          // are already exposed by the runtime diagnostics.
+          // A genuine context change runs every historical structural creator.
+          // The permanent-control guard must still suppress the old sliders.
           panel.narrow = !originalNarrow;
           await new Promise((resolve) => setTimeout(resolve, 220));
-          const read = (kind) => ({
-            label: root.querySelector('.panel-card.emhass')
-              ?.querySelector(`[data-soc-value="${kind}"]`)?.textContent?.trim() || '',
-            value: root.querySelector('.panel-card.emhass')
-              ?.querySelector(`input[data-soc-slider="${kind}"]`)?.value || '',
-          });
-          const unknownEntity = { min: read('min'), max: read('max') };
+          const card = root.querySelector('.panel-card.emhass');
+          const legacySocCount = card?.querySelectorAll('input[data-soc-slider]').length ?? -1;
+          const permanentSocCount = root.querySelectorAll(
+            'ep-battery-strategy [data-control-id="profile:minimum-soc"], ' +
+            'ep-battery-strategy [data-control-id="profile:maximum-soc"]'
+          ).length;
+
+          window.__epSetEntity(costfunId, 'Profit', {emhass_costfun: 'profit'});
+          await new Promise((resolve) => setTimeout(resolve, 120));
+          const profit = [...card.querySelectorAll('button[data-emhass-overview-costfun]')]
+            .filter((button) => button.getAttribute('aria-pressed') === 'true')
+            .map((button) => button.dataset.emhassOverviewCostfun);
+
+          window.__epSetEntity(costfunId, 'Cost', {emhass_costfun: 'cost'});
+          await new Promise((resolve) => setTimeout(resolve, 120));
+          const cost = [...card.querySelectorAll('button[data-emhass-overview-costfun]')]
+            .filter((button) => button.getAttribute('aria-pressed') === 'true')
+            .map((button) => button.dataset.emhassOverviewCostfun);
 
           window.__epSetEntityByKey('emhass_minimum_soc', 5);
           window.__epSetEntityByKey('emhass_maximum_soc', 95);
+          window.__epSetEntity(costfunId, 'Profit', {emhass_costfun: 'profit'});
           panel.narrow = originalNarrow;
           await new Promise((resolve) => setTimeout(resolve, 220));
           return {
-            unknownEntity,
-            restored: { min: read('min'), max: read('max') },
+            legacySocCount,
+            permanentSocCount,
+            profit,
+            cost,
+            restoredLegacySocCount:
+              root.querySelector('.panel-card.emhass')
+                ?.querySelectorAll('input[data-soc-slider]').length ?? -1,
           };
         }
         """
@@ -1388,7 +1521,7 @@ def selection_snapshot(page: Page, selector: str, key: str) -> dict[str, object]
 
 def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, object]:
     """Emulate Home Assistant host assignments during one physical press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "no_full_render": False,
@@ -1620,7 +1753,7 @@ def exercise_host_property_press(page: Page, profile: Profile) -> dict[str, obje
 
 def exercise_live_copy_press(page: Page, profile: Profile) -> dict[str, object]:
     """Keep WebKit's native click alive while live patches refresh button copy."""
-    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "optimize_click": False,
@@ -1679,6 +1812,9 @@ def exercise_live_copy_press(page: Page, profile: Profile) -> dict[str, object]:
                 entity_id,
             )
             control = shadow(page, selector)
+            control.evaluate(
+                "node => { const disclosure = node.closest('details'); if (disclosure) disclosure.open = true; }"
+            )
             control.scroll_into_view_if_needed(timeout=5_000)
             box = control.bounding_box()
             if box is None:
@@ -1780,7 +1916,7 @@ def exercise_live_copy_press(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, object]:
     """Prove split HA state events patch one unambiguous stable selection."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "event_ordering": False,
@@ -1993,7 +2129,7 @@ def exercise_quick_action_state(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Keep EMHASS and manual selectors live without rebuilding the dashboard."""
-    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "costfun_delayed": False,
@@ -2136,6 +2272,9 @@ def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, objec
             """
         )
         busy_button = shadow(page, '[data-costfun="profit"]')
+        busy_button.evaluate(
+            "node => { const disclosure = node.closest('details'); if (disclosure) disclosure.open = true; }"
+        )
         busy_button.scroll_into_view_if_needed(timeout=5_000)
         busy_box = busy_button.bounding_box()
         if busy_box is None:
@@ -2247,7 +2386,7 @@ def exercise_selector_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise repeated real taps and verify semantic, visual and action state."""
-    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
+    enabled = profile.touch and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "touch_media": False,
@@ -2807,7 +2946,7 @@ def exercise_touch_controls(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, object]:
     """Prove that the inherited v0.44 Optimize action keeps the interaction DOM."""
-    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "single_call": False,
@@ -3058,7 +3197,7 @@ def exercise_optimize_stability(page: Page, profile: Profile) -> dict[str, objec
 
 def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]:
     """Refresh the plan card during one physical S/M/L press."""
-    enabled = EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "refresh_during_press": False,
@@ -3204,7 +3343,7 @@ def exercise_chart_size_press(page: Page, profile: Profile) -> dict[str, object]
 
 def exercise_chart_range_press(page: Page, profile: Profile) -> dict[str, object]:
     """Switch 12/24/36-hour views without reloading Recorder or replacing controls."""
-    enabled = EXPECTED_ENTRYPOINT in {"v050", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v050", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "refresh_during_press": False,
@@ -3553,6 +3692,7 @@ def exercise_language(page: Page) -> dict[str, object]:
     result: dict[str, object] = {
         "localized": False,
         "flow_localized": False,
+        "help_localized": False,
         "manual_summary_localized": False,
         "setpoint_update_localized": False,
         "main_stable_during_telemetry": False,
@@ -3583,6 +3723,17 @@ def exercise_language(page: Page) -> dict[str, object]:
               '.panel-card.controller .metric'
             )).find(metric => metric.querySelector('.metric-label')?.textContent.trim() === 'EMS-setpoint')
               ?.querySelector('.metric-sub')?.textContent.trim().startsWith('Laatste update:') === true
+            """
+        )
+        result["help_localized"] = page.evaluate(
+            """
+            () => {
+              const help = window.__epPanel.shadowRoot.querySelector('.ep-v016-help-button');
+              return Boolean(
+                help?.href.endsWith('/docs/HANDLEIDING_NL.md') &&
+                help?.getAttribute('aria-label') === 'Open de GW EnergyPilot-handleiding'
+              );
+            }
             """
         )
         telemetry = page.evaluate(
@@ -3672,7 +3823,6 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
         "flow_matches": False,
         "split_nodes": False,
         "routes_match": False,
-        "external_flow_moves": False,
         "telemetry_main_stable": False,
         "external_value_matches": False,
         "flow_values_match": False,
@@ -3764,14 +3914,6 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                   externalRect.right >= hubRect.left - 18 &&
                   externalRect.right <= hubRect.right
                 ),
-                externalFlowMoves: Boolean(
-                  externalLink?.dataset.epV041FlowStatus === 'active' &&
-                  externalLink?.dataset.epV038Motion === 'right' &&
-                  getComputedStyle(
-                    externalLink.querySelector('.ep-v041-flow-particle')
-                  ).animationName === 'ep-v041-flow-horizontal' &&
-                  !externalLink.querySelector('.ep-v041-flow-arrow')
-                ),
               };
             }
             """
@@ -3824,7 +3966,6 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                 "flow_matches": topology["flowMatches"],
                 "split_nodes": topology["splitNodes"],
                 "routes_match": topology["routesMatch"],
-                "external_flow_moves": topology["externalFlowMoves"],
                 "telemetry_main_stable": telemetry["mainStable"],
                 "external_value_matches": telemetry["externalMatches"],
                 "flow_values_match": telemetry["flowValuesMatch"],
@@ -3832,6 +3973,144 @@ def exercise_pv_insight(page: Page) -> dict[str, object]:
                 "scroll_delta": telemetry["scrollDelta"],
             }
         )
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
+def exercise_flow_sizes_and_ev_charger(page: Page, profile: Profile) -> dict[str, object]:
+    result: dict[str, object] = {
+        "ran": False,
+        "sizes_present": False,
+        "small_selected": False,
+        "medium_selected": False,
+        "large_selected": False,
+        "preference_saved": False,
+        "desktop_widths": False,
+        "ev_initially_hidden": False,
+        "ev_shown": False,
+        "ev_value": False,
+        "ev_linked": False,
+        "ev_hidden_again": False,
+        "main_stable": False,
+        "error": None,
+    }
+    try:
+        initial = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const card = root.querySelector('[data-ep-card="flow"]');
+              window.__epFlowSizeMain = root.querySelector('main');
+              return {
+                controls: root.querySelectorAll('[data-flow-size]').length,
+                hidden: Boolean(
+                  root.querySelector('.ep-flow-ev')?.hidden &&
+                  root.querySelector('.ep-link-ev')?.hidden
+                ),
+                width: card?.getBoundingClientRect().width || 0,
+              };
+            }
+            """
+        )
+        result["sizes_present"] = initial["controls"] == 3
+        result["ev_initially_hidden"] = initial["hidden"]
+
+        widths: dict[str, float] = {"small": initial["width"]}
+        for size in ("medium", "large", "small"):
+            activate(page, profile, f'[data-ep-card="flow"] [data-flow-size="{size}"]')
+            page.wait_for_function(
+                f"""
+                () => window.__epPanel.shadowRoot.querySelector(
+                  '[data-ep-card="flow"]'
+                )?.classList.contains('ep-v031-flow-size-{size}')
+                """,
+                timeout=5_000,
+            )
+            widths[size] = page.evaluate(
+                """
+                () => window.__epPanel.shadowRoot.querySelector(
+                  '[data-ep-card="flow"]'
+                )?.getBoundingClientRect().width || 0
+                """
+            )
+            result[f"{size}_selected"] = True
+
+        result["preference_saved"] = page.evaluate(
+            """
+            () => JSON.parse(
+              localStorage.getItem('gw_energypilot_dashboard_v008') || '{}'
+            )?.sizes?.flow === 'small'
+            """
+        )
+        result["desktop_widths"] = (
+            profile.width <= 720
+            or widths["medium"] > widths["small"]
+            and (profile.width <= 1180 or widths["large"] > widths["medium"])
+        )
+
+        page.evaluate(
+            "window.__epFlowSizeMain = window.__epPanel.shadowRoot.querySelector('main')"
+        )
+        page.evaluate(
+            """
+            () => window.__epSetEntityByKey('control_command', 'battery_charge', {
+              ev_charger_configured: true,
+              ev_active: true,
+              ev_power_w: 7400,
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => window.__epPanel.shadowRoot.querySelector('.ep-flow-ev')?.hidden === false
+            """,
+            timeout=5_000,
+        )
+        shown = page.evaluate(
+            """
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              const node = root.querySelector('.ep-flow-ev');
+              const link = root.querySelector('.ep-link-ev');
+              return {
+                shown: Boolean(node && !node.hidden),
+                value: node?.querySelector('.ep-flow-node-value')?.textContent || '',
+                linked: Boolean(
+                  link && !link.hidden && link.dataset.epV041FlowStatus === 'active' &&
+                  link.getAttribute('aria-label')?.includes('EV charger')
+                ),
+              };
+            }
+            """
+        )
+        result["ev_shown"] = shown["shown"]
+        result["ev_value"] = "7.40 kW" in shown["value"]
+        result["ev_linked"] = shown["linked"]
+
+        page.evaluate(
+            """
+            () => window.__epSetEntityByKey('control_command', 'battery_charge', {
+              ev_charger_configured: false,
+              ev_active: false,
+              ev_power_w: null,
+            })
+            """
+        )
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel.shadowRoot.querySelector('.ep-flow-ev')?.hidden &&
+              window.__epPanel.shadowRoot.querySelector('.ep-link-ev')?.hidden
+            )
+            """,
+            timeout=5_000,
+        )
+        result["ev_hidden_again"] = True
+        result["main_stable"] = page.evaluate(
+            "window.__epFlowSizeMain === window.__epPanel.shadowRoot.querySelector('main')"
+        )
+        result["ran"] = True
     except PlaywrightError as err:
         result["error"] = str(err)
     return result
@@ -3922,9 +4201,167 @@ def exercise_pv_settings(page: Page, profile: Profile) -> dict[str, object]:
     return result
 
 
+def exercise_hybrid2_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Select the opt-in actuator strategy, persist it and patch its live note."""
+    result = {"ran": EXPECTED_ENTRYPOINT == "v131", "selected": False,
+              "persisted": False, "explanation": False, "note": False, "stable": False,
+              "restored": False, "error": None}
+    if not result["ran"]:
+        return result
+    select = ".ep-v024-control-strategy-field select"
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        shadow(page, select).select_option("hybrid_2", timeout=10_000)
+        page.wait_for_function(
+            "() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid_2'",
+            timeout=10_000,
+        )
+        result["selected"] = shadow(page, select).input_value() == "hybrid_2"
+        explanation = shadow(
+            page, ".ep-v024-control-strategy-field .ep-v016-field-description"
+        ).inner_text()
+        result["explanation"] = all(text in explanation for text in (
+            "grid deadband first", "mode 2", "grid assistance", "PV can add", "mode 3", "mode 5", "mode 8 Hold", "15 seconds", "30 seconds",
+        ))
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        state = page.evaluate(
+            """async () => {
+              const root = window.__epPanel.shadowRoot;
+              const main = root.querySelector('main');
+              const surface = root.querySelector('ep-control-surface');
+              const note = root.querySelector('.ep-v022-strategy-note');
+              window.__epSetEntityByKey('battery_power', -8200);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              return {
+                note: Boolean(note && !note.hidden &&
+                  note.textContent.includes('Hybrid 2.0 Beta') &&
+                  note.textContent.includes('mode 2') &&
+                  note.textContent.includes('grid assistance') &&
+                  note.textContent.includes('PV can add') &&
+                  note.textContent.includes('mode 3') &&
+                  note.textContent.includes('mode 5') &&
+                  note.textContent.includes('mode 8 Hold') &&
+                  note.textContent.includes('15 seconds')),
+                stable: root.querySelector('main') === main &&
+                  root.querySelector('ep-control-surface') === surface &&
+                  root.querySelector('.ep-v022-strategy-note') === note,
+              };
+            }"""
+        )
+        result.update(state)
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        result["persisted"] = shadow(page, select).input_value() == "hybrid_2"
+        shadow(page, select).select_option("hybrid", timeout=10_000)
+        page.wait_for_function(
+            "() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid'",
+            timeout=10_000,
+        )
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        # Settings remembers its tab; leave the original tab for later tests.
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="energypilot"]')
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function(
+            "() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')",
+            timeout=10_000,
+        )
+        result["restored"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
+def exercise_hybrid3_settings(page: Page, profile: Profile) -> dict[str, object]:
+    """Six-scenario opt-in selection, EN/NL table and permanent telemetry DOM."""
+    result = {"ran": EXPECTED_ENTRYPOINT == "v131", "selected": False,
+              "persisted": False, "explanation": False, "table": False,
+              "stable": False, "touch_target": False, "restored": False, "error": None}
+    if not result["ran"]:
+        return result
+    select = ".ep-v024-control-strategy-field select"
+    try:
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        shadow(page, select).select_option("hybrid_3", timeout=10_000)
+        page.wait_for_function("() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid_3'")
+        result["selected"] = shadow(page, select).input_value() == "hybrid_3"
+        explanation = shadow(page, ".ep-v024-control-strategy-field .ep-v016-field-description").inner_text()
+        result["explanation"] = all(text in explanation for text in (
+            "Tibber Grid Rewards", "mode 1", "mode 2", "mode 3", "mode 5",
+            "15 seconds", "30 seconds", "two fresh pairs", "unchanged"))
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function("() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')")
+        table_results = []
+        for language in ("en", "nl"):
+            page.evaluate("language => window.__epSetLanguage(language)", language)
+            wait_render_idle(page)
+            # Language changes may preserve the permanent disclosure's open
+            # state. Do not turn a retained open table into a closed one.
+            if not page.evaluate("window.__epPanel.shadowRoot.querySelector('.ep-hybrid3-scenarios').open"):
+                activate(page, profile, ".ep-hybrid3-scenarios summary")
+            table_results.append(page.evaluate("""async (language) => {
+                const root = window.__epPanel.shadowRoot;
+                const main = root.querySelector('main');
+                const surface = root.querySelector('ep-control-surface');
+                const detail = root.querySelector('.ep-hybrid3-scenarios');
+                const table = detail.querySelector('table');
+                const rows = [...table.querySelectorAll('tbody tr')];
+                const note = root.querySelector('.ep-v022-strategy-note');
+                const modes = rows.map(row => row.children[2].textContent.trim());
+                const modeHeading = document.createRange();
+                modeHeading.selectNodeContents(table.querySelector('thead th:nth-child(3)'));
+                const target = detail.querySelector('summary').getBoundingClientRect();
+                window.__epSetEntityByKey('battery_power', -7500);
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return {
+                    language,
+                    open: detail.open,
+                    modes,
+                    width: [table.scrollWidth, table.clientWidth],
+                    table: !detail.hidden && detail.open && rows.length === 6 &&
+                        modeHeading.getClientRects().length === 1 &&
+                        modes.join(',') === '1,5,3,5,2,2' &&
+                        rows[0].children[0].textContent.trim() === (language === 'nl' ? 'Zelfverbruik' : 'Self-use') &&
+                        note.textContent.includes('Tibber Grid Rewards') &&
+                        table.scrollWidth <= table.clientWidth + 1,
+                    stable: root.querySelector('main') === main &&
+                        root.querySelector('ep-control-surface') === surface &&
+                        root.querySelector('.ep-hybrid3-scenarios table') === table && detail.open,
+                    touch_target: target.height >= 44,
+                };
+            }""", language))
+        for key in ("table", "stable", "touch_target"):
+            result[key] = all(item[key] for item in table_results)
+        result["languages"] = table_results
+        page.evaluate("window.__epSetLanguage('en')")
+        wait_render_idle(page)
+        activate(page, profile, ".ep-v016-settings-button")
+        activate(page, profile, '[data-settings-tab="goodwe"]')
+        result["persisted"] = shadow(page, select).input_value() == "hybrid_3"
+        shadow(page, select).select_option("hybrid", timeout=10_000)
+        page.wait_for_function("() => window.__epPanel.__epV022SmartMeter?.data?.strategy === 'hybrid'")
+        activate(page, profile, '[data-settings-tab="energypilot"]')
+        activate(page, profile, ".ep-v016-back")
+        page.wait_for_function("() => !window.__epPanel.shadowRoot.querySelector('.ep-v016-settings')")
+        result["restored"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    return result
+
+
 def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the beta.2 EP deadband panel, validation and responsive fit."""
-    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110"}
+    enabled = EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "inputs_present": False,
@@ -4045,7 +4482,7 @@ def exercise_deadband_settings(page: Page, profile: Profile) -> dict[str, object
 
 def exercise_sems_settings(page: Page, profile: Profile) -> dict[str, object]:
     """Verify the SEMS Beta selector, secret field and local-control boundary."""
-    enabled = EXPECTED_ENTRYPOINT == "v110"
+    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "tab_present": False,
@@ -4280,6 +4717,10 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         "future_rows": False,
         "wanted_soc_history": False,
         "source_bars": False,
+        "actual_solar_visible": False,
+        "forecast_solar_visible": False,
+        "solar_all_sizes": False,
+        "solar_expanded": False,
         "ev_charge_underlay": False,
         "ev_hold_underlay": False,
         "modal_open": False,
@@ -4290,7 +4731,7 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         "modal_closed": False,
         "error": None,
     }
-    if EXPECTED_ENTRYPOINT not in {"v051", "v100", "v101", "v110"}:
+    if EXPECTED_ENTRYPOINT not in {"v051", "v100", "v101", "v110", "v130", "v131"}:
         return result
     try:
         page.wait_for_function(
@@ -4344,16 +4785,77 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
         activate(page, profile, '.ep-v027-battery-plan-card [data-chart-size="large"]')
         page.wait_for_function(
             """
-            () => Boolean(
-              window.__epPanel.shadowRoot.querySelector(
-                '.ep-v027-battery-plan-card [data-source-series]'
-              )
-            )
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              return Boolean(
+                root.querySelector('.ep-v027-battery-plan-card [data-source-series]') &&
+                root.querySelector('.ep-v027-battery-plan-card [data-series="actual-pv"]') &&
+                root.querySelector('.ep-v027-battery-plan-card [data-series="forecast-pv"]')
+              );
+            }
             """,
             timeout=10_000,
         )
         result["source_bars"] = True
+        result.update(page.evaluate("""
+            () => {
+              const root = window.__epPanel.shadowRoot;
+              return {
+                actual_solar_visible: Boolean(root.querySelector(
+                  '.ep-v027-battery-plan-card [data-series="actual-pv"]'
+                )),
+                forecast_solar_visible: Boolean(root.querySelector(
+                  '.ep-v027-battery-plan-card [data-series="forecast-pv"]'
+                )),
+              };
+            }
+        """))
         activate(page, profile, '.ep-v027-battery-plan-card [data-chart-size="normal"]')
+
+        for size in ("normal", "compact", "large", "normal"):
+            activate(page, profile, f'.ep-v027-battery-plan-card [data-chart-size="{size}"]')
+            page.wait_for_function(
+                """
+                size => {
+                  const card = window.__epPanel.shadowRoot.querySelector(
+                    `.ep-v027-battery-plan-card.size-${size}`
+                  );
+                  return card && ['actual', 'forecast'].every(kind => {
+                    const path = card.querySelector(`[data-series="${kind}-pv"]`);
+                    const legend = card.querySelector(`.ep-v027-legend .${kind}-pv`);
+                    return path?.getTotalLength() > 0 && legend &&
+                      legend.parentElement.getBoundingClientRect().width > 0;
+                  });
+                }
+                """,
+                arg=size,
+                timeout=10_000,
+            )
+        result["solar_all_sizes"] = True
+
+        activate(page, profile, '.ep-v027-battery-plan-card .ep-v027-expand')
+        page.wait_for_function(
+            """
+            () => {
+              const modal = document.querySelector('.ep-v027-modal');
+              return modal && ['actual', 'forecast'].every(kind =>
+                modal.querySelector(`[data-series="${kind}-pv"]`)?.getTotalLength() > 0 &&
+                modal.querySelector(`.ep-v027-legend .${kind}-pv`)?.getBoundingClientRect().width > 0
+              );
+            }
+            """,
+            timeout=10_000,
+        )
+        result["solar_expanded"] = True
+        close_graph = page.locator('.ep-v027-modal [data-window-action="close"]')
+        if profile.touch:
+            close_graph.tap(timeout=5_000)
+        else:
+            close_graph.click(timeout=5_000)
+        page.wait_for_function(
+            "() => !document.querySelector('.ep-v027-modal')",
+            timeout=10_000,
+        )
 
         activate(page, profile, '.ep-v051-history-card [data-action="full-history"]')
         page.wait_for_function(
@@ -4413,7 +4915,7 @@ def exercise_execution_history(page: Page, profile: Profile) -> dict[str, object
 
 def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
     """Exercise the local-only control laboratory without touching HA services."""
-    enabled = EXPECTED_ENTRYPOINT == "v110"
+    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "initially_hidden": False,
@@ -4718,7 +5220,7 @@ def exercise_beta_tests(page: Page, profile: Profile) -> dict[str, object]:
 
 def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, object]:
     """Prove missing iOS clicks recover once across controls and menus."""
-    enabled = EXPECTED_ENTRYPOINT == "v110"
+    enabled = EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}
     result: dict[str, object] = {
         "ran": enabled,
         "installed": False,
@@ -4858,8 +5360,18 @@ def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, obj
         )
         result["menu_switch"] = switch_after is not None and switch_after != switch_before
 
+        # The switch queues a structural menu refresh on requestAnimationFrame.
+        # Let that refresh finish before selecting the reset button so slower
+        # WebKit runners never target the just-disconnected menu instance.
+        page.evaluate(
+            "() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+        )
+
         page.evaluate("window.__epDispatchMissingTouch('.ep-menu-reset')")
-        page.wait_for_timeout(100)
+        page.wait_for_function(
+            "() => window.__epPanel.shadowRoot.querySelector('[data-ep-visible=\"solar\"]')?.checked === true",
+            timeout=2_000,
+        )
         result["menu_reset"] = page.evaluate(
             "() => window.__epPanel.shadowRoot.querySelector('[data-ep-visible=\"solar\"]')?.checked === true"
         )
@@ -5056,19 +5568,94 @@ def exercise_touch_click_fallback(page: Page, profile: Profile) -> dict[str, obj
     return result
 
 
+def exercise_controller_target_labels(page: Page) -> dict[str, object]:
+    """Mode-2 assistance and subsequent targets patch the same metric in EN/NL."""
+    result: dict[str, object] = {"passed": False, "error": None}
+    original = page.evaluate("""() => Object.fromEntries(
+        ['control_command', 'ems_mode', 'target_power'].map(key =>
+          [key, window.__epPanel._stateByKey(key)])
+    )""")
+    try:
+        for language, labels in (
+            ("en", ("Grid assistance allowance", "Battery target", "Inverter AC target", "PCC target", "Control target")),
+            ("nl", ("Netassistentie-limiet", "Accudoel", "Inverter-AC-doel", "PCC-doel", "Regeldoel")),
+        ):
+            page.evaluate("language => window.__epSetLanguage(language)", language)
+            wait_render_idle(page)
+            identity = page.evaluate_handle("window.__epPanel.shadowRoot.querySelector('main')")
+            for command, strategy, expected, watts in (
+                ("hybrid2_planned_battery_charge", "hybrid_2", labels[0], 8400),
+                ("ev_battery_charge", "hybrid_2", labels[0], 4300),
+                ("hybrid3_planned_battery_charge", "hybrid_3", labels[0], 700),
+                ("ev_battery_charge", "hybrid_3", labels[0], 15000),
+                ("hybrid3_planned_battery_discharge", "hybrid_3", labels[1], 1400),
+                ("ev_house_self_consumption", "hybrid_3", labels[2], 700),
+                ("ev_battery_charge", "battery", labels[1], 3200),
+                ("hybrid2_planned_battery_charge", "hybrid_2", labels[0], 2100),
+                ("hybrid2_planned_battery_discharge", "hybrid_2", labels[1], 1800),
+                ("ev_house_self_consumption", "hybrid_2", labels[2], 1500),
+                ("grid_import", "grid", labels[3], 1200),
+                ("manual_mode_11", "hybrid_2", labels[4], 900),
+            ):
+                page.evaluate("""({command, strategy, watts}) => {
+                    window.__epSetEntityByKey('ems_mode', '11');
+                    window.__epSetEntityByKey('target_power', watts);
+                    window.__epSetEntityByKey('control_command', command, {control_strategy: strategy});
+                }""", {"command": command, "strategy": strategy, "watts": watts})
+                page.wait_for_function("""({expected, watts, main}) => {
+                    const panel = window.__epPanel;
+                    const root = panel.shadowRoot;
+                    const metric = Array.from(root.querySelectorAll('.panel-card.controller .metric'))
+                      .find(item => item.querySelector('.metric-label')?.textContent === expected);
+                    return root.querySelector('main') === main && metric?.querySelector('.metric-value')
+                      ?.textContent === panel._formatPower(watts);
+                }""", arg={"expected": expected, "watts": watts, "main": identity}, timeout=5000)
+            identity.dispose()
+        result["passed"] = True
+    except PlaywrightError as err:
+        result["error"] = str(err)
+    finally:
+        page.evaluate("""original => {
+            for (const [key, state] of Object.entries(original)) {
+              window.__epSetEntityByKey(key, state.state, state.attributes);
+            }
+            window.__epSetLanguage('en');
+        }""", original)
+        wait_render_idle(page)
+    return result
+
+
 def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     page.goto(HARNESS, wait_until="domcontentloaded", timeout=30_000)
     page.evaluate("window.__epReady")
-    page.wait_for_function(
-        """
-        () => Boolean(
-          window.__epPanel?.shadowRoot?.querySelector('.ep-layout-button') &&
-          window.__epPanel.shadowRoot.querySelector('#auto-toggle') &&
-          window.__epPanel.shadowRoot.querySelectorAll('[data-ep-card]').length >= 8
+    try:
+        page.wait_for_function(
+            """
+            () => Boolean(
+              window.__epPanel?.shadowRoot?.querySelector('.ep-layout-button') &&
+              window.__epPanel.shadowRoot.querySelector('#auto-toggle') &&
+              window.__epPanel.shadowRoot.querySelectorAll('[data-ep-card]').length >= 8
+            )
+            """,
+            timeout=10_000,
         )
-        """,
-        timeout=10_000,
-    )
+    except PlaywrightError as err:
+        bootstrap = page.evaluate(
+            """
+            () => ({
+              ready: Boolean(window.__epReady),
+              entrypoint: window.__epEntryPoint || '',
+              panel: Boolean(window.__epPanel),
+              shadow: Boolean(window.__epPanel?.shadowRoot),
+              layout: Boolean(window.__epPanel?.shadowRoot?.querySelector('.ep-layout-button')),
+              automatic: Boolean(window.__epPanel?.shadowRoot?.querySelector('#auto-toggle')),
+              cards: window.__epPanel?.shadowRoot?.querySelectorAll('[data-ep-card]').length ?? -1,
+              html: window.__epPanel?.shadowRoot?.innerHTML?.slice(0, 180) || '',
+              errors: window.__epErrors || [],
+            })
+            """
+        )
+        raise RuntimeError(f"dashboard bootstrap timed out: {bootstrap}") from err
     page.wait_for_timeout(350)
 
     initial = page.evaluate(
@@ -5084,6 +5671,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
             costfun: root.querySelector('[data-costfun="profit"]'),
             maxExport: root.querySelector('[data-action="max_export"]'),
             strategy: root.querySelector('[data-ep-v038-profile="mad_steve"]'),
+            help: root.querySelector('.ep-v016-help-button'),
           };
           const max = scroller.scrollHeight - scroller.clientHeight;
           scroller.scrollTop = Math.max(0, Math.round(max * 0.55));
@@ -5099,6 +5687,15 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
             max,
             cards: root.querySelectorAll('[data-ep-card]').length,
             buttons: root.querySelectorAll('button').length,
+            helpHref: root.querySelector('.ep-v016-help-button')?.href || '',
+            helpTarget: root.querySelector('.ep-v016-help-button')?.target || '',
+            helpRel: root.querySelector('.ep-v016-help-button')?.rel || '',
+            helpAria: root.querySelector('.ep-v016-help-button')?.getAttribute('aria-label') || '',
+            helpSize: (() => {
+              const help = root.querySelector('.ep-v016-help-button');
+              const rect = help?.getBoundingClientRect();
+              return rect ? {width: rect.width, height: rect.height} : {width: 0, height: 0};
+            })(),
           };
         }
         """
@@ -5126,6 +5723,8 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
             strategy: window.__epTelemetryIdentity.strategy === root.querySelector(
               '[data-ep-v038-profile="mad_steve"]'
             ),
+            help:
+              window.__epTelemetryIdentity.help === root.querySelector('.ep-v016-help-button'),
           };
         }
         """
@@ -5137,6 +5736,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     static_flow = exercise_static_flow(page)
     connectivity = exercise_connectivity_status(page, profile)
     ev_protection = exercise_ev_protection_banner(page)
+    flow_sizes_ev = exercise_flow_sizes_and_ev_charger(page, profile)
 
     motion = page.evaluate(
         """
@@ -5170,7 +5770,10 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         """
     )
 
+    controller_target_labels = exercise_controller_target_labels(page)
     pv_insight = exercise_pv_insight(page)
+    hybrid2_settings = exercise_hybrid2_settings(page, profile)
+    hybrid3_settings = exercise_hybrid3_settings(page, profile)
     deadband_settings = exercise_deadband_settings(page, profile)
     sems_settings = exercise_sems_settings(page, profile)
     pv_settings = exercise_pv_settings(page, profile)
@@ -5183,7 +5786,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
     optimize_stability = exercise_optimize_stability(page, profile)
     menu = open_and_close_menu(page)
     automatic = exercise_automatic_control(page)
-    soc_limit_fallback = exercise_soc_limit_fallback(page)
+    emhass_overview_controls = exercise_emhass_overview_controls(page)
     soc_slider = exercise_soc_slider_draft(page)
     strategy = exercise_strategy(page)
     chart_size_press = exercise_chart_size_press(page, profile)
@@ -5197,6 +5800,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 
     return {
         "profile": profile.name,
+        "controller_target_labels": controller_target_labels,
         "initial": initial,
         "idle_before": idle_before,
         "idle_after": idle_after,
@@ -5208,8 +5812,11 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "static_flow": static_flow,
         "connectivity": connectivity,
         "ev_protection": ev_protection,
+        "flow_sizes_ev": flow_sizes_ev,
         "motion": motion,
         "pv_insight": pv_insight,
+        "hybrid2_settings": hybrid2_settings,
+        "hybrid3_settings": hybrid3_settings,
         "deadband_settings": deadband_settings,
         "sems_settings": sems_settings,
         "pv_settings": pv_settings,
@@ -5222,7 +5829,7 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
         "optimize_stability": optimize_stability,
         "menu": menu,
         "automatic": automatic,
-        "soc_limit_fallback": soc_limit_fallback,
+        "emhass_overview_controls": emhass_overview_controls,
         "soc_slider": soc_slider,
         "strategy": strategy,
         "chart_size_press": chart_size_press,
@@ -5242,6 +5849,8 @@ def exercise_profile(page: Page, profile: Profile) -> dict[str, object]:
 def result_failures(profile: Profile, result: dict[str, object], page_errors: list[str]) -> list[str]:
     failures: list[str] = []
     name = profile.name
+    if result["controller_target_labels"]["passed"] is not True:
+        failures.append(f"{name}: controller target classification regression: {result['controller_target_labels']}")
     initial = result["initial"]
     control_architecture = bool(initial.get("controlArchitecture"))
     identity = result["telemetry_identity"]
@@ -5251,6 +5860,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     static_flow = result["static_flow"]
     connectivity = result["connectivity"]
     ev_protection = result["ev_protection"]
+    flow_sizes_ev = result["flow_sizes_ev"]
     motion = result["motion"]
     pv_insight = result["pv_insight"]
     deadband_settings = result["deadband_settings"]
@@ -5265,7 +5875,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     optimize_stability = result["optimize_stability"]
     menu = result["menu"]
     automatic = result["automatic"]
-    soc_limit_fallback = result["soc_limit_fallback"]
+    emhass_overview_controls = result["emhass_overview_controls"]
     soc_slider = result["soc_slider"]
     strategy = result["strategy"]
     chart_size_press = result["chart_size_press"]
@@ -5277,6 +5887,30 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     language_result = result["language"]
     structural = result["structural"]
     animation = result["animation"]
+
+    if EXPECTED_ENTRYPOINT == "v131":
+        hybrid2 = result["hybrid2_settings"]
+        if not all(hybrid2[key] is True for key in (
+            "ran", "selected", "persisted", "explanation", "note", "stable", "restored"
+        )) or hybrid2["error"]:
+            failures.append(f"{name}: Hybrid 2.0 selection/persistence/live note failed")
+        hybrid3 = result["hybrid3_settings"]
+        if not all(hybrid3[key] is True for key in (
+            "ran", "selected", "persisted", "explanation", "table", "stable", "touch_target", "restored"
+        )) or hybrid3["error"]:
+            failures.append(f"{name}: Hybrid 3.0 selection/table/persistence/stable DOM failed: {hybrid3}")
+
+    if EXPECTED_ENTRYPOINT == "v110":
+        required_flow_sizes_ev = (
+            "ran", "sizes_present", "small_selected", "medium_selected",
+            "large_selected", "preference_saved", "desktop_widths",
+            "ev_initially_hidden", "ev_shown", "ev_value", "ev_linked",
+            "ev_hidden_again", "main_stable",
+        )
+        if not all(flow_sizes_ev[key] is True for key in required_flow_sizes_ev):
+            failures.append(f"{name}: flow S/M/L or conditional EV charger regression failed")
+        if flow_sizes_ev["error"]:
+            failures.append(f"{name}: flow S/M/L or EV charger interaction error")
 
     if EXPECTED_ENTRYPOINT and initial["entrypoint"] != EXPECTED_ENTRYPOINT:
         failures.append(f"{name}: loaded {initial['entrypoint']} instead of {EXPECTED_ENTRYPOINT}")
@@ -5290,12 +5924,31 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         "v051": "v0.51 BETA",
         "v100": "v1.0.0 STABLE",
         "v101": "v1.0.1-beta.4 BETA",
-        "v110": "v1.2.1 STABLE",
+        "v110": "v1.2.0 STABLE",
+        "v130": "v1.3.0-beta.1 BETA",
+        "v131": "v1.4.0 STABLE",
     }.get(EXPECTED_ENTRYPOINT)
     if expected_badge and initial["releaseVersion"] != expected_badge:
         failures.append(
             f"{name}: release badge is {initial['releaseVersion']!r} instead of {expected_badge}"
         )
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}:
+        if not (
+            initial["helpHref"].endswith("/docs/USER_GUIDE.md")
+            and initial["helpTarget"] == "_blank"
+            and "noopener" in initial["helpRel"]
+            and "noreferrer" in initial["helpRel"]
+            and initial["helpAria"] == "Open GW EnergyPilot user guide"
+        ):
+            failures.append(f"{name}: localized header help link is missing or unsafe")
+        minimum_help_size = 44 if profile.touch else 38
+        if (
+            initial["helpSize"]["width"] + 0.5 < minimum_help_size
+            or initial["helpSize"]["height"] + 0.5 < minimum_help_size
+        ):
+            failures.append(f"{name}: header help target is smaller than {minimum_help_size}px")
+        if identity["help"] is not True:
+            failures.append(f"{name}: telemetry replaced the header help link")
     hybrid_phrases = (
         (
             "Battery Hold deadband on P_batt",
@@ -5303,7 +5956,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "modes 9/10 outside it",
             "full grid target as setpoint",
         )
-        if EXPECTED_ENTRYPOINT in {"v101", "v110"}
+        if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}
         else (
             "neutral P_batt plan in mode 8",
             "mode 1 inside the configured deadband",
@@ -5311,7 +5964,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             "full grid target as setpoint",
         )
     )
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"} and not all(
         phrase in initial["hybridNote"] for phrase in hybrid_phrases
     ):
         failures.append(f"{name}: active Hybrid operator copy is stale")
@@ -5323,7 +5976,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: dashboard controls/cards did not initialize completely")
     if abs(result["idle_delta"]) > 2:
         failures.append(f"{name}: idle telemetry moved scroll by {result['idle_delta']} px")
-    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_strategy_note = (
             "ran", "present", "note_stable", "strong_stable", "height_stable",
             "no_child_rebuilds", "dutch_copy", "context_refresh",
@@ -5351,15 +6004,15 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             f"{emhass_mapping}"
         )
     expected_initial = {
-        "pv": ("active", "right", "high"),
-        "grid": ("active", "right", "low"),
-        "house": ("active", "up", "medium"),
-        "battery": ("active", "down", "low"),
+        "pv": ("active", "right", "high", "→"),
+        "grid": ("active", "right", "low", "→"),
+        "house": ("active", "up", "medium", "↑"),
+        "battery": ("active", "down", "low", "↓"),
     }
     for key, expected in expected_initial.items():
         state = static_flow["initial"][key]
         actual = (
-            state["status"], state["direction"], state["intensity"]
+            state["status"], state["direction"], state["intensity"], state["arrow"]
         )
         if actual != expected:
             failures.append(f"{name}: initial {key} flow {actual} != {expected}")
@@ -5367,9 +6020,10 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             state["role"] != "img"
             or not state["label"]
             or "relative flow" not in state["label"]
-            or state["particleDisplay"] != "flex"
-            or not state["particleAnimation"].startswith("ep-v041-flow-")
-            or state["particleRadius"] != "50%"
+            or state["arrowDisplay"] != "flex"
+            or state["arrowBorder"] != "none"
+            or "polygon" not in state["arrowClipPath"]
+            or state["arrowFontSize"] != 0
             or "gradient" not in state["trackMask"]
             or state["stateDisplay"] != "none"
             or not state["inside"]
@@ -5383,7 +6037,9 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: low flow pipeline is not visually bounded")
     if (
         static_flow["reversed"]["grid"]["direction"] != "left"
+        or static_flow["reversed"]["grid"]["arrow"] != "←"
         or static_flow["reversed"]["battery"]["direction"] != "up"
+        or static_flow["reversed"]["battery"]["arrow"] != "↑"
     ):
         failures.append(f"{name}: import/discharge physical direction is wrong")
     for key, state in static_flow["unknown"].items():
@@ -5406,10 +6062,6 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: {key} near-zero flow presentation is ambiguous")
     if not all(static_flow["identity"].values()):
         failures.append(f"{name}: flow telemetry replaced stable DOM nodes")
-    if static_flow["reduced_motion"] is not True:
-        failures.append(f"{name}: reduced-motion preference did not stop flow particles")
-    if static_flow["arrowsAbsent"] is not True:
-        failures.append(f"{name}: redundant flow arrows remain in the active DOM")
     if not static_flow["responsive"]:
         failures.append(f"{name}: flow overview overflows its responsive container")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS:
@@ -5434,6 +6086,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         required_ev_protection = (
             "present", "initial_hidden", "blocking", "allowing", "waiting",
             "inactive_hidden", "main_stable", "banner_stable", "non_interactive",
+            "house_self_consumption", "self_consumption_hold",
         )
         if not all(ev_protection[key] is True for key in required_ev_protection):
             failures.append(f"{name}: EV protection banner state/stability regression failed")
@@ -5441,12 +6094,11 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: EV protection banner interaction error")
         pv_required = (
             "ran", "total_matches", "flow_matches", "split_nodes", "routes_match",
-            "external_flow_moves",
             "telemetry_main_stable", "external_value_matches", "flow_values_match",
             "flow_nodes_stable",
         ) if control_architecture else (
             "ran", "topology_rendered", "total_matches", "flow_matches",
-            "split_nodes", "routes_match", "external_flow_moves", "telemetry_main_stable",
+            "split_nodes", "routes_match", "telemetry_main_stable",
             "external_value_matches", "flow_values_match", "flow_nodes_stable",
         )
         if not all(pv_insight[key] is True for key in pv_required) or pv_insight["source_count"] != 2:
@@ -5467,7 +6119,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: PV settings tab/entity-search regression failed")
         if pv_settings["error"]:
             failures.append(f"{name}: PV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v101", "v110"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"} and not all(
         deadband_settings.get(key) is True
         for key in (
             "ran", "inputs_present", "defaults_correct", "zero_centered",
@@ -5481,7 +6133,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if deadband_settings["error"]:
         failures.append(f"{name}: EP deadband settings interaction error")
-    if EXPECTED_ENTRYPOINT == "v110" and not all(
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"} and not all(
         sems_settings.get(key) is True
         for key in (
             "ran", "tab_present", "choices_present",
@@ -5496,7 +6148,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if sems_settings["error"]:
         failures.append(f"{name}: SEMS settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         if not all(
             ev_settings[key] is True
             for key in (
@@ -5511,7 +6163,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: EV load-balancing settings safety regression failed")
         if ev_settings["error"]:
             failures.append(f"{name}: EV settings interaction error")
-    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_host_press = (
             "ran", "no_full_render", "main_stable", "controls_stable",
             "native_click", "touch_click", "real_panel_change",
@@ -5520,7 +6172,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: Home Assistant host update interrupted a control press")
         if host_property_press["error"]:
             failures.append(f"{name}: host-property press interaction error")
-        if EXPECTED_ENTRYPOINT in {"v101", "v110"}:
+        if EXPECTED_ENTRYPOINT in {"v101", "v110", "v130", "v131"}:
             required_live_copy_press = (
                 "ran", "optimize_click", "costfun_click",
                 "optimize_copy_stable", "costfun_copy_stable",
@@ -5558,7 +6210,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: stable selector feedback regression failed")
         if selector_stability["error"]:
             failures.append(f"{name}: stable selector feedback interaction error")
-    if profile.touch and not control_architecture and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
+    if profile.touch and not control_architecture and EXPECTED_ENTRYPOINT in {"v043", "v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_touch = (
             "ran", "touch_media", "optimize", "emhass", "battery",
             "quick_actions", "menu_cycles", "hover_reset",
@@ -5568,7 +6220,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: repeated touch-control regression failed")
         if touch_controls["error"]:
             failures.append(f"{name}: touch-control interaction error")
-    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110"}:
+    if EXPECTED_ENTRYPOINT in {"v044", "v045", "v046", "v047", "v048", "v049", "v050", "v051", "v100", "v101", "v110", "v130", "v131"}:
         required_optimize = (
             "ran", "single_call", "no_full_render", "main_stable",
             "optimize_stable", "layout_stable", "automatic_stable",
@@ -5590,8 +6242,14 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
             failures.append(f"{name}: Optimize now stability interaction error")
     if menu["open"] is not True or menu["close"] is not True:
         failures.append(f"{name}: dashboard menu did not reliably open and close")
-    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and menu["motion_disabled"] is not True:
-        failures.append(f"{name}: stable-DOM motion control is not locked off")
+    if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and not all(
+        menu[key] is True
+        for key in (
+            "motion_available", "motion_default_on", "motion_off",
+            "motion_on", "motion_reduced",
+        )
+    ):
+        failures.append(f"{name}: scoped flow-motion preference regressed: {menu}")
     if menu["error"]:
         failures.append(f"{name}: dashboard menu interaction error")
     if not control_architecture and not all(
@@ -5608,18 +6266,16 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if automatic["error"] and not control_architecture:
         failures.append(f"{name}: Automatic Control interaction error")
-    if soc_limit_fallback != {
-        "unknownEntity": {
-            "min": {"label": "5%", "value": "5"},
-            "max": {"label": "95%", "value": "95"},
-        },
-        "restored": {
-            "min": {"label": "5%", "value": "5"},
-            "max": {"label": "95%", "value": "95"},
-        },
+    if emhass_overview_controls != {
+        "legacySocCount": 0,
+        "permanentSocCount": 2,
+        "profit": ["profit"],
+        "cost": ["cost"],
+        "restoredLegacySocCount": 0,
     }:
         failures.append(
-            f"{name}: canonical SOC-limit fallback did not replace unknown NumberEntity state"
+            f"{name}: EMHASS overview ownership/selection mismatch: "
+            f"{emhass_overview_controls}"
         )
     if not control_architecture and EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and not all(
         soc_slider[key] is True
@@ -5635,7 +6291,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: SOC slider interaction error")
     if strategy["present"] is not True or strategy["changed"] is not True:
         failures.append(f"{name}: Battery Strategy button did not apply")
-    if EXPECTED_ENTRYPOINT == "v110" and not (
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"} and not (
         strategy["profile_choices"] == 6
         and strategy["chargegasm_present"] is True
         and strategy["managed_summary"] is True
@@ -5646,7 +6302,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if strategy["error"]:
         failures.append(f"{name}: Battery Strategy interaction error")
-    if EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v047", "v051", "v100", "v101", "v110", "v130", "v131"} and not all(
         chart_size_press[key] is True
         for key in (
             "ran", "refresh_during_press", "click_delivered", "size_selected",
@@ -5658,7 +6314,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh interrupted an S/M/L chart-size press")
     if chart_size_press["error"]:
         failures.append(f"{name}: chart-size press interaction error")
-    if EXPECTED_ENTRYPOINT in {"v050", "v110"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v050", "v110", "v130", "v131"} and not all(
         chart_range_press[key] is True
         for key in (
             "ran", "refresh_during_press", "click_delivered",
@@ -5687,11 +6343,12 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: plan refresh rebuilt more than the graph card or did not refresh")
     if plan["error"]:
         failures.append(f"{name}: battery-plan refresh interaction error")
-    if EXPECTED_ENTRYPOINT in {"v051", "v100", "v101", "v110"} and not all(
+    if EXPECTED_ENTRYPOINT in {"v051", "v100", "v101", "v110", "v130", "v131"} and not all(
         execution_history.get(key) is True
         for key in (
             "ran", "single_card", "compact_rows", "future_rows",
-            "wanted_soc_history", "source_bars", "ev_charge_underlay",
+            "wanted_soc_history", "source_bars", "actual_solar_visible",
+            "forecast_solar_visible", "solar_all_sizes", "solar_expanded", "ev_charge_underlay",
             "ev_hold_underlay", "modal_open", "modal_rows",
             "modal_no_filter", "card_stable", "main_stable", "modal_closed",
         )
@@ -5702,7 +6359,7 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         )
     if execution_history["error"]:
         failures.append(f"{name}: execution-history interaction error")
-    if EXPECTED_ENTRYPOINT == "v110":
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"}:
         required_beta_tests = (
             "ran", "initially_hidden", "menu_entry", "opened", "dashboard_hidden", "touch_targets",
             "responsive", "telemetry_main_stable", "telemetry_tests_stable",
@@ -5789,6 +6446,8 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
         failures.append(f"{name}: Dutch structural render did not localize")
     if language_result["flow_localized"] is not True:
         failures.append(f"{name}: Dutch flow accessibility label did not localize")
+    if EXPECTED_ENTRYPOINT in {"v110", "v130", "v131"} and language_result["help_localized"] is not True:
+        failures.append(f"{name}: Dutch help link did not localize")
     if language_result["main_stable_during_telemetry"] is not True:
         failures.append(f"{name}: Dutch telemetry replaced the main DOM")
     if abs(language_result["idle_delta"] or 0) > 2:
@@ -5804,10 +6463,13 @@ def result_failures(profile: Profile, result: dict[str, object], page_errors: li
     if structural["error"] and not control_architecture:
         failures.append(f"{name}: post-structure menu interaction error")
     if EXPECTED_ENTRYPOINT in STABLE_ENTRYPOINTS and (
-        animation["animations"] < 4 or animation["transitions"] != 0
+        animation["flowParticleAnimations"] <= 0
+        or animation["otherAnimations"] != 0
+        or animation["transitions"] != 0
     ):
         failures.append(
-            f"{name}: stable-DOM flow motion has {animation['animations']} animations and "
+            f"{name}: scoped flow motion has {animation['flowParticleAnimations']} particle, "
+            f"{animation['otherAnimations']} other animations and "
             f"{animation['transitions']} transitions"
         )
     if result["errors"] or page_errors:
@@ -5846,7 +6508,6 @@ def main() -> int:
                 has_touch=profile.touch,
                 device_scale_factor=2 if profile.mobile else 1,
                 locale="en-US",
-                reduced_motion="no-preference",
             )
             page = context.new_page()
             page_errors: list[str] = []

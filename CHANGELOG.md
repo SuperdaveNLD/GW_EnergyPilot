@@ -4,6 +4,275 @@ All notable changes to GW EnergyPilot are documented here.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-13
+
+### Changed
+
+- Promote v1.3.0-beta.11 to the stable production channel as v1.4.0.
+- Synchronize the manifest, complete frontend cache boundary, dashboard badge
+  and release documentation. Runtime behavior remains identical to beta.11.
+- Retain Hybrid 2.0/3.0 as explicit opt-in strategies with their documented
+  field-validation limits; existing settings and stored history are preserved.
+
+## [1.3.0-beta.11] - 2026-09-09
+
+### Added
+
+- Opt-in `hybrid_3` / Hybrid 3.0 excl. EV for independently scheduled Tibber
+  Grid Rewards charging. Self-use/discharge/charge use modes 1/3/2 without EV
+  and 5/5/2 with EV. Preserve grid-first self-use and planned mode-2 watts;
+  neutral battery plans also select self-use, with no mode-9/10 net-only path.
+- A six-scenario table in the permanent EN/NL dashboard control surface and
+  documented purpose, mode-specific watt semantics and field-validation limits.
+- Hybrid 3.0 measurement-age/skew diagnostics, fail-closed Hold and recovery
+  requiring two distinct fresh report pairs and at least 15 seconds. Use the
+  existing controller cadence/lock; no second feedback loop or charger writes.
+
+### Fixed
+
+- Hybrid 3.0 invalidates old acknowledgements before each write and obtains
+  bounded direct local EMS readback. Failed refreshes cannot verify stale
+  matching telemetry. Do not refresh the local-load timestamp with control data.
+- Keep native Hybrid 3.0 EV-stop Hold until a new successful optimization and
+  both fresh finite live plan publications; repeated idle events cannot release
+  the previous plan. Preserve valid plan resilience and manual ownership.
+- Surface readback/write failures before the EV-override history label, and
+  include Hybrid 3.0 hold reason and measurement ages in the full history table.
+- Correct stale Hybrid 2.0 settings/API documentation to its actual existing
+  grid-first mode-2 planned-assistance behavior; its control logic is unchanged.
+
+### Unchanged / validation
+
+- Existing selections, manual modes, stable channel, CUSTOM load forecast,
+  SOC/EMHASS settings and persistent identifiers/Store versions are unchanged.
+- Complete manifest/frontend cache boundary is 1.3.0-beta.11. Software tests
+  do not establish physical EV exclusion, PV behavior or Grid Rewards gains;
+  synchronized inverter field validation remains required.
+
+## [1.3.0-beta.10] - 2026-09-08
+
+### Changed
+
+- Hybrid 2.0 automatic charging selects mode 2 instead of mode 11, with and
+  without EV. Retain grid-first branching and the bounded `abs(P_batt)`
+  setpoint, now a PV-priority grid-assistance allowance rather than a fixed
+  battery-power target. Available PV can add to actual charging; inverter
+  and BMS limits remain authoritative.
+- Keep manual modes, Battery/Grid/Hybrid, EV self-use/Hold, freshness,
+  scheduling, CUSTOM load forecast, EMHASS config and persistent identities
+  unchanged. Update shared preview/history mapping, English/Dutch copy and
+  regression coverage. This does not fix the separately reported stale
+  read-back/EV-stop race or repeated self-use/Hold transitions.
+- Advance the manifest, beta badge and complete frontend module cache boundary
+  to 1.3.0-beta.10. Publish as an opt-in prerelease, never Latest.
+- Classify the live mode-2 target as grid assistance in English/Dutch, using
+  the requested command and strategy rather than delayed inverter read-back.
+  Preserve stable metric DOM while updating labels and watts across commands.
+
+## [1.3.0-beta.9] - 2026-09-06
+
+### Changed
+
+- Replace the opt-in Hybrid 2.0 mapping with the owner-requested grid-first
+  test model: Auto inside the grid deadband, including P_batt = 0; mode 11
+  for planned charging watts and mode 3 for discharging watts outside it;
+  neutral-battery net targets via 9/10. Explicit Pause remains mode 8.
+- EV house self-use now requests mode 5 at fresh local 35172 minus measured
+  EV power every 15 seconds. Do not subtract external PV twice. Explicit
+  discharge, unresolved net-only EV cases and unusable measurements Hold.
+  Preserve manual ownership, legacy strategies and EV-stop/plan safeguards.
+- Timestamp complete local Modbus telemetry for the 30-second load freshness
+  gate; control-only/cloud readback cannot make local load fresh.
+- Update English/Dutch operator copy and label the EV reference as inverter
+  AC output. Document the still-unverified PV and external-PV/EV assumptions.
+
+### Added
+
+- Read-only `mapping_preview` on the existing control-command sensor and
+  `scripts/preview_ems_mapping.py` for complete EMHASS CSV/TSV/pasted-table
+  replay, including all 96 quarter-hour rows. No additional controller,
+  charger writes, entity identities or persistent Store versions.
+- Regression coverage for grid-first boundaries, explicit Pause, planned
+  watts, EV/load freshness, local/cloud isolation and unchanged manual modes.
+
+## [1.3.0-beta.8] - 2026-09-06
+
+### Fixed
+
+- Follow planned battery watts in mode 11 during Hybrid 2.0 net-charge windows,
+  bounded by maximum control power; stop replacing the requested amplitude
+  with maximum mode-2 assistance.
+- Preserve house self-consumption during EV charging, including positive
+  P_batt with neutral grid. Self-use and PV-charge steps use mode 9 at measured
+  EV power, refreshed every 15 seconds by the existing controller. Pause and
+  explicit planned discharge remain mode 8 Hold.
+- Require a fresh measured EV reference with explicit units and report time;
+  stale, unavailable or out-of-range references select Hold. Missing/non-ready
+  or suspended plans during EV charging also select Hold. Preserve the active
+  session on missing activity data and apply Hold immediately on confirmed
+  native EV stop before waiting for a fresh plan.
+- Restore normal Hybrid mapping without EV outside net-charge windows. A
+  negative battery plan alone no longer authorizes maximum grid purchases.
+- Restore the common finite-grid gate for both Hybrid variants, preventing
+  beta.7's missing-grid charge dispatch and neutral/discharge conversion error.
+- Retain optimizer readiness, valid persistent-plan fallback, EV-stop freshness,
+  manual modes and existing Battery/Grid/Hybrid behavior. Update English/Dutch
+  explanations and prepare one complete beta.8 frontend cache boundary.
+
+- Distinguish house self-consumption from charging and Hold in the dashboard;
+  record the EV reference without mislabeling self-use as charge-only history.
+
+## [1.3.0-beta.7] - 2026-09-06
+
+### Fixed
+
+- Make the Hybrid 2.0 mode-2 charging branch depend on the explicit `P_batt`
+  charge plan alone. A neutral, exporting or unavailable `P_grid` no longer
+  incorrectly selects mode 1 or waits while the battery plan requests charge.
+- Cover the supplied EV-active field case (`P_batt = -1.33 kW`,
+  `P_grid = -29 W`) and retain mode 2 at configured maximum power with or
+  without EV activity.
+- Keep optimizer readiness, Battery Hold for neutral/discharge plans, normal
+  Hybrid mapping outside charge windows, manual ownership and EV-stop
+  freshness unchanged.
+
+## [1.3.0-beta.6] - 2026-09-06
+
+### Added
+
+- Opt-in Hybrid 2.0 Beta automatic strategy (`hybrid_2`): explicit battery
+  charging with planned grid import selects mode 2 at configured maximum
+  control power, with PV priority. Other steps retain Hybrid mapping.
+- Preserve this charging command during EV activity; continue holding neutral
+  and discharge plans, waiting for unavailable inputs and requiring a fresh
+  plan after EV stop.
+- English/Dutch selector and permanent control explanation, backed by the
+  existing command sensor's new `control_strategy` attribute. No entity or
+  storage migration; manual modes and other strategies retain their behavior.
+
+### Changed
+
+- Prepare beta.6 with one complete frontend cache boundary, mapping/runtime
+  regressions and native strategy selection in all three browser profiles.
+- Document mode-2 hardware observations, their telemetry limits, and actual
+  charging/SOC divergence from the optimizer forecast. Correct stale mode-9/10
+  and mode-11 feedback descriptions in the Modbus reference.
+
+## [1.3.0-beta.5] - 2026-09-06
+
+### Fixed
+
+- Preserve normal strategy mode/setpoint during EV charging for explicit battery
+  charge plans; remove the Grid/Hybrid mode-11 fallback.
+- Wait safely for missing/non-finite grid plans in the EV controller path.
+- Retain neutral/discharge Hold, EV-stop freshness, existing status labels and
+  persistent storage compatibility. No register semantics change.
+
+### Changed
+
+- Prepare beta.5 with a synchronized frontend version/cache boundary and
+  direction, strategy, missing-data and deadband regression coverage.
+
+## [1.3.0-beta.4] - 2026-09-05
+
+### Fixed
+
+- Display actual and expected solar production and their legend in all
+  Battery · Plan · Price sizes, including the default Medium and Compact.
+  Beta.3 incorrectly restricted them to Large and expanded views.
+- Include the solar data-source and unavailable-data notes in the normal
+  graph, using the existing Recorder actuals and official EMHASS forecast.
+- Give the expanded graph its own solid/dashed solar legend swatches because
+  it renders outside the dashboard ShadowRoot.
+
+### Changed
+
+- Advance the complete active frontend cache boundary to `1.3.0-beta.4`.
+- Extend desktop Chromium, iPad WebKit and iPhone WebKit regressions to verify
+  both solar curves and legend entries through S/M/L switches and expansion.
+
+## [1.3.0-beta.3] - 2026-09-05
+
+### Added
+
+- Show solid actual and dashed expected solar production in the Large and
+  expanded Battery · Plan · Price graph. Actuals use the existing combined-PV
+  Recorder statistics; the expected series uses only non-negative `P_PV` rows
+  from the validated official EMHASS plan and remains display-only.
+
+### Changed
+
+- Advance the complete active frontend module graph to cache boundary
+  `1.3.0-beta.3` so Home Assistant reloads the solar-chart presentation as one
+  coherent module graph.
+
+## [1.3.0-beta.2] - 2026-09-04
+
+### Added
+
+- Add `S`, `M` and `L` sizing to the Power overview card. Small uses one
+  dashboard column, Medium two columns and Large the complete row; narrow
+  mobile layouts safely collapse all three to one column.
+- Show a display-only EV charger branch in Power overview when an EV charger
+  source is configured. The branch reports configured charger power when
+  available and remains separate from household-load accounting and control.
+
+### Fixed
+
+- Base compact Power overview geometry on the measured card width, keeping the
+  house, grid, battery, PV and optional charger nodes aligned when the card is
+  placed in a narrow dashboard column.
+- Preserve direct EV-power display updates while Automatic Control is off,
+  without adding a charger-control loop.
+- Combine the compact control-card overflow geometry with its established
+  stacking context so disclosures remain visible above neighboring cards.
+- Reduce the non-interactive `AUTO ACTIVE` status badge without shrinking any
+  operational control or touch target.
+
+### Changed
+
+- Advance the complete active frontend module graph to cache boundary
+  `1.3.0-beta.2` so Home Assistant cannot mix beta.1 presentation modules with
+  the updated flow layout.
+
+## [1.3.0-beta.1] - 2026-09-04
+
+### Added
+
+- Add a localized **?** help link to the permanent dashboard header. Dutch
+  Home Assistant sessions open the Dutch manual; other sessions open the
+  English user guide in a new tab.
+- Add task-oriented English and Dutch user guides covering safe first setup,
+  dashboard use, automatic strategies, battery profiles, planning, EV features
+  and troubleshooting.
+
+### Fixed
+
+- Remove the duplicate minimum/maximum SOC sliders from the EMHASS overview;
+  Battery Strategy → Custom remains their single dashboard editor.
+- Make the overview Profit/Cost/Self-consumption buttons reflect the confirmed
+  stateful EMHASS `costfun`, including changes made outside the dashboard.
+- Advance the complete active frontend module graph to cache boundary
+  `1.3.0-beta.1` so browsers cannot retain the earlier overview behavior.
+
+### Changed
+
+- Replace the oversized full-width EnergyPilot control area with one fixed,
+  single-column dashboard card directly after the four live power cards. Quick
+  actions use a 2 × 2 grid; EMHASS and Battery Strategy use compact native
+  disclosures; Optimize remains immediately available; and manual EMS stays
+  collapsed while Automatic Control is active (#125).
+- Preserve every permanent Lit control node through telemetry and genuine
+  structural renders while moving its containing dashboard card. Existing
+  browser-local card orders gain the new fixed card after Grid without
+  resetting the user's remaining order or visibility preferences.
+- Re-enable the dashboard's **Flow animations** preference for active energy
+  connectors. The scoped compositor animation leaves the permanent control
+  surface, stable telemetry DOM and native touch path untouched.
+- Keep general animations, CSS transitions and modal backdrop filters frozen;
+  switching Flow animations off or requesting reduced motion produces zero
+  active dashboard animations.
+
 ## [1.2.1] - 2026-09-06
 
 ### Fixed
@@ -20,6 +289,7 @@ All notable changes to GW EnergyPilot are documented here.
 - Advance the complete active frontend module graph to cache boundary
   `1.2.1-stable1` without changing GoodWe, EMS, EMHASS, entity or persistent
   storage semantics.
+
 
 ## [1.2.0] - 2026-09-03
 

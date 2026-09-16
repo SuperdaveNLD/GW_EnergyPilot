@@ -118,6 +118,8 @@ class FakeState:
     def __init__(self, state, **attributes):
         self.state = state
         self.attributes = attributes
+        self.last_reported = datetime.now(timezone.utc)
+        self.last_updated = self.last_reported
 
 
 class FakeStates:
@@ -130,7 +132,8 @@ class FakeStates:
         return self._values.get(entity_id)
 
     def set(self, entity_id, value):
-        self._values[entity_id] = FakeState(value)
+        previous = self._values.get(entity_id)
+        self._values[entity_id] = FakeState(value, **(previous.attributes if previous else {}))
 
 
 class FakeHass:

@@ -8,7 +8,7 @@ Inspect the current repository before changing behavior. Do not reconstruct acti
 
 For AI-assisted work, read `AGENTS.md` and `docs/ARCHITECTURE.md` first.
 
-## Current v1.2.1 runtime structure
+## Current v1.4.0 runtime structure
 
 ```text
 custom_components/gw_energypilot/
@@ -17,7 +17,7 @@ custom_components/gw_energypilot/
 Core modules:
 
 ```text
-__init__.py             config-entry setup, APIs, v1.2.1 panel and v0.44 orchestrator entrypoints
+__init__.py             config-entry setup, APIs, v1.4.0 panel and v0.44 orchestrator entrypoints
 registers.py            canonical GoodWe register definitions/read blocks
 client.py               asynchronous Modbus TCP I/O + verified hardware writes
 sems_api.py             asynchronous SEMS+/legacy auth, selection, renewal and polling
@@ -25,9 +25,9 @@ sems_model.py           pure cloud identity/freshness/telemetry normalization
 coordinator.py          selected telemetry snapshot + independent local control read-back
 connectivity_model.py   pure charger reachability debounce/state machine
 connectivity.py         coordinator/entity-backed status, five-minute timer and transition logging
-controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid strategy
+controller.py           canonical automatic/manual EMS ownership + Battery/Grid/Hybrid/Hybrid 2.0 strategy
 controller_v033.py      live-first persistent-plan fallback + v0.34 EV anti-discharge strategy override
-control_decision.py     pure shared Battery/Grid/Hybrid/EV command mapping
+control_decision.py     pure shared Battery/Grid/Hybrid/Hybrid 2.0/EV command mapping
 ev_detection.py         exclusive power/status EV activity interpretation + legacy compatibility
 control_history.py      persistent latest successful EMS-setpoint update evidence
 execution_history.py    bounded plan/decision/write/read-back evidence Store
@@ -160,8 +160,10 @@ post-refresh read-back but can never own or retry a command.
 Top level:
 
 ```text
-gw-energy-pilot-v110.js
-    -> gw-energy-pilot-v101.js
+gw-energy-pilot-v131.js
+    -> gw-energy-pilot-v130.js
+         -> gw-energy-pilot-v110.js
+         -> gw-energy-pilot-v101.js
          -> gw-energy-pilot-v051.js
          -> gw-energy-pilot-v051-history.js
          -> gw-energy-pilot-v050.js
@@ -180,8 +182,9 @@ gw-energy-pilot-v110.js
                                                                           -> gw-energy-pilot-v038-runtime.js
 ```
 
-v1.2.1 uses the final presentation-only stable wrapper and advances one
-complete `1.2.1-stable1` active-graph cache boundary. The bounded
+v1.4.0 uses the existing presentation-only wrapper with stable release copy
+and advances one complete `1.4.0` active-graph cache boundary. It promotes the
+v1.3.0-beta.11 runtime without control changes. The bounded
 v1.0.1-beta.4 wrapper remains in the chain so all beta-4 behavior stays present.
 The local-only Beta tests component additionally buffers pointer/click evidence
 until after the synthesis window and compares five guarded activation methods;
@@ -204,7 +207,11 @@ strategy/settings typography and field-tuned profile presentation; v0.46
 retains external-PV presentation, v0.44 owns the bounded Optimize
 listener/floating action, v0.43 touch-hover presentation, v0.42 the EMHASS
 settings overview, and v0.41 ordinary telemetry patching, targeted plan
-refresh, PV presentation and live-flow DOM/CSS. The v0.41 PV flow keeps one
+refresh, PV presentation and stable-flow DOM/CSS. The only permitted motion is
+the existing browser-local Flow animations preference: active connector
+particles use the v0.38 physical direction mapping, while the off state and
+`prefers-reduced-motion: reduce` produce zero animations. All non-flow
+animations, transitions and modal backdrop filters remain disabled. The v0.41 PV flow keeps one
 combined group total while patching one internal ETA/DC node and one aggregated
 external AC/PCC node; it remains independent of control and EMHASS inputs.
 
@@ -217,6 +224,15 @@ v0.38 delegated-strategy, v0.44 Optimize and base Automatic Control listeners
 must remain bypassed while `__epControlSurfaceArchitecture` is active.
 Historical modules may style compatible class names but must neither recreate
 nor mutate descendants of `ep-control-surface`.
+
+The surface host is a fixed, non-hideable one-column card in the v0.08 layout,
+canonically placed after the four live power cards. Its default presentation is
+the 2 × 2 quick-action grid, compact EMHASS and Battery Strategy disclosures,
+the always-visible Optimize action and a collapsed manual EMS disclosure.
+Stored v0.08 card orders are merged in place to add this card after Grid; never
+reset the user's other order or visibility choices. Structural commits retain
+the existing grid container with the surface so every Lit control node remains
+connected while the replaceable cards are rebuilt around it.
 
 v0.41 additionally mounts `ep-beta-tests.js` as a local-only diagnostic page
 behind the dashboard layout menu. This component must remain isolated from the
@@ -246,7 +262,7 @@ Run both frontend browser gates after a rendering, interaction or CSS change:
 
 ```text
 /private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_control_surface.py
-/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_stability_v110.py
+/private/tmp/gw-energy-pilot-browser-venv/bin/python tests/browser/test_frontend_stability_v131.py
 ```
 
 The first is the authoritative gate for 50 activations of every rendered
@@ -284,9 +300,41 @@ else P_grid < -GoodWe Auto deadband -> mode 10 using abs(P_grid)
 
 The Hybrid neutral-battery branch is evaluated first so ordinary forecast house import/export does not become an active PCC target while EMHASS asked the battery to remain idle. Every non-neutral plan is PCC-controlled: mode 1 owns `P_grid` inside the separate GoodWe Auto deadband, while modes 9/10 own import/export targets outside it. Both variable boundaries are inclusive and classify the branch only; never subtract either threshold from the transmitted setpoint.
 
+### Hybrid 3.0 excl. EV
+
+The separate `hybrid_3` strategy implements the six-scenario mapping in
+`preview_hybrid3_mapping`: normal modes 1/3/2 become 5/5/2 with EV. Its pure
+recovery state lives in `hybrid3_reference.py`; the existing v0.33 controller
+retains all actuator, polling and ownership responsibilities. Test stale/skewed
+EV/load data, two-pair recovery, delayed/failed targeted readback, acknowledgement
+invalidation and EV-stop fresh optimization/publication. No Store migration,
+new entity, register, optimizer objective or charger write is introduced.
+See [Hybrid 3.0 policy](HYBRID_3.md); physical EV/PV behavior remains a test gate.
+
+### Hybrid 2.0 Beta
+
+The opt-in `hybrid_2` test strategy checks the grid deadband first: inside it,
+mode **1**, including `P_batt = 0`. Outside it, charging uses **2** at bounded
+`abs(P_batt)` as PV-priority grid assistance. PV can add to actual battery
+charging; the existing watt calculation is retained, not maximum dispatch.
+Published beta.9 used mode 11 for this branch. Discharging uses **3** at
+planned battery watts, and neutral
+battery plans use net targets **9/10**. Explicit manual Pause remains **8**.
+With EV active, self-use uses **5** at fresh local 35172 minus measured EV
+power, updated every 15 seconds. Explicit planned discharge and unsupported
+net-only EV cases use Hold. Missing/stale load or EV measurements also hold.
+This assumes an unverified 35172/external-PV boundary; PV priority at the
+inverter limit and mode-5 surplus behavior still need field testing. Other
+strategies and manual modes retain their behavior. The existing command sensor
+exposes a read-only `mapping_preview`; it does not control the actuator.
+See [Hybrid 2.0 behavior and hardware evidence](HYBRID_2.md).
+
+
 ### EV anti-discharge override
 
-While the configured EV source is actively charging, `P_batt` remains the directional safety guard:
+For Battery, Grid and original Hybrid, `P_batt` remains the directional safety
+guard while the configured EV source is actively charging. Hybrid 2.0 uses
+the house-self-consumption exception above:
 
 ```text
 P_batt >= -Battery Hold deadband -> mode 8 Battery Hold
@@ -297,8 +345,10 @@ For an explicit home-battery charge request:
 
 ```text
 Battery -> mode 11 using abs(P_batt)
-Grid    -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
-Hybrid  -> mode 9 when P_grid > GoodWe Auto deadband, otherwise mode 11 fallback
+Grid    -> normal strategy mode/setpoint; wait if required P_grid is unavailable
+Hybrid  -> normal strategy mode/setpoint; wait if required P_grid is unavailable
+Hybrid 2.0 -> grid-first; EV self-use via mode 5 at load minus EV; directed charge via 2; explicit EV discharge via 8
+Hybrid 3.0 -> grid-first + neutral battery self-use; EV self-use/discharge via mode 5; directed charge via 2 unchanged
 ```
 
 `ev_detection.py` is the single interpretation owner. Explicit power mode
@@ -701,3 +751,11 @@ Publishing is tag-only. Use `v1.x.x-beta.N` for a prerelease from the exact
 remote `beta` head and `v1.x.x` for stable from the exact remote `main` head.
 Never reuse or move a published tag. The workflow marks beta as prerelease and
 not Latest; stable is a normal/latest release. See `docs/RELEASE_WORKFLOW.md`.
+
+## Beta.5 EV direction regression
+
+The canonical `control_decision.py` EV charge path delegates to its normal
+strategy mapping; it must preserve mode/setpoint and missing-input waits.
+`controller_v033.py` checks readiness before applying that decision. Regression
+tests cover all strategies, PV export, deadband boundaries and unavailable grid
+plans. Existing EV-stop, ownership and persistent-plan tests remain mandatory.
